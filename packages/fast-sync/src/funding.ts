@@ -12,7 +12,8 @@
 // Lifted from examples/hello-world's test suite, which was the only place in
 // the repo that did this, and generalized with `registerDust` for Dave.
 
-import { waitForFunds, type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
+import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
+import { unshieldedToken } from '@midnight-ntwrk/midnight-js-protocol/ledger';
 import type { FacadeState, UnshieldedKeystore, WalletFacade } from '@midnight-ntwrk/wallet-sdk';
 import * as Rx from 'rxjs';
 import type { Logger } from 'pino';
@@ -71,6 +72,9 @@ export interface FundingGateOptions {
  * Returns immediately once the wallet already has what it needs, so this is
  * cheap on every run after the first — the funding prompt only appears when
  * the wallet genuinely has no NIGHT.
+ *
+ * `envConfig` is unused since registration moved off testkit's waitForFunds;
+ * it stays in the signature so the example suites' call sites don't change.
  */
 export async function waitForNightThenDust(
   logger: Logger,
@@ -124,7 +128,47 @@ export async function waitForNightThenDust(
   }
 
   logger.info(`${label}: NIGHT present; registering NIGHT->DUST generation...`);
-  await waitForFunds(wallet, envConfig, false, keystore);
+  await registerNightForDust(logger, wallet, keystore);
   await waitForDust(logger, wallet, 1, FUND_TIMEOUT_MS);
   logger.info(`${label}: funded and ready.`);
+}
+
+// Register every not-yet-registered NIGHT UTXO for DUST generation, unless the
+// wallet already holds DUST. This is what testkit's waitForFunds does, minus
+// its strict syncWallet check (90 s, not configurable). That check needs the
+// unshielded wallet's applied id to equal the indexer's latest
+// UnshieldedTransactionsProgress.highestTransactionId. A new transaction moves
+// the applied id at once, but the highest id only moves on the indexer's next
+// progress poll. Current indexers (Blockfrost's among them) back that poll off
+// to ~4 min on an idle subscription, so right after the faucet transfer the
+// check times out even though the NIGHT is spendable. waitForDust below is the
+// real readiness gate.
+async function registerNightForDust(
+  logger: Logger,
+  wallet: WalletFacade,
+  keystore: UnshieldedKeystore,
+): Promise<void> {
+  const state = await Rx.firstValueFrom(wallet.state());
+  if (state.dust.balance(new Date()) > 0n) {
+    logger.info('Wallet already holds DUST; skipping registration.');
+    return;
+  }
+  const night = unshieldedToken().raw;
+  const unregistered = state.unshielded.availableCoins.filter(
+    (coin) => coin.utxo.type === night && !coin.meta.registeredForDustGeneration,
+  );
+  if (unregistered.length === 0) {
+    // Already registered (e.g. by an earlier run that died before DUST
+    // accrued); waitForDust picks it up from here.
+    logger.info('No unregistered NIGHT UTXOs; waiting for DUST from the existing registration.');
+    return;
+  }
+  logger.info(`Registering ${unregistered.length} NIGHT UTXO(s) for DUST generation...`);
+  const recipe = await wallet.registerNightUtxosForDustGeneration(
+    unregistered,
+    keystore.getPublicKey(),
+    (payload) => keystore.signData(payload),
+  );
+  const txId = await wallet.submitTransaction(await wallet.finalizeRecipe(recipe));
+  logger.info(`DUST registration tx submitted: ${txId}`);
 }
