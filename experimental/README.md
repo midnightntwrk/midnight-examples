@@ -1,0 +1,21 @@
+- /examples for regression tests
+- how do we test features that are not in Compact?
+- the yarn new:example is good for Dapp generation, but what about other features?
+- How do we test babe? Can we orchestrate a Docker network that runs a collection of nodes and migrate from Aura to Babe
+- fast sync fixed in ledger 9? How do we test this?
+- input: source of truth for Q3 SOW
+- Input: MIPs and MPS Acceptance criteria
+- V2: of this may include PR/branch tracking with github labels mapped to "Q4 SOW"
+- Input: SOW/MIPs/Clickup (?)
+- Could we use Notion (or Google Drive) as a "shared context space" and "agent to agent handover". This won't scale, it will need to be a RAG MCP to scale
+- Output: Which features need to be tested by which partners
+- Output: servicedesk area for Q3 SOW support
+- NOTE: We are going to get the architecture wrong. Be prepared for iterating on this design!
+- 
+
+Action:
+- Gather inputs
+- Agentic orchestration
+- Clearly define and map the outputs
+- Goal: leave only the middle in question
+- Middle: Start with the lowest hanging fruit
