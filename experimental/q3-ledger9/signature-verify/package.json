@@ -1,0 +1,23 @@
+{
+  "name": "@q3/signature-verify",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "compile": "node scripts/compile.mjs",
+    "test:sim": "vitest run --project sim",
+    "test:local": "vitest run --project e2e"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/compact-js": "3.0.0-rc.3",
+    "@midnight-ntwrk/compact-runtime": "0.20.0",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
+    "@q3/harness": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.8.0",
+    "vitest": "^4.1.0"
+  }
+}
