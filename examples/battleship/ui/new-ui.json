@@ -1,4 +1,7 @@
 {
   "contract": "battleship",
-  "privateState": "persistent"
+  "privateState": "persistent",
+  "networks": [
+    "mainnet"
+  ]
 }
