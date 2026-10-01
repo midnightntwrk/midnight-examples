@@ -15,9 +15,10 @@ const WALLET_KEY = "hello-world-ui:wallet";
 
 /**
  * Network ids a Midnight wallet recognizes. `undeployed` is the local devnet
- * from examples/hello-world/compose.yml.
+ * from examples/hello-world/compose.yml. `mainnet` is listed only when the UI opts
+ * in with `"networks": ["mainnet"]` in ui/new-ui.json (it spends real DUST).
  */
-export const NETWORK_IDS = ["undeployed", "preview", "preprod"] as const;
+export const NETWORK_IDS = ["undeployed", "preview", "preprod", "mainnet"] as const;
 export type NetworkId = (typeof NETWORK_IDS)[number];
 
 export type WalletConnectionStatus =

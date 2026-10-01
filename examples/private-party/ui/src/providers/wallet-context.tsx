@@ -15,7 +15,8 @@ const WALLET_KEY = "private-party-ui:wallet";
 
 /**
  * Network ids a Midnight wallet recognizes. `undeployed` is the local devnet
- * from examples/private-party/compose.yml.
+ * from examples/private-party/compose.yml. `mainnet` is listed only when the UI opts
+ * in with `"networks": ["mainnet"]` in ui/new-ui.json (it spends real DUST).
  */
 export const NETWORK_IDS = ["undeployed", "preview", "preprod"] as const;
 export type NetworkId = (typeof NETWORK_IDS)[number];

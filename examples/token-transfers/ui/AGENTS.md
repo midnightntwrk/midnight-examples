@@ -425,7 +425,10 @@ suites' DUST. Don't copy it into an example; extend the shared one.
   entry picked the wrong wallet on a real machine.
 - **Network id:** `connect(networkId)` must match the network the wallet is set
   to. Let the user pick it before connecting; everything else comes from
-  `getConfiguration()`.
+  `getConfiguration()`. The picker offers `undeployed`, `preview` and
+  `preprod`; `mainnet` is opt-in per UI with `"networks": ["mainnet"]` in
+  `ui/new-ui.json`, then `yarn new:ui <name> --sync`. Opt in only for a UI
+  that has been run on mainnet: every deploy and call there spends real DUST.
 - **Error shapes:** connector errors are plain objects
   (`type === "DAppConnectorAPIError"`; use no `instanceof`). Wallet fee
   failures are Effect `FiberFailure`s with an empty `message`; the reason is in

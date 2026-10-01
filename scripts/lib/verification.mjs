@@ -40,6 +40,7 @@ export const STEPS = [
   { key: 'laceDeploy', title: 'Lace deploy (step 7)' },
   { key: 'laceCalls', title: 'Lace circuit calls (step 7)' },
   { key: 'preprod', title: 'preprod' },
+  { key: 'mainnet', title: 'mainnet' },
 ];
 const STATUS_MARK = { verified: '✅', partial: '◐', 'not-run': '—' };
 export const VERIFICATION_FILE = 'verification.json';

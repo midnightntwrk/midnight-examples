@@ -113,6 +113,7 @@ const KNOWN_TOKENS = [
   '__CIRCUIT_CALLS__',
   '__DEPLOYMENT_OPS__',
   '__TEST_BODY__',
+  '__NETWORK_IDS__',
 ];
 
 function usage() {
@@ -265,6 +266,20 @@ if (savedConfig && mode !== 'create') {
   }
   contractFlag = savedConfig.contract;
   privateStateFlag = savedConfig.privateState;
+}
+
+// Networks every UI's picker offers, plus the ones a UI opts into through
+// `"networks"` in its new-ui.json. Mainnet is opt-in per example: it spends
+// real DUST, so only a UI that has been run there should offer it.
+const BASE_NETWORKS = ['undeployed', 'preview', 'preprod'];
+const OPT_IN_NETWORKS = ['mainnet'];
+const extraNetworks = savedConfig?.networks ?? [];
+if (
+  !Array.isArray(extraNetworks) ||
+  extraNetworks.some((n) => !OPT_IN_NETWORKS.includes(n)) ||
+  new Set(extraNetworks).size !== extraNetworks.length
+) {
+  fail(`ui/${CONFIG} "networks" must be a list of distinct ids from: ${OPT_IN_NETWORKS.join(', ')}`);
 }
 
 const managedRoot = path.join(exampleDir, 'contract', 'managed');
@@ -484,7 +499,11 @@ const psAuto = !factoryTakesArgs;
 // A factory with parameters builds per-user private state (secret keys,
 // hidden values): losing it on reload usually locks the user out.
 const privateState = privateStateFlag ?? (factoryTakesArgs ? 'persistent' : 'memory');
-const configContent = `${JSON.stringify({ contract: managed, privateState }, null, 2)}\n`;
+const configContent = `${JSON.stringify(
+  { contract: managed, privateState, ...(extraNetworks.length ? { networks: extraNetworks } : {}) },
+  null,
+  2,
+)}\n`;
 
 const names = deriveNames(name);
 const { Name } = names;
@@ -613,6 +632,7 @@ const needs = [hasCtorArgs && 'constructor args', !psAuto && 'an initial private
   .join(' and ');
 
 const blocks = {
+  __NETWORK_IDS__: [...BASE_NETWORKS, ...extraNetworks].map((n) => JSON.stringify(n)).join(', '),
   __CIRCUIT_UNION__: circuits.length ? circuits.map((c) => JSON.stringify(c.name)).join(' | ') : 'never',
   __WITNESS_METHOD__: hasWitnesses ? 'withWitnesses(witnesses)' : 'withVacantWitnesses',
   __WITNESS_METHOD_DOC__: hasWitnesses
