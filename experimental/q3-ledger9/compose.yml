@@ -1,0 +1,75 @@
+# Local ledger 9 network for the Q3 acceptance tests.
+#
+# Images are the record's "Component versions" pins (2026-q3-deliverables.md):
+# node 2.1.0-rc.3, indexer 4.4.0-rc.6-068403cd, proof server 9.0.0-rc.8. The
+# node and proof-server digests were checked against the record on 2026-09-30.
+#
+# Host ports are offset by 10000 from the mn-examples defaults (9944/8088/6300)
+# so a ledger 8 example network can run alongside. Container ports are unchanged.
+# Env and command lines follow compact-end-2-end's infra/docker-compose.yml,
+# which runs the vendor QA on these same images.
+services:
+  node:
+    image: 'midnightntwrk/midnight-node:2.1.0-rc.3'
+    ports:
+      - '127.0.0.1:19944:9944'
+    environment:
+      # The `dev` preset loads the `undeployed` chainspec, which gifts NIGHT,
+      # shielded tokens and DUST to the genesis seeds 00..01 to 00..04.
+      CFG_PRESET: 'dev'
+      SIDECHAIN_BLOCK_BENEFICIARY: '04bcf7ad3be7a5c790460be82a713af570f22e0f801f6659ab8e84a52be6969e'
+      RUST_LOG: 'info'
+    # Healthy only once block 1 exists: indexer 4.4.0-rc.6's SPO indexer exits
+    # with "block number 1 not found" if started against block 0.
+    # (compact-end-2-end's infra/stack.ts waits for block 1 the same way.)
+    healthcheck:
+      test:
+        - 'CMD-SHELL'
+        - >-
+          curl -sf -H 'Content-Type: application/json'
+          -d '{"id":1,"jsonrpc":"2.0","method":"chain_getHeader","params":[]}'
+          http://localhost:9944 | grep -q '"number":"0x[1-9a-f]'
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  indexer:
+    # Note the org: ghcr.io/midnightntwrk (no hyphen), where the package is
+    # PUBLIC. The record's "Indexer images" block and compact-end-2-end's
+    # infra/pins.ts write ghcr.io/midnight-ntwrk/..., which does not exist on
+    # ghcr (pulls fail 401 anonymously, 403 when logged in). Digest matches the
+    # record: sha256:5c717d83...2d64458.
+    image: 'ghcr.io/midnightntwrk/indexer-standalone:4.4.0-rc.6-068403cd'
+    restart: on-failure
+    ports:
+      - '127.0.0.1:18088:8088'
+    environment:
+      APP__INFRA__NODE__URL: 'ws://node:9944'
+      APP__INFRA__SPO_NODE__URL: 'ws://node:9944'
+      APP__INFRA__SPO_NODE__BLOCKFROST_ID: 'dummy-not-using-spo'
+      APP__INFRA__SECRET: '303132333435363738393031323334353637383930313233343536373839303132'
+      APP__APPLICATION__NETWORK_ID: 'undeployed'
+    healthcheck:
+      test: ['CMD-SHELL', 'cat /var/run/indexer-standalone/running']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    depends_on:
+      node:
+        condition: service_healthy
+
+  proof-server:
+    image: 'midnightntwrk/proof-server:9.0.0-rc.8'
+    command: ['midnight-proof-server', '-v']
+    ports:
+      - '127.0.0.1:16300:6300'
+    environment:
+      RUST_BACKTRACE: 'full'
+    healthcheck:
+      test: ['CMD-SHELL', 'echo > /dev/tcp/127.0.0.1/6300']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 10s

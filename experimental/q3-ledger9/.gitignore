@@ -1,0 +1,5 @@
+node_modules/
+**/contract/managed/
+midnight-level-db/
+logs/
+reports/*.vitest.json
