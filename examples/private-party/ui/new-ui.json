@@ -1,4 +1,7 @@
 {
   "contract": "private-party",
-  "privateState": "persistent"
+  "privateState": "persistent",
+  "networks": [
+    "mainnet"
+  ]
 }

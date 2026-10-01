@@ -85,6 +85,24 @@ On the local devnet, give **each** browser wallet DUST with
 `yarn fund:wallet <mn_dust_…> [mn_addr_…]`, from anywhere in the repo. The UI shows the
 exact command when the connected wallet has none.
 
+### Mainnet
+
+This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
+`mainnet` is in the network picker. Before you use it:
+
+- **It costs real DUST.** Deploy and every circuit call pay fees in DUST, which
+  is generated from NIGHT the wallet holds. There is no faucet.
+- **Everything is public and permanent.** The contract and its public ledger
+  stay on mainnet.
+- **Prove with the wallet** if it supports `getProvingProvider`, or with a
+  proof server you run yourself (`yarn proof:up` in `examples/hello-world`).
+- **Use your own wallet.** Never use the repo's fast-sync or seeded test wallets
+  (`.env.<network>`, `yarn wallets:new`) on mainnet.
+- **One identity per browser profile.** Your secret key and ships live in
+  this profile's passphrase-encrypted private state. Lose the passphrase or
+  clear site data and you lose your seat. The contract refuses to let one key
+  play itself, so player two needs a second browser profile.
+
 ## Scripts
 
 | Script | What it does |

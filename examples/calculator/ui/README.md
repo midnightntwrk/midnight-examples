@@ -35,6 +35,20 @@ On the local devnet, give your browser wallet DUST (and NIGHT) with
 `yarn fund:wallet <mn_dust_…> [mn_addr_…]`, run from anywhere in the repo. The
 page prints the exact command when the connected wallet has no DUST.
 
+### Mainnet
+
+This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
+`mainnet` is in the network picker. Before you use it:
+
+- **It costs real DUST.** Deploy and every circuit call pay fees in DUST, which
+  is generated from NIGHT the wallet holds. There is no faucet.
+- **Everything is public and permanent.** The contract and its public ledger
+  stay on mainnet.
+- **Prove with the wallet** if it supports `getProvingProvider`, or with a
+  proof server you run yourself (`yarn proof:up` in `examples/hello-world`).
+- **Use your own wallet.** Never use the repo's fast-sync or seeded test wallets
+  (`.env.<network>`, `yarn wallets:new`) on mainnet.
+
 ## Scripts
 
 | Script | What it does |
