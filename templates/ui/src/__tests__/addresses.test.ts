@@ -29,6 +29,13 @@ describe("userAddressFromBech32", () => {
     expect(() => userAddressFromBech32(bech32("preprod"), "undeployed")).toThrow();
   });
 
+  it("decodes a mainnet address, which has no network segment", () => {
+    const addr = bech32("mainnet");
+    expect(addr.startsWith("mn_addr1")).toBe(true);
+    expect(userAddressFromBech32(addr, "mainnet")).toEqual({ bytes: RAW });
+    expect(() => userAddressFromBech32(addr, "preprod")).toThrow();
+  });
+
   it("reads the connected wallet's own address", async () => {
     const api = { getUnshieldedAddress: async () => ({ unshieldedAddress: bech32("preview") }) };
     await expect(walletUserAddress(api as unknown as ConnectedAPI, "preview")).resolves.toEqual({ bytes: RAW });
@@ -43,6 +50,12 @@ describe("coinPublicKeyFromBech32", () => {
     const key = cpk("undeployed");
     expect(key.startsWith("mn_shield-cpk_undeployed1")).toBe(true);
     expect(coinPublicKeyFromBech32(key, "undeployed")).toEqual({ bytes: RAW });
+  });
+
+  it("decodes a mainnet key, which has no network segment", () => {
+    const key = cpk("mainnet");
+    expect(key.startsWith("mn_shield-cpk1")).toBe(true);
+    expect(coinPublicKeyFromBech32(key, "mainnet")).toEqual({ bytes: RAW });
   });
 
   it("gives the same bytes as the Node harness's encodeCoinPublicKey(hex)", () => {

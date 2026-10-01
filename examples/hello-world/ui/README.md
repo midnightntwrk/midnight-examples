@@ -46,8 +46,8 @@ scripts, so `dev` and `build` call `copy:zk` explicitly.
 
 Then, in the page:
 
-1. Choose the network your wallet is set to (`undeployed`, `preview` or
-   `preprod`) and click **Connect Wallet**. The requested network has to match
+1. Choose the network your wallet is set to (`undeployed`, `preview`,
+   `preprod` or `mainnet`) and click **Connect Wallet**. The requested network has to match
    the wallet's.
 2. **Deploy new contract**, or paste an address and **Join**. The address is
    remembered per network, so a reload re-joins automatically.
@@ -85,6 +85,27 @@ so there's nothing to configure in the app itself.
 
 Set the wallet to that network, get tNIGHT from the faucet, and let it generate
 DUST. Pick the same network in the header.
+
+### Mainnet
+
+This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
+`mainnet` is in the network picker. Before you use it:
+
+- **It costs real DUST.** Deploy and every `storeMessage` pay fees in DUST. DUST
+  is generated from NIGHT the wallet holds, and there is no faucet.
+- **Everything is public and permanent.** The contract and every message you
+  store stay on mainnet's ledger. Don't store anything you wouldn't publish.
+- **Prove with the wallet** (the default), or with a proof server you run
+  yourself. Never use a hosted proof server you don't control.
+- **Use your own Lace wallet.** Never use the repo's fast-sync or seeded test
+  wallets (`.env.<network>`, `yarn wallets:new`) on mainnet.
+- **Versions must match.** This UI is built against the repo's pinned
+  toolchain (see the version matrix in the root `README.md`). If mainnet runs a
+  different ledger or protocol version, transactions fail at proving or
+  submission. That is fixed with a repo-wide version pass, not here.
+
+Set Lace to Mainnet, pick `mainnet` in the header, connect, deploy, then store a
+message. Record what you ran under `mainnet` in `verification.json`.
 
 ## Proving: wallet vs local proof server
 

@@ -15,7 +15,8 @@ const WALLET_KEY = "battleship-ui:wallet";
 
 /**
  * Network ids a Midnight wallet recognizes. `undeployed` is the local devnet
- * from examples/battleship/compose.yml.
+ * from examples/battleship/compose.yml. `mainnet` is listed only when the UI opts
+ * in with `"networks": ["mainnet"]` in ui/new-ui.json (it spends real DUST).
  */
 export const NETWORK_IDS = ["undeployed", "preview", "preprod"] as const;
 export type NetworkId = (typeof NETWORK_IDS)[number];

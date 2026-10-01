@@ -161,7 +161,13 @@ function NoDustWarning({ cap, networkId }: { cap: bigint; networkId: string | nu
           </code>
         </>
       )}
-      {cap === 0n && networkId !== "undeployed" && (
+      {cap === 0n && networkId === "mainnet" && (
+        <p className="text-muted-foreground">
+          Hold NIGHT in this wallet and designate its DUST generation to this wallet. There is
+          no faucet on mainnet.
+        </p>
+      )}
+      {cap === 0n && networkId !== "undeployed" && networkId !== "mainnet" && (
         <p className="text-muted-foreground">
           Get tNIGHT from the faucet and have it generate DUST for this wallet.
         </p>
