@@ -17,7 +17,9 @@
       "status": "not-run"
     },
     "mainnet": {
-      "status": "not-run"
+      "status": "verified",
+      "date": "2026-10-01",
+      "notes": "Mainnet (node 1.0.400-c338b9ac, runtime specVersion 1000300) with the 1AM wallet and the local proof server (8.1.0), not wallet proving. Deployed contract d1f28aef939f32242fbaaa8fa2fd977c776abdd8388192bd1fc441e2c8433053 (tx 38b72a747513502822f25126a393716e3a4e7c2224e17ef977ac538e271c96e6, block 2827489), then storeMessage \"Hello World!\" (tx 2414f646e90ba2bad1cf9a9b535b1eb831970e8ea34e85ad66d4f299c70d8747, block 2827504). Both txs were read back from the mainnet indexer, and the compiled contract's ledger() decodes the on-chain state as message = \"Hello World!\". Only storeMessage reached the proof server; the deploy needed no proof from it. Lace and wallet-delegated proving were not run on mainnet."
     }
   }
 }
