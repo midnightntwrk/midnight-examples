@@ -22,9 +22,9 @@ get run; delete it once every item is ticked.
 |---|---|---|---|---|---|
 | battleship | ✅ 1 | — | — | — | — |
 | calculator | ✅ 2 | — | — | — | — |
-| hello-world | ✅ 3 | ◐ 4 | — | — | — |
-| private-party | ✅ 5 | — | — | — | — |
-| token-transfers | ✅ 6 | — | — | — | — |
+| hello-world | ✅ 3 | ◐ 4 | — | — | ✅ 5 |
+| private-party | ✅ 6 | — | — | — | — |
+| token-transfers | ✅ 7 | — | — | — | — |
 
 ✅ verified · ◐ partly verified (see its note) · — not run
 
@@ -32,8 +32,9 @@ get run; delete it once every item is ticked.
 2. 2026-09-24: `divide` ran in the page, calling the `divMod` witness. That covers the witness wiring only.
 3. 2026-09-24: The page loaded, the WASM ledger and a circuit ran in it, and ZK assets were served as binaries.
 4. 2026-09-24: A deploy tx was built and proven by the local proof server, and `yarn fund:wallet` got DUST to the Lace wallet. This predates the move of deploy/join/forget into `hooks/use-deployment.ts` and `components/deployment-card.tsx`; re-run it before calling that verified. The moved `yarn fund:wallet` (packages/fast-sync, one sponsor per wallet) was run twice against a throwaway seed wallet, not Lace: the wallet received 1,000 NIGHT and accruing DUST, and the rerun took the "already sponsored" path.
-5. 2026-09-24: The constructor and `rsvp` ran in the page. `lib/addresses.ts` decoded a Bech32m unshielded address. A `{ secret }` private state survived a reload, and a wrong passphrase was refused. The vitest suite replays the Node test's party and checks, for every person and circuit at every step, that `actionError` predicts what the contract accepts. Unrun with Lace: `checkIn`'s NIGHT payment (the wallet must add it while balancing) and `claimFees`'s payout.
-6. 2026-09-25: `mintAndReceive` and `mintAndSendShielded` ran in the page. `customTokenColor` matched the color the circuit returned, and a verifier key was served byte-for-byte. The vitest suite replays the Node test's sequence and checks every call's `Effects` (mints, inputs, outputs, coin claims), and that the coin book finds the coins the shielded circuits return. Unrun with Lace, and not covered by any other UI: the wallet supplying a custom-token or shielded-coin input while balancing (`receiveTokens`, `receiveShieldedTokens`), and `getUnshieldedBalances` / `getShieldedBalances` keys matching the hex colors `<WalletBalancesCard>` labels.
+5. 2026-10-01: Mainnet (node 1.0.400-c338b9ac, runtime specVersion 1000300) with the 1AM wallet and the local proof server (8.1.0), not wallet proving. Deployed contract d1f28aef939f32242fbaaa8fa2fd977c776abdd8388192bd1fc441e2c8433053 (tx 38b72a747513502822f25126a393716e3a4e7c2224e17ef977ac538e271c96e6, block 2827489), then storeMessage "Hello World!" (tx 2414f646e90ba2bad1cf9a9b535b1eb831970e8ea34e85ad66d4f299c70d8747, block 2827504). Both txs were read back from the mainnet indexer, and the compiled contract's ledger() decodes the on-chain state as message = "Hello World!". Only storeMessage reached the proof server; the deploy needed no proof from it. Lace and wallet-delegated proving were not run on mainnet.
+6. 2026-09-24: The constructor and `rsvp` ran in the page. `lib/addresses.ts` decoded a Bech32m unshielded address. A `{ secret }` private state survived a reload, and a wrong passphrase was refused. The vitest suite replays the Node test's party and checks, for every person and circuit at every step, that `actionError` predicts what the contract accepts. Unrun with Lace: `checkIn`'s NIGHT payment (the wallet must add it while balancing) and `claimFees`'s payout.
+7. 2026-09-25: `mintAndReceive` and `mintAndSendShielded` ran in the page. `customTokenColor` matched the color the circuit returned, and a verifier key was served byte-for-byte. The vitest suite replays the Node test's sequence and checks every call's `Effects` (mints, inputs, outputs, coin claims), and that the coin book finds the coins the shielded circuits return. Unrun with Lace, and not covered by any other UI: the wallet supplying a custom-token or shielded-coin input while balancing (`receiveTokens`, `receiveShieldedTokens`), and `getUnshieldedBalances` / `getShieldedBalances` keys matching the hex colors `<WalletBalancesCard>` labels.
 
 <!-- END generated -->
 
