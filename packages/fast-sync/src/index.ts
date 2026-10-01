@@ -5,8 +5,10 @@ export type { WalletSecret } from './types.js';
 export {
   getConfig,
   LOCAL_CONFIG,
-  PREPROD_CONFIG,
   PREVIEW_CONFIG,
+  preprodConfig,
+  redactUrl,
+  withBlockfrostKey,
   type NetworkConfig,
 } from './config.js';
 export {

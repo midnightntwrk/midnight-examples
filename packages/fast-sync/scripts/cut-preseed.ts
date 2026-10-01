@@ -35,6 +35,7 @@ import {
   assembleWallet,
   getChainTipHeight,
   getConfig,
+  redactUrl,
   loadReferenceBundle,
   REFERENCE_ROOT,
 } from '../src/index.js';
@@ -100,7 +101,7 @@ function fmt(progress: unknown): string {
 const seed = randomBytes(32).toString('hex');
 const tipAtStart = await getChainTipHeight(config.indexer);
 if (tipAtStart === undefined) {
-  throw new Error(`Could not read the ${network} chain tip from ${config.indexer}.`);
+  throw new Error(`Could not read the ${network} chain tip from ${redactUrl(config.indexer)}.`);
 }
 
 const existing = fromGenesis ? null : loadReferenceBundle(REFERENCE_ROOT, config.networkId);
@@ -217,9 +218,14 @@ try {
     }
   }
 
+  // Record which indexer produced the cursors. Ledger-event and transaction ids
+  // are the indexer's own numbering, not chain data: Blockfrost's preprod ids
+  // run 22 behind the official indexer's, so a bundle only restores cleanly on
+  // the indexer it was cut against. Host only: the URL carries the API token.
+  const indexer = new URL(config.indexer).host;
   writeFileSync(
     join(dir, 'manifest.json'),
-    `${JSON.stringify({ network: config.networkId, height, parts, witnesses }, null, 2)}\n`,
+    `${JSON.stringify({ network: config.networkId, height, indexer, parts, witnesses }, null, 2)}\n`,
   );
 
   // Validate the staged bundle before it replaces anything. loadReferenceBundle

@@ -1,3 +1,5 @@
+import { preprodConfig } from '@midnight-ntwrk/example-fast-sync';
+
 export type NetworkConfig = {
   networkId: string;
   indexer: string;
@@ -30,37 +32,10 @@ export const PREVIEW_CONFIG: NetworkConfig = {
   faucet: 'https://midnight-tmnight-preview.nethermind.dev/',
 };
 
-// Preprod goes through Blockfrost, which rejects every request without a
-// project token. The SDK's indexer, wallet and node clients only take URLs, so
-// the token rides along as a `project_id` query parameter. It is read from
-// BLOCKFROST_PROJECT_ID (set it in the gitignored repo-root .env.preprod) and
-// must never be written into this file.
-function withBlockfrostKey(url: string, projectId: string): string {
-  const sep = url.includes('?') ? '&' : '?';
-  return `${url}${sep}project_id=${encodeURIComponent(projectId)}`;
-}
-
-// Built on demand rather than at import time so it sees the env vitest loads
-// from .env.preprod.
-export function preprodConfig(): NetworkConfig {
-  const projectId = process.env['BLOCKFROST_PROJECT_ID']?.trim();
-  if (!projectId) {
-    throw new Error(
-      'BLOCKFROST_PROJECT_ID is not set. Add it to the repo-root .env.preprod ' +
-        '(gitignored) or export it in your shell.',
-    );
-  }
-  return {
-    networkId: 'preprod',
-    indexer: withBlockfrostKey('https://midnight-preprod.blockfrost.io/api/v0', projectId),
-    indexerWS: withBlockfrostKey('wss://midnight-preprod.blockfrost.io/api/v0/ws', projectId),
-    node: withBlockfrostKey('https://rpc.midnight-preprod.blockfrost.io', projectId),
-    nodeWS: withBlockfrostKey('wss://rpc.midnight-preprod.blockfrost.io', projectId),
-    proofServer: process.env['MIDNIGHT_PROOF_SERVER'] ?? 'http://127.0.0.1:6300',
-    faucet: 'https://midnight-tmnight-preprod.nethermind.dev/',
-  };
-}
-
+// Preprod goes through Blockfrost, which needs a project token on every
+// request (BLOCKFROST_PROJECT_ID in the gitignored repo-root .env.preprod). The
+// config is shared with the wallet harness in @midnight-ntwrk/example-fast-sync
+// and built on demand, so it sees the env vitest loads from .env.preprod.
 export function getConfig(): NetworkConfig {
   const network = process.env['MIDNIGHT_NETWORK'] ?? 'local';
   if (network === 'local') return LOCAL_CONFIG;
