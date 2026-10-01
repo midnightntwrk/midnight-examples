@@ -1,0 +1,125 @@
+// This file is part of example-private-bid.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+// Licensed under the Apache License, Version 2.0 (the "License");
+// You may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// A private bid: the bidder proves their bid meets a public minimum WITHOUT
+// revealing the amount, stores only a commitment to it, and may reveal the
+// amount later. This is the contract from the docs guide "How to build a
+// private smart contract" (docs/guides/build-a-private-smart-contract).
+//
+// What an observer of the chain learns, step by step:
+//   deploy     -> the minimum bid.
+//   placeBid   -> that SOME bidder placed a bid >= the minimum (the proof says
+//                 so), an opaque bidder key, and an opaque commitment. Not the
+//                 amount, not the bidder's wallet, not the secret key.
+//   revealBid  -> the amount, linked to that same bidder key (by design: the
+//                 bidder chose to publish it).
+
+pragma language_version 0.23;
+
+import CompactStandardLibrary;
+
+// --- Public state -----------------------------------------------------------
+// Every `ledger` field is on-chain and readable by anyone.
+
+// `sealed`: only the constructor (or a non-exported helper it calls) may write
+// this field. The compiler rejects any exported circuit that writes it, so the
+// rule bidders are checked against cannot be changed after deployment.
+export sealed ledger minimumBid: Uint<64>;
+
+// bidder key -> commitment to that bidder's amount. Both are 32-byte hashes, so
+// the map shows how many bids exist and nothing about their amounts.
+export ledger bidCommitments: Map<Bytes<32>, Bytes<32>>;
+
+// bidder key -> amount, written only when the bidder reveals.
+export ledger revealedBids: Map<Bytes<32>, Uint<64>>;
+
+// --- Private input ------------------------------------------------------------
+// A witness is implemented in TypeScript (contract/witnesses.ts) and runs on the
+// bidder's device. Its result is private inside the circuit: the compiler
+// refuses to let it (or anything derived from it) reach the ledger unless the
+// code wraps it in `disclose()`.
+witness localSecretKey(): Bytes<32>;
+
+constructor(minimum: Uint<64>) {
+  // Constructor arguments are private by default, like circuit arguments. The
+  // minimum is meant to be public, so the deployer says so with disclose().
+  minimumBid = disclose(minimum);
+}
+
+// Derives a 32-byte value bound to (purpose, this contract, secret key).
+//
+// - `purpose` is a domain separator: the bidder key and the salt come from the
+//   same secret, and must not be equal or derivable from each other.
+// - `kernel.self().bytes` is this deployment's address. The same secret key
+//   yields unrelated values in any other contract or redeployment, so a bidder
+//   cannot be linked across auctions by their key.
+// - `persistentHash` (not `transientHash`) because the bidder key is stored on
+//   the ledger and must be recomputed identically in later transactions.
+//
+// Not exported: it is an internal helper, so it has no proving key of its own.
+circuit derive(purpose: Bytes<32>, secretKey: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>([purpose, kernel.self().bytes, secretKey]);
+}
+
+export circuit placeBid(amount: Uint<64>): [] {
+  const secretKey = localSecretKey();
+
+  // The comparison runs inside the proof. The network learns only that it
+  // held, i.e. that amount >= minimumBid. A failing assert aborts the call on
+  // the bidder's machine, before any proof is generated or anything is sent.
+  assert(amount >= minimumBid, "Bid is below the minimum");
+
+  // The bidder key is used as a ledger Map key, so it must be disclosed. We
+  // disclose the hash, never the secret key. disclose() does not publish
+  // anything by itself; it records that this value is allowed to go public.
+  const bidder = disclose(derive(pad(32, "private-bid:key:"), secretKey));
+  assert(!bidCommitments.member(bidder), "This bidder already placed a bid");
+
+  // Store a commitment, not the amount. persistentCommit(value, rand) hashes
+  // the value together with a hiding randomness, and the compiler treats its
+  // result as safe to put on the ledger without disclose().
+  //
+  // Why not persistentHash(amount)? Bid amounts are guessable: anyone could
+  // hash 1, 2, 3, ... until one matches. The salt makes that impossible
+  // without the secret key.
+  //
+  // The salt is deterministic (derived from the secret key), which is only safe
+  // because each bidder commits exactly once (the member() check above): the
+  // same value under the same salt always yields the same commitment. A
+  // contract that commits repeatedly for one user needs a fresh random salt
+  // per commitment, kept in private state. The compiler does NOT check that
+  // the second argument is secret or high-entropy; that is on the author.
+  const salt = derive(pad(32, "private-bid:salt:"), secretKey);
+  bidCommitments.insert(bidder, persistentCommit<Uint<64>>(amount, salt));
+}
+
+export circuit revealBid(amount: Uint<64>): [] {
+  const secretKey = localSecretKey();
+  // Recomputes the same bidder key and salt as placeBid. Only the holder of the
+  // secret key can do so, which is what authorizes the reveal.
+  const bidder = disclose(derive(pad(32, "private-bid:key:"), secretKey));
+  const salt = derive(pad(32, "private-bid:salt:"), secretKey);
+
+  assert(bidCommitments.member(bidder), "This bidder has not placed a bid");
+  // Opening the commitment: the claimed amount must be the one committed to.
+  assert(bidCommitments.lookup(bidder) == persistentCommit<Uint<64>>(amount, salt),
+    "Amount does not match the committed bid");
+
+  // The one place the amount becomes public. Removing this disclose() makes
+  // the compiler reject the program ("potential witness-value disclosure must
+  // be declared but is not ... ledger operation might disclose the witness
+  // value"), naming `amount` and the path to this insert.
+  revealedBids.insert(bidder, disclose(amount));
+}
