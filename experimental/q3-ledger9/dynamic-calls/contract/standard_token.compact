@@ -1,0 +1,38 @@
+// SOW-Q3-03 · standard_token: one implementation of the `Token` interface.
+//
+// A deliberately small balance-map token, in the spirit of the delivery demo's
+// toy tokens (sow-03 transcript: "very, very simple"). It has no authorisation:
+// the point under test is WHICH CODE runs for a given address, not token
+// security. Do not reuse it as a token.
+//
+// Its `transfer` signature matches the `contract Token { ... }` declaration in
+// token_registry.compact exactly. The runtime checks that match (the
+// conformance rules Existence, Purity, Provability, Arity, ArgumentType,
+// ResultType) before entering this code from a cross-contract call.
+//
+// A callee entered by a cross-contract call may not call witnesses, so there
+// are none.
+pragma language_version 0.27;
+
+import CompactStandardLibrary;
+
+export ledger balances: Map<Bytes<32>, Uint<64>>;
+
+constructor(holder: Bytes<32>, supply: Uint<64>) {
+  balances.insert(disclose(holder), disclose(supply));
+}
+
+// Moves `amount` and returns the sender's new balance.
+export circuit transfer(sender: Bytes<32>, recipient: Bytes<32>, amount: Uint<64>): Uint<64> {
+  const s = disclose(sender);
+  const r = disclose(recipient);
+  const a = disclose(amount);
+  assert(balances.member(s), "unknown sender");
+  const sender_balance = balances.lookup(s);
+  assert(sender_balance >= a, "insufficient balance");
+  const remaining = (sender_balance - a) as Uint<64>;
+  balances.insert(s, remaining);
+  const recipient_balance = balances.member(r) ? balances.lookup(r) : 0 as Uint<64>;
+  balances.insert(r, (recipient_balance + a) as Uint<64>);
+  return remaining;
+}
