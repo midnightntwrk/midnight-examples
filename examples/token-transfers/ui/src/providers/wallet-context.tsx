@@ -15,7 +15,8 @@ const WALLET_KEY = "token-transfers-ui:wallet";
 
 /**
  * Network ids a Midnight wallet recognizes. `undeployed` is the local devnet
- * from examples/token-transfers/compose.yml.
+ * from examples/token-transfers/compose.yml. `mainnet` is listed only when the UI opts
+ * in with `"networks": ["mainnet"]` in ui/new-ui.json (it spends real DUST).
  */
 export const NETWORK_IDS = ["undeployed", "preview", "preprod"] as const;
 export type NetworkId = (typeof NETWORK_IDS)[number];

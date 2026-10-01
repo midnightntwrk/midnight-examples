@@ -15,6 +15,9 @@
     },
     "preprod": {
       "status": "not-run"
+    },
+    "mainnet": {
+      "status": "not-run"
     }
   }
 }
