@@ -15,7 +15,9 @@
       "status": "not-run"
     },
     "mainnet": {
-      "status": "not-run"
+      "status": "partial",
+      "date": "2026-10-01",
+      "notes": "Mainnet (node 1.0.400-c338b9ac, runtime specVersion 1000300) with the 1AM wallet and the local proof server (8.1.0) selected; persistent private state behind the passphrase card. Deployed contract 40a26d412370f292947c0013529b28bffba4e5105accd682f9600eb3ec2c67a1 with party size 1 and entry fee 1 STAR (tx 559560091e92bdd6cfc52f4f37abfe179f4620ea59c4dc2088fcf5a29155f47e, block 2827820). Read back from the mainnet indexer; the compiled contract's ledger() decodes maxListSize = 1, entryFee = 1, partyState = NOT_STARTED, empty guest and check-in sets, and an organizer key set from the generated secret. Deploy only: rsvp, startParty, checkIn (NIGHT payment), closeEntry and claimFees were not run on mainnet."
     }
   }
 }

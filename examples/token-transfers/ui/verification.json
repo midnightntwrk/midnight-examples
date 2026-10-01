@@ -15,7 +15,9 @@
       "status": "not-run"
     },
     "mainnet": {
-      "status": "not-run"
+      "status": "partial",
+      "date": "2026-10-01",
+      "notes": "Mainnet (node 1.0.400-c338b9ac, runtime specVersion 1000300) with the 1AM wallet and the local proof server (8.1.0) selected. Deployed contract f801895336c73820651f13a9e8b85c8d885ebf79b8a5f18f48cc46c3d4590d38 (tx 99c7a3525eaafd4274378cedbb1bec972009d62cca7cdff463a69a12b82d460b, block 2827798), read back from the mainnet indexer as a ContractDeploy. The contract has no ledger to decode. Deploy only: no mint, send or receive circuit was run on mainnet."
     }
   }
 }
