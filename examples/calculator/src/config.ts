@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { preprodConfig } from '@midnight-ntwrk/example-fast-sync';
+
 // The main purpose of this file is to hold network configurations. Add configs for new networks
 // (such as Preprod) and modify the code in getConfig() to set `const network` appropriately
 export type NetworkConfig = {
@@ -48,16 +50,10 @@ export const PREVIEW_CONFIG: NetworkConfig = {
   faucet: 'https://midnight-tmnight-preview.nethermind.dev/',
 };
 
-export const PREPROD_CONFIG: NetworkConfig = {
-  networkId: 'preprod',
-  indexer: 'https://indexer.preprod.midnight.network/api/v4/graphql',
-  indexerWS: 'wss://indexer.preprod.midnight.network/api/v4/graphql/ws',
-  node: 'https://rpc.preprod.midnight.network',
-  nodeWS: 'wss://rpc.preprod.midnight.network',
-  proofServer: process.env['MIDNIGHT_PROOF_SERVER'] ?? 'http://127.0.0.1:6300',
-  faucet: 'https://midnight-tmnight-preprod.nethermind.dev/',
-};
-
+// Preprod goes through Blockfrost, which needs a project token on every
+// request (BLOCKFROST_PROJECT_ID in the gitignored repo-root .env.preprod). The
+// config is shared with the wallet harness in @midnight-ntwrk/example-fast-sync
+// and built on demand, so it sees the env vitest loads from .env.preprod.
 export function getConfig(): NetworkConfig {
   const network = process.env['MIDNIGHT_NETWORK'] ?? 'local';
   switch (network) {
@@ -66,7 +62,7 @@ export function getConfig(): NetworkConfig {
     case 'preview':
       return PREVIEW_CONFIG;
     case 'preprod':
-      return PREPROD_CONFIG;
+      return preprodConfig();
     default:
       throw new Error(
         `Unknown network: ${network}. Supported: 'local', 'preview', 'preprod'.`,

@@ -15,6 +15,7 @@ import { createKeystore } from '@midnight-ntwrk/wallet-sdk/unshielded';
 import {
   getChainTipHeight,
   getConfig,
+  redactUrl,
   loadReferenceBundle,
   REFERENCE_ROOT,
   type CanonicalRole,
@@ -42,7 +43,7 @@ if (existsSync(envPath) && !force) {
 
 const tip = await getChainTipHeight(config.indexer);
 if (tip === undefined) {
-  throw new Error(`Could not read the ${network} chain tip from ${config.indexer}.`);
+  throw new Error(`Could not read the ${network} chain tip from ${redactUrl(config.indexer)}.`);
 }
 
 // Warn loudly if the reference is newer than the wallets we are about to mint:
