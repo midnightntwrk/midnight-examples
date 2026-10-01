@@ -91,6 +91,7 @@ yarn test:preprod        # every suite, sequentially (they share those wallets)
 | `secret-message` | Private on-chain data via hashing: a witness supplies a secret, the circuit publishes only its `persistentHash` commitment |
 | `zk-loan` | Private credit scoring: an in-circuit Schnorr/Jubjub signature check on a witness-supplied profile, witness-derived identity (no `ownPublicKey()`), nested `Map`s, batched migration |
 | `shielded-chips` | Shielded tokens end to end: a MIP-0011 native shielded token (mint, both burn paths) plus a roulette contract that custodies and pays out coins; commitment-based escrow and `mergeCoin` ordering keep coin nonces (and so wallets) off chain; two contracts wired from one harness |
+| `private-bid` | The docs guide "How to build a private smart contract": prove a bid meets a public `sealed` minimum without revealing it, store a salted `persistentCommit` under a hashed, contract-bound bidder key (`kernel.self()`), reveal later; the minimal `disclose()` boundary |
 
 Each example has its own `AGENTS.md` with specifics.
 
