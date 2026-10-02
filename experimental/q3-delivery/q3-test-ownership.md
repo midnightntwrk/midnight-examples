@@ -29,21 +29,21 @@
 
 | SOW | Deliverable | R1 authors / builders | R2 owner | R3 tester | State |
 |---|---|---|---|---|---|
-| [01](#sow-q3-01-crypto-schemes) | Crypto schemes | iquerejeta | **nstanford5** | Foundation run, done | L1 and L2 green; report waiting for sign-off |
-| [02](#sow-q3-02-recursive-proofs) | Recursive proofs | dybvig, whankinsiv, miguel-ambrona, iquerejeta | after Ledger 10 | after Ledger 10 | **blocked: Ledger 10** |
-| [03](#sow-q3-03-dynamic-cross-contract-calls) | Dynamic cross-contract calls | JosephDenman, jonathan-sobel, kmillikin | **OpenZeppelin** (contact TBD) + **Jay Albert** (Foundation co-signer) | Foundation run, done | L1 and L2 green; report waiting for sign-off |
-| [04](#sow-q3-04-private-state-mip) | Private state MIP | kapke, jonathan-sobel | Karmoola (MPS-0021) | TBD | ready for review |
+| [01](#sow-q3-01-crypto-schemes) | Crypto schemes | iquerejeta | **nstanford5** + **Jalal-1** | Foundation run, done | owner named (L1 and L2 green; report waiting for sign-off) |
+| [02](#sow-q3-02-recursive-proofs) | Recursive proofs | dybvig, whankinsiv, miguel-ambrona, iquerejeta | Jalal-1 + mbs-midnight (*provisional*); partner **Webisoft** | after Ledger 10 | **blocked: Ledger 10** |
+| [03](#sow-q3-03-dynamic-cross-contract-calls) | Dynamic cross-contract calls | JosephDenman, jonathan-sobel, kmillikin | **OpenZeppelin** (contact TBD) + **Jay Albert** and **Ricardo Rius** (Foundation); partner **Midnames** | Foundation run, done | owner named (L1 and L2 green; report waiting for sign-off) |
+| [04](#sow-q3-04-private-state-mip) | Private state MIP | kapke, jonathan-sobel | Karmoola (MPS-0021) + **riusricardo** | TBD | owner named |
 | [05](#sow-q3-05-babe-phase-1) | BABE phase 1 | Klapeyron, LGLO | **Ricardo Rius** (`riusricardo`) | TBD | owner named |
 | [06](#sow-q3-06-block-production-rewards) | Block production rewards | MicroProofs, luminight99, LGLO | Karmoola (MPS-0019, MPS-0033) | TBD | 06-G2 blocked on `π`, `dist_fee` |
-| [07](#sow-q3-07-shielded-source-of-funds) | Shielded source of funds | kapke | Jalal-1, hbulgarini (MPS-0025) | TBD | ready for review |
+| [07](#sow-q3-07-shielded-source-of-funds) | Shielded source of funds | kapke | Jalal-1 (MPS-0025) + **mbs-midnight** | TBD | owner named |
 | [08](#sow-q3-08-hard-fork-v8-to-v9) | Hard fork v8 → v9 | ozgb, jacek-kurkowski-shielded, mhounslow, GiuseppeSalvatoreShielded, gilescope | **Leonard Hegarty** (`hegaleon`) | TBD | owner named |
-| [09](#sow-q3-09-throughput-performance) | Throughput performance | dzajkowski, chrispalaskas | **BenB-MNF** | TBD | owner named |
+| [09](#sow-q3-09-throughput-performance) | Throughput performance | dzajkowski, chrispalaskas | **BenB-MNF** + **mbs-midnight** | TBD | owner named |
 
 ---
 
 ## SOW-Q3-01 Crypto schemes
 
-> **Status:** L1 and L2 green on 2026-10-01 (preliminary report, not yet signed) · **Owner:** nstanford5 · **Last updated:** 2026-10-01
+> **Status:** owner named. L1 and L2 green on 2026-10-01 (preliminary report, not yet signed) · **Owner:** nstanford5 and Jalal-1 · **Last updated:** 2026-10-02
 
 This item already has a Foundation run in [`q3-ledger9/signature-verify`](../q3-ledger9/signature-verify/), with a [preliminary report](../q3-ledger9/reports/sow-q3-01-local-2026-10-01.md). It is here so that its owner and sign-off are recorded.
 
@@ -51,19 +51,20 @@ This item already has a Foundation run in [`q3-ledger9/signature-verify`](../q3-
 |---|---|---|---|
 | R1 | iquerejeta | author of [compact#793](https://github.com/LFDT-Minokawa/compact/pull/793) "Add ECDSA over P256 and Ed25519" (merged 2026-09-28), the only commit author on it | AC-1, AC-2; co-signs the gap list 01-G1…G11; answers the P-256 review findings (the `s = 0` arithmetic error, no low-s helper, WebAuthn layout policy) |
 | R2 | **nstanford5** (Nick Stanford) | named by the Foundation, 2026-10-01. Not an author of compact#793, so no conflict. | AC-1 and AC-2 acceptance; signs the report |
+| R2 | **Jalal-1** (Jalal Hannan) | named in Notion by the Foundation, 2026-10-02. Not an author of compact#793, so no conflict. | AC-1 and AC-2 acceptance; signs the report |
 | R3 | Foundation run (`q3-ledger9`), done for L1 and L2 | committed by Nick Stanford; [report JSON](../q3-ledger9/reports/sow-q3-01-local-2026-10-01.json) | AC-1, AC-2, 01-G1…G5, G7…G11. Not done: G6 (Solana, optional) |
 
-The same person both ran the tests and signs them off. The role rules allow this; they only bar authors. It is recorded here so the sign-off states it.
+One of the two owners (nstanford5) both ran the tests and signs them off. The role rules allow this; they only bar authors. It is recorded here so the sign-off states it.
 
 Sign-off artefacts:
 - R1 co-signs that the gap tests exercise the two verify circuits as designed.
-- R2 signs the report JSON. Until then the report stays preliminary.
+- Both R2 owners sign the report JSON. Until then the report stays preliminary.
 
 ---
 
 ## SOW-Q3-02 Recursive proofs
 
-> **Status:** blocked until Ledger 10 is released · **Owner:** after Ledger 10 · **Last updated:** 2026-10-01
+> **Status:** blocked until Ledger 10 is released · **Owner:** Jalal-1 and mbs-midnight (*provisional*) · **Partner:** Webisoft · **Last updated:** 2026-10-02
 
 Recursive proofs cannot be tested until Ledger 10 is released ([record:9](https://github.com/midnightntwrk/midnight-network-ops/blob/a6e7daf8727bc61cfe15b422359ebeb0681ec6bb/releases/deliverables/2026-q3/2026-q3-deliverables.md)). The contributor map is kept so the parties are known when it unblocks. Gap rows 02-G1…G7 in the strategy doc stay as planned but are not scheduled.
 
@@ -73,14 +74,15 @@ Recursive proofs cannot be tested until Ledger 10 is released ([record:9](https:
 | R1 (Compact `verifyProof`, AC-2) | whankinsiv | [compact#794](https://github.com/LFDT-Minokawa/compact/pull/794) (merged); compact-end-2-end [#165](https://github.com/midnightntwrk/compact-end-2-end/pull/165) (inner-proof generation), [#168](https://github.com/midnightntwrk/compact-end-2-end/pull/168) (verifyProof regression) | AC-2; vendor harness |
 | R1 (midnight-zk recursion, AC-1) | miguel-ambrona | 33 of the last 100 commits on [midnight-zk `aggregation/`](https://github.com/midnightntwrk/midnight-zk/commits/main/aggregation) | AC-1; 02-G1, G3 |
 | R1 (midnight-zk recursion, AC-1) | iquerejeta | 9 commits on `aggregation/`; compact-end-2-end [#172](https://github.com/midnightntwrk/compact-end-2-end/pull/172) (recursive RSA-IVC proof verified in Compact) | AC-1; 02-G1, G3 |
-| R2 | after Ledger 10 | there is no MPS | |
+| R2 | Jalal-1 (Jalal Hannan) and mbs-midnight (Mahesh Sashital), *provisional* | named in Notion by the Foundation, 2026-10-02, and treated as provisional until Ledger 10 is scheduled ([Q2](#open-questions)). There is no MPS. Neither is among the R1 handles found, so no conflict. | |
+| Partner | Webisoft | listed in Notion as partner / co-signer, 2026-10-02; role not stated yet | |
 | R3 | after Ledger 10 | | |
 
 ---
 
 ## SOW-Q3-03 Dynamic cross-contract calls
 
-> **Status:** L1 and L2 green on 2026-10-01 (preliminary report, not yet signed) · **Owner:** OpenZeppelin (partner) with Jay Albert (Foundation co-signer) · **Last updated:** 2026-10-02
+> **Status:** owner named. L1 and L2 green on 2026-10-01 (preliminary report, not yet signed) · **Owner:** OpenZeppelin (partner) with Jay Albert and Ricardo Rius (Foundation) · **Partner:** Midnames · **Last updated:** 2026-10-02
 
 This item already has a Foundation run in [`q3-ledger9/dynamic-calls`](../q3-ledger9/dynamic-calls/), with a [preliminary report](../q3-ledger9/reports/sow-q3-03-local-2026-10-01.md). It is here so that its owner and sign-off are recorded.
 
@@ -89,30 +91,33 @@ This item already has a Foundation run in [`q3-ledger9/dynamic-calls`](../q3-led
 | R1 | JosephDenman (Joseph Denman) | [compact#714](https://github.com/LFDT-Minokawa/compact/pull/714) "Dynamic cross-contract calls - Q3" (merged 2026-09-08); [midnight-js#1307](https://github.com/midnightntwrk/midnight-js/pull/1307) (the module provider, merged); co-author of [CoIP 4](https://github.com/LFDT-Minokawa/compact/blob/ca9da303cf00e3ee0083acfa360a7bfd74c11746/coips/coip-0004.md) | AC-1; co-signs the gap list 03-G1…G11; answers the CoIP 4 spec-drift finding (10 vs 11 failure kinds) |
 | R1 | jonathan-sobel (Jonathan Sobel) | co-author of CoIP 4 (front-matter `Authors:`) | spec questions |
 | R1 | kmillikin | committer of `coips/coip-0004.md` @ `ca9da30` | spec questions |
-| R2 | **OpenZeppelin** (partner), contact **TBD**; **Jay Albert** (Foundation co-signer) | named by the Foundation: OpenZeppelin and the Foundation sign together (2026-10-01); Jay Albert as the Foundation co-signer (2026-10-02). GitHub `JAlbertCode` is *inferred*: company "Midnight Network", on the codeowners team, no profile name. Jay is not among the R1 handles found, so no conflict. No OpenZeppelin account appears among the R1 handles found, so no conflict. | AC-1 acceptance; both sign the report |
+| R2 | **OpenZeppelin** (partner), contact **TBD**; **Jay Albert** (Foundation co-signer) | named by the Foundation: OpenZeppelin and the Foundation sign together (2026-10-01); Jay Albert as the Foundation co-signer (2026-10-02). GitHub `JAlbertCode` is *inferred*: company "Midnight Network", on the codeowners team, no profile name. Jay is not among the R1 handles found, so no conflict. No OpenZeppelin account appears among the R1 handles found, so no conflict. | AC-1 acceptance; both sign the report, with Ricardo Rius |
+| R2 | **Ricardo Rius** (`riusricardo`), Foundation | named in Notion by the Foundation, 2026-10-02. Not among the R1 handles found, so no conflict. | AC-1 acceptance; signs the report |
+| Partner | Midnames | listed in Notion as partner / co-signer, 2026-10-02; role not stated yet | |
 | R3 | Foundation run (`q3-ledger9`), done for L1 and L2 | [report JSON](../q3-ledger9/reports/sow-q3-03-local-2026-10-01.json) | AC-1, 03-G1…G7, G9, G10. Not yet done: G8, G11 |
 
 Sign-off artefacts:
 - R1 co-signs that the gap tests exercise CoIP 4 as designed, including the two failure kinds not driven: `PureInterfaceCircuit` and `UnreadableModule`.
-- Both R2 signers sign the report JSON: the OpenZeppelin contact and Jay Albert. Until then the report stays preliminary.
+- All R2 signers sign the report JSON: the OpenZeppelin contact, Jay Albert and Ricardo Rius. Until then the report stays preliminary.
 - R1 answers the review findings in the strategy doc: spec drift, the gap in the migration guide, and the synchronous `resolve()`.
 
 ---
 
 ## SOW-Q3-04 Private state MIP
 
-> **Status:** ready for review · **Owner:** Karmoola (MPS-0021 author, Foundation) · **Last updated:** 2026-10-01
+> **Status:** owner named · **Owner:** Karmoola (MPS-0021 author, Foundation) and riusricardo · **Last updated:** 2026-10-02
 
 | Role | Who | Evidence | Covers |
 |---|---|---|---|
 | R1 | kapke (Andrzej Kopeć) | [MIP PR #334](https://github.com/midnightntwrk/midnight-improvement-proposals/pull/334) front-matter `Authors:` @ `49bbfd7` | review checklist; test stubs from normative text |
 | R1 | jonathan-sobel (Jonathan Sobel) | the same front-matter; PR author | as above |
 | R2 | Karmoola | [MPS-0021](https://github.com/midnightntwrk/midnight-improvement-proposals/blob/078a5a7fc3a0c908307f80c9daf35d5023527286/mps/mps-0021-phase2-contract-to-contract.md) `Authors: Karmel E - karmoola`; the MIP's `MPS: MPS-0021` | the MIP answers MPS-0021 |
+| R2 | **riusricardo** (Ricardo Rius) | named in Notion by the Foundation, 2026-10-02. Not an author of #334, so no conflict. | the MIP answers MPS-0021 |
 | R3 | TBD | | [checklist](q3-testing-strategy.md#mip-and-design-review-checklist), AC-1 fact check |
 | R4 | codeowners team, **excluding kapke** | review requested from the team; no review yet | AC-1 "submitted to the MIP process" |
 
 Sign-off artefacts:
-- R2 and R4 sign the AC-1 fact check (is the MIP in the process, and at which commit).
+- Both R2 owners and R4 sign the AC-1 fact check (is the MIP in the process, and at which commit).
 - R1 co-signs the test-stub list derived from the MIP's MUST and SHOULD statements.
 
 ---
@@ -159,12 +164,13 @@ Sign-off artefacts:
 
 ## SOW-Q3-07 Shielded source of funds
 
-> **Status:** ready for review · **Owner:** Jalal-1 and hbulgarini (MPS-0025 authors, Foundation) · **Last updated:** 2026-10-01 · time and materials, no ACs
+> **Status:** owner named · **Owner:** Jalal-1 (MPS-0025 author, Foundation) and mbs-midnight · **Last updated:** 2026-10-02 · time and materials, no ACs
 
 | Role | Who | Evidence | Covers |
 |---|---|---|---|
 | R1 | kapke (Andrzej Kopeć) | the only `Authors:` entry in `mips/mip-xxxx-custom-spend-logic.md` on [MIP PR #335](https://github.com/midnightntwrk/midnight-improvement-proposals/pull/335) @ `41d3b15`; PR author and assignee | answers review questions |
-| R2 | Jalal-1 (Jalal Hannan), hbulgarini (Hector Bulgarini) | [MPS-0025](https://github.com/midnightntwrk/midnight-improvement-proposals/blob/5d881268081842bdd3b52bf6b4509c937de95c22/mps/mps-0025-shielded-source-of-funds.md) `Authors:` | Designs A, B and C answer MPS-0025 |
+| R2 | Jalal-1 (Jalal Hannan) | [MPS-0025](https://github.com/midnightntwrk/midnight-improvement-proposals/blob/5d881268081842bdd3b52bf6b4509c937de95c22/mps/mps-0025-shielded-source-of-funds.md) `Authors:` | Designs A, B and C answer MPS-0025 |
+| R2 | mbs-midnight (Mahesh Sashital) | named in Notion by the Foundation, 2026-10-02, replacing hbulgarini (Hector Bulgarini, an MPS-0025 co-author, owner until then). Not an author of #335, so no conflict. | Designs A, B and C answer MPS-0025 |
 | R3 | TBD | | [checklist](q3-testing-strategy.md#mip-and-design-review-checklist) |
 | R4 | codeowners team, **excluding kapke** | hbulgarini is also on the team | MIP process |
 
@@ -194,13 +200,14 @@ Sign-off artefacts:
 
 ## SOW-Q3-09 Throughput performance
 
-> **Status:** owner named · **Owner:** BenB-MNF · **Last updated:** 2026-10-01 · time and materials, no ACs
+> **Status:** owner named · **Owner:** BenB-MNF and mbs-midnight · **Last updated:** 2026-10-02 · time and materials, no ACs
 
 | Role | Who | Evidence | Covers |
 |---|---|---|---|
 | R1 | dzajkowski (Dominik Zajkowski) | front-matter author of [MIP #312](https://github.com/midnightntwrk/midnight-improvement-proposals/pull/312) @ `9ab5b9c` and [MIP #309](https://github.com/midnightntwrk/midnight-improvement-proposals/pull/309) @ `6e3ba62`; co-author of [MPS PR #82](https://github.com/midnightntwrk/midnight-improvement-proposals/pull/82) and of [MPS-0032](https://github.com/midnightntwrk/midnight-improvement-proposals/blob/078a5a7fc3a0c908307f80c9daf35d5023527286/mps/mps-0032-storage-management.md) | report questions |
 | R1 | chrispalaskas | midnight-node [#2041](https://github.com/midnightntwrk/midnight-node/pull/2041) (the combined experiment); reviewer on #312 and #309 | experiment data |
 | R2 | **BenB-MNF** | named by the Foundation, 2026-10-01. Has reviewed [MPS PR #82](https://github.com/midnightntwrk/midnight-improvement-proposals/pull/82), but is not an author of it, of MPS-0032, or of either MIP, so there is no conflict. On the codeowners team. The MPSs behind 09 are vendor-authored (MPS #82 by bobblessinghartley, dzajkowski and jrossie, all `@shielded.io`; MPS-0032 by dzajkowski), so this owner is named directly. | design review verdict |
+| R2 | **mbs-midnight** (Mahesh Sashital) | named in Notion by the Foundation, 2026-10-02. Not an author of MPS #82, MPS-0032 or either MIP, so no conflict. | design review verdict |
 | R3 | TBD. nstanford5 is a **requested reviewer** on #312 and #309. | `reviewRequests` on both PRs | report hash check (P1); [checklist](q3-testing-strategy.md#mip-and-design-review-checklist) |
 | R4 | codeowners team, **excluding dzajkowski** | reviews so far: chrispalaskas and jsidorenko (#312); chrispalaskas and ozgb (#309); BenB-MNF, bwbush and bobblessinghartley (#82) | MIP process |
 
@@ -214,15 +221,15 @@ Decision values: `Not signed`, `Accepted`, `Accepted with conditions`, `Rejected
 
 | SOW | Criteria | Signer(s) | Decision | Date | Conditions |
 |---|---|---|---|---|---|
-| 01 | AC-1, AC-2 | nstanford5 | Not signed | — | — |
-| 02 | AC-1, AC-2 | owner after Ledger 10 | Not signed | — | — |
-| 03 | AC-1 | OpenZeppelin (contact TBD); Jay Albert | Not signed | — | — |
-| 04 | AC-1 | Karmoola | Not signed | — | — |
+| 01 | AC-1, AC-2 | nstanford5; Jalal-1 | Not signed | — | — |
+| 02 | AC-1, AC-2 | Jalal-1; mbs-midnight (*provisional*) | Not signed | — | — |
+| 03 | AC-1 | OpenZeppelin (contact TBD); Jay Albert; riusricardo | Not signed | — | — |
+| 04 | AC-1 | Karmoola; riusricardo | Not signed | — | — |
 | 05 | AC-1 | riusricardo | Not signed | — | — |
 | 06 | AC-1 (prototype; MIP) | Karmoola | Not signed | — | — |
-| 07 | no ACs: design-review verdict | Jalal-1; hbulgarini | Not signed | — | — |
+| 07 | no ACs: design-review verdict | Jalal-1; mbs-midnight | Not signed | — | — |
 | 08 | AC-1, AC-2 (can be signed separately) | hegaleon | Not signed | — | — |
-| 09 | no ACs: report checksum and review verdict | BenB-MNF | Not signed | — | — |
+| 09 | no ACs: report checksum and review verdict | BenB-MNF; mbs-midnight | Not signed | — | — |
 
 ## People index
 
@@ -237,12 +244,12 @@ An affiliation is either *confirmed* by the Foundation or *inferred* from a hard
 | dzajkowski | 09 (MPS #82 and MPS-0032 author too) | — | yes | Shielded: `@shielded.io` email in MPS #82 |
 | gilescope | 08 | — | yes | |
 | GiuseppeSalvatoreShielded | 08 | — | | Shielded: handle suffix |
-| hbulgarini | — | 07 | yes | Foundation: confirmed by the Foundation, 2026-10-01 |
+| hbulgarini | — (MPS-0025 co-author; R2 on 07 until 2026-10-02) | — | yes | Foundation: confirmed by the Foundation, 2026-10-01 |
 | hegaleon (Leonard Hegarty) | — | 08 | | |
 | iquerejeta | 01, 02 | — | | |
 | jacek-kurkowski-shielded | 08 | — | | Shielded: handle suffix |
 | JAlbertCode (Jay Albert; handle *inferred*) | — | 03 (Foundation co-signer) | yes | Foundation: named by the Foundation, 2026-10-02 |
-| Jalal-1 | — | 07 | | Foundation: confirmed by the Foundation, 2026-10-01 |
+| Jalal-1 | — | 01, 02 (*provisional*), 07 | | Foundation: confirmed by the Foundation, 2026-10-01 |
 | jonathan-sobel | 03, 04 | — | | |
 | JosephDenman | 03 | — | yes | |
 | jrossie | — (MPS #82 author) | — | | Shielded: `@shielded.io` email in MPS #82 |
@@ -252,13 +259,16 @@ An affiliation is either *confirmed* by the Foundation or *inferred* from a hard
 | kmillikin | 03 | — | yes | |
 | LGLO | 05, 06 | — | | |
 | luminight99 | 06 | — | | |
+| mbs-midnight (Mahesh Sashital) | — | 02 (*provisional*), 07, 09 | | Foundation: GitHub profile company @midnightntwrk; named by the Foundation, 2026-10-02 |
 | mhounslow | 08 | — | | |
 | MicroProofs | 06 | — | | |
+| Midnames (organisation) | — | partner on 03 | | partner: listed in Notion, 2026-10-02; role not stated |
 | miguel-ambrona | 02 | — | | |
 | nstanford5 | — | 01 | yes | Foundation: the account owner's `midnight.foundation` email |
-| OpenZeppelin (organisation, contact TBD) | — | 03, with Jay Albert | | partner: named by the Foundation, 2026-10-01 |
+| OpenZeppelin (organisation, contact TBD) | — | 03, with Jay Albert and riusricardo | | partner: named by the Foundation, 2026-10-01 |
 | ozgb | 08 | — | | |
-| riusricardo (Ricardo Rius) | — | 05 | yes | |
+| riusricardo (Ricardo Rius) | — | 03, 04, 05 | yes | |
+| Webisoft (organisation) | — | partner on 02 | | partner: listed in Notion, 2026-10-02; role not stated |
 | whankinsiv | 02 | — | | |
 
 ## Conflicts and open assignments
@@ -277,9 +287,9 @@ Other open assignments, still to fill:
 Items that need a named Foundation owner. Each one blocks sign-off on that item. They are tracked in ClickUp, with this list as the record. Question ids stay fixed once assigned; a resolved question is struck through, not deleted.
 
 - ~~**Q1. SOW-09 throughput: who is the Foundation owner?**~~ **Resolved 2026-10-01:** BenB-MNF owns it.
-- **Q2. SOW-02 recursive proofs: who owns it when Ledger 10 is released?** It is deferred, so nobody is named now. Name the owner when Ledger 10 is scheduled, so the gap tests 02-G1…G7 can start straight away.
+- **Q2. SOW-02 recursive proofs: who owns it when Ledger 10 is released?** It is deferred, so only provisional owners are named now. Confirm the owner when Ledger 10 is scheduled, so the gap tests 02-G1…G7 can start straight away. **Provisional, 2026-10-02:** Jalal-1 and mbs-midnight are named in Notion, with Webisoft as partner; confirm them when Ledger 10 is scheduled.
 - ~~**Q3. SOW-01: who signs off the report already filed?**~~ **Resolved 2026-10-01:** nstanford5 signs.
-- ~~**Q4. SOW-03: who at OpenZeppelin signs, and does the Foundation co-sign?**~~ **Resolved in part:** the Foundation co-signs with OpenZeppelin (2026-10-01), and Jay Albert is the Foundation co-signer (2026-10-02). Still open: the named OpenZeppelin contact and their GitHub handle.
+- ~~**Q4. SOW-03: who at OpenZeppelin signs, and does the Foundation co-sign?**~~ **Resolved in part:** the Foundation co-signs with OpenZeppelin (2026-10-01), and Jay Albert is the Foundation co-signer (2026-10-02). Ricardo Rius was added as a second Foundation owner, and Midnames as a partner (2026-10-02). Still open: the named OpenZeppelin contact and their GitHub handle, and Midnames' role.
 
 ## ClickUp: action for Tracie Mitchell (not yet linked)
 
@@ -296,6 +306,8 @@ The Q3 SOW work is already tracked in ClickUp, in tasks Tracie Mitchell created 
 3. Put the Notion hub and these two docs in the milestone's description, and add each task's URL to the matching section here and to its Notion row.
 
 Record her answer here, with the date, and then mirror it in Notion.
+
+**2026-10-02, Tracie Mitchell (comment on the Notion hub):** she has linked the Notion hub to [SOW Q3 - MNF ACCEPTANCE](https://app.clickup.com/t/123xrj7kcyu) and says that is sufficient for now. All SOW3 items are already linked to a program milestone through a release that lists the items being tested, and she will track this work in the background without requiring the ClickUp tool. None of options 1–3 has been taken up. This item stays open.
 
 ## How this was gathered
 
