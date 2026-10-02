@@ -1,21 +1,28 @@
 # SOW3 acceptance: status and changelog
 
-- **Generated:** 2026-10-02 18:15 UTC by `/sow3-update`
+- **Generated:** 2026-10-02 18:26 UTC by `/sow3-update`, with the 2026-10-02 [Solutions Weekly Huddle](https://app.notion.com/p/3ed4057b9f2381d0ba6df848f83b21b6) notes as an extra input
 - **Notion last synced:** 2026-10-02 from the uncommitted working tree on `import-examples` (the repo docs this reflects)
 - **Source:** [SOW3 hub in Notion](https://app.notion.com/p/3ed4057b9f2381f49681d7f96458e796), a display copy of the repo docs [testing strategy](https://github.com/midnightntwrk/midnight-examples/blob/import-examples/experimental/q3-delivery/q3-testing-strategy.md) and [who tests and signs off](https://github.com/midnightntwrk/midnight-examples/blob/import-examples/experimental/q3-delivery/q3-test-ownership.md). If this file and Notion disagree, Notion is newer.
 
-All nine Q3 deliverables now have named owners, and most have two. Eight are at "Owner named". SOW-02 is still blocked until Ledger 10, with provisional owners. Foundation testing has passed for SOW-01 (crypto schemes) and SOW-03 (dynamic cross-contract calls), and both reports wait for sign-off. No item is signed off yet. The most important next steps: the two SOW-01 owners sign that report, and the OpenZeppelin contact for SOW-03 gets named.
+All nine Q3 deliverables now have named owners, and most have two. Eight are at "Owner named". SOW-02 is still blocked until Ledger 10, with provisional owners. Foundation testing has passed for SOW-01 (crypto schemes) and SOW-03 (dynamic cross-contract calls), and both reports wait for sign-off. No item is signed off yet. The most important next steps: the two SOW-01 owners sign that report, and the OpenZeppelin contact for SOW-03 gets named. The Solutions team walked through the owner assignments in today's huddle and raised no objections.
 
-## Since last update (2026-10-02 02:03 UTC)
-- SOW-01 Crypto schemes: Tested – awaiting sign-off → Owner named. Jalal Hannan added as a second owner, alongside Nick Stanford. (Notion sync of 2026-10-02)
-- SOW-02 Recursive proofs: Jalal Hannan and Mahesh Sashital named as provisional owners, to be confirmed when Ledger 10 is scheduled. Webisoft added as a partner. Independent tester now reads "Ledger 10". (Notion sync of 2026-10-02)
-- SOW-03 Dynamic cross-contract calls: Tested – awaiting sign-off → Owner named. Ricardo Rius added as a second Foundation signer, alongside Jay Albert. Midnames added as a partner. (Notion sync of 2026-10-02)
-- SOW-04 Private state MIP: Ready for review → Owner named. Ricardo Rius added as a second owner, alongside Karmel Elshinnawi. (Notion sync of 2026-10-02)
-- SOW-07 Shielded source of funds: Ready for review → Owner named. Mahesh Sashital replaces Hector Bulgarini as owner, alongside Jalal Hannan. (Notion sync of 2026-10-02)
-- SOW-09 Throughput performance: Mahesh Sashital added as a second owner, alongside Ben Beckmann. (Notion sync of 2026-10-02)
-- New comment on the hub from Tracie Mitchell (2026-10-02). She has linked the hub to the ClickUp acceptance milestone and says this is sufficient for now. The SOW3 items are already linked to a program milestone through a release. She will track in the background. The ClickUp question is still listed as open.
-- Notion last synced moved from commit `c996be8` to the uncommitted working tree on `import-examples`: the repo docs were updated to match the owner and status changes above.
-- Flag: on SOW-02, "Next step" still reads "Name an owner when Ledger 10 is scheduled", although provisional owners are named. On SOW-03, the "Partner / co-signer" field and the "Next step" field ("then both sign") still describe a single Foundation signer.
+## Since last update (2026-10-02 18:15 UTC)
+- Notion: no changes. The fields, open questions and comments are the same as in the 18:15 run.
+
+**From the Solutions Weekly Huddle (2026-10-02).** These notes come from the meeting transcript, not from Notion. The Snapshot below still reflects Notion only.
+- SOW-02 Recursive proofs: owners Jalal Hannan and Mahesh Sashital confirmed. Ledger 10 is the official blocker. The delivery is a Ledger 10 experiment, not a complete solution. It was asked for to check that the next SOW's work is heading in the right direction, and it won't ship even if Ledger 10 lands in the next few weeks. A local ("undeployed") network test is possible. First, find out exactly what was delivered.
+- SOW-01 and SOW-03: Nick Stanford said the Foundation runs so far are smoke tests from his harness, not proper validation. Owners still need to validate for real before signing.
+- SOW-03 Dynamic cross-contract calls: Jay Albert confirmed as owner. OpenZeppelin stays listed as a partner for now. Jay may send the acceptance criteria and Notion pages straight to partners, because no deliverable information is private.
+- SOW-04 Private state MIP: Ricardo Rius confirmed as lead, with Karmel Elshinnawi overseeing.
+- SOW-05 BABE: Ricardo Rius confirmed as owner. He will ask Shielded how they tested it and what triggers the consensus switch in phase 1. If we can't reproduce their test but the method is sound, that may be enough: BABE isn't used until phase 2, and the normal preview → preprod promotion gates still apply. BABE fixes a security weakness (a DDoS risk in the current Aura block production). It does not speed up blocks, and it may cause more short-lived forks.
+- SOW-06 Block production rewards: the deliverable is a MIP, probably not implemented yet. It is mostly internal, with no partner. The C-NIGHT / M-NIGHT handling needs to be right.
+- SOW-07 Shielded source of funds: the updated proposal was delivered about two days ago. The "Ready for review" label was set by an agent, not by a person. The owner will spend time on it next week. The 14-day review target is soft and can stretch by a couple of weeks.
+- SOW-09 Throughput performance: this is a review of Shielded's throughput report, not testing. Ben Beckmann reads it first and decides where it goes. Mahesh Sashital will ping him.
+- All items: owners fill in the partner / co-signer contact as they identify it.
+- Ledger 9: it will still go to mainnet, but first as a newer Ledger 9 version than the one on StageNet. Security fixes and some Q3 supporting code, for example Midnight.js support for dynamic cross-contract calls, are being backported into it. Most of that backported code probably won't need an audit.
+- StageNet: the team wants it kept running. Partners use it to prepare for the new architecture, and it gives deployed contracts for cross-contract call testing. Shielded wants to shut it down after the token launch, and Jenna is pushing back. Action: list every partner using StageNet.
+- Action for Nick Stanford: share the midnight-examples repo link (the `import-examples` branch, experimental section) in the Solutions channel.
+- Flag: none of the huddle decisions changes a Notion field, so there is no Notion mismatch to report.
 
 ## Snapshot
 | SOW | Item | Status | Owner | Independent tester | Testability | Blocked by | Next step | Sign-off |
@@ -67,6 +74,7 @@ None yet: all nine items are Not signed.
 - **Ledger 9 / Ledger 10:** versions of the Midnight ledger. Hard fork SOW-08 moves the network from 8 to 9; SOW-02 needs 10.
 - **BABE:** a block-production method; SOW-05 migrates the node to it from the current method (Aura).
 - **qanet / preprod:** shared Midnight test networks.
+- **StageNet / preview:** StageNet is the public network where Shielded's Q2 delivery runs. Preview is the playground network for testing new features, and it gets new versions before preprod and mainnet.
 - **q3-ledger9:** the Foundation's acceptance test suite in the midnight-examples repo.
 - **OpenZeppelin:** a partner organisation co-signing SOW-03.
 - **Midnames, Webisoft:** partner organisations listed on SOW-03 and SOW-02; their roles are not stated yet.
@@ -74,6 +82,7 @@ None yet: all nine items are Not signed.
 
 ## Changelog
 ### 2026-10-02
+- Solutions Weekly Huddle: the team walked through the owner assignments and confirmed them. SOW-02 is a Ledger 10 experiment. The SOW-01 and SOW-03 Foundation runs are smoke tests that still need real validation. Ricardo Rius will ask Shielded how BABE's consensus switch is triggered. Ben Beckmann reviews the SOW-09 report first, and Mahesh Sashital will ping him. The SOW-07 review starts next week, and the 14-day target is soft. The team wants StageNet kept up.
 - Second owners named: Jalal Hannan on SOW-01, Ricardo Rius on SOW-03 (Foundation signer) and SOW-04, and Mahesh Sashital on SOW-09. On SOW-07, Mahesh Sashital replaces Hector Bulgarini.
 - SOW-02: Jalal Hannan and Mahesh Sashital named as provisional owners, with Webisoft as partner.
 - SOW-03: Midnames added as a partner.
