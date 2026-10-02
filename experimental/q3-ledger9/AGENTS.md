@@ -13,7 +13,8 @@ on the ledger 9 stack. It is **not** an mn-examples example:
 
 The plan, the gap ids and the status for each deliverable live in
 [`../q3-delivery/q3-testing-strategy.md`](../q3-delivery/q3-testing-strategy.md). Keep that
-doc in step when you add or change a test.
+doc in step when you add or change a test, and its Notion mirror too (see
+[`../q3-delivery/AGENTS.md`](../q3-delivery/AGENTS.md)).
 
 ## Rules
 

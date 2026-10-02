@@ -1,5 +1,7 @@
 # Q3 2026 deliverables: testing strategy
 
+> Mirrored for non-developers in Notion: [SOW3](https://app.notion.com/p/3ed4057b9f2381f49681d7f96458e796). The md is canonical: when you change owners, statuses, signers or open questions here, sync Notion as well (see [`AGENTS.md`](AGENTS.md)).
+
 - **Status:** living draft. Expect to restructure it; we will get the architecture wrong the first time, so iterate.
 - **Started:** 2026-09-30.
 - **Scope:** the nine items in the Shielded Q3 2026 statement of work. For each one: how the Foundation verifies it independently, where that testing runs, and in what order.
@@ -14,7 +16,7 @@
 - Cite the canonical file for any claim about a deliverable. Do not cite memory or a transcript paraphrase.
 - Mark Compact and SDK identifiers as *per delivery record* until they have been compiled **and** run in our harness. This follows the repo's golden rule in [`AGENTS.md`](../../AGENTS.md): "Compilation alone is not proof — code must run."
 - When a test exists, link it from its gap row. When a run happens, link its report JSON (see [P4](#p4-acceptance-report-format)).
-- Put new findings about a deliverable, such as a defect or a doc inconsistency, under **Review findings** in that item's section, so they can be raised with the delivering team.
+- Put new findings about a deliverable, such as a defect or a doc inconsistency, under **Review findings** in that item's section. File the defects and doc errors at the servicedesk ([Reporting bugs and issues](#reporting-bugs-and-issues)), and link the ticket back from the finding.
 
 ## Testing posture
 
@@ -50,15 +52,15 @@ The rules that follow from this:
 
 | ID | Deliverable | Tier | Where tested | Vendor QA | Our focus | Blocker | Owner / partner |
 |---|---|---|---|---|---|---|---|
-| [01](#sow-q3-01-crypto-schemes) | ed25519 + ECDSA P-256 in Compact | **A** | [`q3-ledger9/signature-verify`](../q3-ledger9/signature-verify/) | PASS, 63/63 tests | QA gaps, DApp-shape signature auth | none | TBD |
-| [03](#sow-q3-03-dynamic-cross-contract-calls) | Dynamic cross-contract calls | **A** | [`q3-ledger9/dynamic-calls`](../q3-ledger9/dynamic-calls/) | PASS, 183/183 tests | `ContractModuleProvider` + error kinds | none | TBD |
-| [08](#sow-q3-08-hard-fork-v8-to-v9) | Hard fork ledger 8 → 9 | **B, highest value** | `midnight-node/local-environment` + our ledger 8 examples | PASS on local-env and devnet | Pre-fork DApps working post-fork | local-env bring-up | TBD |
-| [02](#sow-q3-02-recursive-proofs) | `verifyProof` / recursive proofs | **B** | compact-end-2-end harness, ledger 10 alpha | Demo cases + named negatives | Missing negative cases | Ledger 10 images built from source | TBD |
-| [05](#sow-q3-05-babe-phase-1) | AURA → BABE migration | **C** | node team; we add a DApp liveness probe | Demo + runbook | DApp + indexer continuity across the flip | node 3.0.0 local-env | TBD (node team) |
-| [06](#sow-q3-06-block-production-rewards) | Block production rewards | **C** (+ D for MIPs) | reserve-contracts `just private-net-*` | Demo | DUST-destination outcome, reward arithmetic | Custom Lace, TBD parameters | TBD (node + reserve-contracts teams) |
-| [04](#sow-q3-04-private-state-mip) | Private state MIP | **D** | review | n/a | AC-1 = submitted | none | TBD |
-| [07](#sow-q3-07-shielded-source-of-funds) | Shielded source of funds | **D** | review | n/a | Design review | none | TBD |
-| [09](#sow-q3-09-throughput-performance) | Throughput performance | **D** | review + hash check | n/a | Report integrity, MIP review | none | TBD |
+| [01](#sow-q3-01-crypto-schemes) | ed25519 + ECDSA P-256 in Compact | **A** | [`q3-ledger9/signature-verify`](../q3-ledger9/signature-verify/) | PASS, 63/63 tests | QA gaps, DApp-shape signature auth | none | nstanford5 ([roles](q3-test-ownership.md#sow-q3-01-crypto-schemes)) |
+| [03](#sow-q3-03-dynamic-cross-contract-calls) | Dynamic cross-contract calls | **A** | [`q3-ledger9/dynamic-calls`](../q3-ledger9/dynamic-calls/) | PASS, 183/183 tests | `ContractModuleProvider` + error kinds | none | OpenZeppelin + Foundation co-sign, contacts TBD ([roles](q3-test-ownership.md#sow-q3-03-dynamic-cross-contract-calls)) |
+| [08](#sow-q3-08-hard-fork-v8-to-v9) | Hard fork ledger 8 → 9 | **B, highest value** | `midnight-node/local-environment` + our ledger 8 examples | PASS on local-env and devnet | Pre-fork DApps working post-fork | local-env bring-up | Leonard Hegarty, `hegaleon` ([roles](q3-test-ownership.md#sow-q3-08-hard-fork-v8-to-v9)) |
+| [02](#sow-q3-02-recursive-proofs) | `verifyProof` / recursive proofs | **B** | compact-end-2-end harness, ledger 10 alpha | Demo cases + named negatives | Missing negative cases | **Blocked until Ledger 10 is released** | after Ledger 10 ([contributors](q3-test-ownership.md#sow-q3-02-recursive-proofs)) |
+| [05](#sow-q3-05-babe-phase-1) | AURA → BABE migration | **C** | node team; we add a DApp liveness probe | Demo + runbook | DApp + indexer continuity across the flip | node 3.0.0 local-env | Ricardo Rius, `riusricardo` ([roles](q3-test-ownership.md#sow-q3-05-babe-phase-1)) |
+| [06](#sow-q3-06-block-production-rewards) | Block production rewards | **C** (+ D for MIPs) | reserve-contracts `just private-net-*` | Demo | DUST-destination outcome, reward arithmetic | Custom Lace, TBD parameters | Karmoola, MPS-0019 ([roles](q3-test-ownership.md#sow-q3-06-block-production-rewards)) |
+| [04](#sow-q3-04-private-state-mip) | Private state MIP | **D** | review | n/a | AC-1 = submitted | none | Karmoola, MPS-0021 ([roles](q3-test-ownership.md#sow-q3-04-private-state-mip)) |
+| [07](#sow-q3-07-shielded-source-of-funds) | Shielded source of funds | **D** | review | n/a | Design review | none | Jalal-1, hbulgarini, MPS-0025 ([roles](q3-test-ownership.md#sow-q3-07-shielded-source-of-funds)) |
+| [09](#sow-q3-09-throughput-performance) | Throughput performance | **D** | review + hash check | n/a | Report integrity, MIP review | none | BenB-MNF ([roles](q3-test-ownership.md#sow-q3-09-throughput-performance)) |
 
 ## Cross-cutting prerequisites
 
@@ -125,11 +127,71 @@ The vendor QA runs did not always use the pinned stack:
 
 Every acceptance report records its exact stack. Each item section notes where our pins differ from QA's.
 
+## Reporting bugs and issues
+
+Anyone testing this delivery opens a ticket at the **[Midnight servicedesk](https://github.com/midnightntwrk/servicedesk)** when they find a bug or an issue with a delivered feature. That includes Foundation testers, partners such as OpenZeppelin, and item owners. The servicedesk is the single entry point: triage routes the ticket to the delivering team, and it carries the SLA. Do not report defects only in ClickUp, a chat thread or this doc.
+
+**Which template**
+
+| What you found | Where it goes |
+|---|---|
+| A delivered feature behaves wrongly: a refusal that should not happen, an acceptance that should not, a crash, or a wrong result | [Bug report](https://github.com/midnightntwrk/servicedesk/issues/new?template=bug-report.yml) |
+| An error or gap in the record, an example, a runbook or a migration guide (e.g. the wrong indexer image org, or `contractModuleProvider` missing from the Midnight.js migration guide) | [Documentation improvement](https://github.com/midnightntwrk/servicedesk/issues/new?template=documentation-improvement.yml) |
+| A question that blocks testing (e.g. "where do `π` and `dist_fee` come from?") | [Help request](https://github.com/midnightntwrk/servicedesk/issues/new?template=help-request.yml) |
+| **Anything with a security impact** (e.g. a signature accepted that should be refused, or a proof that verifies when it should not) | **[Private vulnerability report](https://github.com/midnightntwrk/servicedesk/security/advisories/new)**, never a public issue. Fallback: security@midnight.foundation |
+| A comment on a MIP's design (04, 06, 07, 09) | The MIP pull request, not the servicedesk |
+| A bug in our own harness (`q3-ledger9`, `examples/`) | Fix it here |
+
+**What a ticket must contain.** The servicedesk's [AI reporting guidelines](https://github.com/midnightntwrk/servicedesk/blob/main/ai-reports.md) apply to every ticket, and to agent-assisted testing in particular. A ticket without a reproducing test is not triaged. Our harness already produces what they ask for:
+
+- **Branch and commit SHA:** the mn-examples commit, the record commit (`a6e7daf`), and the exact stack (the `yarn stack:check` output, or the `subjectUnderTest` from the report JSON). These are pre-release versions, so name the RC and the image digest.
+- **File paths and line references:** the test file and line, e.g. `experimental/q3-ledger9/signature-verify/src/…sim.test.ts:NN`, plus the contract source involved.
+- **A runnable test case, in full:** the `it(…)` block that carries the gap id, and the command that runs it (`yarn test:sim` or `yarn test:local`).
+- **Expected behaviour,** citing the record, spec or example line that says so, e.g. `[record:125]` or CoIP 4.
+- **Actual behaviour,** with the logs, stack trace or error output.
+
+**How to fill the form**
+
+- **Title:** `[Bug]: SOW-Q3-0N <gap id>: <one-line summary>`, e.g. `[Bug]: SOW-Q3-03 03-G3: <what happened, on which input>`. The gap id ties the ticket to its test.
+- **Component:** use the table below. Triage re-routes if the choice is wrong.
+- **Network:** the form offers only Mainnet, Preprod, Preview or Not applicable. For local-env, devnet or qanet, pick *Not applicable* and name the environment in the first line of the description.
+- **First seen where:** *Internal test / QA*.
+- **Severity:** the form's P1–P4. Most findings on a local pre-release stack are P3 (degraded, workaround exists) or P2 (feature broken). Security findings skip the form; see above.
+- **Label:** ask triage to add **`q3sow26`**, so that Q3 SOW tickets can be pulled together. This follows the `q2sow26` label used on last quarter's tickets (e.g. [#95](https://github.com/midnightntwrk/servicedesk/issues/95), [#97](https://github.com/midnightntwrk/servicedesk/issues/97)). `q3sow26` does not exist yet, so ask the servicedesk maintainers to create it. If an agent helped find or write up the bug, say so in the ticket, as the guidelines ask; triage has a `bot:ai-assisted` label for this.
+
+| SOW | Likely components (servicedesk form) |
+|---|---|
+| 01 | Contracts — Compact Compiler (compactc); Contracts — ZKIR; Contracts — Contract Runtime |
+| 02 | Infra — ZK Circuits (midnight-zk); Contracts — Compact Compiler (compactc) |
+| 03 | Contracts — Compact Compiler (compactc); Contracts — Contract Runtime; App/SDK — Midnight.js SDK (module provider) |
+| 05 | Infra — Node (midnight-node); Infra — Indexer (midnight-indexer) |
+| 06 | Infra — Node (midnight-node); Interop — Bridge Contracts; Interop — Partner Chains (Cardano) |
+| 08 | Infra — Node; Infra — Ledger; Infra — Indexer; Infra — Proof Server; App/SDK — Wallet SDK; App/SDK — Midnight.js SDK |
+| 04, 07, 09 | No running feature to report against. Design comments go on the MIP PR; errors in the delivered docs use the documentation template |
+
+**After filing**
+
+- Link the ticket from the finding under the item's **Review findings**, and from its gap row.
+- Link it from the item's ClickUp task.
+- Add it to the next report JSON for that item ([P4](#p4-acceptance-report-format)), so the sign-off shows what is still open.
+- A ticket that is still open does not by itself block sign-off. The item owner decides, and records the decision with the sign-off.
+
+**Not yet filed.** These findings in this doc are candidates. None has been filed yet:
+
+| Finding | Item | Template |
+|---|---|---|
+| The indexer image path in the record names the wrong org (`midnight-ntwrk`, not `midnightntwrk`) | P2, all | documentation |
+| CoIP 4 lists 10 failure kinds; compact-runtime 0.20.0 has 11 (`PureInterfaceCircuit`) | 03 | documentation |
+| The Midnight.js v5.0.0-rc.2 migration guide does not mention `contractModuleProvider` | 03 | documentation |
+| `secp256r1EcdsaVerify` throws an arithmetic error on `s = 0` rather than failing an assertion; behaviour when proven (L2) not yet checked | 01 | bug, once L2 confirms |
+| Runbook ordering and gate-number inconsistencies | 05 | documentation |
+| The AC puts staker payment out of scope, yet the demo pays delegators | 06 | help request, to the owner first |
+
 ---
 
 ## SOW-Q3-01 Crypto schemes
 
-> **Status:** L1 green (50 tests), L2 green (6 tests), local network, record stack · **Owner:** TBD · **Last updated:** 2026-10-01 · **Tier A**
+> **Status:** L1 green (50 tests), L2 green (6 tests), local network, record stack · **Owner:** nstanford5 ([roles](q3-test-ownership.md#sow-q3-01-crypto-schemes)) · **Last updated:** 2026-10-01 · **Tier A**
 >
 > **Report (preliminary, not for formal acceptance):** [Markdown](../q3-ledger9/reports/sow-q3-01-local-2026-10-01.md) · [JSON](../q3-ledger9/reports/sow-q3-01-local-2026-10-01.json)
 >
@@ -191,7 +253,7 @@ From the L1 run on 2026-10-01 (details in [`q3-ledger9/README.md`](../q3-ledger9
 
 ## SOW-Q3-03 Dynamic cross-contract calls
 
-> **Status:** L1 green (16 tests), L2 green (6 tests), local network, Midnight.js 5.0.0-rc.2 · **Owner:** TBD · **Last updated:** 2026-10-01 · **Tier A** (no longer gated)
+> **Status:** L1 green (16 tests), L2 green (6 tests), local network, Midnight.js 5.0.0-rc.2 · **Owner:** OpenZeppelin + Foundation co-sign, contacts TBD ([roles](q3-test-ownership.md#sow-q3-03-dynamic-cross-contract-calls)) · **Last updated:** 2026-10-01 · **Tier A** (no longer gated)
 >
 > **Report (preliminary, not for formal acceptance):** [Markdown](../q3-ledger9/reports/sow-q3-03-local-2026-10-01.md) · [JSON](../q3-ledger9/reports/sow-q3-03-local-2026-10-01.json)
 >
@@ -248,7 +310,7 @@ From the L1 run on 2026-10-01 (details in [`q3-ledger9/README.md`](../q3-ledger9
 
 ## SOW-Q3-08 Hard fork v8 to v9
 
-> **Status:** not started · **Owner:** TBD · **Last updated:** 2026-09-30 · **Tier B, highest value for this repo**
+> **Status:** not started · **Owner:** Leonard Hegarty, `hegaleon` ([roles](q3-test-ownership.md#sow-q3-08-hard-fork-v8-to-v9)) · **Last updated:** 2026-10-01 · **Tier B, highest value for this repo**
 
 **ACs** ([record:236-239][rec])
 - AC-1: ledger state migrates; SDKs, wallets and DApp interfaces work without loss of state or breaking changes.
@@ -311,7 +373,7 @@ Phase 3 checks:
 
 ## SOW-Q3-02 Recursive proofs
 
-> **Status:** not started · **Owner:** TBD · **Last updated:** 2026-09-30 · **Tier B**
+> **Status:** blocked until Ledger 10 is released · **Owner:** after Ledger 10 ([contributors](q3-test-ownership.md#sow-q3-02-recursive-proofs)) · **Last updated:** 2026-10-01 · **Tier B**
 
 **ACs** ([record:157-158][rec])
 - AC-1: a recursive proof can be created in midnight-zk.
@@ -349,7 +411,7 @@ vp run cases:regression:qa -- recursive-verify-proof
 
 ## SOW-Q3-05 BABE phase 1
 
-> **Status:** not started · **Owner:** TBD (node team primary) · **Last updated:** 2026-09-30 · **Tier C**
+> **Status:** not started · **Owner:** Ricardo Rius, `riusricardo` ([roles](q3-test-ownership.md#sow-q3-05-babe-phase-1)) · **Last updated:** 2026-10-01 · **Tier C**
 
 **AC** ([record:201][rec])
 - AC-1: working prototype of BABE integrated into a branch of the Q2 release.
@@ -387,7 +449,7 @@ The rehearsal scripts are `npm run consensus-upgrade-arm-babe:local-env` and `np
 
 ## SOW-Q3-06 Block production rewards
 
-> **Status:** not started · **Owner:** TBD (node + reserve-contracts teams) · **Last updated:** 2026-09-30 · **Tier C**, MIP part **D**
+> **Status:** not started · **Owner:** Karmoola, MPS-0019 ([roles](q3-test-ownership.md#sow-q3-06-block-production-rewards)) · **Last updated:** 2026-10-01 · **Tier C**, MIP part **D**
 
 **AC** ([record:218][rec])
 - AC-1: a working prototype and a MIP for rewards in NIGHT to validators. Payment to Ada stakers is out of scope.
@@ -414,7 +476,7 @@ The rehearsal scripts are `npm run consensus-upgrade-arm-babe:local-env` and `np
 
 ## SOW-Q3-04 Private state MIP
 
-> **Status:** not started · **Owner:** TBD · **Last updated:** 2026-09-30 · **Tier D**
+> **Status:** not started · **Owner:** Karmoola, MPS-0021 ([roles](q3-test-ownership.md#sow-q3-04-private-state-mip)) · **Last updated:** 2026-10-01 · **Tier D**
 
 - AC-1 "Completed MIP submitted to the MIP process": check it against [MIP PR #334][mip-334] (text @ `49bbfd7`). This is a fact check, not a test.
 - Run the [MIP review checklist](#mip-and-design-review-checklist).
@@ -422,14 +484,14 @@ The rehearsal scripts are `npm run consensus-upgrade-arm-babe:local-env` and `np
 
 ## SOW-Q3-07 Shielded source of funds
 
-> **Status:** not started · **Owner:** TBD · **Last updated:** 2026-09-30 · **Tier D** (time and materials, no ACs)
+> **Status:** not started · **Owner:** Jalal-1, hbulgarini, MPS-0025 ([roles](q3-test-ownership.md#sow-q3-07-shielded-source-of-funds)) · **Last updated:** 2026-10-01 · **Tier D** (time and materials, no ACs)
 
 - Design review of [MIP PR #335][mip-335] @ `41d3b15` against [MPS-0025][mps-25], using the checklist.
 - Optional, out of scope for Q3: a Compact "token guard" spike to test whether the custom-spend-logic design can be expressed on today's stack.
 
 ## SOW-Q3-09 Throughput performance
 
-> **Status:** not started · **Owner:** TBD · **Last updated:** 2026-09-30 · **Tier D** (time and materials, no ACs)
+> **Status:** not started · **Owner:** BenB-MNF ([roles](q3-test-ownership.md#sow-q3-09-throughput-performance)) · **Last updated:** 2026-10-01 · **Tier D** (time and materials, no ACs)
 
 - Verify the report PDF SHA-256 `b53b19ee83817dcd603f7395ac26a4e38aaf055bad9bbd886b37cd91bd67da86` (P1).
 - Review [MIP #312][mip-312] (revalidation cache) and [MIP #309][mip-309] (interim ledger state).
@@ -456,17 +518,20 @@ Use for 04, 06 (MIPs), 07 and 09.
 3. **SOW-08 fork rehearsal** on `local-environment`, using our ledger 8 examples.
 4. **SOW-03:** L1 and L2 green on Midnight.js `5.0.0-rc.2` (see [`q3-ledger9`](../q3-ledger9/)).
 5. **Review passes:** 04, 06 MIPs, 07, 09, and the 05 runbook findings.
-6. **SOW-02** baseline reproduction, then negatives on ledger 10.
+6. **SOW-02** baseline reproduction, then negatives on ledger 10. Blocked until Ledger 10 is released.
 7. **SOW-05** DApp liveness probe, when a node 3.0.0 local-env with indexer and proof server is available.
 8. **SOW-06** checks, once `π` and `dist_fee` are set.
 
 ## Open questions
 
-- **Owners and partners:** which partner tests which item (the owner column above).
+- **Owners and partners:** who tests and who signs off each item is mapped in [`q3-test-ownership.md`](q3-test-ownership.md), starting from the MIP and deliverable authors. The independent testers are still open there.
+- **Foundation owners still to name** (details in [`q3-test-ownership.md` Open questions](q3-test-ownership.md#open-questions)):
+  - SOW-02: the owner is named when Ledger 10 is released.
+  - SOW-03: OpenZeppelin and the Foundation sign together. Both named signers are still TBD.
 - **Network access:** access to qanet for SOW-08; who schedules our phase 3 runs against each fork.
 - **Upstream contributions:** should the pure stdlib-level gap tests (01-G1/G3/G4/G7, 02-G1–G6) be contributed to compact-end-2-end instead of, or as well as, living here?
 - **Custom Lace:** can we get the build (`MicroProofs/lace@3fc3166`) for SOW-06, and is a wallet-free CLI path enough?
-- **Tracking surface:** ClickUp, Notion, or GitHub labels such as "Q4 SOW" (see [`first-thoughts.md`](../first-thoughts.md)).
+- ~~**Tracking surface**~~ **Decided 2026-10-01: ClickUp.** The open questions and assignments are tracked there. Defects go to the servicedesk instead (see [Reporting bugs and issues](#reporting-bugs-and-issues)).
 - **On-chain runtime rc.4:** do we ask vendor QA to re-run SOW-01 on the rc.4 it lists, or is our 01-G11 enough?
 
 [rec-dir]: https://github.com/midnightntwrk/midnight-network-ops/tree/a6e7daf8727bc61cfe15b422359ebeb0681ec6bb/releases/deliverables/2026-q3
