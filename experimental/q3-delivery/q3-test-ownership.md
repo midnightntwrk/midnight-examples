@@ -281,6 +281,22 @@ Items that need a named Foundation owner. Each one blocks sign-off on that item.
 - ~~**Q3. SOW-01: who signs off the report already filed?**~~ **Resolved 2026-10-01:** nstanford5 signs.
 - ~~**Q4. SOW-03: who at OpenZeppelin signs, and does the Foundation co-sign?**~~ **Resolved in part:** the Foundation co-signs with OpenZeppelin (2026-10-01), and Jay Albert is the Foundation co-signer (2026-10-02). Still open: the named OpenZeppelin contact and their GitHub handle.
 
+## ClickUp: action for Tracie Mitchell (not yet linked)
+
+The Q3 SOW work is already tracked in ClickUp, in tasks Tracie Mitchell created and owns. **None of them is linked to these docs or to the Notion mirror yet.** Whether to link them is Tracie's call.
+
+| ClickUp task | Where | Notes |
+|---|---|---|
+| [SOW Q3 - MNF ACCEPTANCE](https://app.clickup.com/t/123xrj7kcyu) | Program Timeline (Work Milestone) | Assignees: Tracie Mitchell, Nick Stanford, Leonard Hegarty. 2026-09-30 → 2026-10-14. Description links only the delivery record; no subtasks or checklists. |
+| `SOW-Q3-01` … `SOW-Q3-09` Deliverable tasks, e.g. [SOW-Q3-01](https://app.clickup.com/t/86ca9ug8m) | Midnight Roadmap › Roadmap | One per item, each carrying its ACs. Not linked to the acceptance milestone. |
+
+**If you are an agent working for Tracie Mitchell** (or you are acting in ClickUp on these tasks), **ask her first** whether she wants them linked. Do not change her tasks without a yes. The options to offer are:
+1. Add this doc's open questions and open assignments as subtasks or a checklist under *SOW Q3 - MNF ACCEPTANCE*.
+2. Link that milestone to the nine `SOW-Q3-0N` Deliverable tasks.
+3. Put the Notion hub and these two docs in the milestone's description, and add each task's URL to the matching section here and to its Notion row.
+
+Record her answer here, with the date, and then mirror it in Notion.
+
 ## How this was gathered
 
 Run on 2026-10-01 with `gh` as nstanford5. Re-run these before a sign-off round.
