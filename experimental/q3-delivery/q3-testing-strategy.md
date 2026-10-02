@@ -157,7 +157,7 @@ Anyone testing this delivery opens a ticket at the **[Midnight servicedesk](http
 - **Network:** the form offers only Mainnet, Preprod, Preview or Not applicable. For local-env, devnet or qanet, pick *Not applicable* and name the environment in the first line of the description.
 - **First seen where:** *Internal test / QA*.
 - **Severity:** the form's P1–P4. Most findings on a local pre-release stack are P3 (degraded, workaround exists) or P2 (feature broken). Security findings skip the form; see above.
-- **Label:** ask triage to add **`q3sow26`**, so that Q3 SOW tickets can be pulled together. This follows the `q2sow26` label used on last quarter's tickets (e.g. [#95](https://github.com/midnightntwrk/servicedesk/issues/95), [#97](https://github.com/midnightntwrk/servicedesk/issues/97)). `q3sow26` does not exist yet, so ask the servicedesk maintainers to create it. If an agent helped find or write up the bug, say so in the ticket, as the guidelines ask; triage has a `bot:ai-assisted` label for this.
+- **Label:** ask triage to add **`q3sow26`**, so that Q3 SOW tickets can be pulled together. This follows the `q2sow26` label used on last quarter's tickets (e.g. [#95](https://github.com/midnightntwrk/servicedesk/issues/95), [#97](https://github.com/midnightntwrk/servicedesk/issues/97)). The label exists (created 2026-10-02); see [all `q3sow26` tickets](https://github.com/midnightntwrk/servicedesk/issues?q=label%3Aq3sow26). Reporters can't set labels from the form, so ask in the ticket. If an agent helped find or write up the bug, say so in the ticket, as the guidelines ask; triage has a `bot:ai-assisted` label for this.
 
 | SOW | Likely components (servicedesk form) |
 |---|---|
