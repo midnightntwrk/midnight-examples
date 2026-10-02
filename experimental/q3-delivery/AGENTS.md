@@ -40,6 +40,7 @@ Row pages, one per item:
 ### Rules
 
 - **The `.md` files are canonical.** Notion is a display copy. Never change Notion first, and never treat a Notion edit as the source of a fact.
+- **One exception: formal sign-off starts in Notion.** Owners sign in each item page's **Formal sign-off** section and in the row's `Sign-off`, `Signed by`, `Signed on` and `Conditions` fields. When you sync, read those fields and the page's decision tables, and copy them into the [Sign-off record](q3-test-ownership.md#sign-off-record) in `q3-test-ownership.md`, with the date. A signature counts only if the signer is that item's named owner or co-signer; otherwise, flag it and do not copy it. When a decision is recorded, also set the row's `Status` and the item's status block in both md files.
 - **Every change to `q3-testing-strategy.md` or `q3-test-ownership.md` that touches an owner, a status, a signer, an open question, the servicedesk rules or a conflict of interest must be synced to Notion in the same piece of work.** Gap-row and evidence-only changes do not need a sync, because Notion links to the md for detail.
 - **After syncing, update the "Last synced" line** in the hub's top callout: the date, and the git commit, or "uncommitted working tree on `<branch>`".
 - **Comments in Notion are change requests.** Read them (`get_comments` on the hub and row pages), make the change in the md, sync it, then reply to the comment with what changed.
@@ -56,11 +57,13 @@ Row pages, one per item:
 | the same table: R1 authors / builders | row `Built by` |
 | the same table: R3 tester | row `Independent tester` |
 | the same table: State, plus the item's status block in the strategy doc | row `Status`: one of Tested – awaiting sign-off · Ready for review · Owner named · Blocked · Not started |
-| the item section's "Sign-off artefacts" | row page "Sign-off" to-do list |
 | the strategy doc's Triage table: Tier | row `Testability` (A–D) |
 | the strategy doc's Triage table: Blocker; each item's dependencies | row `Blocked by` |
 | the next action implied by the open questions and sign-off | row `Next step` |
 | a partner or co-signer, e.g. SOW-03 OpenZeppelin | row `Partner / co-signer` |
+| `STL 2026-q3-deliverables.md`: each item's "Acceptance criteria" list, **word for word** | row page "Acceptance criteria": one `###` per AC, with the verbatim quote, then "In plain English", "How we check it" and "Evidence so far". For an item with no ACs (07, 09), a "Review questions" list |
+| the item section's "Sign-off artefacts" in `q3-test-ownership.md` | row page "Formal sign-off › Before you sign" checklist |
+| `q3-test-ownership.md` › Sign-off record ← **copied from Notion**, not to it | row `Sign-off`, `Signed by`, `Signed on`, `Conditions`, and the page's "Decision on each criterion" and "Statement" tables |
 | `q3-test-ownership.md` › Open questions, plus the strategy doc's Open questions | hub "Open questions" list, and its "Resolved" toggle |
 | the strategy doc › Reporting bugs and issues | hub "Found a problem?" section (condensed) |
 | `q3-test-ownership.md` › Conflicts | hub "Conflicts of interest" toggle |
