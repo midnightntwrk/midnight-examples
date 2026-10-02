@@ -12,6 +12,10 @@ The Foundation's acceptance plan for the Q3 2026 SOW deliverables:
 
 The tests themselves live in [`../q3-ledger9/`](../q3-ledger9/), which has its own `AGENTS.md`.
 
+## ClickUp: ask Tracie Mitchell before linking
+
+The Q3 SOW tasks in ClickUp belong to Tracie Mitchell. They are listed in [`q3-test-ownership.md` › ClickUp](q3-test-ownership.md#clickup-action-for-tracie-mitchell-not-yet-linked), and none is linked to these docs yet. **If you are working for Tracie, or you are about to touch those ClickUp tasks, stop and ask her whether she wants them linked to these docs and to the Notion mirror.** The three options are in that section. Do not create, edit or link ClickUp tasks without her yes, and record her answer in that section.
+
 ## The Notion mirror: keep it in sync
 
 The two `.md` files above are mirrored in Notion as a display copy for non-developers on the team:
@@ -80,6 +84,7 @@ Row pages, one per item:
 | Karmoola | Karmel Elshinnawi | `user://2c3d872b-594c-81dd-b81c-000253b0257c` | |
 | Jalal-1 | Jalal Hannan | `user://25ad872b-594c-8192-bddf-00026c1058fc` | |
 | hbulgarini | Hector Bulgarini | `user://2bfd872b-594c-8185-854e-0002b40cacf0` | |
+| — | Tracie Mitchell | `user://281d872b-594c-814d-9d09-00029dbee5c4` | owns the ClickUp Q3 SOW tasks |
 | JAlbertCode | Jay Albert | `user://2e2d872b-594c-817a-b84e-0002d85ae7a7` | GitHub handle *inferred* (company "Midnight Network", no profile name) |
 | — | OpenZeppelin | none | a partner organisation; write it as text |
 
