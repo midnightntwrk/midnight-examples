@@ -52,15 +52,15 @@ The rules that follow from this:
 
 | ID | Deliverable | Tier | Where tested | Vendor QA | Our focus | Blocker | Owner / partner |
 |---|---|---|---|---|---|---|---|
-| [01](#sow-q3-01-crypto-schemes) | ed25519 + ECDSA P-256 in Compact | **A** | [`q3-ledger9/signature-verify`](../q3-ledger9/signature-verify/) | PASS, 63/63 tests | QA gaps, DApp-shape signature auth | none | nstanford5 ([roles](q3-test-ownership.md#sow-q3-01-crypto-schemes)) |
-| [03](#sow-q3-03-dynamic-cross-contract-calls) | Dynamic cross-contract calls | **A** | [`q3-ledger9/dynamic-calls`](../q3-ledger9/dynamic-calls/) | PASS, 183/183 tests | `ContractModuleProvider` + error kinds | none | OpenZeppelin (contact TBD) + Jay Albert, Foundation ([roles](q3-test-ownership.md#sow-q3-03-dynamic-cross-contract-calls)) |
+| [01](#sow-q3-01-crypto-schemes) | ed25519 + ECDSA P-256 in Compact | **A** | [`q3-ledger9/signature-verify`](../q3-ledger9/signature-verify/) | PASS, 63/63 tests | QA gaps, DApp-shape signature auth | none | nstanford5 + Jalal-1 ([roles](q3-test-ownership.md#sow-q3-01-crypto-schemes)) |
+| [03](#sow-q3-03-dynamic-cross-contract-calls) | Dynamic cross-contract calls | **A** | [`q3-ledger9/dynamic-calls`](../q3-ledger9/dynamic-calls/) | PASS, 183/183 tests | `ContractModuleProvider` + error kinds | none | OpenZeppelin (contact TBD) + Jay Albert and Ricardo Rius, Foundation; partner Midnames ([roles](q3-test-ownership.md#sow-q3-03-dynamic-cross-contract-calls)) |
 | [08](#sow-q3-08-hard-fork-v8-to-v9) | Hard fork ledger 8 → 9 | **B, highest value** | `midnight-node/local-environment` + our ledger 8 examples | PASS on local-env and devnet | Pre-fork DApps working post-fork | local-env bring-up | Leonard Hegarty, `hegaleon` ([roles](q3-test-ownership.md#sow-q3-08-hard-fork-v8-to-v9)) |
-| [02](#sow-q3-02-recursive-proofs) | `verifyProof` / recursive proofs | **B** | compact-end-2-end harness, ledger 10 alpha | Demo cases + named negatives | Missing negative cases | **Blocked until Ledger 10 is released** | after Ledger 10 ([contributors](q3-test-ownership.md#sow-q3-02-recursive-proofs)) |
+| [02](#sow-q3-02-recursive-proofs) | `verifyProof` / recursive proofs | **B** | compact-end-2-end harness, ledger 10 alpha | Demo cases + named negatives | Missing negative cases | **Blocked until Ledger 10 is released** | Jalal-1 + mbs-midnight (*provisional*); partner Webisoft ([contributors](q3-test-ownership.md#sow-q3-02-recursive-proofs)) |
 | [05](#sow-q3-05-babe-phase-1) | AURA → BABE migration | **C** | node team; we add a DApp liveness probe | Demo + runbook | DApp + indexer continuity across the flip | node 3.0.0 local-env | Ricardo Rius, `riusricardo` ([roles](q3-test-ownership.md#sow-q3-05-babe-phase-1)) |
 | [06](#sow-q3-06-block-production-rewards) | Block production rewards | **C** (+ D for MIPs) | reserve-contracts `just private-net-*` | Demo | DUST-destination outcome, reward arithmetic | Custom Lace, TBD parameters | Karmoola, MPS-0019 ([roles](q3-test-ownership.md#sow-q3-06-block-production-rewards)) |
-| [04](#sow-q3-04-private-state-mip) | Private state MIP | **D** | review | n/a | AC-1 = submitted | none | Karmoola, MPS-0021 ([roles](q3-test-ownership.md#sow-q3-04-private-state-mip)) |
-| [07](#sow-q3-07-shielded-source-of-funds) | Shielded source of funds | **D** | review | n/a | Design review | none | Jalal-1, hbulgarini, MPS-0025 ([roles](q3-test-ownership.md#sow-q3-07-shielded-source-of-funds)) |
-| [09](#sow-q3-09-throughput-performance) | Throughput performance | **D** | review + hash check | n/a | Report integrity, MIP review | none | BenB-MNF ([roles](q3-test-ownership.md#sow-q3-09-throughput-performance)) |
+| [04](#sow-q3-04-private-state-mip) | Private state MIP | **D** | review | n/a | AC-1 = submitted | none | Karmoola, MPS-0021 + riusricardo ([roles](q3-test-ownership.md#sow-q3-04-private-state-mip)) |
+| [07](#sow-q3-07-shielded-source-of-funds) | Shielded source of funds | **D** | review | n/a | Design review | none | Jalal-1, MPS-0025 + mbs-midnight ([roles](q3-test-ownership.md#sow-q3-07-shielded-source-of-funds)) |
+| [09](#sow-q3-09-throughput-performance) | Throughput performance | **D** | review + hash check | n/a | Report integrity, MIP review | none | BenB-MNF + mbs-midnight ([roles](q3-test-ownership.md#sow-q3-09-throughput-performance)) |
 
 ## Cross-cutting prerequisites
 
@@ -191,7 +191,7 @@ Anyone testing this delivery opens a ticket at the **[Midnight servicedesk](http
 
 ## SOW-Q3-01 Crypto schemes
 
-> **Status:** L1 green (50 tests), L2 green (6 tests), local network, record stack · **Owner:** nstanford5 ([roles](q3-test-ownership.md#sow-q3-01-crypto-schemes)) · **Last updated:** 2026-10-01 · **Tier A**
+> **Status:** owner named; L1 green (50 tests), L2 green (6 tests), local network, record stack · **Owner:** nstanford5 and Jalal-1 ([roles](q3-test-ownership.md#sow-q3-01-crypto-schemes)) · **Last updated:** 2026-10-02 · **Tier A**
 >
 > **Report (preliminary, not for formal acceptance):** [Markdown](../q3-ledger9/reports/sow-q3-01-local-2026-10-01.md) · [JSON](../q3-ledger9/reports/sow-q3-01-local-2026-10-01.json)
 >
@@ -253,7 +253,7 @@ From the L1 run on 2026-10-01 (details in [`q3-ledger9/README.md`](../q3-ledger9
 
 ## SOW-Q3-03 Dynamic cross-contract calls
 
-> **Status:** L1 green (16 tests), L2 green (6 tests), local network, Midnight.js 5.0.0-rc.2 · **Owner:** OpenZeppelin (contact TBD) + Jay Albert, Foundation ([roles](q3-test-ownership.md#sow-q3-03-dynamic-cross-contract-calls)) · **Last updated:** 2026-10-01 · **Tier A** (no longer gated)
+> **Status:** owner named; L1 green (16 tests), L2 green (6 tests), local network, Midnight.js 5.0.0-rc.2 · **Owner:** OpenZeppelin (contact TBD) + Jay Albert and Ricardo Rius, Foundation; partner Midnames ([roles](q3-test-ownership.md#sow-q3-03-dynamic-cross-contract-calls)) · **Last updated:** 2026-10-02 · **Tier A** (no longer gated)
 >
 > **Report (preliminary, not for formal acceptance):** [Markdown](../q3-ledger9/reports/sow-q3-03-local-2026-10-01.md) · [JSON](../q3-ledger9/reports/sow-q3-03-local-2026-10-01.json)
 >
@@ -373,7 +373,7 @@ Phase 3 checks:
 
 ## SOW-Q3-02 Recursive proofs
 
-> **Status:** blocked until Ledger 10 is released · **Owner:** after Ledger 10 ([contributors](q3-test-ownership.md#sow-q3-02-recursive-proofs)) · **Last updated:** 2026-10-01 · **Tier B**
+> **Status:** blocked until Ledger 10 is released · **Owner:** Jalal-1 and mbs-midnight (*provisional*); partner Webisoft ([contributors](q3-test-ownership.md#sow-q3-02-recursive-proofs)) · **Last updated:** 2026-10-02 · **Tier B**
 
 **ACs** ([record:157-158][rec])
 - AC-1: a recursive proof can be created in midnight-zk.
@@ -476,7 +476,7 @@ The rehearsal scripts are `npm run consensus-upgrade-arm-babe:local-env` and `np
 
 ## SOW-Q3-04 Private state MIP
 
-> **Status:** not started · **Owner:** Karmoola, MPS-0021 ([roles](q3-test-ownership.md#sow-q3-04-private-state-mip)) · **Last updated:** 2026-10-01 · **Tier D**
+> **Status:** owner named · **Owner:** Karmoola, MPS-0021, and riusricardo ([roles](q3-test-ownership.md#sow-q3-04-private-state-mip)) · **Last updated:** 2026-10-02 · **Tier D**
 
 - AC-1 "Completed MIP submitted to the MIP process": check it against [MIP PR #334][mip-334] (text @ `49bbfd7`). This is a fact check, not a test.
 - Run the [MIP review checklist](#mip-and-design-review-checklist).
@@ -484,14 +484,14 @@ The rehearsal scripts are `npm run consensus-upgrade-arm-babe:local-env` and `np
 
 ## SOW-Q3-07 Shielded source of funds
 
-> **Status:** not started · **Owner:** Jalal-1, hbulgarini, MPS-0025 ([roles](q3-test-ownership.md#sow-q3-07-shielded-source-of-funds)) · **Last updated:** 2026-10-01 · **Tier D** (time and materials, no ACs)
+> **Status:** owner named · **Owner:** Jalal-1, MPS-0025, and mbs-midnight ([roles](q3-test-ownership.md#sow-q3-07-shielded-source-of-funds)) · **Last updated:** 2026-10-02 · **Tier D** (time and materials, no ACs)
 
 - Design review of [MIP PR #335][mip-335] @ `41d3b15` against [MPS-0025][mps-25], using the checklist.
 - Optional, out of scope for Q3: a Compact "token guard" spike to test whether the custom-spend-logic design can be expressed on today's stack.
 
 ## SOW-Q3-09 Throughput performance
 
-> **Status:** not started · **Owner:** BenB-MNF ([roles](q3-test-ownership.md#sow-q3-09-throughput-performance)) · **Last updated:** 2026-10-01 · **Tier D** (time and materials, no ACs)
+> **Status:** owner named · **Owner:** BenB-MNF and mbs-midnight ([roles](q3-test-ownership.md#sow-q3-09-throughput-performance)) · **Last updated:** 2026-10-02 · **Tier D** (time and materials, no ACs)
 
 - Verify the report PDF SHA-256 `b53b19ee83817dcd603f7395ac26a4e38aaf055bad9bbd886b37cd91bd67da86` (P1).
 - Review [MIP #312][mip-312] (revalidation cache) and [MIP #309][mip-309] (interim ledger state).
@@ -526,12 +526,12 @@ Use for 04, 06 (MIPs), 07 and 09.
 
 - **Owners and partners:** who tests and who signs off each item is mapped in [`q3-test-ownership.md`](q3-test-ownership.md), starting from the MIP and deliverable authors. The independent testers are still open there.
 - **Foundation owners still to name** (details in [`q3-test-ownership.md` Open questions](q3-test-ownership.md#open-questions)):
-  - SOW-02: the owner is named when Ledger 10 is released.
-  - SOW-03: OpenZeppelin and the Foundation sign together. Jay Albert signs for the Foundation; the OpenZeppelin contact is still TBD.
+  - SOW-02: the owner is confirmed when Ledger 10 is released. Jalal-1 and mbs-midnight are named provisionally (2026-10-02), with Webisoft as partner.
+  - SOW-03: OpenZeppelin and the Foundation sign together. Jay Albert and Ricardo Rius sign for the Foundation; Midnames is listed as a partner, role not stated; the OpenZeppelin contact is still TBD.
 - **Network access:** access to qanet for SOW-08; who schedules our phase 3 runs against each fork.
 - **Upstream contributions:** should the pure stdlib-level gap tests (01-G1/G3/G4/G7, 02-G1–G6) be contributed to compact-end-2-end instead of, or as well as, living here?
 - **Custom Lace:** can we get the build (`MicroProofs/lace@3fc3166`) for SOW-06, and is a wallet-free CLI path enough?
-- ~~**Tracking surface**~~ **Decided 2026-10-01: ClickUp.** The open questions and assignments are tracked there. Tracie Mitchell's existing Q3 SOW tasks are not linked to these docs yet; that is an action for her (see [`q3-test-ownership.md` › ClickUp](q3-test-ownership.md#clickup-action-for-tracie-mitchell-not-yet-linked)). Defects go to the servicedesk instead (see [Reporting bugs and issues](#reporting-bugs-and-issues)).
+- ~~**Tracking surface**~~ **Decided 2026-10-01: ClickUp.** The open questions and assignments are tracked there. Tracie Mitchell's existing Q3 SOW tasks are not linked to these docs yet; that is an action for her (see [`q3-test-ownership.md` › ClickUp](q3-test-ownership.md#clickup-action-for-tracie-mitchell-not-yet-linked), which records her 2026-10-02 reply; still open). Defects go to the servicedesk instead (see [Reporting bugs and issues](#reporting-bugs-and-issues)).
 - **On-chain runtime rc.4:** do we ask vendor QA to re-run SOW-01 on the rc.4 it lists, or is our 01-G11 enough?
 
 [rec-dir]: https://github.com/midnightntwrk/midnight-network-ops/tree/a6e7daf8727bc61cfe15b422359ebeb0681ec6bb/releases/deliverables/2026-q3

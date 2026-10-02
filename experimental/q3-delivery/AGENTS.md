@@ -90,6 +90,7 @@ Row pages, one per item:
 | hbulgarini | Hector Bulgarini | `user://2bfd872b-594c-8185-854e-0002b40cacf0` | |
 | — | Tracie Mitchell | `user://281d872b-594c-814d-9d09-00029dbee5c4` | owns the ClickUp Q3 SOW tasks |
 | JAlbertCode | Jay Albert | `user://2e2d872b-594c-817a-b84e-0002d85ae7a7` | GitHub handle *inferred* (company "Midnight Network", no profile name) |
+| mbs-midnight | Mahesh Sashital | `user://23cd872b-594c-818a-9165-00021f1cd2ad` | handle confirmed from GitHub profile (name "Mahesh Sashital", company @midnightntwrk) |
 | — | OpenZeppelin | none | a partner organisation; write it as text |
 
 For anyone not in this table, find their Notion user with a user search before mentioning them. If you can't find one, write the name as plain text.
