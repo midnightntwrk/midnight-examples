@@ -23,7 +23,7 @@
 | **R3 Independent tester** | Runs the gap tests in the strategy doc | Produce the report JSON ([P4](q3-testing-strategy.md#p4-acceptance-report-format)) | Be an R1 on the same item |
 | **R4 Process gate** | `@midnightntwrk/mn-codeowners-improvement-proposals`, the `*` owner in the MIP repo's `CODEOWNERS` | Approve MIP-process ACs, such as 04 "submitted to the MIP process" | Approve their own MIP |
 
-"Sign-off" here means a named person approves a specific artefact (the gap-test list, or the report JSON for a run), on a date. Later, the [P4](q3-testing-strategy.md#p4-acceptance-report-format) report shape could carry it as `signOff: [{ role, github, date, artefact }]`. The report writer does not do that yet.
+"Sign-off" here means a named person approves a specific artefact (the gap-test list, or the report JSON for a run), on a date. The owner's formal acceptance is recorded in the [Sign-off record](#sign-off-record). Later, the [P4](q3-testing-strategy.md#p4-acceptance-report-format) report shape could carry it as `signOff: [{ role, github, date, artefact }]`. The report writer does not do that yet.
 
 ## Summary
 
@@ -205,6 +205,24 @@ Sign-off artefacts:
 | R4 | codeowners team, **excluding dzajkowski** | reviews so far: chrispalaskas and jsidorenko (#312); chrispalaskas and ozgb (#309); BenB-MNF, bwbush and bobblessinghartley (#82) | MIP process |
 
 ---
+
+## Sign-off record
+
+The owner's formal decision on each item's acceptance criteria. The owner signs in Notion, in the item's page, under **Formal sign-off** (the page quotes the ACs word for word from the record). An agent then copies the decision here, so the repo holds the record. This is the one fact that starts in Notion; see [`AGENTS.md`](AGENTS.md).
+
+Decision values: `Not signed`, `Accepted`, `Accepted with conditions`, `Rejected`. A conditional acceptance or a rejection must list its conditions and link any open servicedesk tickets.
+
+| SOW | Criteria | Signer(s) | Decision | Date | Conditions |
+|---|---|---|---|---|---|
+| 01 | AC-1, AC-2 | nstanford5 | Not signed | — | — |
+| 02 | AC-1, AC-2 | owner after Ledger 10 | Not signed | — | — |
+| 03 | AC-1 | OpenZeppelin (contact TBD); Jay Albert | Not signed | — | — |
+| 04 | AC-1 | Karmoola | Not signed | — | — |
+| 05 | AC-1 | riusricardo | Not signed | — | — |
+| 06 | AC-1 (prototype; MIP) | Karmoola | Not signed | — | — |
+| 07 | no ACs: design-review verdict | Jalal-1; hbulgarini | Not signed | — | — |
+| 08 | AC-1, AC-2 (can be signed separately) | hegaleon | Not signed | — | — |
+| 09 | no ACs: report checksum and review verdict | BenB-MNF | Not signed | — | — |
 
 ## People index
 
