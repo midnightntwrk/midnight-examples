@@ -531,7 +531,7 @@ Use for 04, 06 (MIPs), 07 and 09.
 - **Network access:** access to qanet for SOW-08; who schedules our phase 3 runs against each fork.
 - **Upstream contributions:** should the pure stdlib-level gap tests (01-G1/G3/G4/G7, 02-G1–G6) be contributed to compact-end-2-end instead of, or as well as, living here?
 - **Custom Lace:** can we get the build (`MicroProofs/lace@3fc3166`) for SOW-06, and is a wallet-free CLI path enough?
-- ~~**Tracking surface**~~ **Decided 2026-10-01: ClickUp.** The open questions and assignments are tracked there. Defects go to the servicedesk instead (see [Reporting bugs and issues](#reporting-bugs-and-issues)).
+- ~~**Tracking surface**~~ **Decided 2026-10-01: ClickUp.** The open questions and assignments are tracked there. Tracie Mitchell's existing Q3 SOW tasks are not linked to these docs yet; that is an action for her (see [`q3-test-ownership.md` › ClickUp](q3-test-ownership.md#clickup-action-for-tracie-mitchell-not-yet-linked)). Defects go to the servicedesk instead (see [Reporting bugs and issues](#reporting-bugs-and-issues)).
 - **On-chain runtime rc.4:** do we ask vendor QA to re-run SOW-01 on the rc.4 it lists, or is our 01-G11 enough?
 
 [rec-dir]: https://github.com/midnightntwrk/midnight-network-ops/tree/a6e7daf8727bc61cfe15b422359ebeb0681ec6bb/releases/deliverables/2026-q3
