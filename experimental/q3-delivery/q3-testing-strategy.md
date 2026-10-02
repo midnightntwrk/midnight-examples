@@ -53,7 +53,7 @@ The rules that follow from this:
 | ID | Deliverable | Tier | Where tested | Vendor QA | Our focus | Blocker | Owner / partner |
 |---|---|---|---|---|---|---|---|
 | [01](#sow-q3-01-crypto-schemes) | ed25519 + ECDSA P-256 in Compact | **A** | [`q3-ledger9/signature-verify`](../q3-ledger9/signature-verify/) | PASS, 63/63 tests | QA gaps, DApp-shape signature auth | none | nstanford5 ([roles](q3-test-ownership.md#sow-q3-01-crypto-schemes)) |
-| [03](#sow-q3-03-dynamic-cross-contract-calls) | Dynamic cross-contract calls | **A** | [`q3-ledger9/dynamic-calls`](../q3-ledger9/dynamic-calls/) | PASS, 183/183 tests | `ContractModuleProvider` + error kinds | none | OpenZeppelin + Foundation co-sign, contacts TBD ([roles](q3-test-ownership.md#sow-q3-03-dynamic-cross-contract-calls)) |
+| [03](#sow-q3-03-dynamic-cross-contract-calls) | Dynamic cross-contract calls | **A** | [`q3-ledger9/dynamic-calls`](../q3-ledger9/dynamic-calls/) | PASS, 183/183 tests | `ContractModuleProvider` + error kinds | none | OpenZeppelin (contact TBD) + Jay Albert, Foundation ([roles](q3-test-ownership.md#sow-q3-03-dynamic-cross-contract-calls)) |
 | [08](#sow-q3-08-hard-fork-v8-to-v9) | Hard fork ledger 8 → 9 | **B, highest value** | `midnight-node/local-environment` + our ledger 8 examples | PASS on local-env and devnet | Pre-fork DApps working post-fork | local-env bring-up | Leonard Hegarty, `hegaleon` ([roles](q3-test-ownership.md#sow-q3-08-hard-fork-v8-to-v9)) |
 | [02](#sow-q3-02-recursive-proofs) | `verifyProof` / recursive proofs | **B** | compact-end-2-end harness, ledger 10 alpha | Demo cases + named negatives | Missing negative cases | **Blocked until Ledger 10 is released** | after Ledger 10 ([contributors](q3-test-ownership.md#sow-q3-02-recursive-proofs)) |
 | [05](#sow-q3-05-babe-phase-1) | AURA → BABE migration | **C** | node team; we add a DApp liveness probe | Demo + runbook | DApp + indexer continuity across the flip | node 3.0.0 local-env | Ricardo Rius, `riusricardo` ([roles](q3-test-ownership.md#sow-q3-05-babe-phase-1)) |
@@ -253,7 +253,7 @@ From the L1 run on 2026-10-01 (details in [`q3-ledger9/README.md`](../q3-ledger9
 
 ## SOW-Q3-03 Dynamic cross-contract calls
 
-> **Status:** L1 green (16 tests), L2 green (6 tests), local network, Midnight.js 5.0.0-rc.2 · **Owner:** OpenZeppelin + Foundation co-sign, contacts TBD ([roles](q3-test-ownership.md#sow-q3-03-dynamic-cross-contract-calls)) · **Last updated:** 2026-10-01 · **Tier A** (no longer gated)
+> **Status:** L1 green (16 tests), L2 green (6 tests), local network, Midnight.js 5.0.0-rc.2 · **Owner:** OpenZeppelin (contact TBD) + Jay Albert, Foundation ([roles](q3-test-ownership.md#sow-q3-03-dynamic-cross-contract-calls)) · **Last updated:** 2026-10-01 · **Tier A** (no longer gated)
 >
 > **Report (preliminary, not for formal acceptance):** [Markdown](../q3-ledger9/reports/sow-q3-03-local-2026-10-01.md) · [JSON](../q3-ledger9/reports/sow-q3-03-local-2026-10-01.json)
 >
@@ -527,7 +527,7 @@ Use for 04, 06 (MIPs), 07 and 09.
 - **Owners and partners:** who tests and who signs off each item is mapped in [`q3-test-ownership.md`](q3-test-ownership.md), starting from the MIP and deliverable authors. The independent testers are still open there.
 - **Foundation owners still to name** (details in [`q3-test-ownership.md` Open questions](q3-test-ownership.md#open-questions)):
   - SOW-02: the owner is named when Ledger 10 is released.
-  - SOW-03: OpenZeppelin and the Foundation sign together. Both named signers are still TBD.
+  - SOW-03: OpenZeppelin and the Foundation sign together. Jay Albert signs for the Foundation; the OpenZeppelin contact is still TBD.
 - **Network access:** access to qanet for SOW-08; who schedules our phase 3 runs against each fork.
 - **Upstream contributions:** should the pure stdlib-level gap tests (01-G1/G3/G4/G7, 02-G1–G6) be contributed to compact-end-2-end instead of, or as well as, living here?
 - **Custom Lace:** can we get the build (`MicroProofs/lace@3fc3166`) for SOW-06, and is a wallet-free CLI path enough?

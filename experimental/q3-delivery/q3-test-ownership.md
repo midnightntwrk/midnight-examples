@@ -31,7 +31,7 @@
 |---|---|---|---|---|---|
 | [01](#sow-q3-01-crypto-schemes) | Crypto schemes | iquerejeta | **nstanford5** | Foundation run, done | L1 and L2 green; report waiting for sign-off |
 | [02](#sow-q3-02-recursive-proofs) | Recursive proofs | dybvig, whankinsiv, miguel-ambrona, iquerejeta | after Ledger 10 | after Ledger 10 | **blocked: Ledger 10** |
-| [03](#sow-q3-03-dynamic-cross-contract-calls) | Dynamic cross-contract calls | JosephDenman, jonathan-sobel, kmillikin | **OpenZeppelin** (contact TBD) + Foundation (co-signer TBD) | Foundation run, done | L1 and L2 green; report waiting for sign-off |
+| [03](#sow-q3-03-dynamic-cross-contract-calls) | Dynamic cross-contract calls | JosephDenman, jonathan-sobel, kmillikin | **OpenZeppelin** (contact TBD) + **Jay Albert** (Foundation co-signer) | Foundation run, done | L1 and L2 green; report waiting for sign-off |
 | [04](#sow-q3-04-private-state-mip) | Private state MIP | kapke, jonathan-sobel | Karmoola (MPS-0021) | TBD | ready for review |
 | [05](#sow-q3-05-babe-phase-1) | BABE phase 1 | Klapeyron, LGLO | **Ricardo Rius** (`riusricardo`) | TBD | owner named |
 | [06](#sow-q3-06-block-production-rewards) | Block production rewards | MicroProofs, luminight99, LGLO | Karmoola (MPS-0019, MPS-0033) | TBD | 06-G2 blocked on `π`, `dist_fee` |
@@ -80,7 +80,7 @@ Recursive proofs cannot be tested until Ledger 10 is released ([record:9](https:
 
 ## SOW-Q3-03 Dynamic cross-contract calls
 
-> **Status:** L1 and L2 green on 2026-10-01 (preliminary report, not yet signed) · **Owner:** OpenZeppelin (partner) with a Foundation co-signer · **Last updated:** 2026-10-01
+> **Status:** L1 and L2 green on 2026-10-01 (preliminary report, not yet signed) · **Owner:** OpenZeppelin (partner) with Jay Albert (Foundation co-signer) · **Last updated:** 2026-10-02
 
 This item already has a Foundation run in [`q3-ledger9/dynamic-calls`](../q3-ledger9/dynamic-calls/), with a [preliminary report](../q3-ledger9/reports/sow-q3-03-local-2026-10-01.md). It is here so that its owner and sign-off are recorded.
 
@@ -89,12 +89,12 @@ This item already has a Foundation run in [`q3-ledger9/dynamic-calls`](../q3-led
 | R1 | JosephDenman (Joseph Denman) | [compact#714](https://github.com/LFDT-Minokawa/compact/pull/714) "Dynamic cross-contract calls - Q3" (merged 2026-09-08); [midnight-js#1307](https://github.com/midnightntwrk/midnight-js/pull/1307) (the module provider, merged); co-author of [CoIP 4](https://github.com/LFDT-Minokawa/compact/blob/ca9da303cf00e3ee0083acfa360a7bfd74c11746/coips/coip-0004.md) | AC-1; co-signs the gap list 03-G1…G11; answers the CoIP 4 spec-drift finding (10 vs 11 failure kinds) |
 | R1 | jonathan-sobel (Jonathan Sobel) | co-author of CoIP 4 (front-matter `Authors:`) | spec questions |
 | R1 | kmillikin | committer of `coips/coip-0004.md` @ `ca9da30` | spec questions |
-| R2 | **OpenZeppelin** (partner), contact **TBD**; **Foundation** co-signer **TBD** | named by the Foundation, 2026-10-01: OpenZeppelin and the Foundation sign together. No OpenZeppelin account appears among the R1 handles found, so no conflict. | AC-1 acceptance; both sign the report |
+| R2 | **OpenZeppelin** (partner), contact **TBD**; **Jay Albert** (Foundation co-signer) | named by the Foundation: OpenZeppelin and the Foundation sign together (2026-10-01); Jay Albert as the Foundation co-signer (2026-10-02). GitHub `JAlbertCode` is *inferred*: company "Midnight Network", on the codeowners team, no profile name. Jay is not among the R1 handles found, so no conflict. No OpenZeppelin account appears among the R1 handles found, so no conflict. | AC-1 acceptance; both sign the report |
 | R3 | Foundation run (`q3-ledger9`), done for L1 and L2 | [report JSON](../q3-ledger9/reports/sow-q3-03-local-2026-10-01.json) | AC-1, 03-G1…G7, G9, G10. Not yet done: G8, G11 |
 
 Sign-off artefacts:
 - R1 co-signs that the gap tests exercise CoIP 4 as designed, including the two failure kinds not driven: `PureInterfaceCircuit` and `UnreadableModule`.
-- Both R2 signers sign the report JSON: the OpenZeppelin contact and the Foundation co-signer. Until then the report stays preliminary.
+- Both R2 signers sign the report JSON: the OpenZeppelin contact and Jay Albert. Until then the report stays preliminary.
 - R1 answers the review findings in the strategy doc: spec drift, the gap in the migration guide, and the synchronous `resolve()`.
 
 ---
@@ -223,6 +223,7 @@ An affiliation is either *confirmed* by the Foundation or *inferred* from a hard
 | hegaleon (Leonard Hegarty) | — | 08 | | |
 | iquerejeta | 01, 02 | — | | |
 | jacek-kurkowski-shielded | 08 | — | | Shielded: handle suffix |
+| JAlbertCode (Jay Albert; handle *inferred*) | — | 03 (Foundation co-signer) | yes | Foundation: named by the Foundation, 2026-10-02 |
 | Jalal-1 | — | 07 | | Foundation: confirmed by the Foundation, 2026-10-01 |
 | jonathan-sobel | 03, 04 | — | | |
 | JosephDenman | 03 | — | yes | |
@@ -237,7 +238,7 @@ An affiliation is either *confirmed* by the Foundation or *inferred* from a hard
 | MicroProofs | 06 | — | | |
 | miguel-ambrona | 02 | — | | |
 | nstanford5 | — | 01 | yes | Foundation: the account owner's `midnight.foundation` email |
-| OpenZeppelin (organisation, contact TBD) | — | 03, with a Foundation co-signer | | partner: named by the Foundation, 2026-10-01 |
+| OpenZeppelin (organisation, contact TBD) | — | 03, with Jay Albert | | partner: named by the Foundation, 2026-10-01 |
 | ozgb | 08 | — | | |
 | riusricardo (Ricardo Rius) | — | 05 | yes | |
 | whankinsiv | 02 | — | | |
@@ -260,7 +261,7 @@ Items that need a named Foundation owner. Each one blocks sign-off on that item.
 - ~~**Q1. SOW-09 throughput: who is the Foundation owner?**~~ **Resolved 2026-10-01:** BenB-MNF owns it.
 - **Q2. SOW-02 recursive proofs: who owns it when Ledger 10 is released?** It is deferred, so nobody is named now. Name the owner when Ledger 10 is scheduled, so the gap tests 02-G1…G7 can start straight away.
 - ~~**Q3. SOW-01: who signs off the report already filed?**~~ **Resolved 2026-10-01:** nstanford5 signs.
-- ~~**Q4. SOW-03: who at OpenZeppelin signs, and does the Foundation co-sign?**~~ **Resolved in part, 2026-10-01:** the Foundation co-signs with OpenZeppelin. Still open: the named OpenZeppelin contact (and their GitHub handle), and the named Foundation co-signer.
+- ~~**Q4. SOW-03: who at OpenZeppelin signs, and does the Foundation co-sign?**~~ **Resolved in part:** the Foundation co-signs with OpenZeppelin (2026-10-01), and Jay Albert is the Foundation co-signer (2026-10-02). Still open: the named OpenZeppelin contact and their GitHub handle.
 
 ## How this was gathered
 
