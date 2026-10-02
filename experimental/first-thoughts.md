@@ -1,3 +1,4 @@
+- How exactly would you define a contract factory? Human authored words please!
 - /examples for regression tests
 - how do we test features that are not in Compact?
 - the yarn new:example is good for Dapp generation, but what about other features?
@@ -7,7 +8,7 @@
 - Input: MIPs and MPS Acceptance criteria
 - V2: of this may include PR/branch tracking with github labels mapped to "Q4 SOW"
 - Input: SOW/MIPs/Clickup (?)
-- Could we use Notion (or Google Drive) as a "shared context space" and "agent to agent handover". This won't scale, it will need to be a RAG MCP to scale
+- Could we use Notion (or Google Drive) as a "shared context space" and "agent to agent handover". This won't scale, MCP to scale?
 - Output: Which features need to be tested by which partners
 - Output: servicedesk area for Q3 SOW support
 - NOTE: We are going to get the architecture wrong. Be prepared for iterating on this design!
