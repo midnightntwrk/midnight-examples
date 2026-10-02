@@ -12,6 +12,10 @@ The Foundation's acceptance plan for the Q3 2026 SOW deliverables:
 
 The tests themselves live in [`../q3-ledger9/`](../q3-ledger9/), which has its own `AGENTS.md`.
 
+## The status file for the Claude Project
+
+[`SOW3-STATUS.md`](SOW3-STATUS.md) is the rolling status and changelog that Nick uploads to the team's Claude Project. It has a snapshot on top and a 14-day changelog below. Regenerate it with `/sow3-update` ([`.claude/skills/sow3-update/SKILL.md`](../../.claude/skills/sow3-update/SKILL.md)). That skill **reads the Notion mirror only and writes nothing to Notion or ClickUp**. Never hand-edit the file. It is not a source of facts: the md docs are canonical, and sign-offs start in Notion.
+
 ## ClickUp: ask Tracie Mitchell before linking
 
 The Q3 SOW tasks in ClickUp belong to Tracie Mitchell. They are listed in [`q3-test-ownership.md` › ClickUp](q3-test-ownership.md#clickup-action-for-tracie-mitchell-not-yet-linked), and none is linked to these docs yet. **If you are working for Tracie, or you are about to touch those ClickUp tasks, stop and ask her whether she wants them linked to these docs and to the Notion mirror.** The three options are in that section. Do not create, edit or link ClickUp tasks without her yes, and record her answer in that section.
