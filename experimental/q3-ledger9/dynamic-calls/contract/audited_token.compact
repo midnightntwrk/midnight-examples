@@ -1,0 +1,36 @@
+// SOW-Q3-03 · audited_token: a SECOND implementation of the `Token` interface.
+//
+// Same `transfer` signature as standard_token, so it conforms to the caller's
+// `Token` type, but different code: it also counts every transfer in
+// `audited_transfers`. Different code means different verifier keys, which is
+// what lets the runtime tell the two implementations apart.
+//
+// AC-1 is visible on chain through this counter: when the registry's single
+// `pay` call site runs against an audited_token address, `audited_transfers`
+// moves; against a standard_token address it cannot, because that code has no
+// such counter.
+pragma language_version 0.27;
+
+import CompactStandardLibrary;
+
+export ledger balances: Map<Bytes<32>, Uint<64>>;
+export ledger audited_transfers: Counter;
+
+constructor(holder: Bytes<32>, supply: Uint<64>) {
+  balances.insert(disclose(holder), disclose(supply));
+}
+
+export circuit transfer(sender: Bytes<32>, recipient: Bytes<32>, amount: Uint<64>): Uint<64> {
+  const s = disclose(sender);
+  const r = disclose(recipient);
+  const a = disclose(amount);
+  assert(balances.member(s), "unknown sender");
+  const sender_balance = balances.lookup(s);
+  assert(sender_balance >= a, "insufficient balance");
+  const remaining = (sender_balance - a) as Uint<64>;
+  balances.insert(s, remaining);
+  const recipient_balance = balances.member(r) ? balances.lookup(r) : 0 as Uint<64>;
+  balances.insert(r, (recipient_balance + a) as Uint<64>);
+  audited_transfers.increment(1);
+  return remaining;
+}

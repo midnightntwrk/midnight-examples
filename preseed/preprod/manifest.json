@@ -1,0 +1,31 @@
+{
+  "network": "preprod",
+  "height": 2779435,
+  "indexer": "midnight-preprod.blockfrost.io",
+  "parts": {
+    "shielded": {
+      "bytes": 3740,
+      "gzipBytes": 1909
+    },
+    "unshielded": {
+      "bytes": 369,
+      "gzipBytes": 277
+    },
+    "dust": {
+      "bytes": 12663325,
+      "gzipBytes": 5920454
+    }
+  },
+  "witnesses": {
+    "shielded": {
+      "stream": "zswapLedgerEvents",
+      "id": 1576364,
+      "digest": "7527b909103b3515"
+    },
+    "dust": {
+      "stream": "dustLedgerEvents",
+      "id": 1576656,
+      "digest": "ed47bcf324ad2b0d"
+    }
+  }
+}

@@ -1,0 +1,128 @@
+# AGENTS.md — mn-examples
+
+Instructions for AI agents working in this repository. Humans: see `README.md`.
+
+## What this repo is
+
+A single monorepo of official Midnight examples. Each lives under `examples/<name>`
+and is a Yarn 4 workspace. Shared harness code lives under `packages/`. The whole repo shares one lockfile and one pinned
+toolchain (see the version matrix in `README.md`). The point of the monorepo is
+that these examples are **verified**: CI compiles every contract and runs its
+test suite against a local Midnight network. Treat green examples as ground
+truth over your own recollection of Midnight/Compact APIs.
+
+## Golden rules
+
+- **Do not trust memory for Midnight/Compact APIs.** Verify against the compiled
+  output and the running tests. Compilation alone is not proof — code must run.
+- **The `.compact` source files are committed on purpose.** Only the generated
+  `contract/managed/` output is gitignored. Never add a `.gitignore` rule that
+  hides `*.compact`.
+- **Keep the toolchain pinned.** Do not bump `@midnight-ntwrk/*`, the compiler,
+  Node, or Yarn versions for a single example. Version moves are a coordinated
+  repo-wide pass.
+- **The hoisted `vite` is 6.x, set by `examples/zk-loan/ui`.** That UI uses
+  upstream's Vite 6 toolchain, and Yarn hoists it to the root, so every
+  example's `vitest.config.ts` gets Vite 6.4.3 for its bare `import { loadEnv }
+  from 'vite'`. vitest itself still runs on its own nested Vite 8. This is
+  intentional for now: containing Vite 6 to the UI breaks it (see
+  `examples/zk-loan/ui/README.md`). Do not "fix" it by pinning Vite 8 at the
+  root. The Vite 8 move is a TODO for the next coordinated version pass.
+- **The root `devDependencies` pins `bn.js` 5.2.5 on purpose.** It anchors a
+  single `bn.js@5` at `node_modules/`. Without it, the `zk-loan/ui` browser
+  polyfills (`vite-plugin-node-polyfills` → `crypto-browserify` → `elliptic`,
+  `asn1.js`, …) hoist `bn.js@4` to the root, the wallet SDK's node client and
+  `@polkadot/util` each get a private `bn.js@5` copy, and every transaction
+  submit fails with `SubmissionError` (`blockNumber: Expected BN, actual N`)
+  even though the tx lands, followed by `DustDoubleSpend` on the next one. Do
+  not remove it; `bn.js@4` stays nested under the polyfill packages.
+- **Never commit secrets.** Real `.env.preprod` / `.env.preview` and
+  `midnight-level-db/`, `logs/`, wallet preseed state are gitignored. Only the
+  `.env.*.example` templates are tracked. The `preseed/` bundles ARE committed on
+  purpose — they hold public chain state and a public key that gets replaced on
+  restore, no secret.
+- **Never hand-write a `_BIRTHDAY` line in a `.env.<network>`.** It is what
+  authorizes pre-seeding a wallet, and only `yarn wallets:new` — which reads the
+  chain tip as it mints the seed — can state it truthfully. Adding one next to a
+  pre-existing wallet defeats the `isSeedable()` guard and silently hides that
+  wallet's funds. Omitting it is always safe: that wallet just does a full sync.
+- **Remote suites share four wallets** (Alice/Bob/Charlie/Dave, aliased per
+  suite in `packages/fast-sync/src/resolve.ts`). Never run them in parallel.
+
+## Common commands
+
+```bash
+nvm use                  # Node 22 (.nvmrc). Shells often default to 20, which the
+                         # generators and UI dev/build refuse to run on
+corepack enable          # Yarn 4 via packageManager field
+yarn install             # whole-workspace install (one lockfile)
+yarn compile             # compile all contracts (foreach, parallel)
+yarn workspace @midnight-ntwrk/example-<name> run compile   # one example
+yarn new:example <name> [--witnesses]   # phase 1: scaffold an example
+yarn new:ui <name>                      # phase 2: scaffold its browser UI (after test:local is green)
+yarn new:ui <name> --check              # template-owned UI files still match templates/ui
+yarn new:ui --sync-all                  # after editing templates/ui: sync every UI (+ yarn install)
+yarn new:ui --check-all                 # CI's drift check for every UI, plus install --immutable
+yarn fund:wallet <mn_dust_…> [mn_addr_…]  # local devnet: DUST (and NIGHT) for a browser wallet
+```
+
+Per example (from `examples/<name>`): `yarn env:up`, `yarn wait:dust`,
+`yarn test:local`, `yarn env:down`. Running tests requires Docker.
+
+Against a remote network (preprod/preview) — see `FAST-SYNC.md`:
+
+```bash
+yarn preseed:cut         # re-cut the pre-seed reference bundle. ALWAYS BEFORE wallets:new
+yarn wallets:new         # mint the 4 shared wallets into a repo-root .env.<network>
+yarn test:preprod        # every suite, sequentially (they share those wallets)
+```
+
+## Examples
+
+| Example | Teaches |
+|---|---|
+| `hello-world` | Environment smoke test; minimal contract + test harness; zero-setup fast-sync wallet; browser frontend (`ui/`: Lace connect, deploy/join, live ledger, wallet or local proving) |
+| `calculator` | Public `ledger` value updated by arithmetic circuits; a `divMod` witness verified on-chain (verify-off-chain-work pattern); browser frontend (`ui/`, generated by `yarn new:ui`: witness run in the browser, operand pre-checks tested against the real circuits) |
+| `private-party` | Private on-chain data, access control, unshielded (NIGHT), DUST sponsorship; browser frontend (`ui/`, generated by `yarn new:ui`: secret kept in encrypted private state and passed as a circuit argument, wallet address as `UserAddress`, organizer/guest actions pre-checked against the real circuits) |
+| `battleship` | Compact contract as a state machine, role-based access control, private state, on-chain verification of off-chain data; browser frontend (`ui/`, generated by `yarn new:ui`: two-player game, encrypted persistent private state behind a passphrase, seat found via a pure circuit, cheat checks tested against the real circuits) |
+| `token-transfers` | Unshielded tokens (`mintUnshieldedToken`, `sendUnshielded`, `receiveUnshielded`, NIGHT as `default<Bytes<32>>`) and shielded Zswap coins (`mintShieldedToken`, `sendShielded`, `receiveShielded`); a contract with no ledger, observed through wallet balances; browser frontend (`ui/`, generated by `yarn new:ui`: wallet balances instead of a ledger readout, a shielded-coin picker fed by earlier results, mint nonces built in code, circuit `Effects` tested in memory) |
+| `silent-auction` | TODO: what it teaches |
+| `election` | TODO: what it teaches |
+| `secret-message` | Private on-chain data via hashing: a witness supplies a secret, the circuit publishes only its `persistentHash` commitment |
+| `zk-loan` | Private credit scoring: an in-circuit Schnorr/Jubjub signature check on a witness-supplied profile, witness-derived identity (no `ownPublicKey()`), nested `Map`s, batched migration |
+| `shielded-chips` | Shielded tokens end to end: a MIP-0011 native shielded token (mint, both burn paths) plus a roulette contract that custodies and pays out coins; commitment-based escrow and `mergeCoin` ordering keep coin nonces (and so wallets) off chain; two contracts wired from one harness |
+| `private-bid` | The docs guide "How to build a private smart contract": prove a bid meets a public `sealed` minimum without revealing it, store a salted `persistentCommit` under a hashed, contract-bound bidder key (`kernel.self()`), reveal later; the minimal `disclose()` boundary |
+
+Each example has its own `AGENTS.md` with specifics.
+
+## Conventions for new/edited examples
+
+- **Prefer the generator:** `yarn new:example <name> [--witnesses]` scaffolds a
+  new example from `templates/example/` (harness, config, compose, docs stubs,
+  and a test skeleton up to the first `deployContract` call) and registers it in
+  the CI matrix + docs tables. Author only writes the `.compact` and the tests.
+  The conventions below describe what that template produces.
+- Directory shape: `contract/` (singular) with the `.compact` source + `index.ts`
+  (+ `witnesses.ts` where needed); `src/` for the TypeScript test harness;
+  `scripts/` for helpers; `compose.yml` for the local network.
+- Remote-network wiring is shared, not copied: depend on
+  `@midnight-ntwrk/example-fast-sync` and use its `resolveWallet(network, role)`
+  and `waitForNightThenDust(...)` rather than writing a per-example seed resolver.
+  `vitest.config.ts` loads `.env.<network>` from the REPO ROOT via `loadEnv`.
+- Extend `../../tsconfig.base.json` in the example `tsconfig.json`.
+- Provide `compile`, `test`, `test:local`, `env:up`, `env:down`, `wait:dust`
+  scripts so the CI matrix and root aggregates work unchanged.
+- Adding a browser frontend is **phase 2**: once the contract compiles and
+  `test:local` is green, run `yarn new:ui <name>`. Don't hand-copy
+  `hello-world/ui`. The generator reads `contract-info.json` and writes a UI
+  that already typechecks, tests and builds. Put use-case code only in the seed
+  files: `src/midnight/<name>-api.ts`, `src/components/<name>-panel.tsx` and
+  `src/__tests__/<name>-circuits.test.ts`. Record the checks CI can't run
+  (browser, Lace, preprod) in `ui/verification.json`; `--check` keeps
+  `templates/ui/VERIFIED.md` in step with it, and it is the only place that
+  says what a UI has been verified to do. Generic UI changes go in
+  `templates/ui/`, followed by `yarn new:ui <name> --sync`; CI runs `--check` on
+  every generated UI. Details, pins and the verification checklist are in
+  `templates/ui/AGENTS.md`, which every generated UI carries as `ui/AGENTS.md`.
+- Add meticulous comments in contracts and witnesses explaining the *how* and
+  *why* — these examples are read by agents as much as by people.

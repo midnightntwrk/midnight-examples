@@ -1,0 +1,35 @@
+{
+  "name": "@midnight-ntwrk/example-wallet",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared wallet plumbing for the examples: the repo-root .env of test wallets, fast-sync pre-seeding, and the NIGHT to DUST funding gate.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "wallets": "vite-node src/cli/wallets.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/midnight-js-network-id": "4.1.1",
+    "@midnight-ntwrk/midnight-js-protocol": "4.1.1",
+    "@midnight-ntwrk/testkit-js": "4.1.1",
+    "@midnight-ntwrk/wallet-sdk": "1.2.0",
+    "@midnight-ntwrk/wallet-sdk-abstractions": "^2.1.0",
+    "@polkadot/api": "16.5.6",
+    "@polkadot/types": "16.5.6",
+    "@polkadot/util": "14.0.3",
+    "pino": "^9.0.0",
+    "pino-pretty": "^13.0.0",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vite-node": "^6.0.0"
+  }
+}

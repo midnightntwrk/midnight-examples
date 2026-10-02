@@ -1,0 +1,23 @@
+{
+  "steps": {
+    "browser": {
+      "status": "verified",
+      "date": "2026-09-24",
+      "notes": "`divide` ran in the page, calling the `divMod` witness. That covers the witness wiring only."
+    },
+    "laceDeploy": {
+      "status": "not-run"
+    },
+    "laceCalls": {
+      "status": "not-run"
+    },
+    "preprod": {
+      "status": "not-run"
+    },
+    "mainnet": {
+      "status": "partial",
+      "date": "2026-10-01",
+      "notes": "Mainnet (node 1.0.400-c338b9ac, runtime specVersion 1000300) with the 1AM wallet and the local proof server (8.1.0). Deployed contract e2abbe408d68ceec26e3ee9227f2b32a311816efb28524a24f5545460252d609 (tx e50bd82709370aba87e149a4bb50351b6a92f8fbdd79ab0edbbad8c484e3a04e, block 2827738), then called add (tx af8ac1f2b23decc8e2c33c4476c66a0bc013ab44d999ab0f54e8e8b3d86840be, block 2827746). Both read back from the mainnet indexer; the compiled contract's ledger() decodes result = 26. Only add reached the proof server. subtract, multiply, square and divide (the divMod witness) were not run on mainnet."
+    }
+  }
+}

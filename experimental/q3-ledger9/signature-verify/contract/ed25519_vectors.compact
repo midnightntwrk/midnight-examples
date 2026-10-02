@@ -1,0 +1,46 @@
+// SOW-Q3-01 · Ed25519 test-vector circuits (L1, in-memory only).
+//
+// Every circuit here is `pure`: it touches no ledger, so the tests call it
+// straight from the generated `pureCircuits` table with no contract state,
+// no network and no proving keys. It is compiled with --skip-zk.
+//
+// What this file pins down about `ed25519Verify<#n>` (compactc 0.35.0,
+// --feature-zkir-v3, per the toolchain-0.35.0 notes):
+// - It takes the MESSAGE, not a digest. The RFC 8032 challenge
+//   sha512(encode(R) || encode(pk) || msg) is computed in-circuit.
+// - It is generic over the message length `n`, so a contract needs one
+//   instantiation per accepted length. Vendor QA covered n = 1, 32, 64; we add
+//   n = 0 (RFC 8032 TEST 1) and n = 1023 (TEST 1024), gap 01-G7.
+// - It ASSERTS the key is not the identity (a failed assertion, not `false`).
+// - The runtime rejects a Curve25519Point that is off-curve or outside the
+//   prime-order subgroup as a type error before the circuit body runs.
+pragma language_version 0.27;
+
+import CompactStandardLibrary;
+
+export pure circuit verify_empty(msg: Bytes<0>, sig: Ed25519Signature, pk: Curve25519Point): Boolean {
+  return ed25519Verify<0>(msg, sig, pk);
+}
+
+export pure circuit verify_1(msg: Bytes<1>, sig: Ed25519Signature, pk: Curve25519Point): Boolean {
+  return ed25519Verify<1>(msg, sig, pk);
+}
+
+export pure circuit verify_32(msg: Bytes<32>, sig: Ed25519Signature, pk: Curve25519Point): Boolean {
+  return ed25519Verify<32>(msg, sig, pk);
+}
+
+export pure circuit verify_64(msg: Bytes<64>, sig: Ed25519Signature, pk: Curve25519Point): Boolean {
+  return ed25519Verify<64>(msg, sig, pk);
+}
+
+export pure circuit verify_1023(msg: Bytes<1023>, sig: Ed25519Signature, pk: Curve25519Point): Boolean {
+  return ed25519Verify<1023>(msg, sig, pk);
+}
+
+// The owner commitment signature_auth.compact stores for authorize_private:
+// persistentHash over the key's (x, y). Exposed as a pure circuit so the tests
+// derive it with the exact in-circuit encoding rather than re-implementing it.
+export pure circuit commit_key(pk: Curve25519Point): Bytes<32> {
+  return persistentHash<Curve25519Point>(pk);
+}

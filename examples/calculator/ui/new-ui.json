@@ -1,0 +1,7 @@
+{
+  "contract": "calculator",
+  "privateState": "memory",
+  "networks": [
+    "mainnet"
+  ]
+}

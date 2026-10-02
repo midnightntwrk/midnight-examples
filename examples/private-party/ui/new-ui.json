@@ -1,0 +1,7 @@
+{
+  "contract": "private-party",
+  "privateState": "persistent",
+  "networks": [
+    "mainnet"
+  ]
+}
