@@ -1,0 +1,67 @@
+// This file is part of compact-end-2-end.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// Ported from compact PR #438's static Uniswap V2 Option A case
+// (`compiler/test.ss`, test-group ;; uniswap-v2-option-a). Holds a static
+// reference to DEX and cross-calls it (getReserves / contractAddress / swap).
+// On compactc 0.33.0-rc.1 the DEX ↔ MyToken graph compiles fine; the only
+// adaptation from the donor is that each cross-contract call on the `dex`
+// contract-reference parameter must be `disclose(dex)` (a disclosure rule the
+// donor predates — see sellForUSDC). The DEX address is public on-chain.
+
+pragma language_version >= 0.25.0;
+
+import CompactStandardLibrary;
+
+contract DEX {
+  circuit getReserves(_unused: Uint<64>): [Uint<64>, Uint<64>];
+  circuit contractAddress(): ContractAddress;
+  circuit swap(amount_a_out: Uint<64>, amount_b_out: Uint<64>, recipient: ContractAddress): Uint<64>;
+}
+
+export ledger balances: Map<ContractAddress, Uint<64>>;
+
+constructor(owner: ContractAddress, initial_supply: Uint<64>) {
+  balances.insert(disclose(owner), disclose(initial_supply));
+}
+
+// The donor (PR #438 test.ss) assumed every recipient was pre-inserted; on-chain
+// a lookup against a missing key aborts with "expected a cell, received null" the
+// first time a fresh recipient (e.g. the DEX) receives tokens. Default to 0, the
+// correct token semantics — same fix as dapps/no-witness-dex/FungibleToken.
+circuit balance_or_zero(owner: ContractAddress): Uint<64> {
+  return balances.member(disclose(owner)) ? balances.lookup(disclose(owner)) : 0 as Uint<64>;
+}
+
+export circuit transfer(sender: ContractAddress, to: ContractAddress, amount: Uint<64>): Uint<64> {
+  const from_balance = balances.lookup(disclose(sender));
+  assert(from_balance >= amount, "insufficient balance");
+  balances.insert(disclose(sender), disclose(from_balance - amount));
+  balances.insert(disclose(to), disclose((balance_or_zero(to) + amount) as Uint<64>));
+  return amount;
+}
+
+export circuit balanceOf(owner: ContractAddress): Uint<64> {
+  return balances.lookup(disclose(owner));
+}
+
+export circuit sellForUSDC(dex: DEX, caller: ContractAddress, amount_in: Uint<64>, amount_out: Uint<64>, min_usdc_out: Uint<64>): Uint<64> {
+  const zero = 0;
+  // compactc 0.33.0-rc.1 requires the contract-reference parameter to be
+  // disclosed at each cross-contract call site ("contract call contract
+  // reference might disclose the witness value"). The DEX address is public
+  // on-chain, so disclosing it leaks nothing.
+  const [reserve_a, reserve_b] = disclose(dex).getReserves(zero);
+  const dex_addr = disclose(dex).contractAddress();
+  assert(amount_out >= min_usdc_out, "slippage");
+  assert(amount_out < reserve_b, "insufficient reserve");
+  const caller_balance = balances.lookup(disclose(caller));
+  assert(caller_balance >= amount_in, "insufficient balance");
+  balances.insert(disclose(caller), disclose(caller_balance - amount_in));
+  balances.insert(disclose(dex_addr), disclose((balance_or_zero(dex_addr) + amount_in) as Uint<64>));
+  const output = disclose(amount_out);
+  const recipient = disclose(caller);
+  disclose(dex).swap(zero, output, recipient);
+  return amount_out;
+}

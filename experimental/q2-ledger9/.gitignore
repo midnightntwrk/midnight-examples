@@ -1,0 +1,24 @@
+node_modules/
+
+# Yarn 4 install state (machine-local)
+.yarn/install-state.gz
+
+# Compactc-generated artifacts (rebuilt by `yarn compile`)
+contracts/**/managed/
+
+# levelPrivateStateProvider writes private-state DBs to CWD
+midnight-level-db-*/
+
+# Secrets — funded wallet seeds live here, never committed
+.env
+.env.local
+.env.stagenet
+.env.preview
+.env.preprod
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+dist/

@@ -1,0 +1,264 @@
+// This file is part of compact-end-2-end.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// Port of AxelarGateway.sol (code-423n4/2023-07-axelar, contracts/cgp/),
+// reduced to its self-recursion mechanics: execute() dispatches each command
+// by re-entering the gateway through an external call on its own address —
+// Solidity's `(bool success, ) = address(this).call(
+//   abi.encodeWithSelector(commandSelector, params[i], commandId))`.
+// Here that is a `contract AxelarGatewaySelf` interface declaration of this
+// very contract plus `self.<command>(...)` calls inside execute(), with the
+// self reference passed in as a circuit argument (kernel.self() yields only
+// a ContractAddress, not a callable contract-typed value).
+//
+// Port mapping:
+//   keccak selector switch          → Uint<8> command_type tag (0..5)
+//   abi.decode(params, (...))       → typed circuit params; execute() takes
+//                                     the superset, commands slice it
+//   string name/symbol/chain/addr   → Bytes<32> (no dynamic strings)
+//   uint256                         → Uint<128> (Uint<64> for event index)
+//   address / bytes32               → Bytes<32>
+//   onlySelf modifier               → omitted; needs kernel.caller(), its own
+//                                     compile gap (see dapps/caller/)
+//   commands[] loop                 → one command per execute() call (no
+//                                     dynamic arrays); operator/proof
+//                                     validation (AxelarAuth) out of scope
+//   contractCallApproved keccak key → keyed by command_id directly
+//   _setCommandExecuted before call → ordering preserved (reentrancy guard)
+//   isCommandExecuted `continue` +  → assert reverts: no try/catch in
+//     flag reset on call failure      Compact, a failed call aborts the tx
+//   external ERC20 token calls      → internal balances map stands in
+//
+// Self-calls in execute() exercise cross-contract calls inside circuit bodies.
+
+pragma language_version >= 0.25.0;
+
+import CompactStandardLibrary;
+
+// Self-interface: the gateway's own onlySelf command surface, declared the
+// way a foreign contract would be.
+contract AxelarGatewaySelf {
+  circuit deploy_token(
+    name: Bytes<32>,
+    symbol: Bytes<32>,
+    decimals: Uint<8>,
+    cap: Uint<128>,
+    token_address: Bytes<32>,
+    mint_limit: Uint<128>,
+    command_id: Bytes<32>
+  ): [];
+  circuit mint_token(symbol: Bytes<32>, account: Bytes<32>, amount: Uint<128>, command_id: Bytes<32>): [];
+  circuit burn_token(symbol: Bytes<32>, salt: Bytes<32>, command_id: Bytes<32>): [];
+  circuit approve_contract_call(
+    source_chain: Bytes<32>,
+    source_address: Bytes<32>,
+    contract_address: Bytes<32>,
+    payload_hash: Bytes<32>,
+    source_tx_hash: Bytes<32>,
+    source_event_index: Uint<64>,
+    command_id: Bytes<32>
+  ): [];
+  circuit approve_contract_call_with_mint(
+    source_chain: Bytes<32>,
+    source_address: Bytes<32>,
+    contract_address: Bytes<32>,
+    payload_hash: Bytes<32>,
+    symbol: Bytes<32>,
+    amount: Uint<128>,
+    source_tx_hash: Bytes<32>,
+    source_event_index: Uint<64>,
+    command_id: Bytes<32>
+  ): [];
+  circuit transfer_operatorship(new_operators_hash: Bytes<32>, command_id: Bytes<32>): [];
+}
+
+// ── command replay guard ──
+export ledger command_executed: Map<Bytes<32>, Boolean>;
+
+// ── token registry (deployToken) ──
+export ledger token_addresses: Map<Bytes<32>, Bytes<32>>;
+export ledger token_names: Map<Bytes<32>, Bytes<32>>;
+export ledger token_decimals: Map<Bytes<32>, Uint<8>>;
+export ledger token_caps: Map<Bytes<32>, Uint<128>>;
+export ledger token_mint_limits: Map<Bytes<32>, Uint<128>>;
+export ledger token_mint_amounts: Map<Bytes<32>, Uint<128>>;
+
+// ── mint/burn bookkeeping (stand-in for the external ERC20) ──
+export ledger balances: Map<Bytes<32>, Uint<128>>;
+export ledger burn_salts: Map<Bytes<32>, Bytes<32>>;
+
+// ── contract-call approvals, keyed by command_id ──
+export ledger approved_contract_calls: Map<Bytes<32>, Boolean>;
+export ledger approval_source_chain: Map<Bytes<32>, Bytes<32>>;
+export ledger approval_source_address: Map<Bytes<32>, Bytes<32>>;
+export ledger approval_contract_address: Map<Bytes<32>, Bytes<32>>;
+export ledger approval_payload_hash: Map<Bytes<32>, Bytes<32>>;
+export ledger approval_source_tx_hash: Map<Bytes<32>, Bytes<32>>;
+export ledger approval_source_event_index: Map<Bytes<32>, Uint<64>>;
+export ledger approval_mint_symbol: Map<Bytes<32>, Bytes<32>>;
+export ledger approval_mint_amount: Map<Bytes<32>, Uint<128>>;
+
+// ── operators (transferOperatorship; AxelarAuth epoch model) ──
+export ledger operators_epoch: Uint<64>;
+export ledger operators_hash: Bytes<32>;
+
+constructor(initial_operators_hash: Bytes<32>) {
+  operators_epoch = 1 as Uint<64>;
+  operators_hash = disclose(initial_operators_hash);
+}
+
+// execute(): mark the command executed, then dispatch to the matching command
+// circuit via an external call on the gateway's own address. Command tags:
+// 0=deployToken 1=mintToken 2=burnToken 3=approveContractCall
+// 4=approveContractCallWithMint 5=transferOperatorship; unknown tags skipped.
+export circuit execute(
+  self: AxelarGatewaySelf,
+  command_id: Bytes<32>,
+  command_type: Uint<8>,
+  name: Bytes<32>,
+  symbol: Bytes<32>,
+  decimals: Uint<8>,
+  cap: Uint<128>,
+  token_address: Bytes<32>,
+  mint_limit: Uint<128>,
+  account: Bytes<32>,
+  amount: Uint<128>,
+  salt: Bytes<32>,
+  source_chain: Bytes<32>,
+  source_address: Bytes<32>,
+  contract_address: Bytes<32>,
+  payload_hash: Bytes<32>,
+  source_tx_hash: Bytes<32>,
+  source_event_index: Uint<64>,
+  new_operators_hash: Bytes<32>
+): [] {
+  assert(!command_executed.member(disclose(command_id)), "command already executed");
+  // executed flag set BEFORE the self-call — upstream's reentrancy ordering
+  command_executed.insert(disclose(command_id), true);
+  const s = disclose(self);
+
+  if (command_type == 0) {
+    s.deploy_token(
+      disclose(name),
+      disclose(symbol),
+      disclose(decimals),
+      disclose(cap),
+      disclose(token_address),
+      disclose(mint_limit),
+      disclose(command_id)
+    );
+  } else if (command_type == 1) {
+    s.mint_token(disclose(symbol), disclose(account), disclose(amount), disclose(command_id));
+  } else if (command_type == 2) {
+    s.burn_token(disclose(symbol), disclose(salt), disclose(command_id));
+  } else if (command_type == 3) {
+    s.approve_contract_call(
+      disclose(source_chain),
+      disclose(source_address),
+      disclose(contract_address),
+      disclose(payload_hash),
+      disclose(source_tx_hash),
+      disclose(source_event_index),
+      disclose(command_id)
+    );
+  } else if (command_type == 4) {
+    s.approve_contract_call_with_mint(
+      disclose(source_chain),
+      disclose(source_address),
+      disclose(contract_address),
+      disclose(payload_hash),
+      disclose(symbol),
+      disclose(amount),
+      disclose(source_tx_hash),
+      disclose(source_event_index),
+      disclose(command_id)
+    );
+  } else if (command_type == 5) {
+    s.transfer_operatorship(disclose(new_operators_hash), disclose(command_id));
+  }
+}
+
+circuit balance_or_zero(account: Bytes<32>): Uint<128> {
+  return balances.member(disclose(account)) ? balances.lookup(disclose(account)) : 0 as Uint<128>;
+}
+
+export circuit deploy_token(
+  name: Bytes<32>,
+  symbol: Bytes<32>,
+  decimals: Uint<8>,
+  cap: Uint<128>,
+  token_address: Bytes<32>,
+  mint_limit: Uint<128>,
+  command_id: Bytes<32>
+): [] {
+  assert(!token_addresses.member(disclose(symbol)), "token already exists");
+  token_addresses.insert(disclose(symbol), disclose(token_address));
+  token_names.insert(disclose(symbol), disclose(name));
+  token_decimals.insert(disclose(symbol), disclose(decimals));
+  token_caps.insert(disclose(symbol), disclose(cap));
+  token_mint_limits.insert(disclose(symbol), disclose(mint_limit));
+  token_mint_amounts.insert(disclose(symbol), 0 as Uint<128>);
+}
+
+export circuit mint_token(symbol: Bytes<32>, account: Bytes<32>, amount: Uint<128>, command_id: Bytes<32>): [] {
+  assert(token_addresses.member(disclose(symbol)), "token does not exist");
+  const minted = token_mint_amounts.lookup(disclose(symbol));
+  const limit = token_mint_limits.lookup(disclose(symbol));
+  // upstream: mintLimit 0 = unlimited
+  assert(limit == 0 || (minted + amount) <= limit, "exceed mint limit");
+  token_mint_amounts.insert(disclose(symbol), disclose((minted + amount) as Uint<128>));
+  balances.insert(disclose(account), disclose((balance_or_zero(account) + amount) as Uint<128>));
+}
+
+export circuit burn_token(symbol: Bytes<32>, salt: Bytes<32>, command_id: Bytes<32>): [] {
+  assert(token_addresses.member(disclose(symbol)), "token does not exist");
+  // upstream deploys a DepositHandler at `salt` and burns its balance; here
+  // the burn intent is recorded keyed by salt
+  burn_salts.insert(disclose(salt), disclose(symbol));
+}
+
+export circuit approve_contract_call(
+  source_chain: Bytes<32>,
+  source_address: Bytes<32>,
+  contract_address: Bytes<32>,
+  payload_hash: Bytes<32>,
+  source_tx_hash: Bytes<32>,
+  source_event_index: Uint<64>,
+  command_id: Bytes<32>
+): [] {
+  approved_contract_calls.insert(disclose(command_id), true);
+  approval_source_chain.insert(disclose(command_id), disclose(source_chain));
+  approval_source_address.insert(disclose(command_id), disclose(source_address));
+  approval_contract_address.insert(disclose(command_id), disclose(contract_address));
+  approval_payload_hash.insert(disclose(command_id), disclose(payload_hash));
+  approval_source_tx_hash.insert(disclose(command_id), disclose(source_tx_hash));
+  approval_source_event_index.insert(disclose(command_id), disclose(source_event_index));
+}
+
+export circuit approve_contract_call_with_mint(
+  source_chain: Bytes<32>,
+  source_address: Bytes<32>,
+  contract_address: Bytes<32>,
+  payload_hash: Bytes<32>,
+  symbol: Bytes<32>,
+  amount: Uint<128>,
+  source_tx_hash: Bytes<32>,
+  source_event_index: Uint<64>,
+  command_id: Bytes<32>
+): [] {
+  approved_contract_calls.insert(disclose(command_id), true);
+  approval_source_chain.insert(disclose(command_id), disclose(source_chain));
+  approval_source_address.insert(disclose(command_id), disclose(source_address));
+  approval_contract_address.insert(disclose(command_id), disclose(contract_address));
+  approval_payload_hash.insert(disclose(command_id), disclose(payload_hash));
+  approval_source_tx_hash.insert(disclose(command_id), disclose(source_tx_hash));
+  approval_source_event_index.insert(disclose(command_id), disclose(source_event_index));
+  approval_mint_symbol.insert(disclose(command_id), disclose(symbol));
+  approval_mint_amount.insert(disclose(command_id), disclose(amount));
+}
+
+export circuit transfer_operatorship(new_operators_hash: Bytes<32>, command_id: Bytes<32>): [] {
+  operators_epoch = (operators_epoch + (1 as Uint<64>)) as Uint<64>;
+  operators_hash = disclose(new_operators_hash);
+}
