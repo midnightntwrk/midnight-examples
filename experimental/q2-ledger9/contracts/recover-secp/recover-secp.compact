@@ -1,0 +1,37 @@
+// This file is part of stagenet-q2.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// recover-secp256k1.compact — the in-circuit ECDSA public-key recovery path:
+// secp256k1EcdsaRecover(h, sig) recovers the signer's Secp256k1Point from a
+// digest + a recoverable signature, then secp256k1EthereumAddress derives the
+// 20-byte Ethereum address of the recovered key.
+//
+// STATUS: the recover API (Secp256k1EcdsaSignatureWithRecovery +
+// secp256k1EcdsaRecover) was removed between compactc 0.33.0-rc.0 and rc.1
+// (LFDT-Minokawa/compact#610) and is STILL ABSENT in 0.33.0-rc.2 — the type is
+// unbound even with --feature-zkir-v3. This is a compile-gap regression guard:
+// it does not compile today, so the recover-secp suite SKIPS. When the API is
+// restored, this compiles and the suite runs unchanged.
+//
+// Requires --feature-zkir-v3 (the secp256k1 surface lives in the zkir-v3 library).
+
+pragma language_version >= 0.25.0;
+
+import CompactStandardLibrary;
+
+export ledger recoveredAddr: Bytes<20>;
+
+constructor() {
+  recoveredAddr = default<Bytes<20>>;
+}
+
+export circuit recoverAddress(
+  h: Bytes<32>,
+  sig: Secp256k1EcdsaSignatureWithRecovery,
+): Bytes<20> {
+  const pk = secp256k1EcdsaRecover(h, sig);
+  const addr: Bytes<20> = secp256k1EthereumAddress(pk);
+  recoveredAddr = disclose(addr);
+  return disclose(addr);
+}

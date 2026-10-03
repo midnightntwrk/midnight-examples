@@ -1,0 +1,31 @@
+// This file is part of compact-end-2-end.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// End-to-end probe for `kernel.caller()`. `capture()` reads kernel.caller(),
+// writes the result into ledger state, and returns it; `get()` is a
+// read-only view. The companion Proxy.compact cross-calls capture() to
+// exercise the contract-as-caller branch.
+//
+// Exercises the kernel.caller() built-in documented in
+// compact/compiler/midnight-ledger.ss lines 267-274.
+
+pragma language_version >= 0.25.0;
+
+import CompactStandardLibrary;
+
+export ledger last_caller: Maybe<Either<ContractAddress, UserAddress>>;
+
+constructor() {
+  last_caller = none<Either<ContractAddress, UserAddress>>();
+}
+
+export circuit capture(): Maybe<Either<ContractAddress, UserAddress>> {
+  const c = kernel.caller();
+  last_caller = c;
+  return c;
+}
+
+export circuit get(): Maybe<Either<ContractAddress, UserAddress>> {
+  return last_caller;
+}

@@ -1,0 +1,65 @@
+// This file is part of compact-end-2-end.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// FungibleToken fork that exercises the on-chain `emit` statement (events).
+// `transfer` emits the two standard transfer events from the predefined
+// Midnight event catalog (compact/compiler/midnight-events.ss):
+//   - UnshieldedSpend   (tag 4) — the sender side
+//   - UnshieldedReceive (tag 5) — the recipient side
+// `emit` only accepts a declared catalog event; a free struct is rejected
+// at type-check with "<name> is not a declared event type".
+//
+// Requires an events-capable compactc: the `emit` statement (renamed from the
+// earlier `log`) lands with the events feature (compact issue-377 / ledger-9).
+// compactc 0.33 (language version 0.25.0) supports it. The pragma below is a
+// `>=` range (not an exact pin) so it tracks the compiler's language version.
+//
+// Same balance_or_zero deviation as dapps/fungible-token/: guard the
+// recipient lookup against missing keys, else the runtime aborts with
+// `expected a cell, received null` the first time an address is targeted.
+
+pragma language_version >= 0.25.0;
+
+import CompactStandardLibrary;
+
+export ledger balances: Map<Bytes<32>, Uint<64>>;
+
+constructor(initial_owner: Bytes<32>, initial_supply: Uint<64>) {
+  balances.insert(disclose(initial_owner), disclose(initial_supply));
+}
+
+circuit balance_or_zero(owner: Bytes<32>): Uint<64> {
+  return balances.member(disclose(owner)) ? balances.lookup(disclose(owner)) : 0 as Uint<64>;
+}
+
+export circuit transfer(sender: Bytes<32>, to: Bytes<32>, amount: Uint<64>): Uint<64> {
+  const from_balance = balances.lookup(disclose(sender));
+  assert(from_balance >= amount, "insufficient balance");
+  balances.insert(disclose(sender), disclose(from_balance - amount));
+  balances.insert(disclose(to), disclose((balance_or_zero(to) + amount) as Uint<64>));
+
+  const token = nativeToken();
+  // domainSep was added to UnshieldedSpend/Receive (compact CHANGELOG). This
+  // synthetic event doesn't mint a real token, so a zero domain separator is a
+  // valid placeholder — the test asserts on event count + type, not payload.
+  const domainSep = pad(32, "");
+  const value = disclose(amount) as Uint<128>;
+  emit(UnshieldedSpend {
+    sender: left<ZswapCoinPublicKey, ContractAddress>(ZswapCoinPublicKey { bytes: disclose(sender) }),
+    domainSep: domainSep,
+    tokenType: token,
+    amount: value
+  });
+  emit(UnshieldedReceive {
+    recipient: left<ZswapCoinPublicKey, ContractAddress>(ZswapCoinPublicKey { bytes: disclose(to) }),
+    domainSep: domainSep,
+    tokenType: token,
+    amount: value
+  });
+  return amount;
+}
+
+export circuit balance(owner: Bytes<32>): Uint<64> {
+  return balance_or_zero(owner);
+}

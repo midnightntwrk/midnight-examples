@@ -1,0 +1,69 @@
+// This file is part of compact-end-2-end.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// Ported verbatim from compact PR #438's static `no-witness-dex` case
+// (`compiler/test.ss`, test-group ;; no-witness-dex: static composability
+// baseline). The `contract FungibleToken { ... }` block is the static
+// reference into FungibleToken.compact's compiled contract-info.
+
+pragma language_version >= 0.25.0;
+
+import CompactStandardLibrary;
+
+contract FungibleToken {
+  circuit transfer(sender: Bytes<32>, to: Bytes<32>, amount: Uint<64>): Uint<64>;
+  circuit multi_transfer(
+    sender: Bytes<32>,
+    to_0: Bytes<32>,
+    amount_0: Uint<64>,
+    to_1: Bytes<32>,
+    amount_1: Uint<64>
+  ): Uint<64>;
+  circuit balance(owner: Bytes<32>): Uint<64>;
+}
+
+ledger token_a: FungibleToken;
+ledger token_b: FungibleToken;
+ledger fee_address: Bytes<32>;
+
+constructor(
+  a: FungibleToken,
+  b: FungibleToken,
+  fee: Bytes<32>
+) {
+  token_a = disclose(a);
+  token_b = disclose(b);
+  fee_address = disclose(fee);
+}
+
+export circuit swap(
+  a_for_b: Boolean,
+  trader: Bytes<32>,
+  amount_in: Uint<64>,
+  amount_out: Uint<64>,
+  fee_amount: Uint<64>
+): Uint<64> {
+  const dex_address = kernel.self().bytes;
+  if (disclose(a_for_b)) {
+    const received = token_a.transfer(disclose(trader), dex_address, disclose(amount_in));
+    const paid = token_b.multi_transfer(
+      dex_address,
+      disclose(trader),
+      disclose(amount_out),
+      fee_address,
+      disclose(fee_amount)
+    );
+    return (received + paid) as Uint<64>;
+  } else {
+    const received = token_b.transfer(disclose(trader), dex_address, disclose(amount_in));
+    const paid = token_a.multi_transfer(
+      dex_address,
+      disclose(trader),
+      disclose(amount_out),
+      fee_address,
+      disclose(fee_amount)
+    );
+    return (received + paid) as Uint<64>;
+  }
+}

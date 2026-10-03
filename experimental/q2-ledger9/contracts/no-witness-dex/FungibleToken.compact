@@ -1,0 +1,56 @@
+// This file is part of compact-end-2-end.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// Originally ported from compact PR #438's static `no-witness-dex` case
+// (`compiler/test.ss`, test-group ;; no-witness-dex: static composability
+// baseline). DEX.compact holds two instances of this contract via static
+// references; this contract has no back-reference.
+//
+// Deviation from the verbatim port: transfer/multi_transfer guard the
+// recipient lookup against missing keys (the test.ss source assumed all
+// recipients were pre-inserted; on-chain that assumption blows up the
+// runtime with `expected a cell, received null` the first time a circuit
+// targets an uninitialized address).
+
+pragma language_version >= 0.25.0;
+
+import CompactStandardLibrary;
+
+export ledger balances: Map<Bytes<32>, Uint<64>>;
+
+constructor(initial_owner: Bytes<32>, initial_supply: Uint<64>) {
+  balances.insert(disclose(initial_owner), disclose(initial_supply));
+}
+
+circuit balance_or_zero(owner: Bytes<32>): Uint<64> {
+  return balances.member(disclose(owner)) ? balances.lookup(disclose(owner)) : 0 as Uint<64>;
+}
+
+export circuit transfer(sender: Bytes<32>, to: Bytes<32>, amount: Uint<64>): Uint<64> {
+  const from_balance = balances.lookup(disclose(sender));
+  assert(from_balance >= amount, "insufficient balance");
+  balances.insert(disclose(sender), disclose(from_balance - amount));
+  balances.insert(disclose(to), disclose((balance_or_zero(to) + amount) as Uint<64>));
+  return amount;
+}
+
+export circuit multi_transfer(
+  sender: Bytes<32>,
+  to_0: Bytes<32>,
+  amount_0: Uint<64>,
+  to_1: Bytes<32>,
+  amount_1: Uint<64>
+): Uint<64> {
+  const total = (amount_0 + amount_1) as Uint<64>;
+  const from_balance = balances.lookup(disclose(sender));
+  assert(from_balance >= total, "insufficient balance");
+  balances.insert(disclose(sender), disclose(from_balance - total));
+  balances.insert(disclose(to_0), disclose((balance_or_zero(to_0) + amount_0) as Uint<64>));
+  balances.insert(disclose(to_1), disclose((balance_or_zero(to_1) + amount_1) as Uint<64>));
+  return total;
+}
+
+export circuit balance(owner: Bytes<32>): Uint<64> {
+  return balance_or_zero(owner);
+}

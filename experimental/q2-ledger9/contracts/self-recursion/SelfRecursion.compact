@@ -1,0 +1,57 @@
+// This file is part of compact-end-2-end.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// Minimal self-recursion probe: a contract that re-enters itself through an
+// external call on its own address — the Compact analogue of Solidity's
+// `address(this).call(...)`. The contract declares the circuits it self-calls
+// as a `contract` interface (the way a foreign contract would be declared) and
+// receives its own address as a circuit argument: kernel.self() yields only a
+// ContractAddress, not a callable contract-typed value.
+//
+// Two probe shapes:
+//   ping(self)      — self external call into a *different* circuit (the
+//                     AxelarGateway execute() → command dispatch shape).
+//   spiral(self, n) — self external call into the *same* circuit: true
+//                     recursion, bounded by n. Also exercises a contract
+//                     interface declaration that references its own type.
+//
+// A call targeting the contract's own address exercises cross-contract calls
+// inside circuit bodies.
+
+pragma language_version >= 0.25.0;
+
+import CompactStandardLibrary;
+
+contract SelfRecursionSelf {
+  circuit pong(): [];
+  circuit spiral(self: SelfRecursionSelf, n: Uint<8>): [];
+}
+
+export ledger pongs: Uint<64>;
+export ledger spirals: Uint<64>;
+
+constructor() {
+  pongs = 0 as Uint<64>;
+  spirals = 0 as Uint<64>;
+}
+
+export circuit ping(self: SelfRecursionSelf): [] {
+  // Call target is a circuit argument (witness-tainted), so disclose it
+  // before using it as a receiver — ledger-field targets (no-witness-dex)
+  // are already public and skip this.
+  const s = disclose(self);
+  return s.pong();
+}
+
+export circuit pong(): [] {
+  pongs = (pongs + (1 as Uint<64>)) as Uint<64>;
+}
+
+export circuit spiral(self: SelfRecursionSelf, n: Uint<8>): [] {
+  spirals = (spirals + (1 as Uint<64>)) as Uint<64>;
+  if (n != 0) {
+    const s = disclose(self);
+    s.spiral(s, disclose((n - 1) as Uint<8>));
+  }
+}

@@ -1,0 +1,26 @@
+// This file is part of compact-end-2-end.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// Thin proxy that cross-calls Caller.capture(). When the test invokes
+// Proxy.forward() from a user wallet, Caller.last_caller should land as
+// Some(left(proxyAddress)) — exercising the contract-as-caller branch of
+// kernel.caller(). This depends on cross-contract calls inside circuit bodies.
+
+pragma language_version >= 0.25.0;
+
+import CompactStandardLibrary;
+
+contract Caller {
+  circuit capture(): Maybe<Either<ContractAddress, UserAddress>>;
+}
+
+ledger caller_handle: Caller;
+
+constructor(c: Caller) {
+  caller_handle = disclose(c);
+}
+
+export circuit forward(): Maybe<Either<ContractAddress, UserAddress>> {
+  return caller_handle.capture();
+}
