@@ -5,7 +5,7 @@
 // on known vectors, and store that verdict. A DApp needs more than a verdict:
 // it needs a signature to AUTHORISE something, exactly once, for the right key,
 // over the right bytes. This contract does three such authorisations, each
-// aimed at a gap the QA evidence leaves open (see q3-testing-strategy.md):
+// aimed at a gap the QA evidence leaves open (see the SOW3 testing strategy):
 //
 //   authorize_once     Ed25519 (e.g. a Cardano wallet key) authorises a
 //                      32-byte action id once; replays are refused.   01-G10

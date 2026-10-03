@@ -1,7 +1,7 @@
 # q3-ledger9: Q3 2026 acceptance tests on the ledger 9 stack
 
-These are Foundation acceptance tests for the two "easy to test here" Q3 deliverables in
-[`../q3-delivery/q3-testing-strategy.md`](../q3-delivery/q3-testing-strategy.md):
+These are Foundation acceptance tests for the two "easy to test here" Q3 deliverables in the
+Foundation's SOW3 testing strategy (internal):
 
 | Deliverable | What we test | Where |
 |---|---|---|

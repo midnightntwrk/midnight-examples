@@ -1,6 +1,6 @@
 // What stack a run actually used. Every acceptance report embeds this, because
 // "passed" only means something next to the versions it passed on
-// (q3-testing-strategy.md, P5 version-drift log).
+// (SOW3 testing strategy, P5 version-drift log).
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';

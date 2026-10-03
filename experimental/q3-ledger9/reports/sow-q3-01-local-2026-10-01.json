@@ -6,7 +6,7 @@
     "AC-1": "ed25519 signatures can be verified in Compact",
     "AC-2": "ECDSA signatures over P256 can be verified in Compact"
   },
-  "strategy": "experimental/q3-delivery/q3-testing-strategy.md",
+  "strategy": "Foundation SOW3 testing strategy (internal)",
   "run": {
     "startedAt": "2026-10-01T05:05:23.564Z",
     "finishedAt": "2026-10-01T05:08:14.581Z",

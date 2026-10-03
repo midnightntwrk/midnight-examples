@@ -81,7 +81,7 @@ for (const d of DELIVERABLES) {
     deliverable: d.id,
     title: d.title,
     acceptanceCriteria: d.acceptanceCriteria,
-    strategy: 'experimental/q3-delivery/q3-testing-strategy.md',
+    strategy: 'Foundation SOW3 testing strategy (internal)',
     run: {
       startedAt,
       finishedAt: new Date().toISOString(),

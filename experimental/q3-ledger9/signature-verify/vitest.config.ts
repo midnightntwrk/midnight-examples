@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-// Two layers (q3-testing-strategy.md "Testing posture"):
+// Two layers (SOW3 testing strategy, "Testing posture"):
 //   sim  L1 — in memory: pure circuits and the compact-runtime simulator.
 //             No network, no proving keys. Seconds.
 //   e2e  L2 — deploy and call on the local ledger 9 network from ../compose.yml,
