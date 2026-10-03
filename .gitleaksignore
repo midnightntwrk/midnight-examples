@@ -1,0 +1,7 @@
+# gitleaks false positives (generic-api-key), one fingerprint per line.
+# These are line-based: if a line moves, the Scan job prints the new fingerprint.
+# A ledger field declaration, not a credential.
+experimental/q3-ledger9/signature-verify/contract/signature_auth.compact:generic-api-key:74
+# Sample devnet log output in the tutorial: a token color and a public match key.
+examples/shielded-chips/TUTORIAL.md:generic-api-key:1183
+examples/shielded-chips/TUTORIAL.md:generic-api-key:1201
