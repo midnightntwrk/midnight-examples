@@ -133,7 +133,7 @@ function render(r: Report): string {
   L.push(
     `**Source:** \`experimental/q3-ledger9/${c.folder}\` in mn-examples, branch \`${r.run.gitBranch}\` @ \`${r.run.gitCommit}\`, working tree **${r.run.workingTree}** (test code not yet committed)  `,
   );
-  L.push('**Plan:** `experimental/q3-delivery/q3-testing-strategy.md`', '');
+  L.push('**Plan:** the Foundation\'s SOW3 testing strategy (internal)', '');
 
   L.push('## Result', '');
   L.push('| Layer | What it is | Passed | Failed |', '|---|---|---|---|');

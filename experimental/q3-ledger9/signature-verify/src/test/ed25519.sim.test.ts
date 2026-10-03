@@ -1,5 +1,5 @@
 // SOW-Q3-01 AC-1 at L1: ed25519Verify<n> run in memory through pure circuits.
-// Gap ids refer to experimental/q3-delivery/q3-testing-strategy.md.
+// Gap ids refer to the Foundation's SOW3 testing strategy (internal).
 import { describe, expect, it } from 'vitest';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { outcome } from '@q3/harness/sim';
