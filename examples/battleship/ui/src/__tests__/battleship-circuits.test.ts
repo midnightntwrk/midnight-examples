@@ -176,7 +176,9 @@ describe("battleship contract (in memory)", () => {
         expect(accepts, `acceptGame(${x1}, ${x2})`).toBe(expected);
       }
     }
-  });
+    // 49 placements x 3 circuit runs take ~5s on a CI runner, past vitest's
+    // 5s default.
+  }, 30_000);
 
   it("shotError agrees with player1Shoot", () => {
     let { state, ps: alice } = deploy(ALICE);
