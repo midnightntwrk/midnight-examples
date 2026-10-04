@@ -173,7 +173,9 @@ function runAll(each) {
   const failed = names.filter(
     (n) => spawnSync(process.execPath, [script, n, `--${each}`], { stdio: 'inherit' }).status !== 0,
   );
-  const yarn = (args) => spawnSync('yarn', args, { cwd: REPO_ROOT, stdio: 'inherit', shell: true }).status === 0;
+  // Windows needs a shell to run yarn.cmd; elsewhere the fixed args go straight to yarn.
+  const yarn = (args) =>
+    spawnSync('yarn', args, { cwd: REPO_ROOT, stdio: 'inherit', shell: process.platform === 'win32' }).status === 0;
   if (each === 'check') {
     console.log('\n  yarn install --immutable (does yarn.lock match every package.json?)');
     const lockOk = yarn(['install', '--immutable', '--mode=skip-build']);
