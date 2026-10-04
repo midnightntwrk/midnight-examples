@@ -1,6 +1,8 @@
 # Paths opengrep (the Scan workflow) skips. This file REPLACES opengrep's
 # built-in ignore list, so keep the :include; checked with a full-repo scan
-# that adding it surfaces no new findings.
+# that adding it surfaces no new findings. The scanner reads this file and
+# .gitignore as ASCII: a non-ASCII character in either (an em dash in a
+# comment did it) crashes opengrep and fails the required `scan` check.
 :include .gitignore
 
 # Local-devnet compose files: the indexer's plain-websocket node URLs (Docker
