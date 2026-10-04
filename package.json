@@ -32,6 +32,7 @@
     "@midnight-ntwrk/ledger-v8": "8.1.2",
     "@midnight-ntwrk/onchain-runtime-v3": "3.1.1",
     "@midnight-ntwrk/zkir-v2": "2.1.1",
-    "vite-plugin-top-level-await/@swc/core": "1.15.47"
+    "vite-plugin-top-level-await/@swc/core": "1.15.47",
+    "vite-plugin-top-level-await/uuid": "11.1.1"
   }
 }

@@ -36,6 +36,11 @@ truth over your own recollection of Midnight/Compact APIs.
   submit fails with `SubmissionError` (`blockNumber: Expected BN, actual N`)
   even though the tx lands, followed by `DustDoubleSpend` on the next one. Do
   not remove it; `bn.js@4` stays nested under the polyfill packages.
+- **The root `resolutions` pins `vite-plugin-top-level-await/uuid` to 11.1.1
+  on purpose.** The plugin (1.6.0, latest) pins `uuid` exactly at 10.0.0,
+  which Trivy flags (CVE-2026-41907, fixed in 11.1.1). It only calls
+  `require("uuid").v5`, which 11.x keeps. Drop the override once the plugin
+  widens its range.
 - **Never commit secrets.** Real `.env.preprod` / `.env.preview` and
   `midnight-level-db/`, `logs/`, wallet preseed state are gitignored. Only the
   `.env.*.example` templates are tracked. The `preseed/` bundles ARE committed on
