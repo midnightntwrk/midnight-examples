@@ -493,7 +493,8 @@ if (hasWitnesses) {
   // `witnesses`, or `<contract>Witnesses` when one file serves several
   // contracts (shielded-chips: rouletteWitnesses, chipsWitnesses).
   const perContract = `${managed.replace(/[-_](\w)/g, (_, c) => c.toUpperCase())}Witnesses`;
-  witnessesExport = [`witnesses`, perContract].find((n) => new RegExp(`export const ${n}\\b`).test(witnessesSrc));
+  const exported = new Set([...witnessesSrc.matchAll(/export const (\w+)\b/g)].map((m) => m[1]));
+  witnessesExport = [`witnesses`, perContract].find((n) => exported.has(n));
   if (!witnessesExport) {
     fail(`examples/${name}/contract/witnesses.ts exports neither \`witnesses\` nor \`${perContract}\`.`);
   }
