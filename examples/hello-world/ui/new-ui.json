@@ -1,0 +1,7 @@
+{
+  "contract": "hello-world",
+  "privateState": "memory",
+  "networks": [
+    "mainnet"
+  ]
+}

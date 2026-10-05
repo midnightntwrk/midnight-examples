@@ -1,0 +1,7 @@
+{
+  "contract": "token-transfers",
+  "privateState": "memory",
+  "networks": [
+    "mainnet"
+  ]
+}

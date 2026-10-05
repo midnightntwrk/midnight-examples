@@ -1,0 +1,36 @@
+// This file is part of compact-end-2-end.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// Ported verbatim from compact PR #438's static Uniswap V2 Option A case
+// (`compiler/test.ss`, test-group ;; uniswap-v2-option-a). Vanilla fungible
+// token, no contract references — sits outside the DEX↔MyToken static cycle.
+
+pragma language_version >= 0.25.0;
+
+import CompactStandardLibrary;
+
+export ledger balances: Map<ContractAddress, Uint<64>>;
+
+constructor(owner: ContractAddress, initial_supply: Uint<64>) {
+  balances.insert(disclose(owner), disclose(initial_supply));
+}
+
+// Default a missing recipient to 0 (see dapps/no-witness-dex/FungibleToken and
+// MyToken.compact): the donor assumed pre-inserted recipients, which aborts
+// on-chain with "expected a cell, received null" for a fresh recipient.
+circuit balance_or_zero(owner: ContractAddress): Uint<64> {
+  return balances.member(disclose(owner)) ? balances.lookup(disclose(owner)) : 0 as Uint<64>;
+}
+
+export circuit transfer(sender: ContractAddress, to: ContractAddress, amount: Uint<64>): Uint<64> {
+  const from_balance = balances.lookup(disclose(sender));
+  assert(from_balance >= amount, "insufficient balance");
+  balances.insert(disclose(sender), disclose(from_balance - amount));
+  balances.insert(disclose(to), disclose((balance_or_zero(to) + amount) as Uint<64>));
+  return amount;
+}
+
+export circuit balanceOf(owner: ContractAddress): Uint<64> {
+  return balances.lookup(disclose(owner));
+}

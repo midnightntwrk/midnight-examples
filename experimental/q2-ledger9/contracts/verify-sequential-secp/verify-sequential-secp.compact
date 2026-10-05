@@ -1,0 +1,38 @@
+// This file is part of compact-end-2-end.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// verify-sequential-secp256k1.compact — instantiate the `secp256k1EcdsaVerify`
+// gate TWICE in a SINGLE circuit, run sequentially over the same digest `d`
+// with two independent (signature, public-key) witness pairs.
+//
+// MUST be compiled with `--feature-zkir-v3`: the secp256k1 surface (the
+// `Secp256k1Point` type, the `Secp256k1EcdsaSignature` struct, and the
+// `secp256k1Ecdsa*` circuits) lives in the compiler's `zkir-v3-library.compact`,
+// loaded only when the v3 IR is enabled (see verify-secp256k1.compact).
+
+pragma language_version >= 0.25.0;
+
+import CompactStandardLibrary;
+
+export ledger n: Uint<64>;
+
+witness pk0(): Secp256k1Point;
+witness sig0(): Secp256k1EcdsaSignature;
+witness pk1(): Secp256k1Point;
+witness sig1(): Secp256k1EcdsaSignature;
+witness pk2(): Secp256k1Point;
+witness sig2(): Secp256k1EcdsaSignature;
+
+export circuit two(d: Bytes<32>): [] {
+  assert(secp256k1EcdsaVerify(d, sig0(), pk0()), "b0");
+  assert(secp256k1EcdsaVerify(d, sig1(), pk1()), "b1");
+  n = (n + 1) as Uint<64>;
+}
+
+export circuit three(d: Bytes<32>): [] {
+  assert(secp256k1EcdsaVerify(d, sig0(), pk0()), "b0");
+  assert(secp256k1EcdsaVerify(d, sig1(), pk1()), "b1");
+  assert(secp256k1EcdsaVerify(d, sig2(), pk2()), "b2");
+  n = (n + 1) as Uint<64>;
+}

@@ -1,0 +1,131 @@
+// SOW-Q3-01 · signature_auth: in-circuit signature checks in DApp shape.
+//
+// The vendor QA contracts (compact-end-2-end@672bc50, regression/qa/contracts/
+// stdlib/crypto/) prove that the two new stdlib circuits give the right verdict
+// on known vectors, and store that verdict. A DApp needs more than a verdict:
+// it needs a signature to AUTHORISE something, exactly once, for the right key,
+// over the right bytes. This contract does three such authorisations, each
+// aimed at a gap the QA evidence leaves open (see the SOW3 testing strategy):
+//
+//   authorize_once     Ed25519 (e.g. a Cardano wallet key) authorises a
+//                      32-byte action id once; replays are refused.   01-G10
+//   authorize_private  The same check with the key and signature supplied by
+//                      witnesses: the chain learns that the committed owner
+//                      approved `msg`, but never sees the key or the
+//                      signature.                                       01-G9
+//   passkey_action     A WebAuthn/passkey (ECDSA P-256) assertion that is
+//                      checked for the stored challenge, the expected origin
+//                      and relying party, and user presence, all
+//                      in-circuit.                                      01-G5
+//
+// Compile with compactc 0.35.0 and --feature-zkir-v3: the Curve25519 and
+// secp256r1 types and both verify circuits live in the zkir v3 library.
+pragma language_version 0.27;
+
+import CompactStandardLibrary;
+
+// ---- Ed25519 authorisation -------------------------------------------------
+
+// The public key allowed to authorise actions. Ed25519 keys travel as the
+// decompressed affine point (x, y); see src/encode.ts.
+export ledger signer: Curve25519Point;
+
+// Action ids already authorised. A signature over an id is valid forever, so
+// without this set anyone who saw one authorisation could replay it.
+export ledger used: Set<Bytes<32>>;
+
+// Authorises `msg` (a 32-byte action id, e.g. a hash of the action) once.
+export circuit authorize_once(msg: Bytes<32>, sig: Ed25519Signature): [] {
+  // ed25519Verify hashes the message in-circuit (sha512 over R || pk || msg),
+  // so the signature is bound to exactly these 32 bytes. It also asserts that
+  // `signer` is not the identity point.
+  assert(ed25519Verify<32>(msg, sig, signer), "signature does not verify for the registered signer");
+  const id = disclose(msg);
+  assert(!used.member(id), "action already authorised");
+  used.insert(id);
+}
+
+// ---- Private Ed25519 authorisation ----------------------------------------
+
+// A commitment to the owner's key, not the key itself. persistentHash over a
+// Curve25519Point hashes its (x, y) encoding.
+export ledger owner_commitment: Bytes<32>;
+export ledger private_actions: Counter;
+
+// Both come from the prover's machine and never appear in the transcript.
+witness owner_key(): Curve25519Point;
+witness owner_signature(msg: Bytes<32>): Ed25519Signature;
+
+// Proves that the committed owner signed `msg` without revealing who they are
+// or the signature. Only `msg` and the counter bump are public.
+export circuit authorize_private(msg: Bytes<32>): [] {
+  const key = owner_key();
+  // Binding the witness key to the public commitment is what makes this an
+  // authorisation. Without it the prover could sign with any key it likes.
+  assert(persistentHash<Curve25519Point>(key) == owner_commitment, "witness key is not the committed owner");
+  assert(ed25519Verify<32>(msg, owner_signature(msg), key), "owner signature does not verify");
+  // Only the counter changes on chain; the key and signature are never disclosed.
+  private_actions.increment(1);
+}
+
+// ---- Passkey (WebAuthn, ECDSA P-256) authorisation ------------------------
+
+// The registered device credential and the relying party it belongs to.
+export ledger device_key: Secp256r1Point;
+export ledger rp_id_hash: Bytes<32>;
+
+// The challenge the next assertion must sign, stored as the 43-character
+// base64url text that appears in clientDataJSON (32 random bytes, unpadded).
+// It rotates on every successful action, which is what stops a captured
+// assertion being replayed. There is deliberately NO public "set challenge"
+// circuit: anyone able to reset it could reset it to a captured assertion's
+// challenge and replay that assertion.
+export ledger challenge: Bytes<43>;
+export ledger passkey_actions: Counter;
+
+// Rebuilds the exact bytes a WebAuthn authenticator signs and verifies them.
+//
+// Rather than parse a caller-supplied clientDataJSON (no JSON parsing
+// in-circuit), the circuit CONSTRUCTS the only clientDataJSON it will accept,
+// from constants and the stored challenge:
+//   {"type":"webauthn.get","challenge":"<challenge>","origin":"https://q3.example","crossOrigin":false}
+// so type, challenge and origin are checked by construction. Likewise
+// authenticatorData = rpIdHash || flags || signCount is built from the stored
+// rpIdHash. `flags_hi` carries flag bits 1..7 and bit 0 (UP, user present) is
+// forced to 1 by computing flags = flags_hi * 2 + 1: Compact has no bitwise
+// AND, so the bit is set by construction instead of tested.
+//
+// Limitation, recorded as a finding: real browsers may add keys to
+// clientDataJSON (e.g. "other_keys_can_be_added_here") or order them
+// differently, which this fixed layout would refuse. A production contract
+// needs a layout policy agreed with its front end.
+export circuit passkey_action(
+  flags_hi: Uint<7>,
+  sign_count: Bytes<4>,
+  sig: Secp256r1EcdsaSignature,
+  next_challenge: Bytes<43>
+): [] {
+  const cd_head = pad(36, "{\"type\":\"webauthn.get\",\"challenge\":\"");
+  const cd_tail = pad(52, "\",\"origin\":\"https://q3.example\",\"crossOrigin\":false}");
+  const client_data = [...cd_head, ...challenge, ...cd_tail] as Bytes<131>;
+  const flags = (flags_hi * 2 + 1) as Uint<8>;
+  const auth_data = [...rp_id_hash, ...(flags as Bytes<1>), ...sign_count] as Bytes<37>;
+  const signed_digest = persistentHash<Bytes<69>>([...auth_data, ...persistentHash<Bytes<131>>(client_data)] as Bytes<69>);
+  assert(secp256r1EcdsaVerify(signed_digest, sig, device_key), "passkey assertion does not verify");
+  challenge = disclose(next_challenge);
+  passkey_actions.increment(1);
+}
+
+constructor(
+  signer_: Curve25519Point,
+  owner_commitment_: Bytes<32>,
+  device_key_: Secp256r1Point,
+  rp_id_hash_: Bytes<32>,
+  first_challenge: Bytes<43>
+) {
+  signer = disclose(signer_);
+  owner_commitment = disclose(owner_commitment_);
+  device_key = disclose(device_key_);
+  rp_id_hash = disclose(rp_id_hash_);
+  challenge = disclose(first_challenge);
+}

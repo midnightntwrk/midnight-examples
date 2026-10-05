@@ -1,0 +1,74 @@
+// SOW-Q3-01 · ECDSA over P-256 test-vector circuits (L1, in-memory only).
+//
+// Pure circuits, compiled with --skip-zk, called from `pureCircuits`.
+//
+// What this file pins down about `secp256r1EcdsaVerify(msgHash, sig, pk)`:
+// - It takes a 32-byte DIGEST and binds it to nothing. Whoever chooses the
+//   digest chooses what the signature "authorises". `verify_message` hashes the
+//   message in-circuit (the safe form); `verify_digest_UNSAFE` exposes the raw
+//   primitive so gap 01-G2 can show the anti-pattern failing open.
+// - It is raw ECDSA: no low-s rule, so (r, s) and (r, n - s) both verify
+//   (signature malleability, gap 01-G3). `verify_low_s` shows a contract-level
+//   low-s rule.
+// - It asserts the key is not the identity (gap 01-G1).
+// - `persistentHash<Bytes<N>>` is plain SHA-256 of the bytes, big-endian, the
+//   order secp256r1EcdsaVerify expects (gap 01-G8 cross-checks it).
+pragma language_version 0.27;
+
+import CompactStandardLibrary;
+
+// The safe form: the circuit hashes the message it is authorising.
+export pure circuit verify_message(msg: Bytes<6>, sig: Secp256r1EcdsaSignature, pk: Secp256r1Point): Boolean {
+  return secp256r1EcdsaVerify(persistentHash<Bytes<6>>(msg), sig, pk);
+}
+
+// UNSAFE, on purpose. A contract that takes the digest as an argument proves
+// only that SOME message hashing to it was signed; it cannot say which one.
+// Never ship this shape. It exists so the test suite can demonstrate why.
+export pure circuit verify_digest_UNSAFE(digest: Bytes<32>, sig: Secp256r1EcdsaSignature, pk: Secp256r1Point): Boolean {
+  return secp256r1EcdsaVerify(digest, sig, pk);
+}
+
+// Contract-level low-s rule. Secp256r1Scalar supports only == and != (no <),
+// so `s` arrives as two 128-bit limbs that CAN be compared, is checked against
+// floor(n / 2), and is then rebuilt as a scalar. Uint<128> cannot be cast to
+// Secp256r1Scalar directly; it goes through Bytes<32>.
+export pure circuit verify_low_s(
+  msg: Bytes<6>,
+  r: Secp256r1Scalar,
+  s_hi: Uint<128>,
+  s_lo: Uint<128>,
+  pk: Secp256r1Point
+): Boolean {
+  // floor(n / 2) for the P-256 group order n, split into 128-bit limbs.
+  const half_hi: Uint<128> = 0x7fffffff800000007fffffffffffffff;
+  const half_lo: Uint<128> = 0xde737d56d38bcf4279dce5617e3192a8;
+  assert(s_hi < half_hi || (s_hi == half_hi && s_lo <= half_lo), "high-s signature refused");
+  const two64 = ((18446744073709551616 as Uint<65>) as Bytes<32>) as Secp256r1Scalar;
+  const two128 = two64 * two64;
+  const s = ((s_hi as Bytes<32>) as Secp256r1Scalar) * two128 + ((s_lo as Bytes<32>) as Secp256r1Scalar);
+  return secp256r1EcdsaVerify(persistentHash<Bytes<6>>(msg), Secp256r1EcdsaSignature { r: r, s: s }, pk);
+}
+
+// The WebAuthn ES256 construction, as vendor QA ran it on a real YubiKey:
+// sign(sha256(authenticatorData || sha256(clientDataJSON))). This proves the
+// device signed these bytes; it does NOT check the challenge, origin or user
+// presence inside them. signature_auth.compact's passkey_action does.
+export pure circuit verify_device_signature(
+  auth_data: Bytes<196>,
+  client_data: Bytes<180>,
+  sig: Secp256r1EcdsaSignature,
+  pk: Secp256r1Point
+): Boolean {
+  const client_data_hash = persistentHash<Bytes<180>>(client_data);
+  return secp256r1EcdsaVerify(persistentHash<Bytes<228>>([...auth_data, ...client_data_hash] as Bytes<228>), sig, pk);
+}
+
+// Gap 01-G8: expose persistentHash so the tests can compare it to node:crypto.
+export pure circuit sha256_6(msg: Bytes<6>): Bytes<32> {
+  return persistentHash<Bytes<6>>(msg);
+}
+
+export pure circuit sha256_180(msg: Bytes<180>): Bytes<32> {
+  return persistentHash<Bytes<180>>(msg);
+}

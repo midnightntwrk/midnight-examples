@@ -1,0 +1,54 @@
+// SOW-Q3-03 · token_registry: one call site, many implementations.
+//
+// CoIP 4 (LFDT-Minokawa/compact coips/coip-0004.md @ ca9da303) and AC-1:
+// "the same call site can run different callee code depending on the specific
+// value (i.e., contract address) being referred to at the time of the call."
+//
+// `tokens` maps an id to a value of contract type `Token`. `pay` has exactly
+// ONE call site, `tokens.lookup(id).transfer(...)`. Before compactc 0.34.101
+// the caller's module imported a single implementation per contract TYPE at
+// compile time. From 0.35.0 the DApp supplies, per callee ADDRESS, the module
+// that implements it (a ContractModuleProvider), and the runtime checks that
+// module against this declaration and against the verifier keys deployed at
+// that address before running it.
+//
+// Consequences the tests exercise:
+//   - Listing a new implementation needs no redeploy or recompile of this
+//     contract. This file compiles without any token source next to it; only
+//     the interface below is needed.
+//   - `swap` calls two tokens in one transaction, so two implementations can
+//     run from one circuit (gap 03-G7).
+pragma language_version 0.27;
+
+import CompactStandardLibrary;
+
+// The interface every listed token must implement. Only the declared circuits
+// are checked; a callee may export more (vendor QA: extra-callee-circuit).
+contract Token {
+  circuit transfer(sender: Bytes<32>, recipient: Bytes<32>, amount: Uint<64>): Uint<64>;
+}
+
+export ledger tokens: Map<Field, Token>;
+export ledger payments: Counter;
+
+export circuit list(id: Field, token: Token): [] {
+  tokens.insert(disclose(id), disclose(token));
+}
+
+// The single call site under test.
+export circuit pay(id: Field, sender: Bytes<32>, recipient: Bytes<32>, amount: Uint<64>): Uint<64> {
+  const i = disclose(id);
+  assert(tokens.member(i), "token not listed");
+  payments.increment(1);
+  return tokens.lookup(i).transfer(disclose(sender), disclose(recipient), disclose(amount));
+}
+
+// Two cross-contract calls, possibly to two different implementations, in one
+// transaction: `alice` pays `bob` in token `a`, `bob` pays `alice` in token `b`.
+export circuit swap(a: Field, b: Field, alice: Bytes<32>, bob: Bytes<32>, amount_a: Uint<64>, amount_b: Uint<64>): [] {
+  const ia = disclose(a);
+  const ib = disclose(b);
+  assert(tokens.member(ia) && tokens.member(ib), "token not listed");
+  tokens.lookup(ia).transfer(disclose(alice), disclose(bob), disclose(amount_a));
+  tokens.lookup(ib).transfer(disclose(bob), disclose(alice), disclose(amount_b));
+}

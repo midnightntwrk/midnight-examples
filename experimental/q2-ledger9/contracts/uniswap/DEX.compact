@@ -1,0 +1,74 @@
+// This file is part of compact-end-2-end.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// Ported verbatim from compact PR #438's static Uniswap V2 Option A case
+// (`compiler/test.ss`, test-group ;; uniswap-v2-option-a). Holds static
+// references to MyToken AND USDC. Together with MyToken's reverse
+// reference to this DEX, these form the cyclic-artifact graph that
+// today's static contract-info loading cannot resolve.
+
+pragma language_version >= 0.25.0;
+
+import CompactStandardLibrary;
+
+contract MyToken {
+  circuit transfer(sender: ContractAddress, to: ContractAddress, amount: Uint<64>): Uint<64>;
+  circuit balanceOf(owner: ContractAddress): Uint<64>;
+}
+
+contract USDC {
+  circuit transfer(sender: ContractAddress, to: ContractAddress, amount: Uint<64>): Uint<64>;
+  circuit balanceOf(owner: ContractAddress): Uint<64>;
+}
+
+// Reserves are exported so the driver can read them back through the ledger
+// reader (an AMM's reserves are public). token_a/token_b stay unexported —
+// they are internal contract references, not readable state.
+export ledger reserve_a: Uint<64>;
+export ledger reserve_b: Uint<64>;
+ledger token_a: MyToken;
+ledger token_b: USDC;
+
+constructor(initial_a: Uint<64>, initial_b: Uint<64>, a: MyToken, b: USDC) {
+  reserve_a = disclose(initial_a);
+  reserve_b = disclose(initial_b);
+  token_a = disclose(a);
+  token_b = disclose(b);
+}
+
+export circuit getReserves(_unused: Uint<64>): [Uint<64>, Uint<64>] {
+  return [reserve_a, reserve_b];
+}
+
+export circuit contractAddress(): ContractAddress {
+  return kernel.self();
+}
+
+export circuit swap(amount_a_out: Uint<64>, amount_b_out: Uint<64>, recipient: ContractAddress): Uint<64> {
+  const a_out = disclose(amount_a_out);
+  const b_out = disclose(amount_b_out);
+  const total_out = (a_out + b_out) as Uint<64>;
+  assert(total_out > 0, "zero output");
+  assert(a_out < reserve_a, "insufficient reserve a");
+  assert(b_out < reserve_b, "insufficient reserve b");
+  const recipient_addr = disclose(recipient);
+  const dex_address = kernel.self();
+  token_a.transfer(dex_address, recipient_addr, a_out);
+  token_b.transfer(dex_address, recipient_addr, b_out);
+  const balance_a = token_a.balanceOf(dex_address);
+  const balance_b = token_b.balanceOf(dex_address);
+  const expected_a_after = reserve_a - a_out;
+  const expected_b_after = reserve_b - b_out;
+  assert(balance_a >= expected_a_after, "bad balance a");
+  assert(balance_b >= expected_b_after, "bad balance b");
+  const amount_a_in = (balance_a - expected_a_after) as Uint<64>;
+  const amount_b_in = (balance_b - expected_b_after) as Uint<64>;
+  assert(amount_a_in > 0 || amount_b_in > 0, "zero input");
+  const balance_a_adj = (balance_a * 1000 - amount_a_in * 3) as Uint<64>;
+  const balance_b_adj = (balance_b * 1000 - amount_b_in * 3) as Uint<64>;
+  assert(balance_a_adj * balance_b_adj >= reserve_a * reserve_b * 1000 * 1000, "k check");
+  reserve_a = balance_a;
+  reserve_b = balance_b;
+  return (amount_a_in + amount_b_in) as Uint<64>;
+}

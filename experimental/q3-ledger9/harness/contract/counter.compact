@@ -1,0 +1,12 @@
+// Smoke-test contract for the ledger 9 harness: one ledger counter and one
+// circuit. If deploy + call + indexer read-back pass on this, the wallet,
+// providers and network are sound and any later failure is the feature's.
+pragma language_version 0.27;
+
+import CompactStandardLibrary;
+
+export ledger round: Counter;
+
+export circuit increment(): [] {
+  round.increment(1);
+}

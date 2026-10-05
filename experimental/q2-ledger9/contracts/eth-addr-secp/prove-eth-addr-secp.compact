@@ -1,0 +1,35 @@
+// This file is part of compact-end-2-end.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// prove-ethereum-address-secp256k1.compact — the provable counterpart of
+// ethereum-address-secp256k1.compact (which exposes the stdlib
+// `secp256k1EthereumAddress` circuit PURELY). `storeEthereumAddress` writes the
+// same address to a ledger cell, which forces `secp256k1EthereumAddress` —
+// keccak256 over the point's runtime encoding — into zkir.
+//
+// That keccak-over-point USED to crash the zkir v3 lowering pass (`failed
+// assertion cannot-happen ... of compiler/zkir-v3-passes.ss`), which is why the
+// sibling address case is `mode: "pure"`. FIXED by LFDT-Minokawa/compact#612
+// ("Handle alignment for curve points in ZKIR v3", merged 2026-07-13): it now
+// lowers to a provable circuit and this compiles (prover + verifier keys and all).
+// The `secp256k1-std-eth-address-compiles` case pins that compile.
+//
+// Compiled WITH `--feature-zkir-v3` (the secp256k1 surface lives in the compiler's
+// zkir-v3 library; without the flag `Secp256k1Point` is unbound).
+
+pragma language_version >= 0.25.0;
+
+import CompactStandardLibrary;
+
+export ledger lastAddr: Bytes<20>;
+
+constructor() {
+  lastAddr = default<Bytes<20>>;
+}
+
+export circuit storeEthereumAddress(pk: Secp256k1Point): Bytes<20> {
+  const addr: Bytes<20> = secp256k1EthereumAddress(pk);
+  lastAddr = disclose(addr);
+  return disclose(addr);
+}

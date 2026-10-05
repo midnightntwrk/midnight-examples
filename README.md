@@ -1,72 +1,147 @@
-# Midnight Template Repository
+# mn-examples
 
-This GitHub repository should be used as a template when creating a new Midnight GitHub repository.
-The template is configured with default repository settings and a set of default files that are expected to exist in all Midnight GitHub repositories.
+Official Midnight example DApps and smart contracts, consolidated into one
+monorepo so that **every example compiles _and_ runs against a single, pinned
+toolchain** — and stays that way. These examples are the shared, verified
+source that feeds the Midnight docs, the `midnight-expert` skills/MCP tooling,
+and the Kapa answer engine. If an example here is green, an agent or a developer
+who copies it gets working code.
 
-### LICENSE
+> Compilation is not correctness. Every example is expected to compile **and**
+> execute its test suite against a local Midnight network in CI.
 
-Apache 2.0.
+## Layout
 
-### README.md
+```
+mn-examples/
+├── examples/
+│   ├── hello-world/      # environment smoke test + minimal contract/test suite + browser UI (ui/)
+│   ├── calculator/       # public ledger value + arithmetic circuits + a divMod witness + browser UI (ui/)
+│   ├── private-party/    # private on-chain data, access control, DUST sponsorship + browser UI (ui/)
+│   ├── token-transfers/  # mint/send/receive for unshielded, NIGHT, and shielded tokens + browser UI (ui/)
+│   ├── silent-auction/   # sealed reserve price (commit-reveal), NFT auction state machine
+│   ├── election/   # TODO: one-line description
+│   ├── secret-message/   # private message: publish a hash commitment, not the plaintext
+│   ├── zk-loan/   # private credit scoring: verify a signed attestation in-circuit, disclose only the outcome
+│   ├── shielded-chips/   # shielded tokens: MIP-0011 chips + a roulette that custodies and pays out coins privately
+│   ├── private-bid/      # private bid: prove bid >= a public minimum, store only a commitment, reveal later
+│   └── battleship/       # Compact contract as a state machine, RBAC, private state + browser UI (ui/)
+├── packages/
+│   └── fast-sync/        # shared remote-network wallet harness (pre-seed, .env, funding gate)
+├── preseed/              # pre-seed reference bundles, per network
+├── templates/example/    # scaffold copied by `yarn new:example`
+├── templates/ui/         # browser UI scaffold rendered by `yarn new:ui`
+├── tsconfig.base.json    # shared TypeScript compiler options
+├── vitest.config.ts      # aggregate test projects (per-example configs still own env)
+└── .github/workflows/    # CI: compile-and-run every example on a matrix
+```
 
-Provides a brief description for users and developers who want to understand the purpose, setup, and usage of the repository.
+Each example is a Yarn workspace and remains independently runnable.
 
-### SECURITY.md
+## Pinned toolchain (Phase 1 baseline)
 
-Provides a brief description of the Midnight Foundation's security policy and how to properly disclose security issues.
+All Phase 1 examples are frozen on one generation. Do not bump these piecemeal;
+version changes happen in a coordinated pass.
 
-### CONTRIBUTING.md
+| Component | Version |
+|---|---|
+| Compact language (`pragma`) | `0.23` |
+| Compact compiler (`setup-compact-action`) | `0.31.1` |
+| `@midnight-ntwrk/midnight-js-*` | `4.1.1` |
+| `@midnight-ntwrk/testkit-js` | `4.1.1` |
+| wallet SDK | `1.2.0` |
+| Node.js | `22` (see `.nvmrc`) |
+| Yarn | `4.18.0` (Berry, `node-modules` linker) |
+| Vitest | `4.1.0` |
 
-Provides guidelines for how people can contribute to the Midnight project.
+## Prerequisites
 
-### CODEOWNERS
+- **Node.js 22** (`nvm use`).
+- **Corepack** for Yarn 4: `corepack enable`.
+- **Docker** (the examples spin up a local Midnight network via `docker compose`).
+- **Compact compiler** on `PATH` (`compact`); CI installs it via `setup-compact-action`.
 
-Defines repository ownership rules.
+## Getting started
 
-### ISSUE_TEMPLATE
+```bash
+corepack enable
+yarn install          # one lockfile for the whole workspace
+yarn compile          # compile every example's contract (parallel)
+```
 
-Provides templates for reporting various types of issues, such as: bug report, documentation improvement and feature request.
+Run a single example end-to-end (compile is already done above):
 
-### PULL_REQUEST_TEMPLATE
+```bash
+cd examples/battleship
+yarn env:up           # start the local Midnight network (Docker)
+yarn wait:dust        # wait for DUST to accrue for fees
+yarn test:local       # run the test suite against the local network
+yarn env:down
+```
 
-Provides a template for a pull request.
+Run every example's tests from the root:
 
-### CLA Assistant
+```bash
+yarn test:local       # yarn workspaces foreach ... run test:local
+```
 
-The Midnight Foundation appreciates contributions, and like many other open source projects asks contributors to sign a contributor
-License Agreement before accepting contributions. We use CLA assistant (https://github.com/cla-assistant/cla-assistant) to streamline the CLA
-signing process, enabling contributors to sign our CLAs directly within a GitHub pull request.
+## Running against a remote network (preprod / preview)
 
-### Dependabot
+The examples also run against the public **preprod** and **preview** networks. A
+local proof server is still required; everything else is remote.
 
-The Midnight Foundation uses GitHub Dependabot feature to keep our projects dependencies up-to-date and address potential security vulnerabilities.
+The obstacle is wallet sync: a brand-new wallet on preprod takes **~78 minutes** to
+reach chain tip, almost all of it building the chain-wide DUST generation tree. The
+repo ships **pre-seed reference bundles** under `preseed/` that a fresh wallet
+restores from instead, bringing that down to about **75 seconds**. See
+[FAST-SYNC.md](./FAST-SYNC.md).
 
-### Checkmarx
+```bash
+cd examples/hello-world && yarn proof:up   # local proof server on :6300
+cd ../..
 
-The Midnight Foundation uses Checkmarx for application security (AppSec) to identify and fix security vulnerabilities.
-All repositories are scanned with Checkmarx's suite of tools including: Static Application Security Testing (SAST), Infrastructure as Code (IaC), Software Composition Analysis (SCA), API Security, Container Security and Supply Chain Scans (SCS).
+yarn preseed:cut     # 1. re-cut the reference bundle       (~10 min)
+yarn wallets:new     # 2. mint 4 wallets, print 4 addresses
+#                      3. fund those addresses at the faucet (manual)
+yarn test:preprod    # 4. run every suite, sequentially
+```
 
-### Unito
+**Step 1 must come before step 2** — a bundle cut after the wallets exist cannot
+be used to seed them, and every run silently falls back to the 78-minute sync.
+FAST-SYNC.md explains why.
 
-Facilitates two-way data synchronization, automated workflows and streamline processes between: Jira, GitHub issues and Github project Kanban board.
+`yarn wallets:new` writes a repo-root `.env.preprod` (gitignored) holding four
+seeds — **Alice, Bob, Charlie and Dave** — and prints their addresses for the
+[faucet](https://midnight-tmnight-preprod.nethermind.dev/). One file serves all
+eight examples; suites with other role names (silent-auction's
+`ORGANIZER`/`BIDDER_ONE`/`BIDDER_TWO`) alias onto the same four wallets. Copy
+`.env.preprod.example` instead if you want to supply your own.
 
-# TODO - New Repo Owner
+Alice, Bob and Charlie need tNIGHT and the suites register them for DUST
+automatically on first run. **Dave needs tNIGHT and nothing else** — the DUST
+sponsorship suite in `private-party` exists to demonstrate Alice paying his fees,
+and asserts that he has no DUST of his own.
 
-### Software Package Data Exchange (SPDX)
-Include the following Software Package Data Exchange (SPDX) short-form identifier in a comment at the top headers of each source code file.
+> Keep remote runs **sequential**. All eight suites share the same four wallets,
+> and concurrent spends of the same UTxOs produce nondeterministic balancing
+> failures. The root `test:preprod` script is sequential by design.
 
+## Adding / working with examples
 
- <I>// This file is part of <B>REPLACE WITH REPO-NAME</B>.<BR>
- // Copyright (C) Midnight Foundation<BR>
- // SPDX-License-Identifier: Apache-2.0<BR>
- // Licensed under the Apache License, Version 2.0 (the "License");<BR>
- // You may not use this file except in compliance with the License.<BR>
- // You may obtain a copy of the License at<BR>
- //<BR>
- //	https://www.apache.org/licenses/LICENSE-2.0<BR>
- //<BR>
- // Unless required by applicable law or agreed to in writing, software<BR>
- // distributed under the License is distributed on an "AS IS" BASIS,<BR>
- // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.<BR>
- // See the License for the specific language governing permissions and<BR>
- // limitations under the License.</I>
+- **Scaffold a new example with `yarn new:example <name> [--witnesses]`.** It
+  copies `templates/example/` into `examples/<name>`, wires the harness, and
+  registers the example in the CI matrix and the docs tables. You then only
+  write the `.compact` contract and the test bodies. See `templates/example/`.
+- **Add a browser UI with `yarn new:ui <name>`** once the contract compiles and
+  its tests pass. It renders `templates/ui/` into `examples/<name>/ui`, deriving
+  circuits, witnesses and ledger fields from the compiled contract, so the UI
+  typechecks, tests and builds before any use-case code is written. See
+  `templates/ui/AGENTS.md` (copied into every generated UI).
+- The `.compact` **source is committed** (only generated `contract/managed/` output is
+  gitignored). Do not re-introduce a `.gitignore` rule that hides `*.compact`.
+- Each example carries an `AGENTS.md` describing what it teaches and how to run it.
+- See `AGENTS.md` at the repo root for agent-oriented conventions.
+
+## License
+
+Apache-2.0. See [LICENSE](./LICENSE).

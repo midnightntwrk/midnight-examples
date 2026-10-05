@@ -1,0 +1,90 @@
+// This file is part of compact-end-2-end.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+//
+// bridged-usdc-mint.compact — USDCx inbound bridge (Circle CCTP V2 shape),
+// exercising the ZKIR-v3 crypto features end-to-end: in-circuit keccak256 over
+// the 376-byte CCTP message + secp256k1 ECDSA signature verification (2-of-2
+// attesters), replay protection, and a public mint record.
+//
+// ── compactc 0.33.0-rc.1 constraints (see RC3-FINDINGS.md) ──────────────────
+// Compile with `--feature-zkir-v3`; prove with the `_experimental` proof server.
+//   * rc.1 removed in-circuit `secp256k1EcdsaRecover` (BUG-3): recover the signer
+//     pubkey OFF-circuit (driver, via noble) and verify IN-circuit here.
+//   * `keccak256<Secp256k1Point>` / `secp256k1EthereumAddress` crash the compiler
+//     (BUG-1), so we bind attesters by pubkey x-coordinate, not Ethereum address.
+//   * Two `secp256k1EcdsaVerify` calls alone crash the compiler (BUG-2) — pairing
+//     each with a `secp256k1PointX(...)` registration check avoids the crash.
+//   * ledger fields MUST be declared `export ledger` to appear in the generated
+//     ledger() read projector; a plain `ledger` field is written on-chain but is
+//     absent from bindings' ledger() (so it can't be indexer-verified). The
+//     constructor takes the attester x-coords as Bytes<32> (derived off-circuit)
+//     to keep secp256k1PointX out of the constructor.
+//   * rc.1 has no `concat`/Bytes-ordering, so maps are keyed by the CCTP nonce.
+// The attester x-coord is `secp256k1PointX(pk) as Bytes<32>` (little-endian); the
+// driver passes the same encoding as the constructor args.
+
+pragma language_version >= 0.25.0;
+
+import CompactStandardLibrary;
+
+// Registered attesters, bound by the x-coordinate of each authorised pubkey.
+export ledger attester0X: Bytes<32>;
+export ledger attester1X: Bytes<32>;
+
+// Replay protection: CCTP nonces already minted.
+export ledger usedNonces: Map<Bytes<32>, Boolean>;
+
+// Public accounting of total bridged-in amount.
+export ledger totalMinted: Uint<128>;
+
+// Mint records for shielded claim, keyed by CCTP nonce; value = bridged amount.
+export ledger mintEvents: Map<Bytes<32>, Uint<128>>;
+
+// Private inputs supplied by the relayer/prover.
+witness messageBytes(): Bytes<376>;
+witness attesterSig0(): Secp256k1EcdsaSignature;
+witness attesterPubkey0(): Secp256k1Point;
+witness attesterSig1(): Secp256k1EcdsaSignature;
+witness attesterPubkey1(): Secp256k1Point;
+witness mintAmount(): Uint<128>;
+witness messageNonce(): Bytes<32>;
+
+constructor(attester0X_arg: Bytes<32>, attester1X_arg: Bytes<32>) {
+  attester0X = disclose(attester0X_arg);
+  attester1X = disclose(attester1X_arg);
+}
+
+export circuit receiveAndMint(): [] {
+  const msg: Bytes<376> = messageBytes();
+  const sig0: Secp256k1EcdsaSignature = attesterSig0();
+  const pk0: Secp256k1Point = attesterPubkey0();
+  const sig1: Secp256k1EcdsaSignature = attesterSig1();
+  const pk1: Secp256k1Point = attesterPubkey1();
+  const amount: Uint<128> = mintAmount();
+  const nonce: Bytes<32> = messageNonce();
+
+  assert(amount > 0, "zero amount not allowed");
+  const revealedAmount: Uint<128> = disclose(amount);
+
+  // Bind the attestation to THIS message by hashing it in-circuit (keccak256).
+  const digest: Bytes<32> = keccak256<Bytes<376>>(msg);
+
+  // Attester 0: signature valid AND its pubkey is registered attester 0.
+  assert(secp256k1EcdsaVerify(digest, sig0, pk0), "attester 0 signature invalid");
+  assert((secp256k1PointX(pk0) as Bytes<32>) == attester0X, "attester 0 not registered");
+
+  // Attester 1: likewise. Distinctness is inherent — a duplicate signer's x-coord
+  // cannot equal both registered (distinct) x-coords.
+  assert(secp256k1EcdsaVerify(digest, sig1, pk1), "attester 1 signature invalid");
+  assert((secp256k1PointX(pk1) as Bytes<32>) == attester1X, "attester 1 not registered");
+
+  // Replay protection keyed by the CCTP nonce.
+  const nonceKey: Bytes<32> = disclose(nonce);
+  assert(!usedNonces.member(nonceKey), "nonce already used");
+  usedNonces.insert(nonceKey, true);
+
+  // Public mint record.
+  totalMinted = (totalMinted + revealedAmount) as Uint<128>;
+  mintEvents.insert(nonceKey, revealedAmount);
+}
