@@ -137,6 +137,8 @@ and asserts that he has no DUST of his own.
   circuits, witnesses and ledger fields from the compiled contract, so the UI
   typechecks, tests and builds before any use-case code is written. See
   `templates/ui/AGENTS.md` (copied into every generated UI).
+- The scripted generation pipeline (prompt, scaffold, generate, devnet test, UI
+  generator, UI code, serve) is drawn in [`docs/generation-flow.md`](./docs/generation-flow.md).
 - The `.compact` **source is committed** (only generated `contract/managed/` output is
   gitignored). Do not re-introduce a `.gitignore` rule that hides `*.compact`.
 - Each example carries an `AGENTS.md` describing what it teaches and how to run it.
