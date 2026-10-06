@@ -129,5 +129,8 @@ Each example has its own `AGENTS.md` with specifics.
   `templates/ui/`, followed by `yarn new:ui <name> --sync`; CI runs `--check` on
   every generated UI. Details, pins and the verification checklist are in
   `templates/ui/AGENTS.md`, which every generated UI carries as `ui/AGENTS.md`.
+- The scripted generation pipeline (prompt → scaffold → contract code → devnet
+  test → `new:ui` → UI code → serve), with each step's gate and fix loop, is in
+  `docs/generation-flow.md`.
 - Add meticulous comments in contracts and witnesses explaining the *how* and
   *why* — these examples are read by agents as much as by people.
