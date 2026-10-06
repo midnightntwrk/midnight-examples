@@ -115,7 +115,8 @@ It refuses to run when:
 - nothing is compiled
 - `ui/` already exists
 - more than one contract is compiled and `--contract` isn't given (e.g.
-  `shielded-chips`). Multi-contract UIs aren't scaffolded; see §5.
+  `shielded-chips`). The generator renders one contract, the primary; wire
+  the others in the seed files (see §5).
 - the running Node is older than the root `engines.node` (22). Yarn 4 doesn't
   enforce `engines`; run `nvm use` first. The UI's `copy:zk` (the first step
   of `dev` and `build`) has the same guard.
@@ -371,10 +372,21 @@ and ship cells).
 - **Pure circuits** (`pureCircuits`, re-exported from `contract.ts`) run
   locally. Use them to derive what the ledger stores from private state, e.g.
   battleship's `roleOf` compares `getDappPubKey(sk)` with `player1`/`player2`.
-- **Multiple contracts** (e.g. `shielded-chips`): one `CompiledContract`, one
-  `ZK_ASSETS_PATH`, and one `FetchZkConfigProvider` per contract. `copy:zk`
-  copies each `managed/<contract>/{keys,zkir}`. Build a providers bundle per
-  contract (the `zkConfigProvider` differs; the rest can be shared).
+- **Multiple contracts** (e.g. `shielded-chips/ui`, generated with
+  `--contract roulette`): the generator renders the primary contract only.
+  - `copy:zk` serves **every** compiled contract at `/managed/<contract>/`.
+  - For each other contract, a seed file builds its `CompiledContract`
+    (import `contract/managed/<c>/contract/index.js` and its witnesses, then
+    `withCompiledFileAssets("managed/<c>")`) and gets its providers from
+    `useMidnightProviders().providersFor<Circuits>("managed/<c>")`. That
+    bundle shares the wallet, proving settings and passphrase, but has its
+    own `FetchZkConfigProvider`, proof provider and private-state store.
+  - Don't reuse one bundle's `privateStateProvider` for another contract: its
+    contract address is one mutable field. midnight-js sets it when a call
+    starts and writes `nextPrivateState` when the call finalizes, so a shared
+    store can file one contract's state under the other's address.
+  - `useDeployment` remembers one address per network (the primary's). Keep
+    the others' addresses in seed code.
 
 ### 6. Funding on the local devnet
 

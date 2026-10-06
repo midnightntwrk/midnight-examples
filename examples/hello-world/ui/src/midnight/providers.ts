@@ -43,8 +43,15 @@ import {
 } from "./contract";
 import { inMemoryPrivateStateProvider, persistentPrivateStateProvider } from "./private-state";
 
-export type HelloWorldProviders = MidnightProviders<
-  HelloWorldCircuits,
+export type HelloWorldProviders = ContractProviders<HelloWorldCircuits>;
+
+/**
+ * A providers bundle for any compiled contract of this example, keyed by its
+ * circuit ids. HelloWorldProviders is the one for the contract this UI was
+ * generated for; createContractProviders builds one for another contract.
+ */
+export type ContractProviders<C extends string> = MidnightProviders<
+  C,
   typeof PRIVATE_STATE_ID,
   HelloWorldPrivateState
 >;
@@ -78,6 +85,27 @@ export async function createProviders(
   proving: ProvingOptions,
   passphrase: string | null = null,
 ): Promise<HelloWorldProviders> {
+  return createContractProviders<HelloWorldCircuits>(api, proving, passphrase, ZK_ASSETS_PATH);
+}
+
+/**
+ * Build the providers for one compiled contract, whose keys and zkir are
+ * served from `zkAssetsPath` (`managed/<contract>`; scripts/copy-zk.mjs copies
+ * every compiled contract). An example with several contracts calls this once
+ * per extra contract, from its seed files (via useMidnightProviders().providersFor).
+ *
+ * Every call gets its own private-state provider. The store's contract address
+ * is one mutable field: midnight-js sets it when a call starts and writes the
+ * next private state when the call finalizes, minutes later. A store shared by
+ * two contracts' bundles could switch address in between and file one
+ * contract's state under the other's address.
+ */
+export async function createContractProviders<C extends string>(
+  api: ConnectedAPI,
+  proving: ProvingOptions,
+  passphrase: string | null,
+  zkAssetsPath: string,
+): Promise<ContractProviders<C>> {
   // The wallet decides which network we're on. Everything below (indexer
   // endpoints, network id for address encoding) follows from its config, so
   // the same build works on local `undeployed`, preview, and preprod.
@@ -97,8 +125,8 @@ export async function createProviders(
 
   // Fetches keys/<circuit>.{prover,verifier} and zkir/<circuit>.bzkir for
   // each circuit from the page's own origin. scripts/copy-zk.mjs puts them there.
-  const zkConfigProvider = new FetchZkConfigProvider<HelloWorldCircuits>(
-    new URL(ZK_ASSETS_PATH, window.location.origin).toString(),
+  const zkConfigProvider = new FetchZkConfigProvider<C>(
+    new URL(zkAssetsPath, window.location.origin).toString(),
     fetch.bind(window),
   );
 
@@ -175,9 +203,9 @@ async function createPrivateStateProvider(accountId: string, passphrase: string 
   });
 }
 
-async function createProofProvider(
+async function createProofProvider<C extends string>(
   api: ConnectedAPI,
-  zkConfigProvider: FetchZkConfigProvider<HelloWorldCircuits>,
+  zkConfigProvider: FetchZkConfigProvider<C>,
   proving: ProvingOptions,
 ): Promise<ProofProvider> {
   if (proving.mode === "local") {
