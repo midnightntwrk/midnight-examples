@@ -992,6 +992,7 @@ __metadata:
   resolution: "@midnight-ntwrk/example-calculator@workspace:examples/calculator"
   dependencies:
     "@midnight-ntwrk/example-fast-sync": "workspace:^"
+    "@midnight-ntwrk/example-sim": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -1242,6 +1243,7 @@ __metadata:
   resolution: "@midnight-ntwrk/example-private-tip-jar@workspace:examples/private-tip-jar"
   dependencies:
     "@midnight-ntwrk/example-fast-sync": "workspace:^"
+    "@midnight-ntwrk/example-sim": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -1390,6 +1392,17 @@ __metadata:
     vite-node: "npm:^6.0.0"
     vitest: "npm:^4.1.0"
     ws: "npm:^8.14.2"
+  languageName: unknown
+  linkType: soft
+
+"@midnight-ntwrk/example-sim@workspace:^, @midnight-ntwrk/example-sim@workspace:packages/sim":
+  version: 0.0.0-use.local
+  resolution: "@midnight-ntwrk/example-sim@workspace:packages/sim"
+  dependencies:
+    "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
+    "@types/node": "npm:^22.0.0"
+    typescript: "npm:^5.7.0"
+    vitest: "npm:^4.1.0"
   languageName: unknown
   linkType: soft
 

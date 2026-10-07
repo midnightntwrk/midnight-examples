@@ -1,0 +1,26 @@
+{
+  "name": "@midnight-ntwrk/example-sim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "In-memory contract harness for the examples' *.sim.test.ts files: deploy and call a compiled contract without a network, expect rejections, and check that no secret reaches public state.",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p .",
+    "test:sim": "vitest run"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/midnight-js-protocol": "4.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.0"
+  }
+}
