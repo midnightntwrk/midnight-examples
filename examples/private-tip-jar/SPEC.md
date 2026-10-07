@@ -48,14 +48,15 @@ The owner's `ownerSecretKey: Bytes<32>`, made fresh per jar by the deployer
 
 ## Privacy invariants
 
-Each line is an entry in the `assertNotInPublicState` call in
+Each line ends with the key (or key prefix) of its entry in the
+`assertNotInPublicState` call in
 `src/test/private-tip-jar.sim.test.ts` (and, on the devnet, in
 `src/test/private-tip-jar.test.ts`).
 
-- Never on chain: a tipper's coin public key.
-- Never on chain: the nonce of the coin a tipper spent.
-- Never on chain: the owner's secret key (only its hash, `owner`).
-- Never on chain: the owner's coin public key.
+- Never on chain: a tipper's coin public key. → `tipperCoinPublicKey`
+- Never on chain: the nonce of the coin a tipper spent. → `tipperCoinNonce`
+- Never on chain: the owner's secret key (only its hash, `owner`). → `ownerSecretKey`
+- Never on chain: the owner's coin public key. → `ownerCoinPublicKey`
 
 ## Accepted leaks
 
@@ -73,4 +74,10 @@ Each line is an entry in the `assertNotInPublicState` call in
 
 - Hiding tip amounts (needs an off-chain opening from tipper to owner).
 - Several owners, or changing the owner.
-- A tip token: `contract/tip-token.compact` is a demo faucet for the tests.
+- A real tip token: the tests use the demo faucet below.
+
+## Test-only contracts
+
+- `tip-token`: a bare shielded-token faucet (`mint`, `mintCount`), so the
+  devnet test has coins of the jar's color to tip with. Not part of the
+  design; the sim tests use made-up coins instead.

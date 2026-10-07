@@ -32,6 +32,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { derive, sealRegions } from './lib/derive.mjs';
 import { preflight } from './lib/preflight.mjs';
+import { lintDesign } from './lib/spec-lint.mjs';
 import {
   NAME_RE,
   assertNoLeftoverTokens,
@@ -50,12 +51,15 @@ const EXAMPLES_DIR = path.join(REPO_ROOT, 'examples');
 function usage() {
   console.log(
     [
-      'Usage: yarn new:example <name> [--witnesses] [--no-register]',
+      'Usage: yarn new:example <name> [--witnesses] [--no-register] [--spec <file>]',
       '       yarn new:example <name> --derive',
       '',
       '  <name>          kebab-case example name (e.g. voting, hello-world)',
       '  --witnesses     generate a witnesses.ts stub and wire withWitnesses()',
       '  --no-register   do not edit ci.yaml / README.md / AGENTS.md',
+      '  --spec <file>   the reviewed design card (step 1): lint it (yarn spec:lint',
+      '                  --file), check --witnesses against its Witnesses section,',
+      '                  and use it as the new example\'s SPEC.md',
       '  --derive        on an existing, compiled example: fill the @generated-stub',
       '                  regions (witness stubs, constructor args, it.todo per',
       '                  circuit) from the compiled contract. Safe to re-run.',
@@ -64,7 +68,12 @@ function usage() {
 }
 
 // --- arg parsing ------------------------------------------------------------
-const args = process.argv.slice(2);
+const rawArgs = process.argv.slice(2);
+// --spec takes a value; pull it out before the flag/positional split below.
+const specIdx = rawArgs.indexOf('--spec');
+const specFile = specIdx === -1 ? null : rawArgs[specIdx + 1];
+if (specIdx !== -1 && (!specFile || specFile.startsWith('-'))) fail('--spec needs a file: --spec <path/to/SPEC.md>');
+const args = specIdx === -1 ? rawArgs : rawArgs.filter((_, i) => i !== specIdx && i !== specIdx + 1);
 if (args.includes('-h') || args.includes('--help')) {
   usage();
   process.exit(0);
@@ -93,7 +102,7 @@ const targetDir = path.join(EXAMPLES_DIR, name);
 
 // --- --derive: fill the stubs of an existing example, then stop ---------------
 if (args.includes('--derive')) {
-  if (withWitnesses || noRegister) fail('--derive runs on an existing example; it takes no other options.');
+  if (withWitnesses || noRegister || specFile) fail('--derive runs on an existing example; it takes no other options.');
   if (!fs.existsSync(targetDir)) fail(`examples/${name} does not exist. Scaffold it first: yarn new:example ${name}`);
   let result;
   try {
@@ -136,6 +145,15 @@ if (fs.existsSync(targetDir)) {
 }
 if (!fs.existsSync(TEMPLATE_DIR)) {
   fail(`template directory not found at ${path.relative(REPO_ROOT, TEMPLATE_DIR)}`);
+}
+
+// --- the design card (step 1), checked before anything is written -------------
+let specContent = null;
+if (specFile) {
+  if (!fs.existsSync(specFile)) fail(`--spec: ${specFile} not found`);
+  specContent = fs.readFileSync(specFile, 'utf8');
+  const problems = lintDesign(specContent, { witnessesFlag: withWitnesses });
+  if (problems.length > 0) fail(`--spec ${specFile} fails the design lint:\n  - ${problems.join('\n  - ')}`);
 }
 
 // --- name derivations -------------------------------------------------------
@@ -193,6 +211,7 @@ const files = renderTree(TEMPLATE_DIR, {
   // Only copy the witnesses stub when --witnesses is set.
   skip: (rel) => !withWitnesses && rel === path.join('contract', 'witnesses.ts'),
   render: (raw, rel) => {
+    if (specContent !== null && rel === 'SPEC.md') return specContent;
     const content = sealRegions(substitute(raw));
     assertNoLeftoverTokens(rel, content, KNOWN_TOKENS);
     return content;
@@ -265,7 +284,11 @@ if (!noRegister) {
   console.log('    • AGENTS.md Examples table');
 }
 console.log('\n  Next steps (docs/generation-flow.md):');
-console.log(`    1. Fill in examples/${name}/SPEC.md and get the design reviewed`);
+console.log(
+  specContent !== null
+    ? `    1. SPEC.md is your reviewed design card (${specFile}); keep it in step with the code`
+    : `    1. Fill in examples/${name}/SPEC.md and get the design reviewed (yarn spec:lint ${name} --design)`,
+);
 console.log(`    2. Write your contract in examples/${name}/contract/${name}.compact, then:`);
 console.log('         yarn install                          # from the repo root');
 console.log(`         (cd examples/${name} && yarn compile:fast)   # seconds: no proving keys`);

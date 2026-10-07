@@ -51,8 +51,10 @@ here means no --witnesses. -->
 
 ## Privacy invariants
 
-<!-- "Never on chain: …", one line per secret. Each line becomes an entry in
-the assertNotInPublicState call in src/test/__name__.sim.test.ts. -->
+<!-- "Never on chain: …", one line per secret, ending with → `key`: the key (or
+key prefix) of its entry in the assertNotInPublicState call in
+src/test/__name__.sim.test.ts. `yarn spec:lint __name__` checks both ends.
+Write "None." if the example keeps no secrets. -->
 
 - Never on chain:
 
@@ -68,3 +70,12 @@ counts, timing, circuit names, links through fees or reused keys. -->
 <!-- What this example deliberately doesn't do. -->
 
 -
+
+## Test-only contracts
+
+<!-- Optional. Contracts that exist only so the tests can run (a demo token
+faucet for the devnet test), named in backticks, e.g. `demo-token`. The lint
+leaves their circuits and fields out of the checks above. Write "None." or
+delete this section if there are none. -->
+
+None.
