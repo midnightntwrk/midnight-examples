@@ -1,0 +1,34 @@
+// Demo token for the private tip jar's tests. NOT part of the tip jar design.
+//
+// The tip jar accepts shielded coins of one color, and a fresh local devnet
+// has no shielded tokens in it, so the tests need somewhere to get coins
+// from. This contract is a bare faucet: anyone can mint any amount of its
+// shielded token to any wallet. Never deploy something like it as a real
+// currency. For a proper shielded token with an issuer and burn paths, see
+// examples/shielded-chips/contract/chips.compact (MIP-0011).
+
+pragma language_version 0.23;
+import CompactStandardLibrary;
+
+// How many mints have happened. It is here so `mint` writes public state;
+// a circuit that never touches the ledger compiles without a proving key and
+// cannot be submitted (see docs/compact-gotchas.md).
+export ledger mintCount: Counter;
+
+// Mint `amount` of this contract's shielded token straight to `recipient`'s
+// wallet. The color is tokenType(domain, this contract's address), so the
+// test derives it off chain with rawTokenType(domain, address).
+//
+// PRIVACY: mint amounts are public (they are part of the mint effect), and
+// whoever chooses `nonce` knows the minted coin. That is why the tipper in
+// the tests re-nonces the coin with a self-transfer before tipping it: the
+// minter (who is also the jar owner) would otherwise recognise it.
+export circuit mint(recipient: ZswapCoinPublicKey, amount: Uint<64>, nonce: Bytes<32>): [] {
+    mintShieldedToken(
+        pad(32, "private-tip-jar:demo-token:"),
+        disclose(amount),
+        disclose(nonce),
+        left<ZswapCoinPublicKey, ContractAddress>(disclose(recipient))
+    );
+    mintCount.increment(1);
+}

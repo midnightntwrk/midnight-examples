@@ -1,0 +1,58 @@
+{
+  "$comment": "One run of the scripted generation pipeline (docs/generation-flow.md) on a fixed prompt, used as the baseline for later phases of the pipeline work. It measures the Phase 1 flow (honest validate, typecheck gate, docs/compact-gotchas.md + docs/patterns.md context budget), not the flow before Phase 1. Re-run the same prompt after each phase and add a run below.",
+  "prompt": "Build a private tip jar: people can leave tips for the jar's owner without revealing who tipped how much, and only the owner can withdraw.",
+  "scope": "Steps 1-4: name and flags, new:example, contract + witnesses + tests, compile/typecheck, yarn validate. No UI.",
+  "runs": [
+    {
+      "date": "2026-10-07",
+      "flowVersion": "6f896b1 (Phase 1)",
+      "model": "claude-opus-5-5, one general-purpose subagent given only the prompt and the flow doc",
+      "result": {
+        "example": "examples/private-tip-jar",
+        "flags": "--witnesses",
+        "validate": "pass, 10/10 tests",
+        "contracts": ["private-tip-jar.compact (tip jar)", "tip-token.compact (demo faucet so tests have shielded coins)"]
+      },
+      "cost": {
+        "subagentTokens": 160707,
+        "toolUses": 42,
+        "wallClockSeconds": 633,
+        "validateSecondsOnRerun": 197
+      },
+      "gateFailures": {
+        "compile": 0,
+        "typecheck": 1,
+        "validate": 0,
+        "notes": [
+          "typecheck: run before the tests were written; the scaffold's deployContract call lacked the new constructor argument. Phase 2's --derive would generate it."
+        ]
+      },
+      "context": {
+        "approxKBRead": 125,
+        "largestReads": [
+          "examples/shielded-chips/src/test/roulette.test.ts (32 KB, read in full: no 'Your tests begin here' marker)",
+          "examples/shielded-chips/contract/roulette.compact (14 KB)",
+          "scaffolded examples/private-tip-jar files (15 KB)",
+          "AGENTS.md (11 KB, loaded automatically)"
+        ],
+        "beyondBudget": [
+          "shielded-chips src/wallet.ts (splitShieldedCoin) and src/providers.ts: the template harness has no shielded self-transfer",
+          "generated contract/managed/*/contract/index.{d.ts,js}: shape of ledger()"
+        ],
+        "notRead": "LESSONS.md, TUTORIAL.md, midnight-expert skills, SDK sources",
+        "comparison": "The pre-Phase-1 step 3 reading list was about 330 KB."
+      },
+      "humanFixUps": [],
+      "reviewNotes": [
+        "Tip amounts are public (each pot entry is a full QualifiedShieldedCoinInfo); documented as an accepted leak. Who tipped is not recorded.",
+        "reNonceToSelf spends the same-transaction coin with sendShielded and mt_index 0, copied from shielded-chips roulette. docs/compact-gotchas.md (from the shielded-chips TUTORIAL) says same-transaction coins should use sendImmediateShielded. Both contracts pass on the devnet; worth a reviewer's eye.",
+        "Negative check of the new validate on this example: one broken assertion made yarn validate exit 1 at test:local, write logs/compose.log and tear the network down."
+      ],
+      "phase2And3Signals": [
+        "A shielded self-transfer helper and a shielded test faucet had to be ported or written by hand; candidates for packages/ or the template.",
+        "Test files without the 'Your tests begin here' marker are read in full; adding it to every example's test would cut the largest read.",
+        "Context read (~125 KB) is still dominated by one large reference test; patterns.md could point at narrower test slices."
+      ]
+    }
+  ]
+}
