@@ -56,6 +56,8 @@ Entries name a symbol rather than a line number, so search the file for it.
 | Shielded mint, send and receive | token-transfers | `mintShieldedToSelf`, `mintAndSendShielded`, `sendShieldedToUser` |
 | A full shielded token (MIP-0011: mint, both burn paths, treasury) | shielded-chips | `chips.compact` → `mint`, `burn`, `mintToTreasury`, `burnFromTreasury` |
 | Contract custody of coins, commitment escrow, `mergeCoin` order | shielded-chips | `roulette.compact` → `betColor`, `claimWinnings`, `escrowCommit` |
+| Anonymous deposits into a contract-held pot; owner-only withdrawal | private-tip-jar | `private-tip-jar.compact` → `tip`, `reNonceToSelf`, `withdraw` |
+| Shielded self-transfer to re-nonce a coin before using it | private-tip-jar, shielded-chips | `src/wallet.ts` → `splitShieldedCoin` |
 | DUST fee sponsorship (one wallet pays another's fees) | private-party | `src/sponsor.ts`, `src/test/sponsorship.test.ts` |
 
 ## Test patterns
