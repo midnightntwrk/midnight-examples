@@ -225,6 +225,8 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
         }
     });
 
+    // Everything above is harness setup. Your tests begin here.
+
     it('Dave holds NIGHT but has zero DUST', async () => {
         const state = await daveWallet.wallet.waitForSyncedState();
 

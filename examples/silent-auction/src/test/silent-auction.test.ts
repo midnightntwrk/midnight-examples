@@ -250,6 +250,8 @@ describe(`Silent Auction Contract (${network})`, () => {
     }
   });
 
+  // Everything above is harness setup. Your tests begin here.
+
   // ---------------------------------------------------------------------------
   // Deployment — the organizer runs the constructor, committing to the reserve
   // price with its salt, and the auction opens in the RECEIVE state.

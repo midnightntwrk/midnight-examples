@@ -195,6 +195,8 @@ describe(`Election Contract (${network})`, () => {
     }
   });
 
+  // Everything above is harness setup. Your tests begin here.
+
   // ---------------------------------------------------------------------------
   // Deployment — the organizer runs the constructor, which records their pubkey
   // (derived from sk), the two candidates, and opens registration (CLOSED).

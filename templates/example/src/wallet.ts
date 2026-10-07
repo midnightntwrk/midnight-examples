@@ -27,10 +27,13 @@ import type {
   WalletProvider,
 } from '@midnight-ntwrk/midnight-js-types';
 import { ttlOneHour } from '@midnight-ntwrk/midnight-js-utils';
-import type {
-  WalletFacade,
-  FacadeState,
-  UnshieldedKeystore,
+import {
+  type WalletFacade,
+  type FacadeState,
+  type UnshieldedKeystore,
+  ShieldedAddress,
+  ShieldedCoinPublicKey,
+  ShieldedEncryptionPublicKey,
 } from '@midnight-ntwrk/wallet-sdk';
 import {
   type DustWalletOptions,
@@ -95,6 +98,78 @@ export class MidnightWalletProvider implements MidnightProvider, WalletProvider 
 
   submitTx(tx: FinalizedTransaction): Promise<string> {
     return this.wallet.submitTransaction(tx);
+  }
+
+  /** This wallet's own shielded address, for self-transfers. */
+  getShieldedAddress(): ShieldedAddress {
+    return new ShieldedAddress(
+      ShieldedCoinPublicKey.fromHexString(this.getCoinPublicKey()),
+      ShieldedEncryptionPublicKey.fromHexString(this.getEncryptionPublicKey()),
+    );
+  }
+
+  /**
+   * Send `amount` of `tokenType` from this wallet back to itself.
+   *
+   * Also the way to make a coin of an exact value: a contract call that takes
+   * a whole coin (a tip, a bet, a deposit) spends all of it.
+   *
+   * PRIVACY: whoever minted or paid you a shielded coin knows its nonce. If
+   * you spend that coin into a contract, they can recognise it, even when the
+   * contract only records a contract-owned coin re-nonced from it (that nonce
+   * is derived from the old one). A self-transfer first replaces it with a
+   * coin carrying a wallet-chosen nonce they have never seen. Cheap, and worth
+   * doing before any action you want unlinkable. Shared by every example that
+   * moves shielded coins; see shielded-chips and private-tip-jar.
+   */
+  async splitShieldedCoin(
+    tokenType: string,
+    amount: bigint,
+    ttl: Date = ttlOneHour(),
+  ): Promise<void> {
+    const balanceOf = async (): Promise<bigint> => {
+      const state = await this.wallet.waitForSyncedState();
+      return state.shielded.balances[tokenType] ?? 0n;
+    };
+    // A self-transfer is value preserving for this token (fees are paid in
+    // DUST), so the pre-transfer balance is what we wait to see come back.
+    const expected = await balanceOf();
+
+    this.logger.info(`Self-transferring ${amount} of ${tokenType.slice(0, 16)}… to re-nonce`);
+    const recipe = await this.wallet.transferTransaction(
+      [
+        {
+          type: 'shielded',
+          outputs: [{ type: tokenType, receiverAddress: this.getShieldedAddress(), amount }],
+        },
+      ],
+      {
+        shieldedSecretKeys: this.zswapSecretKeys,
+        dustSecretKey: this.dustSecretKey,
+      },
+      { ttl, payFees: true },
+    );
+    const signed = await this.wallet.signRecipe(recipe, (payload) =>
+      this.unshieldedKeystore.signData(payload),
+    );
+    const finalized = await this.wallet.finalizeRecipe(signed);
+    await this.wallet.submitTransaction(finalized);
+
+    // submitTransaction returns once the transaction is accepted, not once it
+    // is on chain and indexed. Until then the input coin is spent and the
+    // replacement is not visible yet, so wait for the balance to reappear
+    // before anyone tries to use the new coin.
+    const deadline = Date.now() + 300_000;
+    for (;;) {
+      if ((await balanceOf()) === expected) {
+        this.logger.info('Re-nonced coin is visible; split complete');
+        return;
+      }
+      if (Date.now() > deadline) {
+        throw new Error(`Split of ${tokenType} did not settle within 300s`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+    }
   }
 
   async start(): Promise<void> {
