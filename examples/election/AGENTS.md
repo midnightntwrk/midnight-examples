@@ -5,7 +5,17 @@
 
 ## What it teaches
 
-- TODO: bullet points describing what this example demonstrates.
+- **Commit-reveal voting.** While voting is open, a voter commits
+  `persistentHash` of their vote and their witness secret into
+  `hashedVoteMap`. After it closes, `revealVote` recomputes the commitment from
+  the witnesses and asserts it matches before counting the vote.
+- **Witness-derived identity.** `getDappPubKey(localSk())` is the organizer's
+  and each voter's key in this contract; the secret never leaves the witness.
+- **`Set`-based guards** against registering twice, voting twice and revealing
+  twice (`registeredVoters`, `hashedVoteMap`, `revealedVoters`).
+- **`Counter` tallies** and a winner computed on chain by `checkWinner`.
+- **`sealed` ledger fields** (organizer, both candidates) set once in the
+  constructor, and a `VotingState` state machine gating every circuit.
 
 ## Layout
 

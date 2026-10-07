@@ -1,6 +1,12 @@
 # Election Example
 
-> TODO: one paragraph describing what this example demonstrates.
+A two-candidate election using commit-reveal. Voters register a DApp-specific
+key derived from a witness secret. While voting is open, each voter commits a
+hash of their vote and secret, so the tally can't be read during voting. After
+the organizer closes voting, each voter reveals: the contract recomputes the
+commitment, rejects a changed vote, and counts it. `Set`s stop double
+registration, double voting and double reveals; `Counter`s hold the tally; and
+the organizer and candidates are `sealed` at deployment.
 
 ## Set up
 

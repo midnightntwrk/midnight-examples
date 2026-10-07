@@ -8,6 +8,7 @@
   },
   "scripts": {
     "compile": "compact compile contract/zk-loan.compact contract/managed/zk-loan",
+    "typecheck": "tsc --noEmit -p .",
     "test": "NODE_OPTIONS='--experimental-vm-modules' vitest run",
     "test:local": "MIDNIGHT_NETWORK=local yarn test",
     "test:preview": "MIDNIGHT_NETWORK=preview yarn test",
@@ -17,7 +18,7 @@
     "proof:up": "docker compose up -d --wait proof-server",
     "proof:down": "docker compose stop proof-server",
     "wait:dust": "vite-node scripts/wait-for-dust.ts",
-    "validate": "yarn env:up && yarn wait:dust && yarn test:local; yarn env:down",
+    "validate": "node ../../scripts/validate-example.mjs",
     "attestation:start": "vite-node attestation-api/index.ts"
   },
   "dependencies": {
