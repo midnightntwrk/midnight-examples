@@ -104,6 +104,18 @@ const READ_ON_FAILURE = [
 ];
 
 /**
+ * The first `<file>:<line>` in a failure message, or undefined. A plain
+ * search rather than a RegExp built from the path, which would need escaping.
+ */
+function fileLine(message = '', file) {
+  for (let i = message.indexOf(`${file}:`); i !== -1; i = message.indexOf(`${file}:`, i + 1)) {
+    const line = /^\d+/.exec(message.slice(i + file.length + 1))?.[0];
+    if (line) return `${file}:${line}`;
+  }
+  return undefined;
+}
+
+/**
  * A fix plan for a failed report:
  *   { kind: 'infra'|'reason', route, cause, actions[], read[], uiAffected, failures[] }
  * `route` is a generation-flow step ('3a', '3c') or '4' (re-run the devnet).
@@ -175,7 +187,7 @@ export function triage(report, name) {
   const first = failures[0];
   const hay = first ? first.message ?? '' : report.steps?.find((s) => s.step === step)?.outputTail ?? '';
   const cls = TEST_CLASSES.find((c) => c.re.test(hay)) ?? FALLBACK;
-  const at = first && new RegExp(`(${first.file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\\d+)`).exec(first.message)?.[1];
+  const at = first && fileLine(first.message, first.file);
   const actions = sub(cls.actions);
   if (at) actions.unshift(`start at the first failure, ${at}`);
   if (failures.length > 1) {
