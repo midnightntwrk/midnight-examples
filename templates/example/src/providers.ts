@@ -38,7 +38,9 @@ export function buildProviders(
   const zkConfigProvider = new NodeZkConfigProvider<__Name__Circuits>(zkConfigPath);
   return {
     privateStateProvider: levelPrivateStateProvider({
-      privateStateStoreName: `__name__-${Date.now()}`,
+      // The random suffix keeps each provider set's private-state store separate
+      // when a test builds several sets (wallets, contracts) in the same millisecond.
+      privateStateStoreName: `__name__-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       // this password has requirements (capital/special chars >= 3)
       privateStoragePasswordProvider: () => '__Name__-Test-Password',
       accountId: wallet.getCoinPublicKey(),

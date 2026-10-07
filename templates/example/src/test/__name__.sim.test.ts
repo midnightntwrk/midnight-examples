@@ -29,8 +29,10 @@ const deploy = () =>
   Sim.deploy({
     contract: new Contract(__SIM_WITNESSES__),
     ledger,
+    // @generated-stub begin private-state sha=0
     privateState: __INITIAL_PRIVATE_STATE__,
-    // @generated-stub begin constructor-args sha=e3b0c44298fc
+    // @generated-stub end private-state
+    // @generated-stub begin constructor-args sha=0
     // @generated-stub end constructor-args
   });
 
@@ -46,10 +48,10 @@ describe('__Title__ (in memory)', () => {
     expect(deploy().ledger()).toBeDefined();
   });
 
-  // @generated-stub begin circuits sha=e3b0c44298fc
+  // @generated-stub begin circuits sha=0
   // @generated-stub end circuits
 
-  // @generated-stub begin privacy sha=2b18b1964dfe
+  // @generated-stub begin privacy sha=0
   // SPEC.md → Privacy invariants: one entry per "never on chain" line.
   it('keeps secrets out of public state', () => {
     assertNotInPublicState(deploy().ledger(), {
