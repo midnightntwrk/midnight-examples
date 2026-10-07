@@ -24,7 +24,9 @@
 // contract compiles: the circuits, ledger fields and witnesses match the
 // compiled contract; every assert message is in the card and in an
 // expectRejects; every invariant key is in an assertNotInPublicState call;
-// every circuit is called in a sim test; and no it.todo is left. Those last
+// every circuit is called in a sim test; no it.todo is left; and the devnet
+// test is written (no it.todo, every transaction circuit called), because the
+// devnet starts in the background as soon as this gate passes. Those last
 // checks matter because the in-memory gate is what unlocks the UI step: an
 // empty or half-written sim suite must not pass it.
 //
@@ -261,6 +263,17 @@ export function lintCode(exampleDir) {
       ? new RegExp(`\\b${c.name}\\s*\\(`).test(simCode)
       : new RegExp(`\\.call\\(\\s*['"\`]${c.name}['"\`]`).test(simCode);
     if (!called) problems.push(`circuit \`${c.name}\` is never ${c.pure ? 'called' : 'run with .call()'} in a sim test`);
+  }
+
+  // The devnet suite runs in the background once this gate passes, so it must
+  // be written by now too: not the scaffold's skeleton (an it.todo per
+  // circuit), and every circuit that makes a transaction mentioned in it.
+  const devnetFiles = walk(path.join(exampleDir, 'src'), (n) => n.endsWith('.test.ts') && !n.endsWith('.sim.test.ts'));
+  if (devnetFiles.length === 0) problems.push('no devnet test (src/**/*.test.ts besides the sim tests)');
+  const devnetCode = stripCode(devnetFiles.map((p) => fs.readFileSync(p, 'utf8')).join('\n'));
+  if (/\bit\.todo\s*\(/.test(devnetCode)) problems.push('an it.todo is left in the devnet test: write the end-to-end flow before the devnet runs');
+  for (const c of circuits.filter((c) => !c.pure)) {
+    if (!new RegExp(`\\b${c.name}\\b`).test(devnetCode)) problems.push(`circuit \`${c.name}\` is never called in the devnet test`);
   }
 
   // Every guard: in the card, and rejected in a sim test.
