@@ -41,15 +41,16 @@ export function walk(dir, pred, out = []) {
 
 /**
  * The files a contract-level gate depends on: the Compact sources, the
- * contract's TypeScript (witnesses, index), the test harness and tests, and
- * the package/test config. ui/ is left out on purpose: UI work must not
- * invalidate the in-memory or devnet stamps.
+ * contract's TypeScript (witnesses, index), the test harness and tests, the
+ * helper scripts (wait-for-dust) and the package/test config. ui/ is left
+ * out on purpose: UI work must not invalidate the in-memory or devnet stamps.
  */
 export function sourceFiles(exampleDir) {
   const ts = (n) => n.endsWith('.ts');
   return [
     ...walk(path.join(exampleDir, 'contract'), (n) => n.endsWith('.compact') || ts(n)),
     ...walk(path.join(exampleDir, 'src'), ts),
+    ...walk(path.join(exampleDir, 'scripts'), ts),
     ...['package.json', 'vitest.config.ts'].map((f) => path.join(exampleDir, f)).filter((p) => fs.existsSync(p)),
   ].sort();
 }

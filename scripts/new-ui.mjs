@@ -64,6 +64,7 @@ import {
   substituteNames,
   writeFiles,
 } from './lib/template.mjs';
+import { gatePath, readJson, sourceHash } from './lib/gates.mjs';
 import {
   ONE_TIME_ADVICE,
   SECRET_ADVICE,
@@ -145,6 +146,8 @@ function usage() {
       '                   default: persistent when the create<X>PrivateState factory',
       '                   in contract/witnesses.ts takes arguments (per-user secrets),',
       '                   with or without witnesses; else memory',
+      '  --skip-gate   create even though the in-memory gate has no stamp for the',
+      '                current sources (.gates/sim.json, written by yarn pipeline)',
       '  --dry-run     print the create summary (forms, TODOs, storage, warnings) and',
       '                write nothing; works even when ui/ already exists',
       '  --check       compare template-owned files in examples/<name>/ui with the',
@@ -224,12 +227,14 @@ const positionals = [];
 const flags = new Set();
 let contractFlag = null;
 let privateStateFlag = null;
+let skipGate = false;
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a === '--contract') contractFlag = argv[++i] ?? fail('--contract needs a value');
   else if (a.startsWith('--contract=')) contractFlag = a.slice('--contract='.length);
   else if (a === '--private-state') privateStateFlag = argv[++i] ?? fail('--private-state needs a value');
   else if (a.startsWith('--private-state=')) privateStateFlag = a.slice('--private-state='.length);
+  else if (a === '--skip-gate') skipGate = true;
   else if (['--check', '--sync', '--check-all', '--sync-all', '--dry-run'].includes(a)) flags.add(a);
   else if (a.startsWith('-')) fail(`unknown flag ${a}`);
   else positionals.push(a);
@@ -263,6 +268,22 @@ if (!fs.existsSync(path.join(exampleDir, 'package.json'))) {
 }
 if (mode === 'create' && !dryRun && fs.existsSync(uiDir)) {
   fail(`examples/${name}/ui already exists. Use --check or --sync to compare/update template-owned files.`);
+}
+// The UI starts once the in-memory gate (typecheck, test:sim, the SPEC code
+// checks) has passed on the current sources; the devnet runs in the background
+// meanwhile (docs/generation-flow.md). Check, sync and dry runs don't need it.
+if (mode === 'create' && !dryRun) {
+  const stamp = readJson(gatePath(exampleDir, 'sim.json'));
+  const fresh = stamp?.sourceHash === sourceHash(exampleDir);
+  if (!fresh && !skipGate) {
+    fail(
+      `examples/${name} has not passed the in-memory gate on its current sources ` +
+        `(${stamp ? 'the contract, witnesses or tests changed since it passed' : 'no .gates/sim.json'}). ` +
+        `Run \`yarn pipeline ${name}\` (it creates the UI once the gate passes), or pass --skip-gate ` +
+        '(an older example without a SPEC.md, after its own typecheck and test:sim).',
+    );
+  }
+  if (!fresh) console.warn('⚠ --skip-gate: creating the UI without a passing in-memory gate on these sources.');
 }
 if (mode !== 'create' && !fs.existsSync(uiDir)) {
   fail(`examples/${name}/ui does not exist — nothing to ${mode}.`);

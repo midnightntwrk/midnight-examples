@@ -299,7 +299,8 @@ console.log(`         src/test/${name}.test.ts       devnet: the end-to-end flow
 console.log(`       cd examples/${name}`);
 console.log('       yarn compile:fast && yarn typecheck && yarn test:sim   # until green');
 console.log('    4. yarn validate                    # compile, env:up, wait:dust, test:local, env:down');
-console.log(`    Optional, once validate passes: yarn new:ui ${name}   (browser frontend)`);
+console.log(`    Or from the repo root: yarn pipeline ${name} [--json]   # runs steps 2–7 with the devnet in the`);
+console.log('       background, creates the UI once the in-memory gate passes, and prints what to do next');
 console.log('');
 
 const failedRegistration = registration.filter((r) => !r.ok);
