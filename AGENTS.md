@@ -66,9 +66,12 @@ yarn compile:fast        # same with --skip-zk: no proving keys, seconds (enough
 yarn typecheck           # typecheck every workspace (needs compiled contracts)
 yarn test:sim            # every in-memory test (*.sim.test.ts); no Docker
 yarn workspace @midnight-ntwrk/example-<name> run compile   # one example
-yarn new:example <name> [--witnesses]   # phase 1: scaffold an example
+yarn new:example <name> [--witnesses] [--spec <card.md>]   # phase 1: scaffold an example
 yarn new:example <name> --derive        # after compile:fast: fill its @generated-stub regions
-yarn new:ui <name>                      # phase 2: scaffold its browser UI (after test:local is green)
+yarn spec:lint <name> [--design]        # SPEC.md alone, then against the compiled contract and sim tests
+yarn pipeline <name> [--json]           # run the next scripts and gates; prints what to do next
+yarn pipeline <name> --wait-devnet      # block until the background devnet run finishes
+yarn new:ui <name>                      # phase 2: scaffold its browser UI (after the in-memory gate passes)
 yarn new:ui <name> --check              # template-owned UI files still match templates/ui
 yarn new:ui --sync-all                  # after editing templates/ui: sync every UI (+ yarn install)
 yarn new:ui --check-all                 # CI's drift check for every UI, plus install --immutable
@@ -80,7 +83,10 @@ Per example (from `examples/<name>`): `yarn compile:fast`, `yarn typecheck` and
 (full compile if stale or keyless → `env:up` → `wait:dust` → `test:local` →
 `env:down`, exiting non-zero if any step fails). The steps also run on their
 own: `yarn env:up`, `yarn wait:dust`, `yarn test:local`, `yarn env:down`.
-Devnet tests require Docker.
+Devnet tests require Docker. `yarn pipeline <name>` chains all of it: it runs
+the devnet in the background once the in-memory gate passes, and never
+compiles while that run holds `.gates/devnet.lock`. Only one devnet runs at a
+time (every example binds the same ports).
 
 Against a remote network (preprod/preview) — see `FAST-SYNC.md`:
 
@@ -151,8 +157,10 @@ Each example has its own `AGENTS.md` with specifics.
 - Provide `compile`, `compile:fast`, `typecheck`, `test`, `test:sim`,
   `test:local`, `env:up`, `env:down`, `wait:dust` and `validate` scripts so the
   CI matrix and root aggregates work unchanged.
-- Adding a browser frontend is **phase 2**: once the contract compiles and
-  `test:local` is green, run `yarn new:ui <name>`. Don't hand-copy
+- Adding a browser frontend is **phase 2**: once the in-memory gate passes
+  (`typecheck`, `test:sim`, `yarn spec:lint`), run `yarn new:ui <name>`, or let
+  `yarn pipeline <name>` do it. The devnet runs in the background meanwhile and
+  must pass before the UI is called done. Don't hand-copy
   `hello-world/ui`. The generator reads `contract-info.json` and writes a UI
   that already typechecks, tests and builds. Put use-case code only in the seed
   files: `src/midnight/<name>-api.ts`, `src/components/<name>-panel.tsx` and
@@ -164,7 +172,8 @@ Each example has its own `AGENTS.md` with specifics.
   every generated UI. Details, pins and the verification checklist are in
   `templates/ui/AGENTS.md`, which every generated UI carries as `ui/AGENTS.md`.
 - The scripted generation pipeline (prompt → SPEC → scaffold → contract →
-  derive → witnesses and tests → devnet → `new:ui` → UI code → serve), with each
-  step's gate and fix loop, is in `docs/generation-flow.md`.
+  derive → witnesses and tests → `new:ui` and UI code, with the devnet in the
+  background → serve), with each step's gate and fix loop, is in
+  `docs/generation-flow.md`; `yarn pipeline <name>` runs it.
 - Add meticulous comments in contracts and witnesses explaining the *how* and
   *why* — these examples are read by agents as much as by people.
