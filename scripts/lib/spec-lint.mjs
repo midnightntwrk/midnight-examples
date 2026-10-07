@@ -181,11 +181,25 @@ function closingParen(src, open) {
   return src.length;
 }
 
+// Names are matched against fixed patterns and looked up in a Set, never
+// spliced into a RegExp: code scanning flags a non-literal RegExp, and a
+// name would need escaping.
+const IDENT = /[A-Za-z_$][\w$]*/g;
+const IDENT_CALL = /\b([A-Za-z_$][\w$]*)\s*\(/g;
+// `.call('circuit'` / `.call("circuit"` / .call(`circuit`
+const SIM_CALL = /\.call\(\s*(['"`])([A-Za-z_$][\w$]*)\1/g;
+
+/** Every identifier in src. */
+const idents = (src) => new Set(src.match(IDENT));
+
+/** Every identifier in src followed by `(`. */
+const calledIdents = (src) => new Set([...src.matchAll(IDENT_CALL)].map((m) => m[1]));
+
 /** The argument text of every `fn(...)` call in src. */
 function callArgs(src, fn) {
   const out = [];
-  const re = new RegExp(`\\b${fn}\\s*\\(`, 'g');
-  for (let m; (m = re.exec(src)); ) {
+  for (const m of src.matchAll(IDENT_CALL)) {
+    if (m[1] !== fn) continue;
     const open = m.index + m[0].length - 1;
     out.push(src.slice(open + 1, closingParen(src, open) - 1));
   }
@@ -258,10 +272,10 @@ export function lintCode(exampleDir) {
   const simCode = stripCode(sim);
   if (/\bit\.todo\s*\(/.test(simCode)) problems.push('an it.todo is left in the sim tests');
 
+  const simCalled = calledIdents(simCode);
+  const simRun = new Set([...simCode.matchAll(SIM_CALL)].map((m) => m[2]));
   for (const c of circuits) {
-    const called = c.pure
-      ? new RegExp(`\\b${c.name}\\s*\\(`).test(simCode)
-      : new RegExp(`\\.call\\(\\s*['"\`]${c.name}['"\`]`).test(simCode);
+    const called = c.pure ? simCalled.has(c.name) : simRun.has(c.name);
     if (!called) problems.push(`circuit \`${c.name}\` is never ${c.pure ? 'called' : 'run with .call()'} in a sim test`);
   }
 
@@ -272,8 +286,9 @@ export function lintCode(exampleDir) {
   if (devnetFiles.length === 0) problems.push('no devnet test (src/**/*.test.ts besides the sim tests)');
   const devnetCode = stripCode(devnetFiles.map((p) => fs.readFileSync(p, 'utf8')).join('\n'));
   if (/\bit\.todo\s*\(/.test(devnetCode)) problems.push('an it.todo is left in the devnet test: write the end-to-end flow before the devnet runs');
+  const devnetIdents = idents(devnetCode);
   for (const c of circuits.filter((c) => !c.pure)) {
-    if (!new RegExp(`\\b${c.name}\\b`).test(devnetCode)) problems.push(`circuit \`${c.name}\` is never called in the devnet test`);
+    if (!devnetIdents.has(c.name)) problems.push(`circuit \`${c.name}\` is never called in the devnet test`);
   }
 
   // Every guard: in the card, and rejected in a sim test.

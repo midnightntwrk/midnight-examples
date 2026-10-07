@@ -436,11 +436,12 @@ export function derive(exampleDir, name, names) {
   }
 
   // An edited witnesses region can't gain stubs for witnesses added later.
+  // A witness counts as written when its name is followed by `:` or `(`. The
+  // names are collected with a fixed pattern rather than spliced into a RegExp.
   const wReport = report.find((r) => r.rel === 'contract/witnesses.ts');
+  const written = new Set([...(witnessesTs?.src ?? '').matchAll(/\b([A-Za-z_$][\w$]*)\s*[:(]/g)].map((m) => m[1]));
   const unstubbed =
-    wReport?.status?.witnesses === 'edited'
-      ? info.witnesses.map((w) => w.name).filter((n) => !new RegExp(`\\b${n}\\s*[:(]`).test(witnessesTs.src))
-      : [];
+    wReport?.status?.witnesses === 'edited' ? info.witnesses.map((w) => w.name).filter((n) => !written.has(n)) : [];
 
   return {
     managed,
