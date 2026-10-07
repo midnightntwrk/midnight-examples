@@ -67,10 +67,11 @@ flowchart TD
   classDef gap fill:#f1f5f9,stroke:#94a3b8,color:#475569,stroke-dasharray: 4 3
 ```
 
-After a contract change in 3c, re-run `yarn compile:fast` and
+After a contract change in 3c, or a change to the `create<X>PrivateState`
+factory in `witnesses.ts`, re-run `yarn compile:fast` and
 `yarn new:example NAME --derive`: derive only rewrites stub regions nobody has
-edited, so it picks up new circuits and constructor parameters without
-touching written code.
+edited, so it picks up new circuits, constructor parameters and factory
+parameters without touching written code.
 
 Colour key: indigo marks input/output, green a deterministic script, orange a
 reasoning (LLM) step, and slate a mechanical gate. Dashed grey marks a step with
@@ -80,7 +81,7 @@ nothing behind it yet.
 
 | # | Step | Kind | Runs | Reads | Writes | Gate |
 |---|------|------|------|-------|--------|------|
-| 1 | Design | reason | Model writes the design card | User prompt; [`templates/example/SPEC.md`](../templates/example/SPEC.md) and the worked example [`examples/private-tip-jar/SPEC.md`](../examples/private-tip-jar/SPEC.md) | Example name (kebab-case), whether it needs witnesses, and the content of `SPEC.md`: roles, public fields, circuits and their asserts, witnesses, **privacy invariants** and **accepted leaks** | A human reviews the design before any code exists; the name matches `NAME_RE`; `--witnesses` matches SPEC's Witnesses section. (**Gap**: nothing turns a prompt into this yet) |
+| 1 | Design | reason | Model drafts the design card; it is saved into the `SPEC.md` that step 2 scaffolds | User prompt; [`templates/example/SPEC.md`](../templates/example/SPEC.md) and the worked example [`examples/private-tip-jar/SPEC.md`](../examples/private-tip-jar/SPEC.md) | Example name (kebab-case), whether it needs witnesses, and the content of `SPEC.md`: roles, public fields, circuits and their asserts, witnesses, **privacy invariants** and **accepted leaks** | A human reviews the design before any code exists; the name matches `NAME_RE`; `--witnesses` matches SPEC's Witnesses section. (**Gap**: nothing turns a prompt into this yet) |
 | 2 | Scaffold | script | `yarn new:example <name> [--witnesses] [--no-register]` ([`scripts/new-example.mjs`](../scripts/new-example.mjs)) | [`templates/example/`](../templates/example/) | `examples/<name>/`: `SPEC.md` (step 1's card goes here), contract stub, `src/` harness, an in-memory test (`<name>.sim.test.ts`) and a devnet test skeleton with `@generated-stub` regions, `compose.yml`, `AGENTS.md`. Registers the example in CI and the docs tables | Node 22, `compact` at the CI pin ([`scripts/lib/preflight.mjs`](../scripts/lib/preflight.mjs)); unknown flags rejected; registration succeeded; no leftover template tokens |
 | 3a | Write the contract | reason | Model writes Compact | See [Context budget](#context-budget) | `contract/<name>.compact` | `yarn compile:fast` (`--skip-zk`: no proving keys, under a second for most contracts); on failure, back to 3a |
 | 3b | Derive stubs | script | `yarn new:example <name> --derive` ([`scripts/lib/derive.mjs`](../scripts/lib/derive.mjs)) | `contract/managed/<name>/compiler/contract-info.json`, `contract/index.d.ts`, `contract/<name>.compact`, `contract/witnesses.ts` | Fills the unedited `@generated-stub` regions: a typed stub per witness, constructor `args` in both tests' deploy calls, an `it.todo` per circuit, the ledger fields, a privacy-test skeleton | Refuses if the contract isn't compiled or declares witnesses without `witnesses.ts`. Re-runnable: edited regions are left alone, and a second run changes nothing |
@@ -99,9 +100,13 @@ you have what you need.
 |---|---|---|
 | 1 (design) | [`templates/example/SPEC.md`](../templates/example/SPEC.md); [`examples/private-tip-jar/SPEC.md`](../examples/private-tip-jar/SPEC.md) as a worked example; [`patterns.md`](patterns.md) to find the nearest example | Any code |
 | 3a (contract) | [`compact-gotchas.md`](compact-gotchas.md) (~1.5K tokens); [`patterns.md`](patterns.md) (~1.5K tokens) to pick the 1–2 nearest examples; their `contract/*.compact`; this example's `SPEC.md` | `src/wallet.ts`, `src/providers.ts`, `src/config.ts`, `scripts/wait-for-dust.ts`, `compose.yml` (identical in every example); the narrative parts of `TUTORIAL.md` and `LESSONS.md`; examples unrelated to the use case |
-| 3c (witnesses, tests) | The derived stubs; the nearest examples' `contract/witnesses.ts` and test bodies after `Your tests begin here`; [`packages/sim/src/index.ts`](../packages/sim/src/index.ts) for the in-memory API, and `examples/calculator/src/test/calculator.sim.test.ts` / `examples/private-tip-jar/src/test/private-tip-jar.sim.test.ts` as models | Everything above a test's `Your tests begin here` marker; `contract/managed/` beyond the generated `index.d.ts` |
+| 3c (witnesses, tests) | The derived stubs; the nearest examples' `contract/witnesses.ts` and test bodies after `Your tests begin here`; `examples/calculator/src/test/calculator.sim.test.ts` and `examples/private-tip-jar/src/test/private-tip-jar.sim.test.ts` as models, and [`packages/sim/src/sim.ts`](../packages/sim/src/sim.ts) / [`privacy.ts`](../packages/sim/src/privacy.ts) if you need more of the in-memory API. If the nearest example's devnet test body calls helpers defined above its marker (multi-wallet or shielded-coin setup, as in `private-tip-jar`), read those helpers too. A second contract (a test token): `private-tip-jar`'s `contract/index.ts` and `package.json` compile scripts | The rest of the setup above a test's marker; `contract/managed/` beyond the generated `index.d.ts` |
 | 3, on a gate failure | The failing gate's output first. If `compact-gotchas.md` doesn't explain it, then the `midnight-expert` skills (`compact-core`, `midnight-verify`) or the linked `LESSONS.md`/`TUTORIAL.md` section | All of `TUTORIAL.md` |
 | 6 (UI seed files) | [`templates/ui/AGENTS.md`](../templates/ui/AGENTS.md) §3 and §5 and the Gotchas; the nearest `examples/*/ui/` seed files (listed under its "Worked examples") | Template-owned UI files; `examples/zk-loan/ui` (hand-built, not authoritative) |
+
+Root and per-example `AGENTS.md` files (about 20 KB together) may be loaded
+automatically when an agent works in an example directory; count them in the
+budget.
 
 `yarn compile:fast`, `yarn typecheck` and `yarn test:sim` take seconds;
 `yarn validate` takes minutes (a full compile with proving keys, then the
@@ -120,10 +125,12 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
 - **`--derive` covers one contract.** It fills the stubs of the contract named
   after the example. A second contract (a demo token, as in
   `private-tip-jar`) is wired by hand.
-- **No shared shielded test faucet.** Examples that need shielded coins in
-  their tests write a small minting contract (`private-tip-jar`'s
-  `tip-token.compact`). The in-memory tests don't need one: `Sim` takes
-  made-up coins.
+- **No shared shielded test faucet or coin helpers.** Examples that need
+  shielded coins in their devnet tests write a small minting contract
+  (`private-tip-jar`'s `tip-token.compact`) and port about 130 lines of
+  two-wallet and coin-selection setup. The in-memory tests don't need either:
+  `Sim` takes made-up coins. The SPEC template has no place for such a
+  test-only contract yet.
 - **Serving (step 7).** Serving stops at the local Vite dev server; there is no
   deploy target in this repo.
 - **Browser verification.** The checks in `verification.json` (Lace, browser)
@@ -139,7 +146,10 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
   3c writes witnesses and tests and gates on `yarn typecheck` and `yarn
   test:sim` (in memory, via `packages/sim`, no Docker). CI runs `test:sim`
   before the devnet. Every example's test now has a `Your tests begin here`
-  marker, and the template wallet has `splitShieldedCoin`.
+  marker, and the template wallet has `splitShieldedCoin`. After the Phase 2
+  baseline run (`reports/generation-baseline.json`): the initial private
+  state in both tests is a derived region too, and the step-3c budget points
+  at the helpers a multi-wallet devnet test needs.
 
 - 2026-10-06: `yarn validate` exits with the failing step's status (it used to
   exit with `env:down`'s, so failing tests passed the gate), compiles first

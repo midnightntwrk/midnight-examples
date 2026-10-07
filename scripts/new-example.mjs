@@ -30,7 +30,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { derive } from './lib/derive.mjs';
+import { derive, sealRegions } from './lib/derive.mjs';
 import { preflight } from './lib/preflight.mjs';
 import {
   NAME_RE,
@@ -193,7 +193,7 @@ const files = renderTree(TEMPLATE_DIR, {
   // Only copy the witnesses stub when --witnesses is set.
   skip: (rel) => !withWitnesses && rel === path.join('contract', 'witnesses.ts'),
   render: (raw, rel) => {
-    const content = substitute(raw);
+    const content = sealRegions(substitute(raw));
     assertNoLeftoverTokens(rel, content, KNOWN_TOKENS);
     return content;
   },

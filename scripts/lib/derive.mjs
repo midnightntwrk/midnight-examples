@@ -22,7 +22,8 @@
 //   // @generated-stub end <id>
 //
 // and is rewritten only while its body still matches the hash, i.e. until
-// someone edits it. Edited regions, and regions whose markers were deleted,
+// someone edits it. The template's regions say sha=0; new-example seals them
+// (sealRegions) after substituting tokens, so every region starts unedited. Edited regions, and regions whose markers were deleted,
 // are left alone, so code a person or model wrote is never touched. Running
 // it twice gives the same files.
 
@@ -80,6 +81,25 @@ export function fillRegions(src, generators) {
   }
   const missing = Object.keys(generators).filter((id) => !(id in status));
   return { out: out.join('\n'), status, missing };
+}
+
+/**
+ * Sets every region's sha= to the hash of its current body. new-example runs
+ * this on each rendered template file, so regions whose template text holds
+ * a token (__INITIAL_PRIVATE_STATE__) start out unedited after substitution.
+ */
+export function sealRegions(src) {
+  const lines = src.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const begin = lines[i].match(BEGIN_RE);
+    if (!begin) continue;
+    const [, indent, id] = begin;
+    const end = lines.findIndex((l, j) => j > i && l.match(END_RE)?.[1] === id);
+    if (end === -1) throw new Error(`@generated-stub begin ${id} has no matching end marker`);
+    lines[i] = `${indent}// @generated-stub begin ${id} sha=${stubHash(lines.slice(i + 1, end).join('\n'))}`;
+    i = end;
+  }
+  return lines.join('\n');
 }
 
 /** A Compact type from contract-info.json, written the way the source would. */
@@ -170,6 +190,26 @@ export function derive(exampleDir, name, names) {
           `${indent}],`,
         ].join('\n');
 
+  // The initial private state: the create<X>PrivateState factory, called with
+  // a placeholder per parameter, so a factory that takes the owner's secret
+  // (say) doesn't leave the deploy calls failing to type-check.
+  const tsPlaceholder = (t) =>
+    ({ bigint: '0n', boolean: 'false', string: "''", Uint8Array: 'new Uint8Array(32)' })[t.trim()] ?? 'undefined as never';
+  const initialPrivateState = !witnessesTs?.factory
+    ? '{}'
+    : `${witnessesTs.factory}(${
+        witnessesTs.factoryParams
+          ? witnessesTs.factoryParams
+              .split(',')
+              .map((p) => {
+                const [n, t = ''] = p.split(':');
+                return `${tsPlaceholder(t)} /* TODO ${n.trim()} */`;
+              })
+              .join(', ')
+          : ''
+      })`;
+  const privateStateLine = (key) => (indent) => `${indent}${key}: ${initialPrivateState},`;
+
   const psType = witnessesTs?.privateStateType ?? `${names.Name}PrivateState`;
   const witnessesConst = witnessesTs?.witnessesExport ?? 'witnesses';
   const witnessStubs = () =>
@@ -209,8 +249,24 @@ export function derive(exampleDir, name, names) {
 
   const targets = [
     ['contract/witnesses.ts', { witnesses: witnessStubs }],
-    [`src/test/${name}.test.ts`, { 'constructor-args': ctorArgs, 'ledger-fields': ledgerComment, circuits: devnetTodos }],
-    [`src/test/${name}.sim.test.ts`, { 'constructor-args': ctorArgs, circuits: simTodos, privacy: privacyTest }],
+    [
+      `src/test/${name}.test.ts`,
+      {
+        'private-state': privateStateLine('initialPrivateState'),
+        'constructor-args': ctorArgs,
+        'ledger-fields': ledgerComment,
+        circuits: devnetTodos,
+      },
+    ],
+    [
+      `src/test/${name}.sim.test.ts`,
+      {
+        'private-state': privateStateLine('privateState'),
+        'constructor-args': ctorArgs,
+        circuits: simTodos,
+        privacy: privacyTest,
+      },
+    ],
   ];
 
   const report = [];

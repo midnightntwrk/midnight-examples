@@ -62,7 +62,7 @@ describe(`__Title__ Contract (${network})`, () => {
   );
 
   // Reads the contract's public ledger state.
-  // @generated-stub begin ledger-fields sha=e3b0c44298fc
+  // @generated-stub begin ledger-fields sha=0
   // @generated-stub end ledger-fields
   async function queryLedger() {
     const state = await providers.publicDataProvider.queryContractState(contractAddress);
@@ -126,8 +126,10 @@ describe(`__Title__ Contract (${network})`, () => {
     const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {
       compiledContract: Compiled__Name__Contract,
       privateStateId: PRIVATE_STATE_ID,
+      // @generated-stub begin private-state sha=0
       initialPrivateState: __INITIAL_PRIVATE_STATE__,
-      // @generated-stub begin constructor-args sha=e3b0c44298fc
+      // @generated-stub end private-state
+      // @generated-stub begin constructor-args sha=0
       // @generated-stub end constructor-args
     });
 
@@ -138,7 +140,7 @@ describe(`__Title__ Contract (${network})`, () => {
   });
 
   // One it.todo per circuit, written by `yarn new:example __name__ --derive`.
-  // @generated-stub begin circuits sha=e3b0c44298fc
+  // @generated-stub begin circuits sha=0
   // @generated-stub end circuits
 
   // TODO: add circuit-interaction tests. `submitCallTx` and `queryLedger` are

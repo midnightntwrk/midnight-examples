@@ -39,7 +39,7 @@ export const create__Name__PrivateState = (): __Name__PrivateState => ({});
 //   ): [__Name__PrivateState, bigint] => {
 //     return [privateState, arg];
 //   },
-// @generated-stub begin witnesses sha=16250017d9b3
+// @generated-stub begin witnesses sha=0
 export const witnesses = {
 };
 // @generated-stub end witnesses
