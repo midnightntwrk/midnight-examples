@@ -87,6 +87,10 @@ is exactly `owner`, `tipColor` and `pot`.
   adds `splitShieldedCoin` (shielded self-transfer), and `src/providers.ts`
   adds a random suffix to the private-state store name so several provider
   sets can be built in the same millisecond.
+- `SPEC.md`: the design card (the worked example for `templates/example/SPEC.md`).
+- `src/test/private-tip-jar.sim.test.ts`: the same guards, flow and privacy
+  invariants in memory (`yarn compile:fast && yarn test:sim`, under a second),
+  using `@midnight-ntwrk/example-sim`'s `assertNotInPublicState`.
 - `src/test/private-tip-jar.test.ts`: Alice (owner, token minter) and Bob
   (tipper). Covers mint, deploy, re-nonce, two tips, the privacy test, a
   negative test for every guard (wrong color, zero value, non-owner withdraw,
@@ -95,7 +99,7 @@ is exactly `owner`, `tipColor` and `pot`.
 ## Run
 
 ```bash
-yarn compile && yarn typecheck   # cheap checks first
+yarn compile:fast && yarn typecheck && yarn test:sim   # seconds, no Docker
 yarn validate                    # compile, env:up, wait:dust, test:local, env:down
 ```
 

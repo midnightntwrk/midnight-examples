@@ -65,6 +65,11 @@ jobs:
       - name: Typecheck harness and tests
         run: yarn typecheck
 
+      # In-memory contract tests (src/**/*.sim.test.ts): no Docker, seconds.
+      # Logic errors fail here before the network is started.
+      - name: Run in-memory contract tests
+        run: yarn test:sim
+
       - name: Start local Midnight network
         run: yarn env:up
 
@@ -145,3 +150,56 @@ jobs:
             echo "::endgroup::"
           done
           [ "$found" = 1 ] || { echo "no generated UIs found"; exit 1; }
+
+  # The scaffolding itself: packages/sim's own tests (including the negative
+  # control for assertNotInPublicState), and a throwaway example taken through
+  # new:example → compile:fast → --derive twice. The second --derive must
+  # change nothing, and the derived stubs must type-check.
+  scaffold:
+    name: scaffold and sim harness
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  #v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Compact Compiler
+        uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
+        with:
+          compact-version: '0.31.1'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  #v6.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack (Yarn 4)
+        run: corepack enable
+
+      - name: Install dependencies (whole workspace)
+        run: yarn install --immutable
+
+      - name: Typecheck and test packages/sim
+        run: |
+          yarn workspace @midnight-ntwrk/example-sim typecheck
+          yarn workspace @midnight-ntwrk/example-sim test:sim
+
+      - name: Scaffold, compile:fast and derive a throwaway example
+        run: |
+          set -euo pipefail
+          yarn new:example ci-derive --witnesses --no-register
+          # A contract with a constructor argument, a witness, a pure circuit and a Map.
+          cp examples/private-tip-jar/contract/private-tip-jar.compact examples/ci-derive/contract/ci-derive.compact
+          yarn install --no-immutable
+          yarn workspace @midnight-ntwrk/example-ci-derive compile:fast
+          yarn new:example ci-derive --derive
+          cp -r examples/ci-derive "$RUNNER_TEMP/first"
+          yarn new:example ci-derive --derive
+          diff -r --exclude=node_modules --exclude=managed "$RUNNER_TEMP/first" examples/ci-derive
+          yarn workspace @midnight-ntwrk/example-ci-derive typecheck

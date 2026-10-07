@@ -18,15 +18,19 @@
 // Zero dependencies — Node built-ins only. Run with no AI assistance:
 //
 //   yarn new:example <name> [--witnesses] [--no-register]
-//   node scripts/new-example.mjs <name> [--witnesses] [--no-register]
+//   yarn new:example <name> --derive
 //
-// After scaffolding, the author only has to write contract/<name>.compact and
-// fill in the test bodies. Everything else (harness, config, docker, docs stubs,
-// and a test skeleton up to the first deployContract call) is generated.
+// After scaffolding, the author writes SPEC.md, then contract/<name>.compact,
+// and fills in the test bodies. Everything else (harness, config, docker, docs
+// stubs, and test skeletons up to the first deployContract call) is generated.
+// Once the contract compiles (`yarn compile:fast`), --derive fills the
+// @generated-stub regions from it: witness stubs, constructor arguments, an
+// it.todo per circuit, the ledger fields. See scripts/lib/derive.mjs.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { derive } from './lib/derive.mjs';
 import { preflight } from './lib/preflight.mjs';
 import {
   NAME_RE,
@@ -47,10 +51,14 @@ function usage() {
   console.log(
     [
       'Usage: yarn new:example <name> [--witnesses] [--no-register]',
+      '       yarn new:example <name> --derive',
       '',
       '  <name>          kebab-case example name (e.g. voting, hello-world)',
       '  --witnesses     generate a witnesses.ts stub and wire withWitnesses()',
       '  --no-register   do not edit ci.yaml / README.md / AGENTS.md',
+      '  --derive        on an existing, compiled example: fill the @generated-stub',
+      '                  regions (witness stubs, constructor args, it.todo per',
+      '                  circuit) from the compiled contract. Safe to re-run.',
     ].join('\n'),
   );
 }
@@ -63,7 +71,7 @@ if (args.includes('-h') || args.includes('--help')) {
 }
 // Reject unknown flags: a typo like `--witness` would otherwise scaffold a
 // witness-free example that only fails later, at new:ui or at compile.
-const KNOWN_FLAGS = new Set(['--witnesses', '--no-register']);
+const KNOWN_FLAGS = new Set(['--witnesses', '--no-register', '--derive']);
 const unknown = args.filter((a) => a.startsWith('-') && !KNOWN_FLAGS.has(a));
 if (unknown.length > 0) {
   usage();
@@ -81,11 +89,48 @@ if (!NAME_RE.test(name)) {
   fail(`invalid name '${name}'. Use kebab-case: lowercase letters/digits, hyphen-separated (e.g. hello-world).`);
 }
 
+const targetDir = path.join(EXAMPLES_DIR, name);
+
+// --- --derive: fill the stubs of an existing example, then stop ---------------
+if (args.includes('--derive')) {
+  if (withWitnesses || noRegister) fail('--derive runs on an existing example; it takes no other options.');
+  if (!fs.existsSync(targetDir)) fail(`examples/${name} does not exist. Scaffold it first: yarn new:example ${name}`);
+  let result;
+  try {
+    result = derive(targetDir, name, deriveNames(name));
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+  const list = (xs) => (xs.length ? xs.join(', ') : 'none');
+  console.log(`\n✔ Derived examples/${name} from contract/managed/${result.managed}`);
+  console.log(`    circuits: ${list(result.circuits)}${result.pureCircuits.length ? `; pure: ${list(result.pureCircuits)}` : ''}`);
+  console.log(`    witnesses: ${list(result.witnesses)}`);
+  console.log(`    constructor: ${list(result.ctorParams)}\n`);
+  for (const r of result.report) {
+    if (r.note) {
+      console.log(`  ${r.rel}: ${r.note}`);
+      continue;
+    }
+    const parts = Object.entries(r.status).map(([id, st]) => `${id} ${st}`);
+    if (r.missing.length) parts.push(`no region for ${r.missing.join(', ')} (markers removed: yours now)`);
+    console.log(`  ${r.rel}: ${parts.join('; ') || 'no regions'}`);
+  }
+  const edited = result.report.flatMap((r) => Object.entries(r.status ?? {}).filter(([, st]) => st === 'edited'));
+  if (edited.length) {
+    console.log('\n  "edited" regions were changed by hand and left alone. To regenerate one, restore its');
+    console.log('  body to the generated text, or delete the body and set its sha= to e3b0c44298fc (empty).');
+  }
+  if (result.unstubbed.length) {
+    console.log(`\n  ⚠ contract/witnesses.ts has no implementation for: ${result.unstubbed.join(', ')}`);
+  }
+  console.log('\n  Next: yarn typecheck && yarn test:sim   (in examples/' + name + ')\n');
+  process.exit(0);
+}
+
 // The next step is `compile`, so check the compiler now rather than after the
 // contract is written. Docker is checked later, by `yarn validate`.
 preflight(REPO_ROOT, { compact: true });
 
-const targetDir = path.join(EXAMPLES_DIR, name);
 if (fs.existsSync(targetDir)) {
   fail(`examples/${name} already exists — choose a different name or remove it first.`);
 }
@@ -106,6 +151,8 @@ const KNOWN_TOKENS = [
   '__WITNESS_METHOD__',
   '__PRIVATE_STATE_IMPORT__',
   '__INITIAL_PRIVATE_STATE__',
+  '__SIM_WITNESS_IMPORT__',
+  '__SIM_WITNESSES__',
 ];
 
 function substitute(content) {
@@ -121,12 +168,19 @@ function substitute(content) {
         '__PRIVATE_STATE_IMPORT__',
         `import { create${Name}PrivateState } from '../../contract/witnesses.js';`,
       )
-      .replaceAll('__INITIAL_PRIVATE_STATE__', `create${Name}PrivateState()`);
+      .replaceAll('__INITIAL_PRIVATE_STATE__', `create${Name}PrivateState()`)
+      .replaceAll(
+        '__SIM_WITNESS_IMPORT__',
+        `import { create${Name}PrivateState, witnesses } from '../../contract/witnesses.js';`,
+      )
+      .replaceAll('__SIM_WITNESSES__', 'witnesses');
   } else {
-    // Drop the whole marker line for the two import markers.
+    // Drop the whole marker line for the import markers.
     out = out
       .replaceAll('__WITNESS_IMPORT__\n', '')
       .replaceAll('__PRIVATE_STATE_IMPORT__\n', '')
+      .replaceAll('__SIM_WITNESS_IMPORT__\n', '')
+      .replaceAll('__SIM_WITNESSES__', '{}')
       .replaceAll('__WITNESS_METHOD__', 'withVacantWitnesses')
       .replaceAll('__INITIAL_PRIVATE_STATE__', '{}');
   }
@@ -211,18 +265,17 @@ if (!noRegister) {
   console.log('    • AGENTS.md Examples table');
 }
 console.log('\n  Next steps (docs/generation-flow.md):');
-console.log(`    1. Write your contract in examples/${name}/contract/${name}.compact`);
-if (withWitnesses) {
-  console.log(`    2. Implement the declared witnesses in examples/${name}/contract/witnesses.ts`);
-  console.log(`    3. Fill in tests in examples/${name}/src/test/${name}.test.ts`);
-} else {
-  console.log(`    2. Fill in tests in examples/${name}/src/test/${name}.test.ts`);
-}
-console.log('    Then:');
-console.log('      yarn install                     # from the repo root');
-console.log(`      cd examples/${name}`);
-console.log('      yarn compile && yarn typecheck   # fix these before the devnet');
-console.log('      yarn validate                    # compile, env:up, wait:dust, test:local, env:down');
+console.log(`    1. Fill in examples/${name}/SPEC.md and get the design reviewed`);
+console.log(`    2. Write your contract in examples/${name}/contract/${name}.compact, then:`);
+console.log('         yarn install                          # from the repo root');
+console.log(`         (cd examples/${name} && yarn compile:fast)   # seconds: no proving keys`);
+console.log(`         yarn new:example ${name} --derive     # stubs from the compiled contract`);
+console.log(`    3. ${withWitnesses ? 'Implement the witness stubs in contract/witnesses.ts; write ' : 'Write '}the tests:`);
+console.log(`         src/test/${name}.sim.test.ts   in memory: logic, every guard, privacy invariants`);
+console.log(`         src/test/${name}.test.ts       devnet: the end-to-end flow`);
+console.log(`       cd examples/${name}`);
+console.log('       yarn compile:fast && yarn typecheck && yarn test:sim   # until green');
+console.log('    4. yarn validate                    # compile, env:up, wait:dust, test:local, env:down');
 console.log(`    Optional, once validate passes: yarn new:ui ${name}   (browser frontend)`);
 console.log('');
 
