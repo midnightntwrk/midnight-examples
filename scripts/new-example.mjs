@@ -27,9 +27,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { preflight } from './lib/preflight.mjs';
 import {
   NAME_RE,
-  assertNodeVersion,
   assertNoLeftoverTokens,
   deriveNames,
   fail,
@@ -42,7 +42,6 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
 const TEMPLATE_DIR = path.join(REPO_ROOT, 'templates', 'example');
 const EXAMPLES_DIR = path.join(REPO_ROOT, 'examples');
-assertNodeVersion(REPO_ROOT);
 
 function usage() {
   console.log(
@@ -62,6 +61,14 @@ if (args.includes('-h') || args.includes('--help')) {
   usage();
   process.exit(0);
 }
+// Reject unknown flags: a typo like `--witness` would otherwise scaffold a
+// witness-free example that only fails later, at new:ui or at compile.
+const KNOWN_FLAGS = new Set(['--witnesses', '--no-register']);
+const unknown = args.filter((a) => a.startsWith('-') && !KNOWN_FLAGS.has(a));
+if (unknown.length > 0) {
+  usage();
+  fail(`unknown option(s): ${unknown.join(' ')}`);
+}
 const withWitnesses = args.includes('--witnesses');
 const noRegister = args.includes('--no-register');
 const positionals = args.filter((a) => !a.startsWith('-'));
@@ -73,6 +80,10 @@ const name = positionals[0];
 if (!NAME_RE.test(name)) {
   fail(`invalid name '${name}'. Use kebab-case: lowercase letters/digits, hyphen-separated (e.g. hello-world).`);
 }
+
+// The next step is `compile`, so check the compiler now rather than after the
+// contract is written. Docker is checked later, by `yarn validate`.
+preflight(REPO_ROOT, { compact: true });
 
 const targetDir = path.join(EXAMPLES_DIR, name);
 if (fs.existsSync(targetDir)) {
@@ -135,7 +146,7 @@ const files = renderTree(TEMPLATE_DIR, {
 });
 const created = writeFiles(targetDir, files).map((p) => path.relative(REPO_ROOT, p));
 
-// --- registration (best-effort, idempotent) ---------------------------------
+// --- registration (idempotent; a failure is fatal after the files are written) --
 function registerCi() {
   const file = path.join(REPO_ROOT, '.github', 'workflows', 'ci.yaml');
   const content = fs.readFileSync(file, 'utf8');
@@ -199,7 +210,7 @@ if (!noRegister) {
   console.log('    • README.md Layout tree');
   console.log('    • AGENTS.md Examples table');
 }
-console.log('\n  Next steps:');
+console.log('\n  Next steps (docs/generation-flow.md):');
 console.log(`    1. Write your contract in examples/${name}/contract/${name}.compact`);
 if (withWitnesses) {
   console.log(`    2. Implement the declared witnesses in examples/${name}/contract/witnesses.ts`);
@@ -207,9 +218,20 @@ if (withWitnesses) {
 } else {
   console.log(`    2. Fill in tests in examples/${name}/src/test/${name}.test.ts`);
 }
-console.log('    Then, from the repo root:');
-console.log('      yarn install');
-console.log(`      yarn workspace @midnight-ntwrk/example-${name} run compile`);
-console.log(`    And from examples/${name}:  yarn env:up && yarn wait:dust && yarn test:local && yarn env:down`);
-console.log(`    Optional, once the tests pass: yarn new:ui ${name}   (browser frontend)`);
+console.log('    Then:');
+console.log('      yarn install                     # from the repo root');
+console.log(`      cd examples/${name}`);
+console.log('      yarn compile && yarn typecheck   # fix these before the devnet');
+console.log('      yarn validate                    # compile, env:up, wait:dust, test:local, env:down');
+console.log(`    Optional, once validate passes: yarn new:ui ${name}   (browser frontend)`);
 console.log('');
+
+const failedRegistration = registration.filter((r) => !r.ok);
+if (failedRegistration.length > 0) {
+  fail(
+    `examples/${name} was written, but registration failed (see ⚠ above). ` +
+      'Fix the listed file(s) by hand, or re-run with --no-register after removing examples/' +
+      name +
+      '.',
+  );
+}

@@ -8,6 +8,7 @@
   },
   "scripts": {
     "compile": "compact compile contract/private-party.compact contract/managed/private-party",
+    "typecheck": "tsc --noEmit -p .",
     "test": "NODE_OPTIONS='--experimental-vm-modules' vitest run",
     "test:local": "MIDNIGHT_NETWORK=local yarn test",
     "test:preview": "MIDNIGHT_NETWORK=preview yarn test",
@@ -19,7 +20,7 @@
     "wait:dust": "vite-node scripts/wait-for-dust.ts",
     "test:sponsorship": "yarn test:local src/test/sponsorship.test.ts",
     "sponsor:serve": "vite-node scripts/sponsor-service.ts",
-    "validate": "yarn env:up && yarn test:local; yarn env:down"
+    "validate": "node ../../scripts/validate-example.mjs"
   },
   "dependencies": {
     "@midnight-ntwrk/example-fast-sync": "workspace:^",

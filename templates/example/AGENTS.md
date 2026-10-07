@@ -16,7 +16,15 @@
 ## Run
 
 ```bash
-yarn compile
+yarn compile && yarn typecheck   # cheap checks first
+yarn validate                    # compile, env:up, wait:dust, test:local, env:down
+```
+
+`yarn validate` exits non-zero if any step fails, and always takes the network
+down. While fixing tests, `yarn validate --keep-net` leaves the network up so
+the next run skips the restart. Step by step:
+
+```bash
 yarn env:up && yarn wait:dust
 yarn test:local
 yarn env:down
@@ -24,7 +32,7 @@ yarn env:down
 
 ## Notes for agents
 
-- A browser UI is phase 2. Once `yarn test:local` is green, run
+- A browser UI is phase 2. Once `yarn validate` passes, run
   `yarn new:ui __name__` from the repo root, then build the use case into its
   seed files. See `templates/ui/AGENTS.md`.
 

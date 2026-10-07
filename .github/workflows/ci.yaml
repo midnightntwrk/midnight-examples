@@ -20,6 +20,8 @@ jobs:
   example:
     name: ${{ matrix.example }}
     runs-on: ubuntu-latest
+    # The slowest suite (shielded-chips) takes about 20 minutes; the rest under 10.
+    timeout-minutes: 45
     permissions:
       contents: read
     strategy:
@@ -58,6 +60,11 @@ jobs:
       - name: Compile contract
         run: yarn compile
 
+      # Seconds, and its errors are clearer than the same mistake surfacing
+      # inside a devnet test run.
+      - name: Typecheck harness and tests
+        run: yarn typecheck
+
       - name: Start local Midnight network
         run: yarn env:up
 
@@ -94,6 +101,7 @@ jobs:
   ui:
     name: generated UIs
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
