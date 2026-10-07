@@ -69,7 +69,7 @@ const TEST_CLASSES = [
     cause: 'wallet, fee or coin handling: DUST balancing, coin selection or a coin the wallet has not synced yet; the sim has none of these',
     actions: [
       'fix the devnet test setup (3c): fund and sync the wallet that pays, wait for a received coin before spending it, use one coin per transaction',
-      'shielded flows: compare with the helpers above "Your tests begin here" in examples/private-tip-jar/src/test/private-tip-jar.test.ts',
+      'shielded flows: use @midnight-ntwrk/example-coins (packages/coins/src/index.ts): waitForShieldedBalance before takeCoin, encryptionKeys(recipient) when minting to another wallet',
     ],
     uiAffected: false,
   },

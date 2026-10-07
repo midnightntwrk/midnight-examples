@@ -153,6 +153,14 @@ Each example has its own `AGENTS.md` with specifics.
   `@midnight-ntwrk/example-fast-sync` and use its `resolveWallet(network, role)`
   and `waitForNightThenDust(...)` rather than writing a per-example seed resolver.
   `vitest.config.ts` loads `.env.<network>` from the REPO ROOT via `loadEnv`.
+- Shielded coins in tests are shared too: `@midnight-ntwrk/example-coins`
+  (`packages/coins`) has the token color, a wallet's coins as circuit
+  arguments, balances, mint arguments and `simCoin` for sim tests. Don't copy
+  the local helpers in `private-tip-jar`'s or `shielded-chips`' tests.
+- A test-only contract (a token the tests mint from) sits beside the main one
+  as `contract/<it>.compact`. The template's compile scripts
+  (`scripts/compile-contracts.mjs`) compile every contract, and `--derive`
+  wires it.
 - Extend `../../tsconfig.base.json` in the example `tsconfig.json`.
 - Provide `compile`, `compile:fast`, `typecheck`, `test`, `test:sim`,
   `test:local`, `env:up`, `env:down`, `wait:dust` and `validate` scripts so the

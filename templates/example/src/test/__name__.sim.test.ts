@@ -23,6 +23,8 @@
 import { describe, expect, it } from 'vitest';
 import { Sim, assertNotInPublicState, expectRejects } from '@midnight-ntwrk/example-sim';
 import { Contract, ledger } from '../../contract/managed/__name__/contract/index.js';
+// @generated-stub begin coin-imports sha=0
+// @generated-stub end coin-imports
 __SIM_WITNESS_IMPORT__
 
 const deploy = () =>

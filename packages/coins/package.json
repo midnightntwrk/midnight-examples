@@ -1,0 +1,26 @@
+{
+  "name": "@midnight-ntwrk/example-coins",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shielded-coin helpers for the examples' tests: token colors, picking a wallet's coins as circuit arguments, balances and waiting for them, and the arguments a mint to another wallet needs.",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p .",
+    "test:sim": "vitest run"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/midnight-js-protocol": "4.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.0"
+  }
+}

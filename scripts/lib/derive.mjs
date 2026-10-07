@@ -32,6 +32,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   compactConstructorParams,
+  contractSources,
+  isShieldedCoinInfo,
   listCompiled,
   placeholderForCompactType,
   readConstructor,
@@ -124,11 +126,29 @@ function describe(t) {
   }
 }
 
+/** A circuit argument that is a coin: ShieldedCoinInfo, or QualifiedShieldedCoinInfo (adds mt_index). */
+const isCoinArg = (a) =>
+  a.type?.['type-name'] === 'Struct' && (isShieldedCoinInfo(a.type) || a.type.name === 'QualifiedShieldedCoinInfo');
+const isCoinKeyArg = (a) => a.type?.['type-name'] === 'Struct' && a.type.name === 'ZswapCoinPublicKey';
+
+/** tip-token → { Name: 'TipToken', camel: 'tipToken' }: the names the tip jar's hand wiring used. */
+const contractNames = (c) => {
+  const Name = c
+    .split('-')
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join('');
+  return { Name, camel: Name[0].toLowerCase() + Name.slice(1) };
+};
+
 const quote = (s) => `'${s.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`;
 const signature = (c) => `${c.name}(${c.arguments.map((a) => `${a.name}: ${describe(a.type)}`).join(', ')})`;
 
 /**
- * Derives the stubs of examples/<name> from its compiled contract. Throws on
+ * Derives the stubs of examples/<name> from its compiled contracts: the
+ * primary one (named after the example) fills the witness, constructor,
+ * circuit and ledger regions; each other contract (a test-only token) gets an
+ * export block in contract/index.ts and a provider set and deploy test in the
+ * devnet test. Shielded-coin circuits pull in @midnight-ntwrk/example-coins. Throws on
  * anything that stops it; returns a report of what it did.
  */
 export function derive(exampleDir, name, names) {
@@ -158,16 +178,18 @@ export function derive(exampleDir, name, names) {
 
   // Constructor parameters: names and types from the Compact source, checked
   // against the arity the compiler declared.
-  const sourcePath = path.join(exampleDir, 'contract', `${managed}.compact`);
-  const dtsParams = ctor.params ? ctor.params.split(',').map((p) => p.trim()) : [];
-  let ctorParams = fs.existsSync(sourcePath) ? compactConstructorParams(fs.readFileSync(sourcePath, 'utf8')) : [];
-  if (ctorParams.length !== dtsParams.length) {
+  const paramsOf = (m, c) => {
+    const sourcePath = path.join(exampleDir, 'contract', `${m}.compact`);
+    const dtsParams = c.params ? c.params.split(',').map((p) => p.trim()) : [];
+    const fromSource = fs.existsSync(sourcePath) ? compactConstructorParams(fs.readFileSync(sourcePath, 'utf8')) : [];
+    if (fromSource.length === dtsParams.length) return fromSource;
     // Fall back to index.d.ts: names without the `_0` suffix, TS types only.
-    ctorParams = dtsParams.map((p) => {
+    return dtsParams.map((p) => {
       const [n, t] = p.split(':').map((s) => s.trim());
       return { name: n.replace(/_\d+$/, ''), type: null, tsType: t };
     });
-  }
+  };
+  const ctorParams = paramsOf(managed, ctor);
   const placeholder = (p) =>
     p.type
       ? placeholderForCompactType(p.type)
@@ -181,14 +203,52 @@ export function derive(exampleDir, name, names) {
       ? `${l.name}: Map<${describe(l.key)}, ${describe(l.value)}>`
       : `${l.name}: ${l.storage && l.storage !== 'Cell' ? `${l.storage}` : describe(l.type)}`;
 
-  const ctorArgs = (indent) =>
-    ctorParams.length === 0
+  const argsFor = (params) => (indent) =>
+    params.length === 0
       ? ''
       : [
           `${indent}args: [`,
-          ...ctorParams.map((p) => `${indent}  ${placeholder(p)}, // TODO ${p.name}: ${p.type ?? p.tsType}`),
+          ...params.map((p) => `${indent}  ${placeholder(p)}, // TODO ${p.name}: ${p.type ?? p.tsType}`),
           `${indent}],`,
         ].join('\n');
+  const ctorArgs = argsFor(ctorParams);
+
+  // The other contracts this example compiles (a test-only token beside the
+  // main one): every contract source except the primary. Each must have been
+  // compiled, or derive would wire a contract that has no output to import.
+  const secondaries = [];
+  for (const { name: other } of contractSources(exampleDir)) {
+    if (other === managed) continue;
+    if (!compiled.includes(other)) {
+      throw new Error(`contract/${other}.compact has not been compiled (no contract/managed/${other}). Run yarn compile:fast first.`);
+    }
+    const otherInfo = readContractInfo(exampleDir, other);
+    const otherCtor = readConstructor(exampleDir, other);
+    if (!otherCtor) throw new Error(`could not find initialState(...) in ${other}/contract/index.d.ts — derive needs updating.`);
+    // The example's witnesses.ts belongs to the primary contract: a second
+    // contract with witnesses of its own is wired by hand.
+    if (otherInfo.witnesses.length > 0) {
+      secondaries.push({ name: other, status: 'has witnesses: wire it by hand' });
+      continue;
+    }
+    secondaries.push({
+      name: other,
+      status: 'wired',
+      ...contractNames(other),
+      info: otherInfo,
+      params: paramsOf(other, otherCtor),
+      pure: otherInfo.circuits.some((c) => c.pure),
+    });
+  }
+  const wired = secondaries.filter((s) => s.status === 'wired');
+
+  // Shielded coins: a circuit that takes a coin, or another contract that
+  // mints to a wallet, gets the coin helpers imported and hinted.
+  const takesCoin = (c) => c.arguments.some(isCoinArg);
+  const coinCircuits = info.circuits.filter((c) => !c.pure && takesCoin(c));
+  const mintsToWallet = (s) => s.info.circuits.some((c) => !c.pure && c.arguments.some(isCoinKeyArg));
+  const devnetCoins =
+    coinCircuits.length > 0 || wired.some((s) => mintsToWallet(s) || s.info.circuits.some((c) => !c.pure && takesCoin(c)));
 
   // The initial private state: the create<X>PrivateState factory, called with
   // a placeholder per parameter, so a factory that takes the owner's secret
@@ -225,10 +285,16 @@ export function derive(exampleDir, name, names) {
       '};',
     ].join('\n');
 
-  const devnetTodos = (indent) => impure.map((c) => `${indent}it.todo(${quote(signature(c))});`).join('\n');
+  // A coin argument gets a hint naming the helper that makes one.
+  const coinHint = (c, how) => {
+    const coins = c.arguments.filter(isCoinArg).map((a) => a.name);
+    return coins.length ? ` — ${coins.map((n) => `${n}: ${how}`).join(', ')}` : '';
+  };
+  const devnetTodos = (indent) =>
+    impure.map((c) => `${indent}it.todo(${quote(signature(c) + coinHint(c, 'takeCoin(wallet, color, value)'))});`).join('\n');
   const simTodos = (indent) =>
     [
-      ...impure.map((c) => `${indent}it.todo(${quote(signature(c))});`),
+      ...impure.map((c) => `${indent}it.todo(${quote(signature(c) + coinHint(c, 'simCoin(value, color)'))});`),
       ...pure.map((c) => `${indent}it.todo(${quote(`${signature(c)} (pure)`)});`),
     ].join('\n');
   const ledgerComment = (indent) =>
@@ -247,8 +313,86 @@ export function derive(exampleDir, name, names) {
       `${indent}});`,
     ].join('\n');
 
+  // --- the other contracts: exports, providers, a deploy test each ---------
+  const secondaryExports = () =>
+    wired
+      .map((s) =>
+        [
+          `// contract/${s.name}.compact, compiled to contract/managed/${s.name}. It declares no witnesses.`,
+          'export {',
+          `  Contract as ${s.Name}Contract,`,
+          `  ledger as ${s.camel}Ledger,`,
+          ...(s.pure ? [`  pureCircuits as ${s.camel}PureCircuits,`] : []),
+          `  type Ledger as ${s.Name}Ledger,`,
+          `} from './managed/${s.name}/contract/index.js';`,
+          `import { Contract as ${s.Name}ContractClass } from './managed/${s.name}/contract/index.js';`,
+          `export const ${s.camel}ZkConfigPath = path.resolve(currentDir, 'managed', ${quote(s.name)});`,
+          '',
+          `export const Compiled${s.Name}Contract = CompiledContract.make(`,
+          `  ${quote(`${s.Name}Contract`)},`,
+          `  ${s.Name}ContractClass,`,
+          ').pipe(',
+          '  CompiledContract.withVacantWitnesses,',
+          `  CompiledContract.withCompiledFileAssets(${s.camel}ZkConfigPath),`,
+          ');',
+        ].join('\n'),
+      )
+      .join('\n\n');
+  const contractImports = (indent) =>
+    wired
+      .flatMap((s) => [`Compiled${s.Name}Contract`, `type ${s.Name}Contract`, `${s.camel}Ledger`, `${s.camel}ZkConfigPath`])
+      .map((x) => `${indent}${x},`)
+      .join('\n');
+  const contractProviders = (indent) =>
+    wired.map((s) => `${indent}let ${s.camel}Providers: ${names.Name}Providers; // for contract/${s.name}.compact`).join('\n');
+  const contractProvidersInit = (indent) =>
+    wired.map((s) => `${indent}${s.camel}Providers = buildProviders(wallet, ${s.camel}ZkConfigPath, config);`).join('\n');
+  const contractDeploys = (indent) =>
+    wired
+      .map((s) => {
+        const circuits = s.info.circuits.filter((c) => !c.pure);
+        const mints = mintsToWallet(s);
+        return [
+          `${indent}// contract/${s.name}.compact. Its circuits, called with submitCallTx and ${s.camel}Providers:`,
+          ...circuits.map((c) => `${indent}//   ${signature(c)}`),
+          ...(mints
+            ? [
+                `${indent}// A circuit that makes coins for a wallet takes recipientOf(wallet) as the`,
+                `${indent}// ZswapCoinPublicKey and, for a wallet other than the caller's, needs`,
+                `${indent}// additionalCoinEncPublicKeyMappings: encryptionKeys(otherWallet). A fresh mintNonce()`,
+                `${indent}// per mint; the coins' color is tokenColor(<its domain separator>, ${s.camel}Address).`,
+              ]
+            : []),
+          `${indent}let ${s.camel}Address: ContractAddress;`,
+          `${indent}it(${quote(`deploys ${s.name}`)}, async () => {`,
+          `${indent}  const deployed: DeployedContract<${s.Name}Contract> = await (deployContract<${s.Name}Contract>)(${s.camel}Providers, {`,
+          `${indent}    compiledContract: Compiled${s.Name}Contract,`,
+          ...(s.params.length ? [argsFor(s.params)(`${indent}    `)] : []),
+          `${indent}  });`,
+          `${indent}  ${s.camel}Address = deployed.deployTxData.public.contractAddress;`,
+          `${indent}  logger.info(\`${s.name} deployed at: \${${s.camel}Address}\`);`,
+          `${indent}  expect(${s.camel}Address).toBeDefined();`,
+          `${indent}});`,
+        ].join('\n');
+      })
+      .join('\n\n');
+  const COIN_HELPERS = [
+    'encryptionKeys',
+    'mintNonce',
+    'recipientOf',
+    'shieldedBalance',
+    'takeCoin',
+    'tokenColor',
+    'waitForShieldedBalance',
+  ];
+  const devnetCoinImports = (indent) =>
+    devnetCoins ? `${indent}import { ${COIN_HELPERS.join(', ')} } from '@midnight-ntwrk/example-coins';` : '';
+  const simCoinImports = (indent) =>
+    coinCircuits.length > 0 ? `${indent}import { simCoin } from '@midnight-ntwrk/example-coins';` : '';
+
   const targets = [
     ['contract/witnesses.ts', { witnesses: witnessStubs }],
+    ['contract/index.ts', { 'secondary-contracts': secondaryExports }],
     [
       `src/test/${name}.test.ts`,
       {
@@ -256,6 +400,11 @@ export function derive(exampleDir, name, names) {
         'constructor-args': ctorArgs,
         'ledger-fields': ledgerComment,
         circuits: devnetTodos,
+        'contract-imports': contractImports,
+        'coin-imports': devnetCoinImports,
+        'contract-providers': contractProviders,
+        'contract-providers-init': contractProvidersInit,
+        'contract-deploys': contractDeploys,
       },
     ],
     [
@@ -265,6 +414,7 @@ export function derive(exampleDir, name, names) {
         'constructor-args': ctorArgs,
         circuits: simTodos,
         privacy: privacyTest,
+        'coin-imports': simCoinImports,
       },
     ],
   ];
@@ -273,13 +423,16 @@ export function derive(exampleDir, name, names) {
   for (const [rel, generators] of targets) {
     const file = path.join(exampleDir, rel);
     if (!fs.existsSync(file)) {
-      if (rel !== 'contract/witnesses.ts') report.push({ rel, note: 'file not found; skipped' });
+      if (rel !== 'contract/witnesses.ts' && rel !== 'contract/index.ts') report.push({ rel, note: 'file not found; skipped' });
       continue;
     }
     const src = fs.readFileSync(file, 'utf8');
     const { out, status, missing } = fillRegions(src, generators);
     if (out !== src) fs.writeFileSync(file, out);
-    report.push({ rel, status, missing });
+    // A region an older example never had is only worth reporting when it
+    // would have held something (an example from before Phase 4 with one
+    // contract and no coins has nothing to miss).
+    report.push({ rel, status, missing: missing.filter((id) => generators[id]('') !== '') });
   }
 
   // An edited witnesses region can't gain stubs for witnesses added later.
@@ -295,6 +448,7 @@ export function derive(exampleDir, name, names) {
     pureCircuits: pure.map((c) => c.name),
     witnesses: info.witnesses.map((w) => w.name),
     ctorParams: ctorParams.map((p) => p.name),
+    secondaries: secondaries.map((s) => ({ name: s.name, status: s.status })),
     report,
     unstubbed,
   };

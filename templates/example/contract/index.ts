@@ -40,3 +40,10 @@ export const Compiled__Name__Contract = CompiledContract.make(
   CompiledContract.__WITNESS_METHOD__,
   CompiledContract.withCompiledFileAssets(zkConfigPath),
 );
+
+// Any other contract in this example (a test-only token the tests mint coins
+// from, say): one export block each, written by `yarn new:example __name__
+// --derive` once it compiles. Add contract/<other>.compact; `yarn compile`
+// compiles every contract under contract/.
+// @generated-stub begin secondary-contracts sha=0
+// @generated-stub end secondary-contracts

@@ -36,6 +36,45 @@ export function listCompiled(exampleDir) {
     : [];
 }
 
+/**
+ * The contracts an example compiles: every contract/*.compact except files
+ * that are only building blocks of another. A file is a building block when
+ * it is one top-level `module X { … }` (zk-loan's schnorr.compact), or when
+ * another .compact pulls it in with `import "x"` or `include "x"`. Each
+ * contract compiles to contract/managed/<name>. Sorted by name.
+ */
+export function contractSources(exampleDir) {
+  const dir = path.join(exampleDir, 'contract');
+  if (!fs.existsSync(dir)) return [];
+  const files = fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.compact'))
+    .sort()
+    .map((f) => ({ name: f.slice(0, -'.compact'.length), file: path.join(dir, f) }));
+  const srcs = new Map(files.map((f) => [f.name, stripComments(fs.readFileSync(f.file, 'utf8'))]));
+  const pulledIn = new Set(
+    [...srcs.values()].flatMap((s) =>
+      [...s.matchAll(/\b(?:import|include)\s+"([^"]+)"/g)].map((m) => path.basename(m[1]).replace(/\.compact$/, '')),
+    ),
+  );
+  return files.filter((f) => !pulledIn.has(f.name) && !isWholeModule(srcs.get(f.name)));
+}
+
+const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+/** True when `src` (comments stripped) is a single `module X { … }` and nothing else. */
+function isWholeModule(src) {
+  const s = src.trim();
+  const open = s.match(/^module\s+[\w$]+\s*\{/);
+  if (!open) return false;
+  let depth = 0;
+  for (let i = open[0].length - 1; i < s.length; i++) {
+    if (s[i] === '{') depth++;
+    else if (s[i] === '}' && --depth === 0) return i === s.length - 1;
+  }
+  return false;
+}
+
 /** contract-info.json of contract/managed/<managed>. */
 export function readContractInfo(exampleDir, managed) {
   // `maxval` can exceed 2^53 (Uint<64>, Uint<128>, ...). Keep its exact source

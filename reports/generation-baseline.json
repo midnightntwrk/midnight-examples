@@ -202,5 +202,29 @@
         "The UI gates re-run on every pipeline call; a stamp over ui/ would skip them when nothing changed."
       ]
     }
-  ]
+  ],
+  "plannedRun": {
+    "$comment": "The next baseline, planned with Phase 4 and not run yet. When it runs, record it in runs[] in the same shape as the Phase 3 run and drop this object.",
+    "flowVersion": "Phase 4 (record the commit the run starts from)",
+    "prompt": "Same as the earlier runs (the private tip jar), so the run compares directly with Phases 1-3. The Phase 3 run suggested a new prompt because the worked example is this one; we kept the same one and watch for copying instead (see watch).",
+    "scope": "As Phase 3: steps 1-5 driven by `yarn pipeline <name> --json`, ending when the background devnet is green. No UI seed code.",
+    "setup": [
+      "nvm use (Node 22); no devnet running (docker ps empty); repo-wide yarn compile:fast && yarn test:sim green",
+      "one general-purpose subagent given only the prompt and docs/generation-flow.md, as before",
+      "scratch name tip-jar-p4, scaffolded with --no-register; discarded after measuring (remove the example, its yarn.lock entry and .gates/)"
+    ],
+    "compareWith": "runs[2] (Phase 3): ~112 KB read, 141k subagent tokens, 40 tool uses, 442 s wall clock, devnet green at 377 s, 2 gate failures (test:sim, new:ui)",
+    "measure": [
+      "KB read above any 'Your tests begin here' marker; it should approach 0 for coin plumbing (the Phase 2 and 3 runs read ~6 KB of private-tip-jar's helpers there)",
+      "whether the devnet test imports @midnight-ntwrk/example-coins or copies tokenCoins/takeCoin/tokenBalance from private-tip-jar",
+      "whether --derive wired the test-only token: no hand edits to contract/index.ts or package.json compile scripts (git diff of those against the derived output)",
+      "gate failures by kind, and gateRuns from logs/pipeline.jsonl",
+      "cost: subagent tokens, tool uses, wall clock, uiReadySeconds, devnetGreenSeconds and the devnet step times"
+    ],
+    "watch": [
+      "Copying instead of importing: private-tip-jar was not ported to example-coins, so the nearest example still shows local helpers. If the agent copies them, port private-tip-jar next (it is the 3c model) and record it in reviewNotes.",
+      "The two-wallet setup (buildWallet(role)) is still copied from private-tip-jar; count its KB separately from the coin plumbing.",
+      "Any derive-generated code the agent had to fix (the deploy test for the token, the coin imports): record each as a gate failure note."
+    ]
+  }
 }

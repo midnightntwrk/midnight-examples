@@ -25,7 +25,9 @@
 // stubs, and test skeletons up to the first deployContract call) is generated.
 // Once the contract compiles (`yarn compile:fast`), --derive fills the
 // @generated-stub regions from it: witness stubs, constructor arguments, an
-// it.todo per circuit, the ledger fields. See scripts/lib/derive.mjs.
+// it.todo per circuit, the ledger fields, and for each other contract under
+// contract/ (a test-only token) its exports, providers and a deploy test. See
+// scripts/lib/derive.mjs.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -114,7 +116,11 @@ if (args.includes('--derive')) {
   console.log(`\n✔ Derived examples/${name} from contract/managed/${result.managed}`);
   console.log(`    circuits: ${list(result.circuits)}${result.pureCircuits.length ? `; pure: ${list(result.pureCircuits)}` : ''}`);
   console.log(`    witnesses: ${list(result.witnesses)}`);
-  console.log(`    constructor: ${list(result.ctorParams)}\n`);
+  console.log(`    constructor: ${list(result.ctorParams)}`);
+  if (result.secondaries.length) {
+    console.log(`    other contracts: ${result.secondaries.map((s) => `${s.name} (${s.status})`).join(', ')}`);
+  }
+  console.log('');
   for (const r of result.report) {
     if (r.note) {
       console.log(`  ${r.rel}: ${r.note}`);
@@ -123,6 +129,10 @@ if (args.includes('--derive')) {
     const parts = Object.entries(r.status).map(([id, st]) => `${id} ${st}`);
     if (r.missing.length) parts.push(`no region for ${r.missing.join(', ')} (markers removed: yours now)`);
     console.log(`  ${r.rel}: ${parts.join('; ') || 'no regions'}`);
+  }
+  if (result.secondaries.some((s) => s.status !== 'wired')) {
+    console.log('\n  A contract with witnesses of its own is not wired: contract/witnesses.ts belongs to');
+    console.log(`  ${name}.compact. Export it from contract/index.ts and deploy it in the test by hand.`);
   }
   const edited = result.report.flatMap((r) => Object.entries(r.status ?? {}).filter(([, st]) => st === 'edited'));
   if (edited.length) {

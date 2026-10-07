@@ -59,6 +59,7 @@ Entries name a symbol rather than a line number, so search the file for it.
 | Contract custody of coins, commitment escrow, `mergeCoin` order | shielded-chips | `roulette.compact` → `betColor`, `claimWinnings`, `escrowCommit` |
 | Anonymous deposits into a contract-held pot; owner-only withdrawal | private-tip-jar | `private-tip-jar.compact` → `tip`, `reNonceToSelf`, `withdraw` |
 | Shielded self-transfer to re-nonce a coin before using it | every example (from the template) | `src/wallet.ts` → `splitShieldedCoin` |
+| A wallet's coins as circuit arguments, a token's color, minting to a wallet, waiting for a coin to arrive | shared package (new examples) | [`packages/coins/src/index.ts`](../packages/coins/src/index.ts) → `takeCoin`, `tokenColor`, `recipientOf`, `encryptionKeys`, `waitForShieldedBalance`, `simCoin` |
 | DUST fee sponsorship (one wallet pays another's fees) | private-party | `src/sponsor.ts`, `src/test/sponsorship.test.ts` |
 
 ## Test patterns
@@ -68,7 +69,7 @@ Entries name a symbol rather than a line number, so search the file for it.
 | Deploy, call, read the ledger back | hello-world, calculator | `src/test/*.test.ts` |
 | Negative tests for every guard (rejected locally, so fast) | private-bid | `private-bid.test.ts` → the `rejects …` tests |
 | Two identities from one fee-paying wallet | zk-loan | `zk-loan.test.ts` (two private-state ids) |
-| Several contracts deployed from one harness | shielded-chips | `src/test/roulette.test.ts` |
+| Several contracts deployed from one harness | shielded-chips, private-tip-jar; new examples get it from `--derive` | `src/test/roulette.test.ts`; `contract/index.ts` |
 | In-memory contract tests (no network, no proofs): `Sim.deploy`, `call`, `expectRejects` | calculator, private-tip-jar | `src/test/*.sim.test.ts`; API in [`packages/sim/src/index.ts`](../packages/sim/src/index.ts) |
 | Asserting a secret never reaches public state | private-tip-jar (in memory), shielded-chips (devnet) | `private-tip-jar.sim.test.ts` → `assertNotInPublicState`; `src/test/privacy.test.ts` |
 | Swapping caller or private state between calls | private-tip-jar | `private-tip-jar.sim.test.ts` → `sim.as(...)`, `sim.privateState = ...` |
