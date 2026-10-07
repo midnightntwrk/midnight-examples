@@ -8,8 +8,10 @@
   },
   "scripts": {
     "compile": "compact compile contract/__name__.compact contract/managed/__name__",
+    "compile:fast": "compact compile --skip-zk contract/__name__.compact contract/managed/__name__",
     "typecheck": "tsc --noEmit -p .",
-    "test": "NODE_OPTIONS='--experimental-vm-modules' vitest run",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' vitest run --exclude 'src/**/*.sim.test.ts'",
+    "test:sim": "vitest run --passWithNoTests .sim.test.ts",
     "test:local": "MIDNIGHT_NETWORK=local yarn test",
     "test:preview": "MIDNIGHT_NETWORK=preview yarn test",
     "test:preprod": "MIDNIGHT_NETWORK=preprod yarn test",
@@ -22,6 +24,7 @@
   },
   "dependencies": {
     "@midnight-ntwrk/example-fast-sync": "workspace:^",
+    "@midnight-ntwrk/example-sim": "workspace:^",
     "@midnight-ntwrk/midnight-js-contracts": "4.1.1",
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "4.1.1",
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "4.1.1",

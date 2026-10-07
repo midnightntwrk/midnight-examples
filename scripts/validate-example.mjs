@@ -76,6 +76,14 @@ function compileIsStale() {
         .filter((p) => fs.existsSync(p))
     : [];
   if (infos.length === 0) return true;
+  // `yarn compile:fast` (--skip-zk) writes the same JS and contract-info.json
+  // but no proving keys, and the devnet tests need them.
+  const missingKeys = infos.some((p) => {
+    const managed = path.dirname(path.dirname(p));
+    const proves = JSON.parse(fs.readFileSync(p, 'utf8')).circuits?.some((c) => c.proof);
+    return proves && !fs.existsSync(path.join(managed, 'keys'));
+  });
+  if (missingKeys) return true;
   const newestSource = Math.max(...walk(contractDir, (n) => n.endsWith('.compact')).map((p) => fs.statSync(p).mtimeMs));
   const oldestOutput = Math.min(...infos.map((p) => fs.statSync(p).mtimeMs));
   return newestSource > oldestOutput;
@@ -88,7 +96,7 @@ function run(script) {
 }
 
 const steps = [...(compileIsStale() ? ['compile'] : []), 'env:up', 'wait:dust', 'test:local'];
-if (!steps.includes('compile')) console.log('• compile skipped: contract/managed is newer than every .compact source');
+if (!steps.includes('compile')) console.log('• compile skipped: contract/managed has proving keys and is newer than every .compact source');
 
 let failed = null;
 let status = 0;
