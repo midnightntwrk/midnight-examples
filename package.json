@@ -16,6 +16,7 @@
     "new:example": "node scripts/new-example.mjs",
     "new:ui": "node scripts/new-ui.mjs",
     "spec:lint": "node scripts/spec-lint.mjs",
+    "pipeline": "node scripts/pipeline.mjs",
     "wallets:new": "yarn workspace @midnight-ntwrk/example-fast-sync run wallets:new",
     "preseed:cut": "yarn workspace @midnight-ntwrk/example-fast-sync run preseed:cut",
     "fund:wallet": "yarn workspace @midnight-ntwrk/example-fast-sync run fund:wallet",
