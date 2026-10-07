@@ -20,12 +20,14 @@ jobs:
   example:
     name: ${{ matrix.example }}
     runs-on: ubuntu-latest
+    # The slowest suite (shielded-chips) takes about 20 minutes; the rest under 10.
+    timeout-minutes: 45
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        example: [hello-world, private-party, battleship, calculator, token-transfers, silent-auction, election, secret-message, zk-loan, shielded-chips, private-bid]
+        example: [hello-world, private-party, battleship, calculator, token-transfers, silent-auction, election, secret-message, zk-loan, shielded-chips, private-bid, private-tip-jar]
     defaults:
       run:
         working-directory: examples/${{ matrix.example }}
@@ -57,6 +59,21 @@ jobs:
 
       - name: Compile contract
         run: yarn compile
+
+      # Seconds, and its errors are clearer than the same mistake surfacing
+      # inside a devnet test run.
+      - name: Typecheck harness and tests
+        run: yarn typecheck
+
+      # In-memory contract tests (src/**/*.sim.test.ts): no Docker, seconds.
+      # Logic errors fail here before the network is started.
+      - name: Run in-memory contract tests
+        run: yarn test:sim
+
+      # SPEC.md against the compiled contract and the sim tests (examples with
+      # a design card only).
+      - name: Lint SPEC.md
+        run: if [ -f SPEC.md ]; then node ../../scripts/spec-lint.mjs ${{ matrix.example }}; fi
 
       - name: Start local Midnight network
         run: yarn env:up
@@ -94,6 +111,7 @@ jobs:
   ui:
     name: generated UIs
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:
@@ -137,3 +155,78 @@ jobs:
             echo "::endgroup::"
           done
           [ "$found" = 1 ] || { echo "no generated UIs found"; exit 1; }
+
+  # The scaffolding itself: packages/sim's own tests (including the negative
+  # control for assertNotInPublicState), and a throwaway example taken through
+  # new:example → compile:fast → --derive twice. The second --derive must
+  # change nothing, and the derived stubs must type-check.
+  scaffold:
+    name: scaffold and sim harness
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  #v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Compact Compiler
+        uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
+        with:
+          compact-version: '0.31.1'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e  #v6.4.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack (Yarn 4)
+        run: corepack enable
+
+      - name: Install dependencies (whole workspace)
+        run: yarn install --immutable
+
+      - name: Typecheck and test packages/sim and packages/coins
+        run: |
+          yarn workspace @midnight-ntwrk/example-sim typecheck
+          yarn workspace @midnight-ntwrk/example-sim test:sim
+          yarn workspace @midnight-ntwrk/example-coins typecheck
+          yarn workspace @midnight-ntwrk/example-coins test:sim
+
+      - name: Scaffold, compile:fast and derive a throwaway example
+        run: |
+          set -euo pipefail
+          yarn new:example ci-derive --witnesses --no-register
+          # A contract with a constructor argument, a witness, a pure circuit, a Map
+          # and a shielded-coin argument, plus a second, witness-less contract that
+          # mints: compile:fast compiles both, and --derive wires the second one.
+          cp examples/private-tip-jar/contract/private-tip-jar.compact examples/ci-derive/contract/ci-derive.compact
+          cp examples/private-tip-jar/contract/tip-token.compact examples/ci-derive/contract/tip-token.compact
+          yarn install --no-immutable
+          yarn workspace @midnight-ntwrk/example-ci-derive compile:fast
+          yarn new:example ci-derive --derive
+          grep -q 'CompiledTipTokenContract = CompiledContract.make' examples/ci-derive/contract/index.ts
+          grep -q "it('deploys tip-token'" examples/ci-derive/src/test/ci-derive.test.ts
+          grep -q "from '@midnight-ntwrk/example-coins'" examples/ci-derive/src/test/ci-derive.sim.test.ts
+          cp -r examples/ci-derive "$RUNNER_TEMP/first"
+          yarn new:example ci-derive --derive
+          diff -r --exclude=node_modules --exclude=managed "$RUNNER_TEMP/first" examples/ci-derive
+          yarn workspace @midnight-ntwrk/example-ci-derive typecheck
+
+      - name: Pipeline runner and SPEC lint
+        run: |
+          set -euo pipefail
+          # The runner stops at step 1 on a scaffold whose SPEC.md is still the template.
+          step=$(yarn pipeline ci-derive --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).next.step))' || true)
+          test "$step" = "1"
+          # new:ui refuses an example that hasn't passed the in-memory gate.
+          if node scripts/new-ui.mjs ci-derive > "$RUNNER_TEMP/new-ui.log" 2>&1; then exit 1; fi
+          grep -q 'in-memory gate' "$RUNNER_TEMP/new-ui.log"
+          # The in-memory gate end to end on a real example: spec lint, compile:fast,
+          # derive, typecheck, test:sim and the SPEC code checks. (Each example's
+          # SPEC.md is also linted in its matrix job.)
+          yarn pipeline private-tip-jar --until sim

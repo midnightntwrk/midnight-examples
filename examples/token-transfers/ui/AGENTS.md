@@ -78,8 +78,11 @@ provider swap and the bundler, not in contract calls.
 ## Recipe in detail
 
 UIs are scaffolded by a script, not by hand. It is **phase 2**, after
-`yarn new:example` (phase 1). Run it only once the example's contract compiles
-and `yarn test:local` is green, because it reads the compiled output. The
+`yarn new:example` (phase 1). Run it once the example's in-memory gate passes
+(`typecheck`, `test:sim`, `yarn spec:lint`): it reads the compiled output, and
+`new:ui` refuses to create a UI without that gate's stamp for the current
+sources (`.gates/sim.json`, written by `yarn pipeline`). The devnet suite runs
+in the background meanwhile and must pass before the UI is called done. The
 commands are in the quick recipe above; `--contract <managed-dir>` picks one
 contract when an example compiles several.
 

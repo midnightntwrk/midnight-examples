@@ -15,7 +15,10 @@
 
 - `contract/calculator.compact` (committed), `contract/index.ts`,
   `contract/witnesses.ts` (implements the `divMod` witness).
-- `src/` harness; `src/test/calculator.test.ts`.
+- `src/` harness. `src/test/calculator.sim.test.ts`: the reference in-memory
+  test (`@midnight-ntwrk/example-sim`): every circuit, a lying `divMod`
+  witness, overflow rejections; `yarn compile:fast && yarn test:sim`, no
+  Docker. `src/test/calculator.test.ts`: the same circuits on the devnet.
 
 ## Notes on `divide`
 

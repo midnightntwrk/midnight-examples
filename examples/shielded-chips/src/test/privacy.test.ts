@@ -292,6 +292,8 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
     if (bobWallet) await bobWallet.stop();
   });
 
+  // Everything above is harness setup. Your tests begin here.
+
   it('sets up: deploy chips, mint to Alice+Bob, deploy roulette, house deposit', async () => {
     // chips
     const deployedChips: DeployedContract<ChipsContract> = await deployContract<ChipsContract>(aliceChipsProv, {

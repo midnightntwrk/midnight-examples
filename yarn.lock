@@ -992,6 +992,7 @@ __metadata:
   resolution: "@midnight-ntwrk/example-calculator@workspace:examples/calculator"
   dependencies:
     "@midnight-ntwrk/example-fast-sync": "workspace:^"
+    "@midnight-ntwrk/example-sim": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -1012,6 +1013,17 @@ __metadata:
     vite-node: "npm:^6.0.0"
     vitest: "npm:^4.1.0"
     ws: "npm:^8.14.2"
+  languageName: unknown
+  linkType: soft
+
+"@midnight-ntwrk/example-coins@workspace:packages/coins":
+  version: 0.0.0-use.local
+  resolution: "@midnight-ntwrk/example-coins@workspace:packages/coins"
+  dependencies:
+    "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
+    "@types/node": "npm:^22.0.0"
+    typescript: "npm:^5.7.0"
+    vitest: "npm:^4.1.0"
   languageName: unknown
   linkType: soft
 
@@ -1237,6 +1249,35 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@midnight-ntwrk/example-private-tip-jar@workspace:examples/private-tip-jar":
+  version: 0.0.0-use.local
+  resolution: "@midnight-ntwrk/example-private-tip-jar@workspace:examples/private-tip-jar"
+  dependencies:
+    "@midnight-ntwrk/example-fast-sync": "workspace:^"
+    "@midnight-ntwrk/example-sim": "workspace:^"
+    "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
+    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
+    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
+    "@midnight-ntwrk/midnight-js-level-private-state-provider": "npm:4.1.1"
+    "@midnight-ntwrk/midnight-js-network-id": "npm:4.1.1"
+    "@midnight-ntwrk/midnight-js-node-zk-config-provider": "npm:4.1.1"
+    "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
+    "@midnight-ntwrk/midnight-js-types": "npm:4.1.1"
+    "@midnight-ntwrk/midnight-js-utils": "npm:4.1.1"
+    "@midnight-ntwrk/testkit-js": "npm:4.1.1"
+    "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
+    "@types/node": "npm:^22.0.0"
+    "@types/ws": "npm:^8.5.9"
+    pino: "npm:^9.0.0"
+    pino-pretty: "npm:^13.0.0"
+    rxjs: "npm:^7.8.2"
+    typescript: "npm:^5.7.0"
+    vite-node: "npm:^6.0.0"
+    vitest: "npm:^4.1.0"
+    ws: "npm:^8.14.2"
+  languageName: unknown
+  linkType: soft
+
 "@midnight-ntwrk/example-secret-message@workspace:examples/secret-message":
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-secret-message@workspace:examples/secret-message"
@@ -1321,6 +1362,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@midnight-ntwrk/example-sim@workspace:^, @midnight-ntwrk/example-sim@workspace:packages/sim":
+  version: 0.0.0-use.local
+  resolution: "@midnight-ntwrk/example-sim@workspace:packages/sim"
+  dependencies:
+    "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
+    "@types/node": "npm:^22.0.0"
+    typescript: "npm:^5.7.0"
+    vitest: "npm:^4.1.0"
+  languageName: unknown
+  linkType: soft
+
 "@midnight-ntwrk/example-token-transfers-ui@workspace:examples/token-transfers/ui":
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-token-transfers-ui@workspace:examples/token-transfers/ui"
@@ -1390,27 +1442,6 @@ __metadata:
     vite-node: "npm:^6.0.0"
     vitest: "npm:^4.1.0"
     ws: "npm:^8.14.2"
-  languageName: unknown
-  linkType: soft
-
-"@midnight-ntwrk/example-wallet@workspace:packages/wallet":
-  version: 0.0.0-use.local
-  resolution: "@midnight-ntwrk/example-wallet@workspace:packages/wallet"
-  dependencies:
-    "@midnight-ntwrk/midnight-js-network-id": "npm:4.1.1"
-    "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
-    "@midnight-ntwrk/testkit-js": "npm:4.1.1"
-    "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
-    "@midnight-ntwrk/wallet-sdk-abstractions": "npm:^2.1.0"
-    "@polkadot/api": "npm:16.5.6"
-    "@polkadot/types": "npm:16.5.6"
-    "@polkadot/util": "npm:14.0.3"
-    "@types/node": "npm:^22.0.0"
-    pino: "npm:^9.0.0"
-    pino-pretty: "npm:^13.0.0"
-    rxjs: "npm:^7.8.2"
-    typescript: "npm:^5.7.0"
-    vite-node: "npm:^6.0.0"
   languageName: unknown
   linkType: soft
 

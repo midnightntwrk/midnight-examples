@@ -26,6 +26,8 @@ dist/
 **/.env.preprod
 **/.env.preview
 **/.fast-sync-wallets/
+# Gate stamps, the background devnet lock and its reports (scripts/lib/gates.mjs)
+**/.gates/
 # scratch dir used while re-cutting a pre-seed bundle; only present mid-cut
 preseed/.staging-*/
 

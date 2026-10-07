@@ -15,11 +15,16 @@
   "scripts": {
     "new:example": "node scripts/new-example.mjs",
     "new:ui": "node scripts/new-ui.mjs",
+    "spec:lint": "node scripts/spec-lint.mjs",
+    "pipeline": "node scripts/pipeline.mjs",
     "wallets:new": "yarn workspace @midnight-ntwrk/example-fast-sync run wallets:new",
     "preseed:cut": "yarn workspace @midnight-ntwrk/example-fast-sync run preseed:cut",
     "fund:wallet": "yarn workspace @midnight-ntwrk/example-fast-sync run fund:wallet",
     "compile": "yarn workspaces foreach --all --parallel run compile",
+    "compile:fast": "yarn workspaces foreach --all --parallel run compile:fast",
+    "typecheck": "yarn workspaces foreach --all --parallel run typecheck",
     "test": "yarn workspaces foreach --all --verbose run test",
+    "test:sim": "yarn workspaces foreach --all --verbose run test:sim",
     "test:local": "yarn workspaces foreach --all --verbose run test:local",
     "test:preprod": "yarn workspaces foreach --all --verbose run test:preprod",
     "test:preview": "yarn workspaces foreach --all --verbose run test:preview"

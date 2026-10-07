@@ -158,6 +158,9 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
             await charlieWallet.stop();
         }
     });
+
+    // Everything above is harness setup. Your tests begin here.
+
     it('Deploys a contract (the easy way)', async () => {
         const PARTY_SIZE = BigInt(10);
         const FEE = BigInt(5);

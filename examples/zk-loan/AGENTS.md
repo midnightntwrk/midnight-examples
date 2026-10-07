@@ -31,11 +31,12 @@ ported.
 
 - `contract/zk-loan.compact` + `contract/schnorr.compact` (committed),
   `contract/index.ts`, `contract/witnesses.ts`.
-- `src/` harness. Two suites, both picked up by `yarn test`:
-  - `src/test/zk-loan.simulator.test.ts` — 62 contract unit tests against the
+- `src/` harness. Two suites:
+  - `src/test/zk-loan.sim.test.ts` — 62 contract unit tests against the
     in-memory simulator (`src/test/zk-loan.simulator.ts`); no network needed:
-    `npx vitest run src/test/zk-loan.simulator.test.ts`.
-  - `src/test/zk-loan.test.ts` — on-chain deploy/call flow via midnight-js.
+    `yarn compile:fast && yarn test:sim`.
+  - `src/test/zk-loan.test.ts` — on-chain deploy/call flow via midnight-js,
+    run by `yarn test` / `yarn validate`.
   - `src/test/attestation-api/*.test.ts` — HTTP and signing tests for the
     attestation API (port 0, no network).
 - `attestation-api/` — the attestation provider as a restify service

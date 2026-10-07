@@ -8,7 +8,10 @@
   },
   "scripts": {
     "compile": "compact compile contract/secret-message.compact contract/managed/secret-message",
-    "test": "NODE_OPTIONS='--experimental-vm-modules' vitest run",
+    "compile:fast": "compact compile --skip-zk contract/secret-message.compact contract/managed/secret-message",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' vitest run --exclude 'src/**/*.sim.test.ts'",
+    "test:sim": "vitest run --passWithNoTests .sim.test.ts",
     "test:local": "MIDNIGHT_NETWORK=local yarn test",
     "test:preview": "MIDNIGHT_NETWORK=preview yarn test",
     "test:preprod": "MIDNIGHT_NETWORK=preprod yarn test",
@@ -17,7 +20,7 @@
     "proof:up": "docker compose up -d --wait proof-server",
     "proof:down": "docker compose stop proof-server",
     "wait:dust": "vite-node scripts/wait-for-dust.ts",
-    "validate": "yarn env:up && yarn wait:dust && yarn test:local; yarn env:down"
+    "validate": "node ../../scripts/validate-example.mjs"
   },
   "dependencies": {
     "@midnight-ntwrk/example-fast-sync": "workspace:^",

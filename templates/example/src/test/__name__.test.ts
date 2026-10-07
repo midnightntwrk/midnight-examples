@@ -35,7 +35,13 @@ import {
   Contract,
   ledger,
   zkConfigPath,
+  // @generated-stub begin contract-imports sha=0
+  // @generated-stub end contract-imports
 } from '../../contract/index.js';
+// Shielded-coin helpers, imported here when a circuit takes a coin or a
+// second contract mints them. See packages/coins/src/index.ts.
+// @generated-stub begin coin-imports sha=0
+// @generated-stub end coin-imports
 
 // Required for GraphQL subscriptions in Node.js
 // @ts-expect-error WebSocket global assignment for apollo
@@ -54,6 +60,8 @@ describe(`__Title__ Contract (${network})`, () => {
   let wallet: MidnightWalletProvider;
   let providers: __Name__Providers;
   let contractAddress: ContractAddress;
+  // @generated-stub begin contract-providers sha=0
+  // @generated-stub end contract-providers
 
   const config = getConfig();
   const isRemote = network !== 'local';
@@ -61,8 +69,9 @@ describe(`__Title__ Contract (${network})`, () => {
     process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ?? (isRemote ? 60 * 60_000 : 10 * 60_000),
   );
 
-  // Reads the contract's public ledger state. Adapt the returned fields to your
-  // own `ledger` declaration.
+  // Reads the contract's public ledger state.
+  // @generated-stub begin ledger-fields sha=0
+  // @generated-stub end ledger-fields
   async function queryLedger() {
     const state = await providers.publicDataProvider.queryContractState(contractAddress);
     expect(state).not.toBeNull();
@@ -107,6 +116,8 @@ describe(`__Title__ Contract (${network})`, () => {
     }
 
     providers = buildProviders(wallet, zkConfigPath, config);
+    // @generated-stub begin contract-providers-init sha=0
+    // @generated-stub end contract-providers-init
     logger.info(`Providers initialized on '${network}'. Ready to test!`);
   });
 
@@ -121,11 +132,20 @@ describe(`__Title__ Contract (${network})`, () => {
   // Everything above is generated boilerplate. Your tests begin here.
   // ---------------------------------------------------------------------------
 
+  // Other contracts first: a test-only token usually feeds this contract's
+  // constructor (its token color, say).
+  // @generated-stub begin contract-deploys sha=0
+  // @generated-stub end contract-deploys
+
   it('deploys the contract', async () => {
     const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {
       compiledContract: Compiled__Name__Contract,
       privateStateId: PRIVATE_STATE_ID,
+      // @generated-stub begin private-state sha=0
       initialPrivateState: __INITIAL_PRIVATE_STATE__,
+      // @generated-stub end private-state
+      // @generated-stub begin constructor-args sha=0
+      // @generated-stub end constructor-args
     });
 
     contractAddress = deployed.deployTxData.public.contractAddress;
@@ -133,6 +153,10 @@ describe(`__Title__ Contract (${network})`, () => {
     expect(contractAddress).toBeDefined();
     expect(contractAddress.length).toBeGreaterThan(0);
   });
+
+  // One it.todo per circuit, written by `yarn new:example __name__ --derive`.
+  // @generated-stub begin circuits sha=0
+  // @generated-stub end circuits
 
   // TODO: add circuit-interaction tests. `submitCallTx` and `queryLedger` are
   // imported/defined for you. Example shape:

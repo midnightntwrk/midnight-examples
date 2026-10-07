@@ -64,6 +64,20 @@ import {
   substituteNames,
   writeFiles,
 } from './lib/template.mjs';
+import { gatePath, readJson, sourceHash } from './lib/gates.mjs';
+import {
+  ONE_TIME_ADVICE,
+  SECRET_ADVICE,
+  argTypeLiteral,
+  enumValuesOf,
+  isOneTimeArg,
+  isSecretArg,
+  listCompiled,
+  readConstructor,
+  readContractInfo,
+  scanWitnessesTs,
+  typeLabel,
+} from './lib/contract-info.mjs';
 import { readAll, renderBlock, skeleton, VERIFICATION_FILE, withBlock } from './lib/verification.mjs';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -132,6 +146,8 @@ function usage() {
       '                   default: persistent when the create<X>PrivateState factory',
       '                   in contract/witnesses.ts takes arguments (per-user secrets),',
       '                   with or without witnesses; else memory',
+      '  --skip-gate   create even though the in-memory gate has no stamp for the',
+      '                current sources (.gates/sim.json, written by yarn pipeline)',
       '  --dry-run     print the create summary (forms, TODOs, storage, warnings) and',
       '                write nothing; works even when ui/ already exists',
       '  --check       compare template-owned files in examples/<name>/ui with the',
@@ -211,12 +227,14 @@ const positionals = [];
 const flags = new Set();
 let contractFlag = null;
 let privateStateFlag = null;
+let skipGate = false;
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   if (a === '--contract') contractFlag = argv[++i] ?? fail('--contract needs a value');
   else if (a.startsWith('--contract=')) contractFlag = a.slice('--contract='.length);
   else if (a === '--private-state') privateStateFlag = argv[++i] ?? fail('--private-state needs a value');
   else if (a.startsWith('--private-state=')) privateStateFlag = a.slice('--private-state='.length);
+  else if (a === '--skip-gate') skipGate = true;
   else if (['--check', '--sync', '--check-all', '--sync-all', '--dry-run'].includes(a)) flags.add(a);
   else if (a.startsWith('-')) fail(`unknown flag ${a}`);
   else positionals.push(a);
@@ -250,6 +268,22 @@ if (!fs.existsSync(path.join(exampleDir, 'package.json'))) {
 }
 if (mode === 'create' && !dryRun && fs.existsSync(uiDir)) {
   fail(`examples/${name}/ui already exists. Use --check or --sync to compare/update template-owned files.`);
+}
+// The UI starts once the in-memory gate (typecheck, test:sim, the SPEC code
+// checks) has passed on the current sources; the devnet runs in the background
+// meanwhile (docs/generation-flow.md). Check, sync and dry runs don't need it.
+if (mode === 'create' && !dryRun) {
+  const stamp = readJson(gatePath(exampleDir, 'sim.json'));
+  const fresh = stamp?.sourceHash === sourceHash(exampleDir);
+  if (!fresh && !skipGate) {
+    fail(
+      `examples/${name} has not passed the in-memory gate on its current sources ` +
+        `(${stamp ? 'the contract, witnesses or tests changed since it passed' : 'no .gates/sim.json'}). ` +
+        `Run \`yarn pipeline ${name}\` (it creates the UI once the gate passes), or pass --skip-gate ` +
+        '(an older example without a SPEC.md, after its own typecheck and test:sim).',
+    );
+  }
+  if (!fresh) console.warn('⚠ --skip-gate: creating the UI without a passing in-memory gate on these sources.');
 }
 if (mode !== 'create' && !fs.existsSync(uiDir)) {
   fail(`examples/${name}/ui does not exist — nothing to ${mode}.`);
@@ -288,13 +322,7 @@ if (
   fail(`ui/${CONFIG} "networks" must be a list of distinct ids from: ${OPT_IN_NETWORKS.join(', ')}`);
 }
 
-const managedRoot = path.join(exampleDir, 'contract', 'managed');
-const compiled = fs.existsSync(managedRoot)
-  ? fs
-      .readdirSync(managedRoot)
-      .filter((d) => fs.existsSync(path.join(managedRoot, d, 'compiler', 'contract-info.json')))
-      .sort()
-  : [];
+const compiled = listCompiled(exampleDir);
 if (compiled.length === 0) {
   fail(
     `no compiled contract under examples/${name}/contract/managed/. Compile it first (and get ` +
@@ -314,85 +342,8 @@ if (managed === null) {
   fail(`--contract ${managed}: not found (compiled: ${compiled.join(', ')})`);
 }
 
-// --- read the compiled contract ---------------------------------------------
-// `maxval` can exceed 2^53 (Uint<64>, Uint<128>, ...). Keep its exact source
-// text instead of letting JSON.parse round it to a float.
-const info = JSON.parse(
-  fs.readFileSync(path.join(managedRoot, managed, 'compiler', 'contract-info.json'), 'utf8'),
-  (key, value, ctx) => (key === 'maxval' ? ctx.source : value),
-);
-
-/**
- * contract-info.json argument type → an ArgType literal for
- * src/lib/circuit-args.ts, or null when it has no generic form. The TypeScript
- * counterparts (bigint, boolean, string, Uint8Array, numeric enum) are the ones
- * the compiler emits in contract/index.d.ts; see the table in circuit-args.ts.
- */
-function argTypeLiteral(t) {
-  switch (t['type-name']) {
-    case 'Uint':
-      return `{ kind: "uint", max: ${t.maxval}n }`;
-    case 'Field':
-      return '{ kind: "field" }';
-    case 'Boolean':
-      return '{ kind: "boolean" }';
-    case 'Opaque':
-      return t.tsType === 'string' ? '{ kind: "string" }' : null;
-    case 'Bytes':
-      return `{ kind: "bytes", length: ${t.length} }`;
-    case 'Enum':
-      return `{ kind: "enum", values: [${t.elements.map((e) => JSON.stringify(e)).join(', ')}] }`;
-    case 'Alias':
-      return argTypeLiteral(t.type);
-    case 'Struct':
-      // Three stdlib structs have a generic input. UserAddress and
-      // ZswapCoinPublicKey are { bytes: Uint8Array } in TypeScript, and the
-      // form can fill them from the wallet (lib/addresses.ts). A
-      // ShieldedCoinInfo is picked from coins earlier results returned
-      // (lib/coin-book.ts). Other structs: no form.
-      if (isBytesStruct(t, 'UserAddress')) return '{ kind: "userAddress" }';
-      if (isBytesStruct(t, 'ZswapCoinPublicKey')) return '{ kind: "coinPublicKey" }';
-      if (isShieldedCoinInfo(t)) return '{ kind: "shieldedCoin" }';
-      return null;
-    default:
-      return null;
-  }
-}
-
-/** A stdlib struct `name { bytes: Bytes<32> }`, matched by shape as well as name. */
-function isBytesStruct(t, name) {
-  const [e, ...rest] = t.elements ?? [];
-  return t.name === name && rest.length === 0 && e?.name === 'bytes' && isBytes32(e.type);
-}
-const isBytes32 = (t) => t?.['type-name'] === 'Bytes' && t.length === 32;
-/** The stdlib ShieldedCoinInfo { nonce: Bytes<32>, color: Bytes<32>, value: Uint<128> }. */
-function isShieldedCoinInfo(t) {
-  const el = Object.fromEntries((t.elements ?? []).map((e) => [e.name, e.type]));
-  return (
-    t.name === 'ShieldedCoinInfo' &&
-    t.elements.length === 3 &&
-    isBytes32(el.nonce) &&
-    isBytes32(el.color) &&
-    el.value?.['type-name'] === 'Uint'
-  );
-}
-
-/**
- * A Bytes argument named like a secret (private-party's `_secret`, an `sk`) or
- * a one-time value (a mint `nonce`, a `salt`). A generic form would ask the
- * user to paste or invent it. The UI should generate it instead: a secret once,
- * kept in private state as the Node test does; a one-time value fresh for
- * every call (reusing a mint nonce mints the same coin again). Such circuits
- * get a TODO, not a form.
- */
-const SECRET_NAME_RE = /secret|^_?sk$|priv|seed/i;
-const ONE_TIME_NAME_RE = /nonce|salt/i;
-const isBytes = (a) => a.type['type-name'] === 'Bytes';
-const isSecretArg = (a) => SECRET_NAME_RE.test(a.name) && isBytes(a);
-const isOneTimeArg = (a) => !isSecretArg(a) && ONE_TIME_NAME_RE.test(a.name) && isBytes(a);
-const SECRET_ADVICE = 'generate it once in code and keep it in private state';
-const ONE_TIME_ADVICE = 'generate fresh random bytes in code for every call';
-const typeLabel = (t) => [t['type-name'], t.name, t.tsType].filter(Boolean).join(' ');
+// --- read the compiled contract (scripts/lib/contract-info.mjs) -------------
+const info = readContractInfo(exampleDir, managed);
 
 const circuits = info.circuits
   .filter((c) => c.proof)
@@ -416,8 +367,6 @@ const circuits = info.circuits
     };
   });
 const formCircuits = circuits.filter((c) => c.specs);
-/** Enum member names of a ledger cell or Set/List element type, through aliases. */
-const enumValuesOf = (t) => (!t ? null : t['type-name'] === 'Alias' ? enumValuesOf(t.type) : t['type-name'] === 'Enum' ? t.elements : null);
 const ledgerFields = info.ledger
   .filter((l) => l.exported)
   .map((l) => ({ name: l.name, storage: l.storage ?? 'Cell', enumValues: enumValuesOf(l.type) }));
@@ -447,21 +396,14 @@ const tokenOps = [
   ),
 ];
 
-// contract-info.json does not describe the constructor. The generated
-// declaration does: a constructor without parameters is exactly this line.
-const dts = fs.readFileSync(path.join(managedRoot, managed, 'contract', 'index.d.ts'), 'utf8');
-if (!dts.includes('initialState(context: __compactRuntime.ConstructorContext<PS>')) {
+// contract-info.json does not describe the constructor; index.d.ts does.
+const ctor = readConstructor(exampleDir, managed);
+if (!ctor) {
   fail(`could not find initialState(...) in ${managed}/contract/index.d.ts — generator needs updating.`);
 }
-const hasCtorArgs = !dts.includes(
-  'initialState(context: __compactRuntime.ConstructorContext<PS>): __compactRuntime.ConstructorResult<PS>;',
-);
+const hasCtorArgs = ctor.hasArgs;
 // Only for TODO comments: e.g. "_x1_0: bigint, _x2_0: bigint".
-const ctorParams = hasCtorArgs
-  ? (dts.match(/initialState\(context: __compactRuntime\.ConstructorContext<PS>,\s*([^)]*)\)/)?.[1] ?? '...')
-      .replace(/\s+/g, ' ')
-      .trim()
-  : '';
+const ctorParams = ctor.params;
 
 // The browser imports contract/witnesses.ts as is: it must be Node-free and
 // export a create<X>PrivateState factory (the phase-1 template convention).
@@ -472,31 +414,27 @@ let factory = null;
 let factoryTakesArgs = false;
 let factoryParams = '';
 let witnessesExport = null;
-const witnessesPath = path.join(exampleDir, 'contract', 'witnesses.ts');
-if (hasWitnesses && !fs.existsSync(witnessesPath)) {
+const witnessesTs = scanWitnessesTs(exampleDir, managed);
+if (hasWitnesses && !witnessesTs) {
   fail(`the contract declares witnesses but examples/${name}/contract/witnesses.ts is missing.`);
 }
-const witnessesSrc = fs.existsSync(witnessesPath) ? fs.readFileSync(witnessesPath, 'utf8') : null;
-const factoryMatch = witnessesSrc?.match(/export const (create\w*PrivateState)\s*=\s*\(([^)]*)\)/);
-if (hasWitnesses && !factoryMatch) {
+if (hasWitnesses && !witnessesTs.factory) {
   fail(`examples/${name}/contract/witnesses.ts has no \`export const create<X>PrivateState = (...) =>\` factory.`);
 }
-if (factoryMatch) {
-  if (/from\s+['"]node:/.test(witnessesSrc)) {
+if (witnessesTs?.factory) {
+  if (witnessesTs.importsNode) {
     fail(`examples/${name}/contract/witnesses.ts imports node:* modules; the browser can't load it. Move those out first.`);
   }
-  factory = factoryMatch[1];
-  factoryParams = factoryMatch[2].replace(/\s+/g, ' ').replace(/,\s*$/, '').trim();
+  factory = witnessesTs.factory;
+  factoryParams = witnessesTs.factoryParams;
   factoryTakesArgs = factoryParams !== '';
 }
 if (hasWitnesses) {
   // `witnesses`, or `<contract>Witnesses` when one file serves several
   // contracts (shielded-chips: rouletteWitnesses, chipsWitnesses).
-  const perContract = `${managed.replace(/[-_](\w)/g, (_, c) => c.toUpperCase())}Witnesses`;
-  const exported = new Set([...witnessesSrc.matchAll(/export const (\w+)\b/g)].map((m) => m[1]));
-  witnessesExport = [`witnesses`, perContract].find((n) => exported.has(n));
+  witnessesExport = witnessesTs.witnessesExport;
   if (!witnessesExport) {
-    fail(`examples/${name}/contract/witnesses.ts exports neither \`witnesses\` nor \`${perContract}\`.`);
+    fail(`examples/${name}/contract/witnesses.ts exports neither \`witnesses\` nor \`${witnessesTs.perContract}\`.`);
   }
 }
 // Import specifier that binds the contract's witnesses to `witnesses`.

@@ -18,18 +18,25 @@
 // Zero dependencies — Node built-ins only. Run with no AI assistance:
 //
 //   yarn new:example <name> [--witnesses] [--no-register]
-//   node scripts/new-example.mjs <name> [--witnesses] [--no-register]
+//   yarn new:example <name> --derive
 //
-// After scaffolding, the author only has to write contract/<name>.compact and
-// fill in the test bodies. Everything else (harness, config, docker, docs stubs,
-// and a test skeleton up to the first deployContract call) is generated.
+// After scaffolding, the author writes SPEC.md, then contract/<name>.compact,
+// and fills in the test bodies. Everything else (harness, config, docker, docs
+// stubs, and test skeletons up to the first deployContract call) is generated.
+// Once the contract compiles (`yarn compile:fast`), --derive fills the
+// @generated-stub regions from it: witness stubs, constructor arguments, an
+// it.todo per circuit, the ledger fields, and for each other contract under
+// contract/ (a test-only token) its exports, providers and a deploy test. See
+// scripts/lib/derive.mjs.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { derive, sealRegions } from './lib/derive.mjs';
+import { preflight } from './lib/preflight.mjs';
+import { lintDesign } from './lib/spec-lint.mjs';
 import {
   NAME_RE,
-  assertNodeVersion,
   assertNoLeftoverTokens,
   deriveNames,
   fail,
@@ -42,25 +49,44 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
 const TEMPLATE_DIR = path.join(REPO_ROOT, 'templates', 'example');
 const EXAMPLES_DIR = path.join(REPO_ROOT, 'examples');
-assertNodeVersion(REPO_ROOT);
 
 function usage() {
   console.log(
     [
-      'Usage: yarn new:example <name> [--witnesses] [--no-register]',
+      'Usage: yarn new:example <name> [--witnesses] [--no-register] [--spec <file>]',
+      '       yarn new:example <name> --derive',
       '',
       '  <name>          kebab-case example name (e.g. voting, hello-world)',
       '  --witnesses     generate a witnesses.ts stub and wire withWitnesses()',
       '  --no-register   do not edit ci.yaml / README.md / AGENTS.md',
+      '  --spec <file>   the reviewed design card (step 1): lint it (yarn spec:lint',
+      '                  --file), check --witnesses against its Witnesses section,',
+      '                  and use it as the new example\'s SPEC.md',
+      '  --derive        on an existing, compiled example: fill the @generated-stub',
+      '                  regions (witness stubs, constructor args, it.todo per',
+      '                  circuit) from the compiled contract. Safe to re-run.',
     ].join('\n'),
   );
 }
 
 // --- arg parsing ------------------------------------------------------------
-const args = process.argv.slice(2);
+const rawArgs = process.argv.slice(2);
+// --spec takes a value; pull it out before the flag/positional split below.
+const specIdx = rawArgs.indexOf('--spec');
+const specFile = specIdx === -1 ? null : rawArgs[specIdx + 1];
+if (specIdx !== -1 && (!specFile || specFile.startsWith('-'))) fail('--spec needs a file: --spec <path/to/SPEC.md>');
+const args = specIdx === -1 ? rawArgs : rawArgs.filter((_, i) => i !== specIdx && i !== specIdx + 1);
 if (args.includes('-h') || args.includes('--help')) {
   usage();
   process.exit(0);
+}
+// Reject unknown flags: a typo like `--witness` would otherwise scaffold a
+// witness-free example that only fails later, at new:ui or at compile.
+const KNOWN_FLAGS = new Set(['--witnesses', '--no-register', '--derive']);
+const unknown = args.filter((a) => a.startsWith('-') && !KNOWN_FLAGS.has(a));
+if (unknown.length > 0) {
+  usage();
+  fail(`unknown option(s): ${unknown.join(' ')}`);
 }
 const withWitnesses = args.includes('--witnesses');
 const noRegister = args.includes('--no-register');
@@ -75,11 +101,69 @@ if (!NAME_RE.test(name)) {
 }
 
 const targetDir = path.join(EXAMPLES_DIR, name);
+
+// --- --derive: fill the stubs of an existing example, then stop ---------------
+if (args.includes('--derive')) {
+  if (withWitnesses || noRegister || specFile) fail('--derive runs on an existing example; it takes no other options.');
+  if (!fs.existsSync(targetDir)) fail(`examples/${name} does not exist. Scaffold it first: yarn new:example ${name}`);
+  let result;
+  try {
+    result = derive(targetDir, name, deriveNames(name));
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+  const list = (xs) => (xs.length ? xs.join(', ') : 'none');
+  console.log(`\n✔ Derived examples/${name} from contract/managed/${result.managed}`);
+  console.log(`    circuits: ${list(result.circuits)}${result.pureCircuits.length ? `; pure: ${list(result.pureCircuits)}` : ''}`);
+  console.log(`    witnesses: ${list(result.witnesses)}`);
+  console.log(`    constructor: ${list(result.ctorParams)}`);
+  if (result.secondaries.length) {
+    console.log(`    other contracts: ${result.secondaries.map((s) => `${s.name} (${s.status})`).join(', ')}`);
+  }
+  console.log('');
+  for (const r of result.report) {
+    if (r.note) {
+      console.log(`  ${r.rel}: ${r.note}`);
+      continue;
+    }
+    const parts = Object.entries(r.status).map(([id, st]) => `${id} ${st}`);
+    if (r.missing.length) parts.push(`no region for ${r.missing.join(', ')} (markers removed: yours now)`);
+    console.log(`  ${r.rel}: ${parts.join('; ') || 'no regions'}`);
+  }
+  if (result.secondaries.some((s) => s.status !== 'wired')) {
+    console.log('\n  A contract with witnesses of its own is not wired: contract/witnesses.ts belongs to');
+    console.log(`  ${name}.compact. Export it from contract/index.ts and deploy it in the test by hand.`);
+  }
+  const edited = result.report.flatMap((r) => Object.entries(r.status ?? {}).filter(([, st]) => st === 'edited'));
+  if (edited.length) {
+    console.log('\n  "edited" regions were changed by hand and left alone. To regenerate one, restore its');
+    console.log('  body to the generated text, or delete the body and set its sha= to e3b0c44298fc (empty).');
+  }
+  if (result.unstubbed.length) {
+    console.log(`\n  ⚠ contract/witnesses.ts has no implementation for: ${result.unstubbed.join(', ')}`);
+  }
+  console.log('\n  Next: yarn typecheck && yarn test:sim   (in examples/' + name + ')\n');
+  process.exit(0);
+}
+
+// The next step is `compile`, so check the compiler now rather than after the
+// contract is written. Docker is checked later, by `yarn validate`.
+preflight(REPO_ROOT, { compact: true });
+
 if (fs.existsSync(targetDir)) {
   fail(`examples/${name} already exists — choose a different name or remove it first.`);
 }
 if (!fs.existsSync(TEMPLATE_DIR)) {
   fail(`template directory not found at ${path.relative(REPO_ROOT, TEMPLATE_DIR)}`);
+}
+
+// --- the design card (step 1), checked before anything is written -------------
+let specContent = null;
+if (specFile) {
+  if (!fs.existsSync(specFile)) fail(`--spec: ${specFile} not found`);
+  specContent = fs.readFileSync(specFile, 'utf8');
+  const problems = lintDesign(specContent, { witnessesFlag: withWitnesses });
+  if (problems.length > 0) fail(`--spec ${specFile} fails the design lint:\n  - ${problems.join('\n  - ')}`);
 }
 
 // --- name derivations -------------------------------------------------------
@@ -95,6 +179,8 @@ const KNOWN_TOKENS = [
   '__WITNESS_METHOD__',
   '__PRIVATE_STATE_IMPORT__',
   '__INITIAL_PRIVATE_STATE__',
+  '__SIM_WITNESS_IMPORT__',
+  '__SIM_WITNESSES__',
 ];
 
 function substitute(content) {
@@ -110,12 +196,19 @@ function substitute(content) {
         '__PRIVATE_STATE_IMPORT__',
         `import { create${Name}PrivateState } from '../../contract/witnesses.js';`,
       )
-      .replaceAll('__INITIAL_PRIVATE_STATE__', `create${Name}PrivateState()`);
+      .replaceAll('__INITIAL_PRIVATE_STATE__', `create${Name}PrivateState()`)
+      .replaceAll(
+        '__SIM_WITNESS_IMPORT__',
+        `import { create${Name}PrivateState, witnesses } from '../../contract/witnesses.js';`,
+      )
+      .replaceAll('__SIM_WITNESSES__', 'witnesses');
   } else {
-    // Drop the whole marker line for the two import markers.
+    // Drop the whole marker line for the import markers.
     out = out
       .replaceAll('__WITNESS_IMPORT__\n', '')
       .replaceAll('__PRIVATE_STATE_IMPORT__\n', '')
+      .replaceAll('__SIM_WITNESS_IMPORT__\n', '')
+      .replaceAll('__SIM_WITNESSES__', '{}')
       .replaceAll('__WITNESS_METHOD__', 'withVacantWitnesses')
       .replaceAll('__INITIAL_PRIVATE_STATE__', '{}');
   }
@@ -128,14 +221,15 @@ const files = renderTree(TEMPLATE_DIR, {
   // Only copy the witnesses stub when --witnesses is set.
   skip: (rel) => !withWitnesses && rel === path.join('contract', 'witnesses.ts'),
   render: (raw, rel) => {
-    const content = substitute(raw);
+    if (specContent !== null && rel === 'SPEC.md') return specContent;
+    const content = sealRegions(substitute(raw));
     assertNoLeftoverTokens(rel, content, KNOWN_TOKENS);
     return content;
   },
 });
 const created = writeFiles(targetDir, files).map((p) => path.relative(REPO_ROOT, p));
 
-// --- registration (best-effort, idempotent) ---------------------------------
+// --- registration (idempotent; a failure is fatal after the files are written) --
 function registerCi() {
   const file = path.join(REPO_ROOT, '.github', 'workflows', 'ci.yaml');
   const content = fs.readFileSync(file, 'utf8');
@@ -199,17 +293,28 @@ if (!noRegister) {
   console.log('    • README.md Layout tree');
   console.log('    • AGENTS.md Examples table');
 }
-console.log('\n  Next steps:');
-console.log(`    1. Write your contract in examples/${name}/contract/${name}.compact`);
-if (withWitnesses) {
-  console.log(`    2. Implement the declared witnesses in examples/${name}/contract/witnesses.ts`);
-  console.log(`    3. Fill in tests in examples/${name}/src/test/${name}.test.ts`);
-} else {
-  console.log(`    2. Fill in tests in examples/${name}/src/test/${name}.test.ts`);
-}
-console.log('    Then, from the repo root:');
-console.log('      yarn install');
-console.log(`      yarn workspace @midnight-ntwrk/example-${name} run compile`);
-console.log(`    And from examples/${name}:  yarn env:up && yarn wait:dust && yarn test:local && yarn env:down`);
-console.log(`    Optional, once the tests pass: yarn new:ui ${name}   (browser frontend)`);
+console.log('\n  Next steps (docs/generation-flow.md):');
+console.log(
+  specContent !== null
+    ? `    1. SPEC.md is your reviewed design card (${specFile}); keep it in step with the code`
+    : `    1. Fill in examples/${name}/SPEC.md and get the design reviewed (yarn spec:lint ${name} --design)`,
+);
+console.log('    2. yarn install, then drive the rest from the repo root:');
+console.log(`         yarn pipeline ${name} [--json]`);
+console.log('       It runs the scripts and gates (compile:fast, --derive, typecheck, test:sim, the SPEC');
+console.log('       checks, compile, the UI, the devnet in the background) and stops with what to do next:');
+console.log(`       the contract (contract/${name}.compact), ${withWitnesses ? 'the witnesses, ' : ''}the sim test and the devnet test,`);
+console.log('       then the UI seed files. Run it again after each change.');
+console.log('    By hand instead: yarn compile:fast, yarn new:example ' + name + ' --derive, yarn typecheck,');
+console.log('       yarn test:sim, yarn spec:lint ' + name + ', then yarn validate (in examples/' + name + ').');
 console.log('');
+
+const failedRegistration = registration.filter((r) => !r.ok);
+if (failedRegistration.length > 0) {
+  fail(
+    `examples/${name} was written, but registration failed (see ⚠ above). ` +
+      'Fix the listed file(s) by hand, or re-run with --no-register after removing examples/' +
+      name +
+      '.',
+  );
+}

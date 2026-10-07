@@ -39,7 +39,7 @@ yarn compile
 ## Run the unit tests (no network)
 
 ```bash
-npx vitest run src/test/zk-loan.simulator.test.ts src/test/attestation-api
+npx vitest run src/test/zk-loan.sim.test.ts src/test/attestation-api
 ```
 
 ## Run the attestation API

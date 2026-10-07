@@ -31,18 +31,26 @@ export function fail(msg) {
 }
 
 /**
- * Exit unless the running Node satisfies the root package.json `engines.node`
- * (a `>=MAJOR…` range). Yarn 4 doesn't enforce `engines`, and a shell that
- * defaults to an older Node produces UIs whose dev server then crashes.
+ * Return a problem string unless the running Node satisfies the root
+ * package.json `engines.node` (a `>=MAJOR…` range), else null. Yarn 4 doesn't
+ * enforce `engines`, and a shell that defaults to an older Node produces UIs
+ * whose dev server then crashes.
  */
-export function assertNodeVersion(repoRoot) {
+export function checkNode(repoRoot) {
   const range = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).engines?.node;
   const min = Number(/^>=\s*(\d+)/.exec(range ?? '')?.[1]);
-  if (!min) return;
+  if (!min) return null;
   const major = Number(process.versions.node.split('.')[0]);
   if (major < min) {
-    fail(`Node ${process.versions.node} is too old: this repo needs Node ${range} (see .nvmrc). Try \`nvm use\`.`);
+    return `Node ${process.versions.node} is too old: this repo needs Node ${range} (see .nvmrc). Try \`nvm use\`.`;
   }
+  return null;
+}
+
+/** Exit unless the running Node satisfies `engines.node` (see checkNode). */
+export function assertNodeVersion(repoRoot) {
+  const problem = checkNode(repoRoot);
+  if (problem) fail(problem);
 }
 
 /** kebab-case `name` → { name, Name (PascalCase), Title (Space Joined) }. */
