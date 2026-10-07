@@ -62,6 +62,7 @@ nvm use                  # Node 22 (.nvmrc). Shells often default to 20, which t
 corepack enable          # Yarn 4 via packageManager field
 yarn install             # whole-workspace install (one lockfile)
 yarn compile             # compile all contracts (foreach, parallel)
+yarn typecheck           # typecheck every workspace (needs compiled contracts)
 yarn workspace @midnight-ntwrk/example-<name> run compile   # one example
 yarn new:example <name> [--witnesses]   # phase 1: scaffold an example
 yarn new:ui <name>                      # phase 2: scaffold its browser UI (after test:local is green)
