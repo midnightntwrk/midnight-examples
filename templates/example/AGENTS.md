@@ -58,6 +58,20 @@ yarn env:down
 - `src/wallet.ts` has `splitShieldedCoin(color, amount)`: a shielded
   self-transfer that re-nonces a coin (and makes one of an exact value) before
   you spend it into the contract.
+- Shielded coins in tests come from `@midnight-ntwrk/example-coins`
+  (`packages/coins/src/index.ts`). Use `tokenColor(domain, mintingContract)`,
+  `takeCoin(wallet, color, value)` for a `ShieldedCoinInfo` argument, and
+  `shieldedBalance` / `waitForShieldedBalance` (a received coin shows up
+  seconds after the transaction is accepted). For a mint, use `recipientOf`,
+  `encryptionKeys` and `mintNonce`. In a sim test, `simCoin(value, color)`
+  makes a coin. `--derive` imports them when a circuit takes a coin. Don't
+  copy the local helpers in older examples' tests.
+- A second contract (a test-only token the tests mint from) needs no script
+  edits. Add `contract/<it>.compact`: `yarn compile` and `yarn compile:fast`
+  compile every contract under `contract/` (skipping modules and imported
+  files). `--derive` then adds its exports to `contract/index.ts`, plus a
+  provider set and a deploy test before the main one in the devnet test. A
+  second contract with witnesses of its own is wired by hand.
 - The circuit-id union in `src/providers.ts` is derived from the compiled
   contract (`keyof ImpureCircuits`), so it never needs editing when circuits
   change.

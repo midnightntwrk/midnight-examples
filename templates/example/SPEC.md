@@ -75,7 +75,9 @@ counts, timing, circuit names, links through fees or reused keys. -->
 
 <!-- Optional. Contracts that exist only so the tests can run (a demo token
 faucet for the devnet test), named in backticks, e.g. `demo-token`. The lint
-leaves their circuits and fields out of the checks above. Write "None." or
-delete this section if there are none. -->
+leaves their circuits and fields out of the checks above. Add the contract as
+contract/<name>.compact: `yarn compile` picks it up and `--derive` wires it
+into contract/index.ts and the devnet test. Write "None." or delete this
+section if there are none. -->
 
 None.

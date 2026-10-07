@@ -35,7 +35,13 @@ import {
   Contract,
   ledger,
   zkConfigPath,
+  // @generated-stub begin contract-imports sha=0
+  // @generated-stub end contract-imports
 } from '../../contract/index.js';
+// Shielded-coin helpers, imported here when a circuit takes a coin or a
+// second contract mints them. See packages/coins/src/index.ts.
+// @generated-stub begin coin-imports sha=0
+// @generated-stub end coin-imports
 
 // Required for GraphQL subscriptions in Node.js
 // @ts-expect-error WebSocket global assignment for apollo
@@ -54,6 +60,8 @@ describe(`__Title__ Contract (${network})`, () => {
   let wallet: MidnightWalletProvider;
   let providers: __Name__Providers;
   let contractAddress: ContractAddress;
+  // @generated-stub begin contract-providers sha=0
+  // @generated-stub end contract-providers
 
   const config = getConfig();
   const isRemote = network !== 'local';
@@ -108,6 +116,8 @@ describe(`__Title__ Contract (${network})`, () => {
     }
 
     providers = buildProviders(wallet, zkConfigPath, config);
+    // @generated-stub begin contract-providers-init sha=0
+    // @generated-stub end contract-providers-init
     logger.info(`Providers initialized on '${network}'. Ready to test!`);
   });
 
@@ -121,6 +131,11 @@ describe(`__Title__ Contract (${network})`, () => {
   // ---------------------------------------------------------------------------
   // Everything above is generated boilerplate. Your tests begin here.
   // ---------------------------------------------------------------------------
+
+  // Other contracts first: a test-only token usually feeds this contract's
+  // constructor (its token color, say).
+  // @generated-stub begin contract-deploys sha=0
+  // @generated-stub end contract-deploys
 
   it('deploys the contract', async () => {
     const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {

@@ -94,8 +94,8 @@ nothing behind it yet.
 |---|------|------|------|-------|--------|------|
 | 1 | Design | reason | Model drafts the design card; `new:example --spec` makes it the example's `SPEC.md` | User prompt; [`templates/example/SPEC.md`](../templates/example/SPEC.md) and the worked example [`examples/private-tip-jar/SPEC.md`](../examples/private-tip-jar/SPEC.md) | Example name (kebab-case), whether it needs witnesses, and the content of `SPEC.md`: roles, public fields, circuits and their asserts, witnesses, **privacy invariants** and **accepted leaks** | `yarn spec:lint --file <card> [--witnesses]`: every section filled in, tables with rows, each privacy invariant names its test key (`→ \`key\``), Witnesses matches `--witnesses`. Then a human reviews the design before any code exists. (**Gap**: nothing turns a prompt into this yet) |
 | 2 | Scaffold | script | `yarn new:example <name> --spec <card> [--witnesses] [--no-register]` ([`scripts/new-example.mjs`](../scripts/new-example.mjs)) | [`templates/example/`](../templates/example/) | `examples/<name>/`: `SPEC.md` (step 1's card goes here), contract stub, `src/` harness, an in-memory test (`<name>.sim.test.ts`) and a devnet test skeleton with `@generated-stub` regions, `compose.yml`, `AGENTS.md`. Registers the example in CI and the docs tables | Node 22, `compact` at the CI pin ([`scripts/lib/preflight.mjs`](../scripts/lib/preflight.mjs)); `--spec` passes the design lint; unknown flags rejected; registration succeeded; no leftover template tokens |
-| 3a | Write the contract | reason | Model writes Compact | See [Context budget](#context-budget) | `contract/<name>.compact` | `yarn compile:fast` (`--skip-zk`: no proving keys, under a second for most contracts); on failure, back to 3a |
-| 3b | Derive stubs | script | `yarn new:example <name> --derive` ([`scripts/lib/derive.mjs`](../scripts/lib/derive.mjs)) | `contract/managed/<name>/compiler/contract-info.json`, `contract/index.d.ts`, `contract/<name>.compact`, `contract/witnesses.ts` | Fills the unedited `@generated-stub` regions: a typed stub per witness, constructor `args` in both tests' deploy calls, an `it.todo` per circuit, the ledger fields, a privacy-test skeleton | Refuses if the contract isn't compiled or declares witnesses without `witnesses.ts`. Re-runnable: edited regions are left alone, and a second run changes nothing |
+| 3a | Write the contract | reason | Model writes Compact | See [Context budget](#context-budget) | `contract/<name>.compact`, plus any test-only contract beside it (`contract/<token>.compact`) | `yarn compile:fast`, which compiles every contract under `contract/` (`--skip-zk`: no proving keys, under a second for most contracts); on failure, back to 3a |
+| 3b | Derive stubs | script | `yarn new:example <name> --derive` ([`scripts/lib/derive.mjs`](../scripts/lib/derive.mjs)) | `contract/managed/<name>/compiler/contract-info.json`, `contract/index.d.ts`, `contract/<name>.compact`, `contract/witnesses.ts` | Fills the unedited `@generated-stub` regions: a typed stub per witness, constructor `args` in both tests' deploy calls, an `it.todo` per circuit, the ledger fields, a privacy-test skeleton. For each other contract: its exports in `contract/index.ts`, plus a provider set and a deploy test in the devnet test. When a circuit takes a shielded coin, or another contract mints to a wallet: the `@midnight-ntwrk/example-coins` imports | Refuses if the contract isn't compiled or declares witnesses without `witnesses.ts`. Re-runnable: edited regions are left alone, and a second run changes nothing |
 | 3c | Witnesses and tests | reason | Model writes code | See [Context budget](#context-budget) | Witness bodies in `contract/witnesses.ts`; `src/test/<name>.sim.test.ts` (logic, a negative test per assert, one `assertNotInPublicState` entry per SPEC privacy invariant); `src/test/<name>.test.ts` (the end-to-end flow) | The **in-memory gate**: `yarn typecheck`, `yarn test:sim` (in memory, no Docker, seconds) and `yarn spec:lint <name>` (the card against the code: circuits, ledger fields, witnesses, every assert in an `expectRejects`, every invariant key in `assertNotInPublicState`, every circuit run, no `it.todo`; and the devnet test written: no `it.todo`, every transaction circuit called, since the devnet starts as soon as this gate passes). The pipeline stamps a pass in `.gates/sim.json`. On failure, back to 3c (or 3a for a contract bug) |
 | 4 | Test on local devnet, **in the background** | script | The pipeline starts `yarn validate --keep-net --report .gates/devnet.json` ([`scripts/validate-example.mjs`](../scripts/validate-example.mjs)) detached, after the in-memory gate, the full compile and step 5's `yarn install`: `env:up` → `wait:dust` → `test:local`. By hand, `yarn validate [--keep-net]` runs the same steps in the foreground (compiling first if needed) and takes the network down | `examples/<name>/compose.yml` (proof server, indexer, node) | `.gates/devnet.json` (steps, failing tests, log tails), `logs/devnet.log`, `logs/compose.log` on failure | Runs while steps 5–6 happen; must pass on the current sources before step 7. On failure the pipeline writes a fix plan (`.gates/devnet-fix.md`): back to 3c/3a, or retry for an infrastructure failure. See [Background devnet](#background-devnet) |
 | 5 | UI generator | script | `yarn new:ui <name> [--contract <managed-dir>] [--private-state memory\|persistent]` ([`scripts/new-ui.mjs`](../scripts/new-ui.mjs)); preview with `--dry-run` | `contract/managed/<c>/compiler/contract-info.json`, `contract/managed/<c>/contract/index.d.ts`, `contract/witnesses.ts`, `contract/<c>.compact`, and [`templates/ui/`](../templates/ui/) | `examples/<name>/ui/` (Vite + React): template-owned files, seed files, `new-ui.json`, `verification.json` | Refuses without an in-memory gate stamp for the current sources (`--skip-gate` overrides), when the contract isn't compiled, `ui/` already exists, or `witnesses.ts` lacks a `create<X>PrivateState` factory |
@@ -183,7 +183,7 @@ you have what you need.
 |---|---|---|
 | 1 (design) | [`templates/example/SPEC.md`](../templates/example/SPEC.md); [`examples/private-tip-jar/SPEC.md`](../examples/private-tip-jar/SPEC.md) as a worked example; [`patterns.md`](patterns.md) to find the nearest example | Any code |
 | 3a (contract) | [`compact-gotchas.md`](compact-gotchas.md) (~1.5K tokens); [`patterns.md`](patterns.md) (~1.5K tokens) to pick the 1–2 nearest examples; their `contract/*.compact`; this example's `SPEC.md` | `src/wallet.ts`, `src/providers.ts`, `src/config.ts`, `scripts/wait-for-dust.ts`, `compose.yml` (identical in every example); the narrative parts of `TUTORIAL.md` and `LESSONS.md`; examples unrelated to the use case |
-| 3c (witnesses, tests) | The derived stubs; the nearest examples' `contract/witnesses.ts` and test bodies after `Your tests begin here`; `examples/calculator/src/test/calculator.sim.test.ts` and `examples/private-tip-jar/src/test/private-tip-jar.sim.test.ts` as models, and [`packages/sim/src/sim.ts`](../packages/sim/src/sim.ts) / [`privacy.ts`](../packages/sim/src/privacy.ts) if you need more of the in-memory API. If the nearest example's devnet test body calls helpers defined above its marker (multi-wallet or shielded-coin setup, as in `private-tip-jar`), read those helpers too. A second contract (a test token): `private-tip-jar`'s `contract/index.ts` and `package.json` compile scripts. The template's `src/wallet.ts` already has `splitShieldedCoin` and `getShieldedAddress`, and `src/providers.ts` a unique private-state store name per provider set: no need to compare them with an example | The rest of the setup above a test's marker; `contract/managed/` beyond the generated `index.d.ts` |
+| 3c (witnesses, tests) | The derived stubs; the nearest examples' `contract/witnesses.ts` and test bodies after `Your tests begin here`; `examples/calculator/src/test/calculator.sim.test.ts` and `examples/private-tip-jar/src/test/private-tip-jar.sim.test.ts` as models, and [`packages/sim/src/sim.ts`](../packages/sim/src/sim.ts) / [`privacy.ts`](../packages/sim/src/privacy.ts) if you need more of the in-memory API. Shielded coins: [`packages/coins/src/index.ts`](../packages/coins/src/index.ts) (token color, `takeCoin`, balances, minting to a wallet) instead of the coin helpers above `private-tip-jar`'s marker; read its multi-wallet setup there only if the suite needs a second wallet. A second contract (a test token) is wired by `--derive`. The template's `src/wallet.ts` already has `splitShieldedCoin` and `getShieldedAddress`, and `src/providers.ts` a unique private-state store name per provider set: no need to compare them with an example | The rest of the setup above a test's marker; `contract/managed/` beyond the generated `index.d.ts` |
 | 3, on a gate failure | The failing gate's output first. If `compact-gotchas.md` doesn't explain it, then the `midnight-expert` skills (`compact-core`, `midnight-verify`) or the linked `LESSONS.md`/`TUTORIAL.md` section | All of `TUTORIAL.md` |
 | 6 (UI seed files) | [`templates/ui/AGENTS.md`](../templates/ui/AGENTS.md) §3 and §5 and the Gotchas; the nearest `examples/*/ui/` seed files (listed under its "Worked examples") | Template-owned UI files; `examples/zk-loan/ui` (hand-built, not authoritative) |
 
@@ -204,15 +204,21 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
 - **The pipeline doesn't scaffold.** `yarn pipeline` starts at an existing
   example; step 2 (`new:example --spec`) is run by hand, because it needs the
   reviewed card and the `--witnesses` choice.
-- **`--derive` covers one contract** (Phase 4). It fills the stubs of the
-  contract named after the example. A second contract (a demo token, as in
-  `private-tip-jar`) is wired by hand.
-- **No shared shielded test faucet or coin helpers** (Phase 4). Examples that need
-  shielded coins in their devnet tests write a small minting contract
-  (`private-tip-jar`'s `tip-token.compact`) and port about 130 lines of
-  two-wallet and coin-selection setup. The in-memory tests don't need either:
-  `Sim` takes made-up coins. SPEC.md lists such a contract under "Test-only
-  contracts", and the SPEC code checks leave it out.
+- **`--derive` leaves a second contract's sim tests and witnesses alone.**
+  It wires another contract into `contract/index.ts` and the devnet test, but
+  writes no in-memory stubs for it, and skips a second contract that declares
+  witnesses (the example's `witnesses.ts` belongs to the main contract).
+- **No shared shielded test faucet.** A devnet suite that needs shielded
+  coins brings a small test-only minting contract (`private-tip-jar`'s
+  `tip-token.compact` is the model), listed in SPEC.md under "Test-only
+  contracts" and left out of the SPEC code checks. `--derive` wires it, and
+  `@midnight-ntwrk/example-coins` handles the coins. The in-memory tests need
+  neither: `Sim` takes made-up coins (`simCoin`).
+- **Two-wallet setup is still per example.** A suite with a second wallet
+  (tipper and owner) copies `private-tip-jar`'s `buildWallet(role)`.
+- **Older examples keep their own coin helpers.** `private-tip-jar` and
+  `shielded-chips` weren't moved to `example-coins`, so the nearest example
+  can still show local copies.
 - **Serving (step 7).** Serving stops at the local Vite dev server; there is no
   deploy target in this repo.
 - **Browser verification.** The checks in `verification.json` (Lace, browser)
@@ -223,6 +229,18 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
   failed tests on the network left up would be faster; nothing does that yet.
 
 ## Changelog
+
+- 2026-10-07: Phase 4. Shielded-coin helpers live in a shared package,
+  `@midnight-ntwrk/example-coins` (`packages/coins`): `tokenColor`,
+  `takeCoin`, `shieldedBalance`, `waitForShieldedBalance`, `recipientOf`,
+  `encryptionKeys`, `mintNonce`, and `simCoin` for sim tests. The template
+  depends on it, and `--derive` imports it when a circuit takes a coin. The
+  template's `compile` and `compile:fast` run `scripts/compile-contracts.mjs`,
+  which compiles every contract under `contract/`. `--derive` wires each
+  other contract (exports, providers, a deploy test). There is no shared
+  faucet: a test-only minting contract stays per example. Existing examples
+  weren't ported. The Phase 4 baseline is planned (`plannedRun` in
+  `reports/generation-baseline.json`) and hasn't been run yet.
 
 - 2026-10-07: Phase 3. The in-memory gate (`typecheck`, `test:sim`, and the
   new `yarn spec:lint` code checks) unlocks the UI; the devnet no longer gates

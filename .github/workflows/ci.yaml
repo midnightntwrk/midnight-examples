@@ -190,20 +190,28 @@ jobs:
       - name: Install dependencies (whole workspace)
         run: yarn install --immutable
 
-      - name: Typecheck and test packages/sim
+      - name: Typecheck and test packages/sim and packages/coins
         run: |
           yarn workspace @midnight-ntwrk/example-sim typecheck
           yarn workspace @midnight-ntwrk/example-sim test:sim
+          yarn workspace @midnight-ntwrk/example-coins typecheck
+          yarn workspace @midnight-ntwrk/example-coins test:sim
 
       - name: Scaffold, compile:fast and derive a throwaway example
         run: |
           set -euo pipefail
           yarn new:example ci-derive --witnesses --no-register
-          # A contract with a constructor argument, a witness, a pure circuit and a Map.
+          # A contract with a constructor argument, a witness, a pure circuit, a Map
+          # and a shielded-coin argument, plus a second, witness-less contract that
+          # mints: compile:fast compiles both, and --derive wires the second one.
           cp examples/private-tip-jar/contract/private-tip-jar.compact examples/ci-derive/contract/ci-derive.compact
+          cp examples/private-tip-jar/contract/tip-token.compact examples/ci-derive/contract/tip-token.compact
           yarn install --no-immutable
           yarn workspace @midnight-ntwrk/example-ci-derive compile:fast
           yarn new:example ci-derive --derive
+          grep -q 'CompiledTipTokenContract = CompiledContract.make' examples/ci-derive/contract/index.ts
+          grep -q "it('deploys tip-token'" examples/ci-derive/src/test/ci-derive.test.ts
+          grep -q "from '@midnight-ntwrk/example-coins'" examples/ci-derive/src/test/ci-derive.sim.test.ts
           cp -r examples/ci-derive "$RUNNER_TEMP/first"
           yarn new:example ci-derive --derive
           diff -r --exclude=node_modules --exclude=managed "$RUNNER_TEMP/first" examples/ci-derive

@@ -1016,6 +1016,17 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@midnight-ntwrk/example-coins@workspace:packages/coins":
+  version: 0.0.0-use.local
+  resolution: "@midnight-ntwrk/example-coins@workspace:packages/coins"
+  dependencies:
+    "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
+    "@types/node": "npm:^22.0.0"
+    typescript: "npm:^5.7.0"
+    vitest: "npm:^4.1.0"
+  languageName: unknown
+  linkType: soft
+
 "@midnight-ntwrk/example-election@workspace:examples/election":
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-election@workspace:examples/election"
