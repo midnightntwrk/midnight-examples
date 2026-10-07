@@ -16,7 +16,7 @@
 // TypeScript implementations of the contract's witnesses — the off-chain logic
 // Compact cannot express. Each witness receives a WitnessContext and returns a
 // tuple [nextPrivateState, returnValue].
-import { type Ledger } from './managed/__name__/contract/index.js';
+import { type Ledger, type Witnesses } from './managed/__name__/contract/index.js';
 import { type WitnessContext } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 
 // The private state carried between witness calls. If your contract keeps no
@@ -25,11 +25,13 @@ export type __Name__PrivateState = Record<string, never>;
 
 export const create__Name__PrivateState = (): __Name__PrivateState => ({});
 
-// TODO: implement each witness declared in __name__.compact. The property
-// names, argument types, and return-tuple shape MUST match the generated
-// `Witnesses` type in contract/managed/__name__/contract/index.d.ts (produced by
-// `yarn compile`). Compact type mappings: Field/Uint -> bigint, Bytes ->
-// Uint8Array, a Compact tuple -> a TS array. Example:
+// TODO: implement each witness declared in __name__.compact. After the first
+// `yarn compile:fast`, `yarn new:example __name__ --derive` (repo root) writes
+// a typed stub per witness into the region below; replace each stub's body.
+// The property names, argument types, and return-tuple shape MUST match the
+// generated `Witnesses` type in contract/managed/__name__/contract/index.d.ts.
+// Compact type mappings: Field/Uint -> bigint, Bytes -> Uint8Array, a Compact
+// tuple -> a TS array. Example:
 //
 //   myWitness: (
 //     { privateState }: WitnessContext<Ledger, __Name__PrivateState>,
@@ -37,9 +39,11 @@ export const create__Name__PrivateState = (): __Name__PrivateState => ({});
 //   ): [__Name__PrivateState, bigint] => {
 //     return [privateState, arg];
 //   },
+// @generated-stub begin witnesses sha=16250017d9b3
 export const witnesses = {
 };
+// @generated-stub end witnesses
 
-// `Ledger` and `WitnessContext` are imported for the types you will use when
-// implementing witnesses above; remove them if your witnesses need neither.
-export type { Ledger, WitnessContext };
+// `Ledger`, `Witnesses` and `WitnessContext` are imported for the types you
+// will use when implementing witnesses above; remove any your witnesses don't need.
+export type { Ledger, Witnesses, WitnessContext };
