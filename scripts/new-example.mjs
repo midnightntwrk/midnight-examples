@@ -289,18 +289,14 @@ console.log(
     ? `    1. SPEC.md is your reviewed design card (${specFile}); keep it in step with the code`
     : `    1. Fill in examples/${name}/SPEC.md and get the design reviewed (yarn spec:lint ${name} --design)`,
 );
-console.log(`    2. Write your contract in examples/${name}/contract/${name}.compact, then:`);
-console.log('         yarn install                          # from the repo root');
-console.log(`         (cd examples/${name} && yarn compile:fast)   # seconds: no proving keys`);
-console.log(`         yarn new:example ${name} --derive     # stubs from the compiled contract`);
-console.log(`    3. ${withWitnesses ? 'Implement the witness stubs in contract/witnesses.ts; write ' : 'Write '}the tests:`);
-console.log(`         src/test/${name}.sim.test.ts   in memory: logic, every guard, privacy invariants`);
-console.log(`         src/test/${name}.test.ts       devnet: the end-to-end flow`);
-console.log(`       cd examples/${name}`);
-console.log('       yarn compile:fast && yarn typecheck && yarn test:sim   # until green');
-console.log('    4. yarn validate                    # compile, env:up, wait:dust, test:local, env:down');
-console.log(`    Or from the repo root: yarn pipeline ${name} [--json]   # runs steps 2–7 with the devnet in the`);
-console.log('       background, creates the UI once the in-memory gate passes, and prints what to do next');
+console.log('    2. yarn install, then drive the rest from the repo root:');
+console.log(`         yarn pipeline ${name} [--json]`);
+console.log('       It runs the scripts and gates (compile:fast, --derive, typecheck, test:sim, the SPEC');
+console.log('       checks, compile, the UI, the devnet in the background) and stops with what to do next:');
+console.log(`       the contract (contract/${name}.compact), ${withWitnesses ? 'the witnesses, ' : ''}the sim test and the devnet test,`);
+console.log('       then the UI seed files. Run it again after each change.');
+console.log('    By hand instead: yarn compile:fast, yarn new:example ' + name + ' --derive, yarn typecheck,');
+console.log('       yarn test:sim, yarn spec:lint ' + name + ', then yarn validate (in examples/' + name + ').');
 console.log('');
 
 const failedRegistration = registration.filter((r) => !r.ok);

@@ -231,6 +231,15 @@ function devnetStatus() {
       report = { crashed: true, passed: false, failedStep: null, sourceHashStart: lock.sourceHash, sourceHashEnd: lock.sourceHash, startedAt: lock.startedAt };
       writeJson(REPORT, report);
     }
+    // First sight of the finished run: log it once, with its own step times.
+    log({
+      step: 'devnet',
+      status: report.passed ? 'pass' : 'fail',
+      ms: report.finishedAt ? Date.parse(report.finishedAt) - Date.parse(report.startedAt) : undefined,
+      failedStep: report.failedStep ?? undefined,
+      steps: report.steps?.map((s) => ({ step: s.step, status: s.status, ms: s.ms })),
+      tests: report.tests ? { passed: report.tests.passed, total: report.tests.total } : undefined,
+    });
     fs.rmSync(LOCK, { force: true });
   }
   if (!report) return { status: 'none' };
@@ -340,7 +349,8 @@ if (opts.wait) {
 
 // --- the pipeline ---------------------------------------------------------------
 preflight(REPO_ROOT, { compact: true });
-const hash = sourceHash(DIR);
+// Recomputed after --derive, which can rewrite a stub region in the tests.
+let hash = sourceHash(DIR);
 
 // A run on older contract-level sources can't tell us anything: stop it now,
 // before anything below compiles under it.
@@ -353,6 +363,7 @@ if (before.status === 'running' && before.sourceHash !== hash) {
 // 1 · the design card
 const spec = path.join(DIR, 'SPEC.md');
 const designProblems = fs.existsSync(spec) ? lintDesign(fs.readFileSync(spec, 'utf8')) : ['SPEC.md is missing'];
+log({ step: 'spec', status: designProblems.length ? 'fail' : 'pass' });
 if (designProblems.length) {
   step('spec', 'fail');
   stop({ kind: 'reason', step: '1', reason: 'SPEC.md fails the design lint; fill it in and have it reviewed', problems: designProblems, edit: [rel(spec)], read: READ[1] });
@@ -393,6 +404,14 @@ if (compiledOutOfDate && devnetStatus().status === 'running') {
   const r = run('derive', 'node', [path.join(REPO_ROOT, 'scripts', 'new-example.mjs'), name, '--derive']);
   step('derive', r.ok ? 'pass' : 'fail', { ms: r.ms });
   if (!r.ok) stop({ kind: 'reason', step: '3a', reason: '--derive refused the compiled contract', output: trimOutput(r.output), read: READ.gate });
+  // Derive rewrote a region (new circuit, constructor or factory parameter):
+  // the stamps below must hold the hash of what the gates actually ran on.
+  const derived = sourceHash(DIR);
+  if (derived !== hash) {
+    hash = derived;
+    const d = devnetStatus();
+    if (d.status === 'running' && d.sourceHash !== hash) cancelDevnet('derive changed the sources');
+  }
 }
 
 // The in-memory gate. A stamp for the current sources means it already passed.
@@ -425,13 +444,20 @@ if (simStamp?.sourceHash === hash) {
     stop({
       kind: 'reason',
       step: '3c',
-      reason: simTests === 0 ? 'no sim tests ran: write src/test/*.sim.test.ts' : 'the in-memory tests failed',
+      reason:
+        simTests === 0
+          ? 'no sim tests ran: write src/test/*.sim.test.ts'
+          : /is not implemented/.test(r.output)
+            ? 'implement the witness stubs in contract/witnesses.ts and write the tests (3c)'
+            : 'the in-memory tests failed',
       output: trimOutput(r.output),
       edit: edit3c,
-      read: [...READ.gate, ...READ['3c']],
+      // A first entry to 3c is writing, not debugging: the 3c models come first.
+      read: [...READ['3c'], ...READ.gate.slice(1)],
     });
   }
   const problems = lintCode(DIR);
+  log({ step: 'spec:code', status: problems.length ? 'fail' : 'pass' });
   step('spec:code', problems.length ? 'fail' : 'pass');
   if (problems.length) {
     stop({
@@ -473,7 +499,7 @@ if (opts.ui && !fs.existsSync(UI_DIR)) {
   const contractArg = listCompiled(DIR).length > 1 && listCompiled(DIR).includes(name) ? ['--contract', name] : [];
   let r = run('new:ui', 'node', [path.join(REPO_ROOT, 'scripts', 'new-ui.mjs'), name, ...contractArg]);
   step('new:ui', r.ok ? 'pass' : 'fail', { ms: r.ms });
-  if (!r.ok) stop({ kind: 'reason', step: '5', reason: 'new:ui refused', output: trimOutput(r.output), read: READ.gate });
+  if (!r.ok) stop({ kind: 'reason', step: '5', reason: 'new:ui refused; its message says what it needs', output: trimOutput(r.output) });
   writeJson(SEEDS, Object.fromEntries(seedFiles.map((p) => [rel(p), seedHash(p)])));
   r = run('install', 'yarn', ['install'], REPO_ROOT);
   step('install', r.ok ? 'pass' : 'fail', { ms: r.ms, note: 'the new UI workspace changes yarn.lock: commit it' });

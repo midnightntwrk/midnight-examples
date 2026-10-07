@@ -1,5 +1,5 @@
 {
-  "$comment": "One run of the scripted generation pipeline (docs/generation-flow.md) on a fixed prompt, used as the baseline for later phases of the pipeline work. It measures the Phase 1 flow (honest validate, typecheck gate, docs/compact-gotchas.md + docs/patterns.md context budget), not the flow before Phase 1. Re-run the same prompt after each phase and add a run below.",
+  "$comment": "One run of the scripted generation pipeline (docs/generation-flow.md) on a fixed prompt, used as the baseline for later phases of the pipeline work. It measures the Phase 1 flow (honest validate, typecheck gate, docs/compact-gotchas.md + docs/patterns.md context budget), not the flow before Phase 1. Re-run the same prompt after each phase and add a run below. From Phase 3 the run is driven by `yarn pipeline`, and its gate counts come from examples/<name>/logs/pipeline.jsonl.",
   "prompt": "Build a private tip jar: people can leave tips for the jar's owner without revealing who tipped how much, and only the owner can withdraw.",
   "scope": "Steps 1-4: name and flags, new:example, contract + witnesses + tests, compile/typecheck, yarn validate. No UI.",
   "runs": [
@@ -126,6 +126,80 @@
         "The SPEC template has no place for a test-only contract.",
         "Root and example AGENTS.md (~21 KB) arrive automatically; the context budget should count them or they should shrink.",
         "Example README.md and AGENTS.md TODO stubs are left unfilled; nothing gates on them."
+      ]
+    },
+    {
+      "date": "2026-10-07",
+      "flowVersion": "f784e40 (Phase 3)",
+      "model": "claude-opus-5-5, one general-purpose subagent given only the prompt and the flow doc, driving `yarn pipeline tip-jar-p3 --json`, in the main checkout (the generated code was not committed)",
+      "scope": "Steps 1-5 as before, plus the UI scaffold that the pipeline now creates once the in-memory gate passes. Step 6 (UI seed code) was not written, so the run ends when the background devnet is green.",
+      "result": {
+        "example": "examples/tip-jar-p3 (discarded after measuring)",
+        "flags": "--spec <card> --witnesses --no-register; then yarn pipeline",
+        "validate": "pass on the first devnet run, 10/10 tests (in the background)",
+        "testSim": "6/6 in memory, every assert in an expectRejects, 4 privacy keys",
+        "contracts": [
+          "tip-jar-p3.compact (tip jar, plus a tipCount Counter)",
+          "tip-token.compact (test-only demo faucet)"
+        ]
+      },
+      "cost": {
+        "subagentTokens": 141332,
+        "toolUses": 40,
+        "wallClockSeconds": 442
+      },
+      "timeline": {
+        "uiReadySeconds": 185,
+        "devnetGreenSeconds": 377,
+        "devnetRunSeconds": 192,
+        "devnetSteps": "env:up 12.0 s, wait:dust 4.4 s, test:local 175.5 s",
+        "note": "uiReady: the pipeline's next first pointed at the UI seed files (UI scaffolded, yarn install done, devnet started). In Phases 1 and 2 the UI could only start after the devnet passed, at the end of the run (633 s, 477 s)."
+      },
+      "gateRuns": {
+        "pipelineRuns": 6,
+        "compile:fast": 1,
+        "derive": 4,
+        "typecheck": 3,
+        "test:sim": 3,
+        "compile": 1,
+        "new:ui": 2,
+        "devnet": 1
+      },
+      "gateFailures": {
+        "compile:fast": 0,
+        "typecheck": 0,
+        "test:sim": 1,
+        "new:ui": 1,
+        "devnet": 0,
+        "notes": [
+          "test:sim (boilerplate): the first entry to 3c ran the derived witness stub ('witness ownerSecretKey is not implemented'). next.read listed the gate-failure reading first; fixed after the run: an unimplemented stub now says 'implement the witness stubs' and the 3c reading comes first.",
+          "new:ui (pipeline bug): the source hash was taken before --derive, which then rewrote the devnet test's private-state region, so the sim stamp held a stale hash and new:ui refused. Fixed after the run: the hash is recomputed after derive (checked by planting an empty region in private-tip-jar: the stamp matches the post-derive sources)."
+        ]
+      },
+      "context": {
+        "approxKBRead": 112,
+        "breakdown": "about 90 KB within the step budget (the private-tip-jar devnet test, 17 KB, read whole including the helpers above its marker, as the budget allows), about 22 KB of AGENTS.md injected automatically; beyond budget only a 3 KB diff of the template wallet/providers against private-tip-jar's, plus pipeline sources read to diagnose the new:ui refusal",
+        "comparison": "Phase 2: ~95 KB. The flow doc grew from 12 KB to 20 KB with the pipeline sections."
+      },
+      "comparisonWithPhase2": {
+        "tokens": "136,742 → 141,332 (+3%)",
+        "wallClock": "477 s → 442 s (−7%) to devnet green, with the UI scaffolded on top",
+        "timeToUi": "≈477 s (after the devnet) → 185 s (the devnet still running)",
+        "gateFailures": "1 → 2: one boilerplate (unimplemented witness stub on first entry to 3c), one pipeline bug (stale hash after derive), both fixed after the run",
+        "note": "One run each; the step-1 worked example (private-tip-jar) is exactly this prompt, so the design and much of the code were close to a port, which flatters every phase equally."
+      },
+      "humanFixUps": [],
+      "reviewNotes": [
+        "Step 1's card passed spec:lint --file --witnesses first time and stood in for the human review (none available).",
+        "The in-memory gate let the devnet start on the scaffold's devnet test skeleton (deploy only, it.todo per circuit); the agent wrote the devnet test on its own initiative. Fixed after the run: the SPEC code checks require no it.todo in the devnet test and every transaction circuit called in it.",
+        "pipeline.jsonl did not log spec, spec:code or the devnet result; fixed after the run (the devnet result is logged once, with its step times, when the pipeline first sees the finished run).",
+        "new:example's next steps still told the agent to run compile:fast and validate by hand; they now lead with yarn pipeline."
+      ],
+      "phase4Signals": [
+        "The shared shielded test faucet and coin helpers: the devnet test was again a port of private-tip-jar's (two wallets, mint, re-nonce).",
+        "--derive for the second (faucet) contract, wired by hand again.",
+        "A different prompt for the next baseline, since the worked example is this one.",
+        "The UI gates re-run on every pipeline call; a stamp over ui/ would skip them when nothing changed."
       ]
     }
   ]
