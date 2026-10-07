@@ -70,6 +70,11 @@ jobs:
       - name: Run in-memory contract tests
         run: yarn test:sim
 
+      # SPEC.md against the compiled contract and the sim tests (examples with
+      # a design card only).
+      - name: Lint SPEC.md
+        run: if [ -f SPEC.md ]; then node ../../scripts/spec-lint.mjs ${{ matrix.example }}; fi
+
       - name: Start local Midnight network
         run: yarn env:up
 
@@ -203,3 +208,17 @@ jobs:
           yarn new:example ci-derive --derive
           diff -r --exclude=node_modules --exclude=managed "$RUNNER_TEMP/first" examples/ci-derive
           yarn workspace @midnight-ntwrk/example-ci-derive typecheck
+
+      - name: Pipeline runner and SPEC lint
+        run: |
+          set -euo pipefail
+          # The runner stops at step 1 on a scaffold whose SPEC.md is still the template.
+          step=$(yarn pipeline ci-derive --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).next.step))' || true)
+          test "$step" = "1"
+          # new:ui refuses an example that hasn't passed the in-memory gate.
+          if node scripts/new-ui.mjs ci-derive > "$RUNNER_TEMP/new-ui.log" 2>&1; then exit 1; fi
+          grep -q 'in-memory gate' "$RUNNER_TEMP/new-ui.log"
+          # The in-memory gate end to end on a real example: spec lint, compile:fast,
+          # derive, typecheck, test:sim and the SPEC code checks. (Each example's
+          # SPEC.md is also linted in its matrix job.)
+          yarn pipeline private-tip-jar --until sim
