@@ -50,11 +50,17 @@ trust recalled APIs over it.
   the wallets that funded it and were paid from it. Store
   `persistentCommit([nonce, color, value], salt)` and reopen it from a
   witness. ([LESSONS §1](../examples/shielded-chips/LESSONS.md#1-the-one-rule))
-- **Coins created in this transaction** are spent with
-  `sendImmediateShielded`. **Coins already in the tree** use `sendShielded`
-  with a real `mt_index`. Mixing them up gives circuits that can't be
-  satisfied, or that trust a caller-supplied index.
-  ([TUTORIAL cheat-sheet](../examples/shielded-chips/TUTORIAL.md#shielded-token-cheat-sheet))
+- **A coin the contract received in this transaction** (`receiveShielded`)
+  has no tree index yet and is spent as a zswap transient, with `mt_index: 0`.
+  `sendImmediateShielded` is exactly `sendShielded` with `mt_index: 0`, so
+  either form works; prefer `sendImmediateShielded` because it states intent.
+  **A coin already in the tree** needs `sendShielded` with its real
+  `mt_index`: the index is not checked in the circuit, but the SDK uses it to
+  build the Merkle path, so a wrong one fails when the transaction is built
+  or applied.
+  ([stdlib 0.31.1](https://github.com/LFDT-Minokawa/compact/blob/compactc-v0.31.1/compiler/standard-library.compact#L199-L205),
+  [zswap transients](https://github.com/midnightntwrk/midnight-ledger/blob/ledger-8.1.2/zswap/src/construct.rs#L386-L412),
+  [TUTORIAL cheat-sheet](../examples/shielded-chips/TUTORIAL.md#shielded-token-cheat-sheet))
 - **`sendShielded` and `mergeCoin` derive the output nonce from the input
   nonce alone** (`mergeCoin` from its *first* argument), so the argument order
   decides what can be linked. ([LESSONS §5](../examples/shielded-chips/LESSONS.md#5-patterns-that-worked))

@@ -172,6 +172,8 @@ describe(`Hello World Contract (${network})`, () => {
     }
   });
 
+  // Everything above is harness setup. Your tests begin here.
+
   it('Deploys the contract', async () => {
     logger.info(`Creating private state...`);
 

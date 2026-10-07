@@ -117,6 +117,8 @@ describe(`Calculator Contract (${network})`, () => {
     }
   });
 
+  // Everything above is harness setup. Your tests begin here.
+
   it('deploys the contract', async () => {
     const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {
       compiledContract: CompiledCalculatorContract,

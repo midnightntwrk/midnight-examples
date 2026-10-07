@@ -155,6 +155,8 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
         }
     });
 
+    // Everything above is harness setup. Your tests begin here.
+
     it('deploys the contract', async () => {
 
         const aliceSk = randomBytes(32);

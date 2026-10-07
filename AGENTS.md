@@ -62,9 +62,12 @@ nvm use                  # Node 22 (.nvmrc). Shells often default to 20, which t
 corepack enable          # Yarn 4 via packageManager field
 yarn install             # whole-workspace install (one lockfile)
 yarn compile             # compile all contracts (foreach, parallel)
+yarn compile:fast        # same with --skip-zk: no proving keys, seconds (enough for typecheck and test:sim)
 yarn typecheck           # typecheck every workspace (needs compiled contracts)
+yarn test:sim            # every in-memory test (*.sim.test.ts); no Docker
 yarn workspace @midnight-ntwrk/example-<name> run compile   # one example
 yarn new:example <name> [--witnesses]   # phase 1: scaffold an example
+yarn new:example <name> --derive        # after compile:fast: fill its @generated-stub regions
 yarn new:ui <name>                      # phase 2: scaffold its browser UI (after test:local is green)
 yarn new:ui <name> --check              # template-owned UI files still match templates/ui
 yarn new:ui --sync-all                  # after editing templates/ui: sync every UI (+ yarn install)
@@ -72,11 +75,12 @@ yarn new:ui --check-all                 # CI's drift check for every UI, plus in
 yarn fund:wallet <mn_dust_…> [mn_addr_…]  # local devnet: DUST (and NIGHT) for a browser wallet
 ```
 
-Per example (from `examples/<name>`): `yarn compile`, `yarn typecheck`, then
-`yarn validate [--keep-net]` (compile if stale → `env:up` → `wait:dust` →
-`test:local` → `env:down`, exiting non-zero if any step fails). The steps also
-run on their own: `yarn env:up`, `yarn wait:dust`, `yarn test:local`,
-`yarn env:down`. Running tests requires Docker.
+Per example (from `examples/<name>`): `yarn compile:fast`, `yarn typecheck` and
+`yarn test:sim` (seconds, no Docker), then `yarn validate [--keep-net]`
+(full compile if stale or keyless → `env:up` → `wait:dust` → `test:local` →
+`env:down`, exiting non-zero if any step fails). The steps also run on their
+own: `yarn env:up`, `yarn wait:dust`, `yarn test:local`, `yarn env:down`.
+Devnet tests require Docker.
 
 Against a remote network (preprod/preview) — see `FAST-SYNC.md`:
 
@@ -112,10 +116,30 @@ Each example has its own `AGENTS.md` with specifics.
   Don't read the whole repo: the harness files are identical in every example.
 
 - **Prefer the generator:** `yarn new:example <name> [--witnesses]` scaffolds a
-  new example from `templates/example/` (harness, config, compose, docs stubs,
-  and a test skeleton up to the first `deployContract` call) and registers it in
-  the CI matrix + docs tables. Author only writes the `.compact` and the tests.
-  The conventions below describe what that template produces.
+  new example from `templates/example/` (harness, config, compose, a `SPEC.md`
+  design card, docs stubs, an in-memory test and a devnet test skeleton) and
+  registers it in the CI matrix + docs tables. Author writes `SPEC.md`, the
+  `.compact`, the witnesses and the tests. After the first `yarn compile:fast`,
+  `yarn new:example <name> --derive` fills the `@generated-stub` regions from
+  the compiled contract (witness stubs, constructor `args`, an `it.todo` per
+  circuit, the ledger fields). It only rewrites a region whose body still
+  matches the `sha=` in its begin marker, so edit a region freely: from then on
+  it is yours. Delete the markers too if you like. The conventions below
+  describe what that template produces.
+- **`SPEC.md` first.** Purpose, roles, public ledger fields, private state,
+  circuits with their asserts, witnesses, **privacy invariants** ("never on
+  chain: …") and **accepted leaks**, out of scope. A human reviews it before
+  code exists; keep it in step with the code afterwards. Worked example:
+  `examples/private-tip-jar/SPEC.md`.
+- **Two kinds of test.** `src/test/*.sim.test.ts` run the compiled contract in
+  memory with `@midnight-ntwrk/example-sim` (`packages/sim`): `Sim.deploy`,
+  `sim.call`, `sim.as`, `expectRejects` for every guard, and
+  `assertNotInPublicState` with one entry per SPEC privacy invariant.
+  `yarn test:sim` runs only these, and CI runs it before starting the network.
+  `src/test/<name>.test.ts` is the devnet suite (`yarn test` excludes
+  `*.sim.test.ts`): keep it to the end-to-end flow. A sim test imports only
+  `contract/managed/…` and `contract/witnesses.ts`, never `src/providers.ts` or
+  `src/wallet.ts`.
 - Directory shape: `contract/` (singular) with the `.compact` source + `index.ts`
   (+ `witnesses.ts` where needed); `src/` for the TypeScript test harness;
   `scripts/` for helpers; `compose.yml` for the local network.
@@ -124,9 +148,9 @@ Each example has its own `AGENTS.md` with specifics.
   and `waitForNightThenDust(...)` rather than writing a per-example seed resolver.
   `vitest.config.ts` loads `.env.<network>` from the REPO ROOT via `loadEnv`.
 - Extend `../../tsconfig.base.json` in the example `tsconfig.json`.
-- Provide `compile`, `typecheck`, `test`, `test:local`, `env:up`, `env:down`,
-  `wait:dust` and `validate` scripts so the CI matrix and root aggregates work
-  unchanged.
+- Provide `compile`, `compile:fast`, `typecheck`, `test`, `test:sim`,
+  `test:local`, `env:up`, `env:down`, `wait:dust` and `validate` scripts so the
+  CI matrix and root aggregates work unchanged.
 - Adding a browser frontend is **phase 2**: once the contract compiles and
   `test:local` is green, run `yarn new:ui <name>`. Don't hand-copy
   `hello-world/ui`. The generator reads `contract-info.json` and writes a UI
@@ -139,8 +163,8 @@ Each example has its own `AGENTS.md` with specifics.
   `templates/ui/`, followed by `yarn new:ui <name> --sync`; CI runs `--check` on
   every generated UI. Details, pins and the verification checklist are in
   `templates/ui/AGENTS.md`, which every generated UI carries as `ui/AGENTS.md`.
-- The scripted generation pipeline (prompt → scaffold → contract code → devnet
-  test → `new:ui` → UI code → serve), with each step's gate and fix loop, is in
-  `docs/generation-flow.md`.
+- The scripted generation pipeline (prompt → SPEC → scaffold → contract →
+  derive → witnesses and tests → devnet → `new:ui` → UI code → serve), with each
+  step's gate and fix loop, is in `docs/generation-flow.md`.
 - Add meticulous comments in contracts and witnesses explaining the *how* and
   *why* — these examples are read by agents as much as by people.

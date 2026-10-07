@@ -7,10 +7,11 @@ Entries name a symbol rather than a line number, so search the file for it.
 ## What to read in an example (and what to skip)
 
 **Read:**
+- `SPEC.md` (if there is one): the design in a page
 - `contract/<name>.compact`
 - `contract/witnesses.ts` (if there is one)
-- the test bodies in `src/test/<name>.test.ts`. In files that have the
-  `Your tests begin here` marker, start reading after it.
+- the test bodies in `src/test/*.test.ts`: start reading after the
+  `Your tests begin here` marker; everything above it is harness setup.
 
 **Skip** (identical in every example, or generated):
 - `src/wallet.ts`, `src/providers.ts`, `src/config.ts`
@@ -57,7 +58,7 @@ Entries name a symbol rather than a line number, so search the file for it.
 | A full shielded token (MIP-0011: mint, both burn paths, treasury) | shielded-chips | `chips.compact` → `mint`, `burn`, `mintToTreasury`, `burnFromTreasury` |
 | Contract custody of coins, commitment escrow, `mergeCoin` order | shielded-chips | `roulette.compact` → `betColor`, `claimWinnings`, `escrowCommit` |
 | Anonymous deposits into a contract-held pot; owner-only withdrawal | private-tip-jar | `private-tip-jar.compact` → `tip`, `reNonceToSelf`, `withdraw` |
-| Shielded self-transfer to re-nonce a coin before using it | private-tip-jar, shielded-chips | `src/wallet.ts` → `splitShieldedCoin` |
+| Shielded self-transfer to re-nonce a coin before using it | every example (from the template) | `src/wallet.ts` → `splitShieldedCoin` |
 | DUST fee sponsorship (one wallet pays another's fees) | private-party | `src/sponsor.ts`, `src/test/sponsorship.test.ts` |
 
 ## Test patterns
@@ -68,8 +69,11 @@ Entries name a symbol rather than a line number, so search the file for it.
 | Negative tests for every guard (rejected locally, so fast) | private-bid | `private-bid.test.ts` → the `rejects …` tests |
 | Two identities from one fee-paying wallet | zk-loan | `zk-loan.test.ts` (two private-state ids) |
 | Several contracts deployed from one harness | shielded-chips | `src/test/roulette.test.ts` |
-| Asserting a secret never reaches public state | shielded-chips | `src/test/privacy.test.ts` |
-| In-memory circuit runs (no network, no proofs) | zk-loan, every `ui/` | `zk-loan.simulator.ts`; `ui/src/__tests__/*-circuits.test.ts` → `call()` |
+| In-memory contract tests (no network, no proofs): `Sim.deploy`, `call`, `expectRejects` | calculator, private-tip-jar | `src/test/*.sim.test.ts`; API in [`packages/sim/src/index.ts`](../packages/sim/src/index.ts) |
+| Asserting a secret never reaches public state | private-tip-jar (in memory), shielded-chips (devnet) | `private-tip-jar.sim.test.ts` → `assertNotInPublicState`; `src/test/privacy.test.ts` |
+| Swapping caller or private state between calls | private-tip-jar | `private-tip-jar.sim.test.ts` → `sim.as(...)`, `sim.privateState = ...` |
+| A lying witness is rejected by the circuit | calculator | `calculator.sim.test.ts` → `rejects a witness that lies` |
+| A hand-written simulator class (many tests, custom fixtures) | zk-loan | `zk-loan.simulator.ts`, `zk-loan.sim.test.ts` |
 
 Read [`compact-gotchas.md`](compact-gotchas.md) before you write the
 contract.

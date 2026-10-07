@@ -297,6 +297,8 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
     if (charlieWallet) await charlieWallet.stop();
   });
 
+  // Everything above is harness setup. Your tests begin here.
+
   it('Alice deploys the chips contract', async () => {
     const alicePrivateState = createRoulettePrivateState(aliceSk);
 
