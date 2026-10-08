@@ -22,7 +22,7 @@ published on [docs.midnight.network](https://docs.midnight.network/tutorials)
 | 1 | [`hello-world`](./examples/hello-world) | Environment smoke test: a minimal contract, the test harness, devnet and fast-sync wallets |
 | 2 | [`private-bid`](./examples/private-bid) | First real contract: prove a bid meets a sealed minimum without revealing it, commit and reveal, the minimal `disclose()` boundary |
 | 3 | [`private-tip-jar`](./examples/private-tip-jar) | Two contracts (jar and tip token), still simple; a first shielded token: anonymous tips into a contract-held pot |
-| 4 | [`battleship`](./examples/battleship) | Defensive programming: a state machine, role checks, and on-chain verification of off-chain data that catches cheating |
+| 4 | [`battleship`](./examples/battleship/tutorials/index.mdx) | Defensive programming: a state machine, role checks, and on-chain verification of off-chain data that catches cheating |
 | 5 | [`zk-loan`](./examples/zk-loan) | Real use case: private credit scoring against a signed attestation from an off-chain API |
 | 6 | [`shielded-chips`](./examples/shielded-chips) | Complex shielded token integration: a native shielded token, contract custody and payout, and the privacy trade-offs between variations |
 | 7 | [`midnight-leaderboard`](https://github.com/midnightntwrk/midnight-leaderboard) | Deploying a DApp to Vercel |
