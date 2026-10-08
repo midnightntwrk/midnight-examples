@@ -1,0 +1,130 @@
+name: Sync tutorials to docs
+
+# Mirrors every examples/<name>/tutorials/ into midnight-docs
+# docs/tutorials/<name>/ and opens (or updates) one PR there. See
+# docs/tutorials.md for the conventions.
+
+# Lock down top-level permissions. Grant per-job.
+permissions: {}
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'examples/*/tutorials/**'
+      - '.github/workflows/sync-tutorials.yml'
+  workflow_dispatch: {}   # manual re-sync (e.g. after the docs PR was closed by mistake)
+
+# Every run copies the full current state of every tutorials/, so only the
+# latest push matters; cancel any in-flight sync superseded by a newer one.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  sync-tutorials:
+    # Guard manual dispatches: running from a stale branch would force-push
+    # that branch's tutorials over the reused sync/examples-tutorials PR branch.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read              # checkout this repo; the docs repo uses the PAT
+    steps:
+      - name: Verify docs token is configured
+        env:
+          DOCS_TOKEN: ${{ secrets.DEVREL_DOCS_PR_TOKEN }}
+        run: |
+          if [ -z "$DOCS_TOKEN" ]; then
+            echo "::error::DEVREL_DOCS_PR_TOKEN is not set. Add it as a repository or org secret with permission to push branches and open PRs on midnightntwrk/midnight-docs."
+            exit 1
+          fi
+
+      - name: Checkout midnight-examples
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: source
+          persist-credentials: false
+
+      - name: Checkout midnight-docs
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: midnightntwrk/midnight-docs
+          token: ${{ secrets.DEVREL_DOCS_PR_TOKEN }}
+          path: docs
+          # create-pull-request receives the token explicitly; don't leave the
+          # PAT sitting in docs/.git/config for the rest of the job.
+          persist-credentials: false
+
+      # One rsync per example, into that example's own docs folder, so docs
+      # tutorials that don't come from this repo are never touched.
+      #
+      # An example is synced only if its tutorials/index.mdx exists (with
+      # --delete, a hollowed-out folder would otherwise delete the docs pages)
+      # and no longer carries the scaffold's tutorial-template marker.
+      #
+      # --delete propagates file removals/renames; --checksum defeats rsync's
+      # size+mtime quick-check, which can silently skip a same-length edit when
+      # both fresh checkouts stamp the file in the same wall-clock second.
+      # Excludes are anchored to the transfer root: README.md documents this
+      # repo's setup and must not land in the docs, and _category_.yaml
+      # (Docusaurus sidebar metadata) is owned by midnight-docs. Excluded names
+      # on the receiver are also protected from --delete, so the docs-side
+      # copy survives.
+      - name: Sync tutorials into docs
+        id: sync
+        run: |
+          set -euo pipefail
+          synced=()
+          for index in source/examples/*/tutorials/index.mdx; do
+            [ -f "$index" ] || continue
+            src_dir=$(dirname "$index")
+            name=$(basename "$(dirname "$src_dir")")
+            if ! [[ "$name" =~ ^[a-z0-9-]+$ ]]; then
+              echo "::error::Unexpected example directory name '$name' — refusing to sync."
+              exit 1
+            fi
+            if grep -q 'tutorial-template' "$index"; then
+              echo "Skipping $name: tutorials/index.mdx still has the tutorial-template marker."
+              continue
+            fi
+            echo "Syncing $name"
+            rsync -av --delete --checksum \
+              --exclude '/README.md' \
+              --exclude '/_category_.yaml' \
+              "$src_dir/" "docs/docs/tutorials/$name/"
+            synced+=("$name")
+          done
+          if [ "${#synced[@]}" -eq 0 ]; then
+            echo "No example has a publishable tutorials/index.mdx; nothing to sync."
+          fi
+          {
+            echo "count=${#synced[@]}"
+            echo "list<<EOF_SYNCED"
+            for name in "${synced[@]}"; do echo "- \`$name\`"; done
+            echo "EOF_SYNCED"
+          } >> "$GITHUB_OUTPUT"
+          echo "Resulting changes in midnight-docs:"
+          git -C docs status --short
+
+      - name: Create pull request
+        if: steps.sync.outputs.count != '0'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          path: docs
+          token: ${{ secrets.DEVREL_DOCS_PR_TOKEN }}
+          commit-message: 'docs: update tutorials from ${{ github.repository }}@${{ github.sha }}'
+          title: 'docs: update tutorials from midnight-examples'
+          body: |
+            Automated PR syncing tutorials from [midnight-examples](${{ github.server_url }}/${{ github.repository }}).
+
+            Synced examples (`examples/<name>/tutorials/` → `docs/tutorials/<name>/`):
+
+            ${{ steps.sync.outputs.list }}
+
+            - Source commit: ${{ github.repository }}@${{ github.sha }}
+            - Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            The source of truth is `examples/<name>/tutorials/` in midnight-examples (see [docs/tutorials.md](${{ github.server_url }}/${{ github.repository }}/blob/main/docs/tutorials.md)). Please make content edits there: changes made directly to a synced folder here will be overwritten by the next sync. `_category_.yaml` stays owned by midnight-docs; a newly synced tutorial needs one added here.
+          branch: sync/examples-tutorials
+          delete-branch: true
