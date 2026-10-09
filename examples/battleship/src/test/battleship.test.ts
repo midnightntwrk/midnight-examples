@@ -175,9 +175,9 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
             args: [alicePrivateState.x1, alicePrivateState.x2]
         });
 
-        contractAddress = deployed.deployTxData.public.contractAddress;      
-        aliceProviders.privateStateProvider.setContractAddress(contractAddress);
-        await aliceProviders.privateStateProvider.set(ALICE_PRIVATE_ID, alicePrivateState);
+        // deployContract has already pointed Alice's private state provider at
+        // this address and stored initialPrivateState under ALICE_PRIVATE_ID.
+        contractAddress = deployed.deployTxData.public.contractAddress;
         
         logger.info(`Contract deployed at: ${contractAddress}`);
         expect(contractAddress).toBeDefined();

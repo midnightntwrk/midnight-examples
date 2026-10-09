@@ -5,7 +5,7 @@ sidebar_label: "Battleship contract"
 title: "Battleship contract"
 description: "Read a Compact contract written defensively: a state machine, role checks, and hash commitments that verify each player's private answers on chain."
 sidebar_position: 10
-toc_max_heading_level: 2
+toc_max_heading_level: 3
 ---
 
 # Battleship contract
@@ -250,7 +250,7 @@ Finally, the constructor asks Alice's machine to record the ships in her private
 checks the answer instead of assuming it:
 
 ```compact title="contract/battleship.compact"
-    // best practice example -- don't disclose(localSetBoard1(_x1, _x2)), 
+    // best practice example -- don't disclose(localSetBoard1(_x1, _x2)),
     // disclose only what you need (localBoardState);
     const localBoardState = localSetBoard(_x1, _x2);
     assert(localBoardState == BoardState.SET, "Please update the state of board1 to SET");
@@ -272,7 +272,7 @@ the same input validation, and a commitment into `board2`. It then opens the fir
 ```compact title="contract/battleship.compact"
     // setting on-chain state
     board2State = disclose(localBoardState);
-    
+
     // updating on-chain state
     turn = TurnState.PLAYER_1_SHOOT;
 }
@@ -349,7 +349,7 @@ committed squares. If she reports a HIT, it must be:
         // don't trust, verify
         assert(!board1.member(honestyCheckHash), "Cheat Detected: Player 1: claimed a MISS, when it was in fact a HIT");
         turn = TurnState.PLAYER_1_SHOOT;
-    
+
     } else {
 
         // don't trust, verify

@@ -5,7 +5,7 @@ sidebar_label: "Battleship tests"
 title: "Battleship tests"
 description: "Play Battleship on a local devnet with MidnightJS, then try to cheat and prove the contract rejects every attempt."
 sidebar_position: 20
-toc_max_heading_level: 2
+toc_max_heading_level: 3
 ---
 
 # Battleship tests
@@ -34,8 +34,8 @@ yarn wait:dust
 yarn test:local
 ```
 
-`yarn env:up` starts a Midnight node, an indexer and a proof server from `compose.yml`. Leave them
-running while you work through this page. The full suite generates real proofs for a dozen
+`yarn env:up` starts a Midnight node, an indexer, and a proof server from `compose.yml`. Leave them
+running while you work through this page. The full suite generates real proofs for ten
 transactions, so expect it to take several minutes.
 
 When it finishes, all 12 tests pass, including the ones that expect a rejection:
@@ -150,17 +150,17 @@ ship locations are the constructor's arguments:
             args: [alicePrivateState.x1, alicePrivateState.x2]
         });
 
-        contractAddress = deployed.deployTxData.public.contractAddress;      
-        aliceProviders.privateStateProvider.setContractAddress(contractAddress);
-        await aliceProviders.privateStateProvider.set(ALICE_PRIVATE_ID, alicePrivateState);
+        // deployContract has already pointed Alice's private state provider at
+        // this address and stored initialPrivateState under ALICE_PRIVATE_ID.
+        contractAddress = deployed.deployTxData.public.contractAddress;
 ```
 
 `deployContract` takes the deploying player's providers, the compiled contract from
 `contract/index.ts`, the private state ID and initial private state, and the constructor `args`.
 
-As soon as the contract address is known, the test points Alice's private state provider at it
-and stores her private state there. Later calls read her private state from the provider by its
-ID, so this step is required.
+`deployContract` also points Alice's private state provider at the new contract address and
+stores `initialPrivateState` there under `ALICE_PRIVATE_ID`, so the test only records the address.
+Later calls read her private state from the provider by that ID.
 
 Then the test checks the ledger against what the constructor should have done:
 
@@ -173,11 +173,13 @@ Then the test checks the ledger against what the constructor should have done:
 
 ### Bob joins
 
-Bob sets up his own private state the same way, then calls `acceptGame` with `submitCallTx`.
-That is the MidnightJS function for calling a circuit on a deployed contract:
+Bob didn't deploy, so nothing has stored his private state yet. The test creates it with a fresh
+secret key, points his private state provider at the contract address and stores it under
+`BOB_PRIVATE_ID` itself. Then he calls `acceptGame` with `submitCallTx`, the MidnightJS function
+for calling a circuit on a deployed contract:
 
 ```typescript title="src/test/battleship.test.ts"
-        const txData: FinalizedCallTxData<Contract, 'acceptGame'> = 
+        const txData: FinalizedCallTxData<Contract, 'acceptGame'> =
             await (submitCallTx<Contract, 'acceptGame'>)(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
