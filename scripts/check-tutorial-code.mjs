@@ -9,8 +9,9 @@
 //   ```
 //
 // passes if its lines appear, contiguously and unchanged, in
-// examples/<name>/contract/battleship.compact. Untitled blocks (commands,
-// sample output) are not checked. See docs/tutorials.md.
+// examples/<name>/contract/battleship.compact. Trailing whitespace is ignored on
+// both sides, so an editor that trims on save can't break the match. Untitled
+// blocks (commands, sample output) are not checked. See docs/tutorials.md.
 //
 //   node scripts/check-tutorial-code.mjs [<name> ...]
 
@@ -20,11 +21,13 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const EXAMPLES = path.join(REPO_ROOT, 'examples');
-const BLOCK = /^```\w*\s+title="([^"]+)"[^\n]*\n([\s\S]*?)\n```/gm;
+const BLOCK = /^```\w*[^\n]*?\btitle="([^"]+)"[^\n]*\n([\s\S]*?)\n```/gm;
 
 const names = process.argv.slice(2).length
   ? process.argv.slice(2)
   : fs.readdirSync(EXAMPLES).filter((n) => fs.existsSync(path.join(EXAMPLES, n, 'tutorials')));
+
+const trimEnd = (line) => line.replace(/\s+$/, '');
 
 const containsRun = (haystack, needle) => {
   for (let i = 0; i + needle.length <= haystack.length; i++) {
@@ -47,8 +50,8 @@ for (const name of names) {
         problems.push(`${where}: title="${title}" names a file that doesn't exist`);
         continue;
       }
-      const lines = body.split('\n');
-      if (!containsRun(fs.readFileSync(src, 'utf8').split('\n'), lines)) {
+      const lines = body.split('\n').map(trimEnd);
+      if (!containsRun(fs.readFileSync(src, 'utf8').split('\n').map(trimEnd), lines)) {
         problems.push(`${where}: block titled "${title}" starting ${JSON.stringify(lines[0])} doesn't match the file`);
       }
     }

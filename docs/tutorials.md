@@ -27,6 +27,13 @@ edit examples/<name>/tutorials/ → PR merged to main → workflow opens a midni
 - `_category_.yaml` (Docusaurus sidebar label and position) is **owned by
   midnight-docs**. The sync excludes it and leaves the docs-side copy alone.
   A new tutorial needs one added on the docs side.
+- Images and other assets a page needs live next to it in `tutorials/` and are
+  referenced by relative path, so they sync with the page. Anything added only
+  on the docs side inside a synced folder (other than `README.md` and
+  `_category_.yaml`) is deleted by the next sync.
+- If midnight-docs already has a docs-authored folder with the example's name
+  (`private-party` does), the first sync replaces its pages wholesale. Land a
+  docs-side PR alongside it that removes or redirects the old pages.
 - An example whose `tutorials/index.mdx` still has the `tutorial-template`
   marker line from the scaffold is skipped, so a stub never reaches the docs.
 - All synced examples share one docs branch, `sync/examples-tutorials`, so
@@ -55,7 +62,8 @@ edit examples/<name>/tutorials/ → PR merged to main → workflow opens a midni
   a `title` naming its file relative to the example, e.g.
   ` ```compact title="contract/battleship.compact" `. CI
   (`node scripts/check-tutorial-code.mjs`) fails if a titled block's lines no
-  longer appear verbatim in that file, so when the code changes, update the
-  tutorial in the same PR. Leave commands and sample output untitled.
+  longer appear verbatim in that file (trailing whitespace aside), so when the
+  code changes, update the tutorial in the same PR. Docusaurus options such as
+  `showLineNumbers` or `{2-4}` may sit before or after `title=`. Leave commands and sample output untitled.
 - **Docs components:** `@site/…` imports such as `PersonaTiles` resolve on the
   docs site only. They are fine to use; they just won't render on GitHub.
