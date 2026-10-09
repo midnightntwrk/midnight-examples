@@ -116,7 +116,7 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
 | `typecheck` | `tsc -b` |
 | `test:unit` | vitest (jsdom + an in-memory circuit test) |
 
-## TODO: end-to-end verification with Lace
+## TODO: end-to-end verification with a wallet
 
 - [ ] Local devnet, two profiles: the full round above, in both proving modes.
 - [ ] Reload mid-round (after the bet): passphrase, re-join, claim still works.

@@ -54,7 +54,7 @@ every example shares.
 
 ## Browser UI
 
-`ui/` runs these circuits in the browser behind a Lace wallet. There is no
+`ui/` runs these circuits in the browser behind a Midnight wallet. There is no
 ledger to show, so it shows your wallet's balances as tokens move. See
 [`ui/README.md`](ui/README.md).
 

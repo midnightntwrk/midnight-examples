@@ -10,7 +10,8 @@ every generated UI gets an identical copy. Edit the template, then run
 `yarn new:ui --sync-all`.
 
 **Verified against:** `midnight-js-*` 4.1.1, `@midnight-ntwrk/dapp-connector-api`
-4.0.1, Vite 6.4.3, vitest 4.1, React 19, Node 22, Lace on the local devnet.
+4.0.1, Vite 6.4.3, vitest 4.1, React 19, Node 22, a Midnight wallet extension
+on the local devnet.
 
 ## Quick recipe
 
@@ -35,7 +36,7 @@ yarn workspace @midnight-ntwrk/example-<name>-ui build
   authoritative). Check what you reuse against the installed types in
   `node_modules`.
 - **Before you claim it works:** run the verification checklist at the end
-  of this file. Record the steps CI can't run (browser, Lace, preprod) in
+  of this file. Record the steps CI can't run (browser, wallet, preprod) in
   `ui/verification.json`, then `--sync`. The status of every UI is in
   `templates/ui/VERIFIED.md`; don't claim more than it says.
 
@@ -78,8 +79,11 @@ provider swap and the bundler, not in contract calls.
 ## Recipe in detail
 
 UIs are scaffolded by a script, not by hand. It is **phase 2**, after
-`yarn new:example` (phase 1). Run it only once the example's contract compiles
-and `yarn test:local` is green, because it reads the compiled output. The
+`yarn new:example` (phase 1). Run it once the example's in-memory gate passes
+(`typecheck`, `test:sim`, `yarn spec:lint`): it reads the compiled output, and
+`new:ui` refuses to create a UI without that gate's stamp for the current
+sources (`.gates/sim.json`, written by `yarn pipeline`). The devnet suite runs
+in the background meanwhile and must pass before the UI is called done. The
 commands are in the quick recipe above; `--contract <managed-dir>` picks one
 contract when an example compiles several.
 
@@ -278,7 +282,7 @@ don't rewrite them (they only validate `verification.json`).
   pre-check against the real circuits so the two can't drift (calculator's
   `evaluate()` is checked this way on an edge-value grid).
 - **`README.md`:** what the UI adds, and a "TODO: end-to-end verification
-  with Lace" checklist until those steps pass.
+  with a wallet" checklist until those steps pass.
 - **`verification.json`:** the status of the steps CI can't run (see the
   Verification checklist).
 
@@ -337,7 +341,7 @@ and ship cells).
 - **`persistent`** (`midnight/private-state.ts`) is midnight-js's own
   `levelPrivateStateProvider`. In the browser, `level` resolves to
   `browser-level` (IndexedDB). It is AES-GCM encrypted with the `webcrypto`
-  backend, and scoped by the wallet's shielded coin public key, so each Lace
+  backend, and scoped by the wallet's shielded coin public key, so each wallet
   account has its own store. The template adds:
   - a `PassphraseCard` that App shows instead of the panel until unlocked.
     The passphrase is held in React state only; never put it in storage.
@@ -391,8 +395,9 @@ and ship cells).
 ### 6. Funding on the local devnet
 
 A new wallet has 0 DUST, and the first tx fails at balancing with
-`Wallet.InsufficientFunds: could not balance dust`. Lace has no "register for
-DUST" button, and the local devnet has no faucet.
+`Wallet.InsufficientFunds: could not balance dust`. A browser wallet may have
+no "register for DUST" button (Lace, for one, has none), and the local devnet
+has no faucet.
 
 The root script `yarn fund:wallet <mn_dust_…> [mn_addr_…]` solves this
 without any wallet action. It runs from anywhere in the repo, for any
@@ -431,10 +436,13 @@ suites' DUST. Don't copy it into an example; extend the shared one.
     enumerate `export *` from an excluded package.
   - Excluding `compact-runtime` breaks its CommonJS `object-inspect` import.
 - **Polyfills:** `nodePolyfills` needs `globals: { Buffer: true, process: true }`.
-- **Multiple wallets:** `window.midnight` can hold several wallets, plus
-  Lace's `mnLace` alias pointing at the same object. Enumerate, dedupe by
-  object identity, default to Lace, and let the user choose. Taking the first
-  entry picked the wrong wallet on a real machine.
+- **Multiple wallets:** `window.midnight` can hold several wallets, and a
+  wallet may also alias itself under a second key pointing at the same object
+  (Lace adds `mnLace`). Enumerate and dedupe by object identity. Default to
+  the user's remembered choice, else the first wallet found, and prefer no
+  wallet vendor. When more than one is installed, always show the picker: the
+  first entry isn't necessarily the wallet the user meant (it picked the wrong
+  one on a real machine).
 - **Network id:** `connect(networkId)` must match the network the wallet is set
   to. Let the user pick it before connecting; everything else comes from
   `getConfiguration()`. The picker offers `undeployed`, `preview` and
@@ -540,6 +548,6 @@ Run the checks in order, and report which ones you actually ran.
 8. Record what you ran. In `ui/verification.json`, set each step you ran to
    `verified` (or `partial`), with a `date` and `notes` saying exactly what
    ran. Then run `yarn new:ui <name> --sync`, which regenerates the table in
-   `templates/ui/VERIFIED.md`. Once the Lace checklist in `ui/README.md`
-   passes, delete it: `--check` refuses a `laceCalls: verified` while it's
-   still there.
+   `templates/ui/VERIFIED.md`. Name the wallet you used in each wallet
+   step's `notes`. Once the wallet checklist in `ui/README.md` passes, delete
+   it: `--check` refuses a `walletCalls: verified` while it's still there.

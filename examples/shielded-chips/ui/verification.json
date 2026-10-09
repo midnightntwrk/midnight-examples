@@ -5,10 +5,10 @@
       "date": "2026-10-06",
       "notes": "Not yet opened in a browser. `yarn dev` serves both contracts' ZK assets (managed/chips and managed/roulette keys and zkir, byte lengths equal to the compiled files, incl. the 19.5 MB burn.prover). Both contracts' circuits run in memory under vitest (a full round with fresh coins, chips mint/burn/treasury). Before the UI was built, the Node harness on the local devnet checked fresh-coin arguments for houseDeposit, betColor (with and without a change output) and burn, the escrow mt_index as zswapStartIndex plus the output's position (position 1 with change; claimWinnings and forfeit then succeeded), and recovering the winning number from the house key."
     },
-    "laceDeploy": {
+    "walletDeploy": {
       "status": "not-run"
     },
-    "laceCalls": {
+    "walletCalls": {
       "status": "not-run"
     },
     "preprod": {

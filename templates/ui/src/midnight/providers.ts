@@ -9,8 +9,8 @@
 //   zkConfigProvider      NodeZkConfigProvider (disk)   FetchZkConfigProvider (HTTP, /managed/…)
 //   proofProvider         local proof server            wallet-delegated OR local proof server
 //   privateStateProvider  LevelDB (disk)                LevelDB on IndexedDB, or in-memory (./private-state.ts)
-//   walletProvider        wallet-sdk WalletFacade       Lace via the DApp Connector API
-//   midnightProvider      wallet-sdk WalletFacade       Lace via the DApp Connector API
+//   walletProvider        wallet-sdk WalletFacade       the wallet, via the DApp Connector API
+//   midnightProvider      wallet-sdk WalletFacade       the wallet, via the DApp Connector API
 import type { ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
 import { dappConnectorProofProvider } from "@midnight-ntwrk/midnight-js-dapp-connector-proof-provider";
 import { FetchZkConfigProvider } from "@midnight-ntwrk/midnight-js-fetch-zk-config-provider";
@@ -148,9 +148,9 @@ export async function createContractProviders<C extends string>(
     // midnight-js hands us a proven but *unbound* transaction
     // (Transaction<SignatureEnabled, Proof, PreBinding>). The Node harness
     // balances it with WalletFacade.balanceUnboundTransaction. In the browser
-    // Lace does the same job: it adds DUST fee inputs, signs, and binds. The
-    // connector speaks hex strings, so we serialize, hand it over, and
-    // deserialize the result as a FinalizedTransaction
+    // the connected wallet does the same job: it adds DUST fee inputs, signs,
+    // and binds. The connector speaks hex strings, so we serialize, hand it
+    // over, and deserialize the result as a FinalizedTransaction
     // (Transaction<SignatureEnabled, Proof, Binding>). The TTL is up to the
     // wallet; the connector has no ttl parameter.
     balanceTx: async (tx, _ttl) => {
@@ -196,7 +196,7 @@ async function createPrivateStateProvider(accountId: string, passphrase: string 
   if (passphrase === null) {
     throw new Error("The private-state store is locked: enter its passphrase first.");
   }
-  // Scoped per wallet account: switching accounts in Lace switches stores.
+  // Scoped per wallet account: switching accounts in the wallet switches stores.
   return persistentPrivateStateProvider<typeof PRIVATE_STATE_ID, __Name__PrivateState>({
     accountId,
     passphrase,
