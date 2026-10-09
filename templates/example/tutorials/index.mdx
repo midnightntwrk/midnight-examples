@@ -1,0 +1,65 @@
+---
+SPDX-License-Identifier: Apache-2.0
+copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+title: __Title__
+description: TODO one sentence on what the reader builds and learns.
+sidebar_position: 1
+tags:
+  - tutorials
+  - __name__
+  - compact
+  - midnight-network
+---
+
+{/* tutorial-template: delete this line when the tutorial is ready to publish. The docs sync skips this example until it is gone. */}
+
+# __Title__ tutorial
+
+**Prerequisites:** complete [TODO previous learning-path step](/tutorials/TODO) first. This
+tutorial builds on it.
+
+TODO: one paragraph on what this tutorial teaches and why it matters.
+
+The source for this tutorial is
+[`examples/__name__`](https://github.com/midnightntwrk/midnight-examples/tree/main/examples/__name__)
+in midnight-examples.
+
+## Set up
+
+From the repo root, install the workspace and compile every contract:
+
+```bash
+git clone https://github.com/midnightntwrk/midnight-examples.git
+cd midnight-examples
+yarn install && yarn compile
+```
+
+Then start a local Midnight network for this example. Make sure the Docker engine is running first:
+
+```bash
+cd examples/__name__
+yarn env:up
+yarn wait:dust
+```
+
+## Build
+
+TODO: walk through `contract/__name__.compact` and `contract/witnesses.ts`.
+
+## Test
+
+```bash
+yarn test:local
+```
+
+TODO: walk through the tests in `src/test/__name__.test.ts`.
+
+Tear the network down when you're done:
+
+```bash
+yarn env:down
+```
+
+## Next
+
+TODO: link the next learning-path step.

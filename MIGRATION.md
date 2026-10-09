@@ -15,6 +15,16 @@ the source repositories.
 > `private-party` was taken from the **canonical** `midnightntwrk/example-private-party`,
 > not the personal `nstanford5/example-private-party` fork.
 
+## Tutorials
+
+Tutorials moved here from elsewhere ([#27](https://github.com/midnightntwrk/midnight-examples/issues/27)).
+Each now lives in `examples/<name>/tutorials/` and syncs back to midnight-docs
+(see [`docs/tutorials.md`](docs/tutorials.md)).
+
+| Tutorial | Source | Source commit | Changes |
+|---|---|---|---|
+| `examples/battleship/tutorials/` | `midnightntwrk/midnight-docs` `docs/tutorials/bship/` (`index.mdx`, `smart-contract.mdx`, `test-suite.mdx`) | `6af8c96f29a363f005417357f6066e1baf6a56bc` | Rewritten as a tour of this repo's code, organized around defensive programming. The build-from-scratch steps and the standalone project setup were replaced by the monorepo commands and shared harness. Published path moves from `/tutorials/bship` to `/tutorials/battleship`. |
+
 ## Changes applied during migration
 
 - **Workspace:** converted from standalone Yarn-classic / npm projects to Yarn 4

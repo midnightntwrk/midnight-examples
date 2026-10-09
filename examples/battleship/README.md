@@ -10,26 +10,30 @@ This example aims to demonstrate several key features of Compact and Midnight JS
 - Operations on a `List`
 - Intermediate witness functionality
 
-## Set up project
-```bash
-git clone git@github.com:midnightntwrk/example-battleship
-```
+For a guided walkthrough of the contract and its cheat-check tests, see the
+[Battleship tutorial](./tutorials/index.mdx), also published at
+[docs.midnight.network](https://docs.midnight.network/tutorials/battleship). It is step 4 of the
+[learning path](../../README.md#learning-path).
 
-Install dependencies:
+## Set up
+
+From the repo root, install dependencies (one lockfile for the whole workspace) and compile:
 ```bash
 yarn install
+yarn compile
 ```
 
-## Compile the contract
+Or compile just this example, from `examples/battleship`:
 ```bash
 yarn compile
 ```
 
-## Start Docker container
+## Start the local Midnight network
 
-Ensure the docker engine is running:
+Ensure the Docker engine is running, then from `examples/battleship`:
 ```bash
 yarn env:up
+yarn wait:dust     # wait until the dev wallets have spendable DUST for fees
 ```
 
 ## Run the test suite
@@ -39,56 +43,26 @@ yarn test:local
 
 The test script will begin to display output from your local devnet and test suite. The tests will progress the contract deployment and interaction programatically:
 ```
-[13:44:22.493] INFO (17759): Wallet sync complete after 22 emissions
-[13:44:22.509] INFO (17759): Providers initialized, ready to test.
-[13:44:44.438] INFO (17759): Contract deployed at: 570de8b6854263eb21ee350c325179e88eba2bd6744f142351b05028e3d09246
-[13:44:44.742] INFO (17759): Bob is accepting the game...
-[13:45:07.948] INFO (17759): Bob successfully joined the game!
-[13:45:07.987] INFO (17759): Bob tries to shoot out of turn...
-[13:45:08.192] INFO (17759): Bobs shot (out of turn) was rejected!
-[13:45:08.192] INFO (17759): Alice shoots (MISS) at Bobs board...
-[13:45:31.952] INFO (17759): Alice shot successfully!
-[13:45:31.990] INFO (17759): Bob checks his board...
-[13:45:55.914] INFO (17759): Bob successfully checked his board!
-[13:45:55.926] INFO (17759): Bob shoots at Alice's board (HIT)
-[13:46:14.621] INFO (17759): Bob shot successfully!
-[13:46:14.639] INFO (17759): Alice is checking the board...
-[13:46:38.641] INFO (17759): Alice has finished checking the board!
-[13:46:38.657] INFO (17759): Alice shoots (HIT) at Bobs board...
-[13:46:56.054] INFO (17759): Alice shot successfully!
-[13:46:56.078] INFO (17759): Bob realizes it is going to be a HIT and tries to cheat...
-[13:46:56.364] INFO (17759): Bobs cheating attempt was rejected!
-[13:46:56.364] INFO (17759): Bob is resetting his board to the original private state...
-[13:46:56.419] INFO (17759): Bob successfully reverted his private state to the original!
-[13:46:56.433] INFO (17759): Bob checks his board...
-[13:47:20.032] INFO (17759): Bob successfully checked his board!
-[13:47:20.044] INFO (17759): Bob shoots his second shot(HIT)...
-[13:47:38.720] INFO (17759): Bob successfully shoots!
-[13:47:38.733] INFO (17759): Alice realizes she is going to lose, so tries to change the ship location...
-[13:47:38.829] INFO (17759): Alice was rejected from changing the ship location!
-[13:47:38.829] INFO (17759): Alice resets to original ship location...
-[13:47:38.848] INFO (17759): Reverted Alice's private state correctly!
-[13:47:38.848] INFO (17759): Alice is checking the board...
- ✓ src/test/battleship.test.ts (12 tests) 222585ms
-   ✓ Battleship Smart Contract via midnight-js > deploys the contract  21945ms
-   ✓ Battleship Smart Contract via midnight-js > Allows Bob to acceptGame  23524ms
-   ✓ Battleship Smart Contract via midnight-js > Allows Alice to take the first shot(MISS)  24007ms
-   ✓ Battleship Smart Contract via midnight-js > Allows Bob to check the board (MISS)  23936ms
-   ✓ Battleship Smart Contract via midnight-js > Allows Bob to shoot(HIT)  18713ms
-   ✓ Battleship Smart Contract via midnight-js > Allows Alice to check the board and report a hit  24017ms
-   ✓ Battleship Smart Contract via midnight-js > Allows Alice to shoot again (HIT)  17421ms
-   ✓ Battleship Smart Contract via midnight-js > Stops Bob from being a cheater  355ms
-   ✓ Battleship Smart Contract via midnight-js > Allows Bob to check the board for a HIT  23611ms
-   ✓ Battleship Smart Contract via midnight-js > Allows Bob to shoot the winning shot  18689ms
-   ✓ Battleship Smart Contract via midnight-js > Stops Alice from cheating by changing her ship location 115ms
-   ✓ Battleship Smart Contract via midnight-js > Allows Alice to check the board and realize she lost...  23960ms
+[17:47:20.826] INFO (84251): Wallet sync complete after 21 emissions
+[17:47:20.829] INFO (84251): Providers initialized on 'local', ready to test.
+[17:47:39.294] INFO (84251): Contract deployed at: ccf2f4f27411dfa05ef7b9096b3fc07ea50c4ac0e942367dfefc9e821c9c3e74
+[17:47:39.445] INFO (84251): Bob is accepting the game...
+...
+ ✓ src/test/battleship.test.ts (12 tests) 179167ms
+     ✓ deploys the contract  18225ms
+     ✓ Allows Bob to acceptGame  17155ms
+     ✓ Allows Alice to take the first shot(MISS)  17340ms
+     ✓ Allows Bob to check the board (MISS)  18665ms
+     ✓ Allows Bob to shoot(HIT)  17348ms
+     ✓ Allows Alice to check the board and report a hit  18670ms
+     ✓ Allows Alice to shoot again (HIT)  17319ms
+     ✓ Allows Bob to check the board for a HIT  17062ms
+     ✓ Allows Bob to shoot the winning shot  18644ms
+     ✓ Stops Alice from cheating  357ms
+     ✓ Allows Alice to check the board and lose  16979ms
 
  Test Files  1 passed (1)
       Tests  12 passed (12)
-   Start at  13:44:16
-   Duration  226.20s (transform 231ms, setup 0ms, collect 3.37s, tests 222.59s, environment 0ms, prepare 62ms)
-
-Done in 227.08s.
 ```
 
 To run the zkir linter, from the project root run:
@@ -123,4 +97,10 @@ zkir-lint: scanned 5 file(s)
 0 error(s), 0 warning(s), 0 info(s) | 5/5 clean
 ```
 
-This repository is currently only set up to support a local devnet running via Docker. The configurations for other networks and handling of those configs can be set up in `config.ts` and supporting files to enable their operation.
+Tear the network down when finished:
+```bash
+yarn env:down
+```
+
+To run the suite against **preprod** or **preview** instead (`yarn test:preprod`,
+`yarn test:preview`), see [FAST-SYNC.md](../../FAST-SYNC.md) at the repo root.
