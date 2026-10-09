@@ -25,7 +25,13 @@ const win = window as unknown as { midnight?: Record<string, unknown> };
 
 function installWallet(connect: ReturnType<typeof vi.fn>) {
   win.midnight = {
-    "5f1c0d3e-uuid": { name: "Lace", apiVersion: "4.0.1", icon: "", rdns: "io.lace", connect },
+    "5f1c0d3e-uuid": {
+      name: "Midnight Wallet",
+      apiVersion: "4.0.1",
+      icon: "",
+      rdns: "com.example.wallet",
+      connect,
+    },
   };
 }
 
@@ -103,30 +109,66 @@ describe("WalletContext", () => {
     expect(screen.getByTestId("error")).toHaveTextContent("User rejected the connection (Rejected)");
   });
 
-  it("prefers Lace when several wallets are installed, and dedupes aliases", async () => {
-    const other = vi.fn().mockResolvedValue(mockConnectedApi("undeployed"));
-    const lace = {
-      name: "lace",
+  // Two wallets plus an alias of the second, in `window.midnight` order. No
+  // vendor is preferred: the first one found is the default.
+  function installTwoWallets() {
+    const a = {
+      name: "Wallet A",
       apiVersion: "4.0.1",
       icon: "",
-      rdns: "io.lace.wallet",
+      rdns: "com.example.a",
+      connect: vi.fn().mockResolvedValue(mockConnectedApi("undeployed")),
+    };
+    const b = {
+      name: "Wallet B",
+      apiVersion: "4.0.1",
+      icon: "",
+      rdns: "com.example.b",
       connect: vi.fn().mockResolvedValue(mockConnectedApi("undeployed")),
     };
     win.midnight = {
-      "1am": { name: "1AM", apiVersion: "4.0.1", icon: "", rdns: "xyz.1am", connect: other },
-      "feb7992d-uuid": lace,
-      mnLace: lace, // alias pointing at the same object
+      "a-uuid": a,
+      "b-uuid": b,
+      bAlias: b, // alias pointing at the same object
     };
+    return { a, b };
+  }
+
+  it("defaults to the first wallet found when several are installed, and dedupes aliases", async () => {
+    const { a, b } = installTwoWallets();
     renderWallet();
 
     const picker = await screen.findByLabelText("Wallet");
-    expect(picker).toHaveValue("feb7992d-uuid");
+    expect(picker).toHaveValue("a-uuid");
     expect(picker.querySelectorAll("option")).toHaveLength(2);
 
     await userEvent.click(screen.getByText("connect"));
     await vi.waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("connected"));
-    expect(lace.connect).toHaveBeenCalledWith("undeployed");
-    expect(other).not.toHaveBeenCalled();
+    expect(a.connect).toHaveBeenCalledWith("undeployed");
+    expect(b.connect).not.toHaveBeenCalled();
+  });
+
+  it("connects to the wallet the user picked, and remembers the pick", async () => {
+    const { a, b } = installTwoWallets();
+    const { unmount } = render(
+      <WalletProvider>
+        <TestConsumer />
+        <WalletWidget />
+      </WalletProvider>,
+    );
+
+    await userEvent.selectOptions(await screen.findByLabelText("Wallet"), "b-uuid");
+    await userEvent.click(screen.getByText("connect"));
+    await vi.waitFor(() => expect(screen.getByTestId("status")).toHaveTextContent("connected"));
+    expect(b.connect).toHaveBeenCalledWith("undeployed");
+    expect(a.connect).not.toHaveBeenCalled();
+
+    // A fresh page load (disconnected first, so it doesn't auto-connect)
+    // starts from the remembered pick, not the first wallet found.
+    await userEvent.click(screen.getByText("disconnect"));
+    unmount();
+    renderWallet();
+    expect(await screen.findByLabelText("Wallet")).toHaveValue("b-uuid");
   });
 
   it("disconnects and clears state", async () => {

@@ -1,6 +1,6 @@
 # Calculator UI
 
-Browser frontend for `examples/calculator`: connect a Midnight wallet (Lace),
+Browser frontend for `examples/calculator`: connect a Midnight wallet,
 deploy or join the contract, watch its public ledger, and call its circuits.
 
 Scaffolded by `yarn new:ui calculator` from `templates/ui/`. See

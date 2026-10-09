@@ -1,10 +1,12 @@
 // Copies the compiled token-transfers ZK artifacts into public/ so the browser can
-// fetch them.
+// fetch them: every contract under contract/managed/, not only the one this UI
+// was generated for (token-transfers), so an example that compiles several
+// contracts (shielded-chips) can wire the others in its seed files.
 //
 // Why: in Node the harness reads keys from disk (NodeZkConfigProvider). A browser
 // can't, so the UI uses FetchZkConfigProvider, which GETs
 //   <base>/keys/<circuit>.prover, <base>/keys/<circuit>.verifier, <base>/zkir/<circuit>.bzkir
-// We serve them from /managed/token-transfers/ (see src/midnight/providers.ts).
+// We serve them from /managed/<contract>/ (see src/midnight/providers.ts).
 //
 // `yarn dev` and `yarn build` run it first (Yarn 4 does not run pre* scripts).
 // The source is the gitignored output of `yarn compile` in examples/token-transfers,
@@ -14,7 +16,7 @@
 // Yarn 4 doesn't enforce `engines`, and a shell defaulting to Node 20 crashed
 // the dev server in hello-world/ui with an unrelated-looking error. This is
 // the first thing `dev` and `build` run, so it fails early and clearly.
-import { cpSync, existsSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,21 +30,33 @@ if (min && Number(process.versions.node.split(".")[0]) < min) {
   );
   process.exit(1);
 }
-const src = path.resolve(here, "../../contract/managed/token-transfers");
-const dest = path.resolve(here, "../public/managed/token-transfers");
+const managed = path.resolve(here, "../../contract/managed");
+const primary = path.join(managed, "token-transfers");
 
 for (const dir of ["keys", "zkir"]) {
-  if (!existsSync(path.join(src, dir))) {
+  if (!existsSync(path.join(primary, dir))) {
     console.error(
-      `[copy:zk] ${path.join(src, dir)} not found.\n` +
+      `[copy:zk] ${path.join(primary, dir)} not found.\n` +
         "Compile the contract first:  yarn workspace @midnight-ntwrk/example-token-transfers run compile",
     );
     process.exit(1);
   }
 }
 
-rmSync(dest, { recursive: true, force: true });
-for (const dir of ["keys", "zkir"]) {
-  cpSync(path.join(src, dir), path.join(dest, dir), { recursive: true });
+// A compiled contract is a managed/<c>/ with compiler/contract-info.json.
+const contracts = readdirSync(managed).filter(
+  (c) =>
+    existsSync(path.join(managed, c, "compiler", "contract-info.json")) &&
+    ["keys", "zkir"].every((dir) => existsSync(path.join(managed, c, dir))),
+);
+
+const destRoot = path.resolve(here, "../public/managed");
+rmSync(destRoot, { recursive: true, force: true });
+for (const c of contracts) {
+  for (const dir of ["keys", "zkir"]) {
+    cpSync(path.join(managed, c, dir), path.join(destRoot, c, dir), { recursive: true });
+  }
 }
-console.log(`[copy:zk] copied keys/ and zkir/ to ${path.relative(process.cwd(), dest)}`);
+console.log(
+  `[copy:zk] copied keys/ and zkir/ of ${contracts.join(", ")} to ${path.relative(process.cwd(), destRoot)}`,
+);

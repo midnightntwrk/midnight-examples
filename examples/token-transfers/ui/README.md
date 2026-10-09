@@ -1,6 +1,6 @@
 # Token Transfers UI
 
-Browser frontend for `examples/token-transfers`: connect a Midnight wallet (Lace),
+Browser frontend for `examples/token-transfers`: connect a Midnight wallet,
 deploy or join the contract, and move unshielded and shielded tokens between
 the contract and your wallet.
 
@@ -46,16 +46,16 @@ Amounts of NIGHT are in STAR (1 NIGHT = 1,000,000 STAR). `receiveNightTokens`
 pays NIGHT from your wallet, so it needs NIGHT as well as DUST. On the local
 devnet, `yarn fund:wallet <mn_dust_…> <mn_addr_…>` arranges both.
 
-## TODO: end-to-end verification with Lace
+## TODO: end-to-end verification with a wallet
 
 Not yet run. Everything below needs a human to approve wallet prompts. What *has* been
 verified is in `templates/ui/VERIFIED.md`, generated from this UI's
 `verification.json`. When you run these, tick them off. Once all pass, set
-`laceDeploy` and `laceCalls` to `verified` in `verification.json` (with the
+`walletDeploy` and `walletCalls` to `verified` in `verification.json` (with the
 date and what ran), run `yarn new:ui token-transfers --sync`, and delete this section.
 
 Setup: `yarn env:up && yarn wait:dust` in `examples/token-transfers`, `yarn
-workspace @midnight-ntwrk/example-token-transfers-ui dev`, and a Lace wallet on
+workspace @midnight-ntwrk/example-token-transfers-ui dev`, and a browser wallet on
 `undeployed` funded with `yarn fund:wallet <mn_dust_…> <mn_addr_…>`.
 
 - [ ] **Deploy (wallet proving):** the "Your wallet" card appears, with NIGHT
@@ -64,9 +64,9 @@ workspace @midnight-ntwrk/example-token-transfers-ui dev`, and a Lace wallet on
       custom token color"; the wallet still holds none of it.
 - [ ] **sendToUser 400, Use my address:** the custom token appears in the
       wallet with 400.
-- [ ] **receiveTokens 400:** Lace must add the 400 custom-token input while
+- [ ] **receiveTokens 400:** the wallet must add the 400 custom-token input while
       balancing; the wallet's custom token goes back to 0.
-- [ ] **receiveNightTokens 5000:** Lace adds the NIGHT input; the wallet's
+- [ ] **receiveNightTokens 5000:** the wallet adds the NIGHT input; the wallet's
       NIGHT drops by 5000 STAR (fees are DUST).
 - [ ] **sendNightTokensToUser 2000, Use my address:** NIGHT rises by 2000 STAR.
 - [ ] **mintShieldedToSelf:** succeeds; the wallet's shielded balances don't
@@ -74,7 +74,7 @@ workspace @midnight-ntwrk/example-token-transfers-ui dev`, and a Lace wallet on
 - [ ] **mintAndSendShielded 500 / 300:** a shielded balance of 300 appears in
       the wallet, and receiveShieldedTokens' coin field offers the "→ sent"
       coin (value 300) and the "→ change" one (200).
-- [ ] **receiveShieldedTokens with the "→ sent" coin:** Lace must spend exactly
+- [ ] **receiveShieldedTokens with the "→ sent" coin:** the wallet must spend exactly
       that coin while balancing; the shielded balance drops back and the coin
       leaves the picker.
 - [ ] Repeat one unshielded and one shielded call with **local proving** (proof
