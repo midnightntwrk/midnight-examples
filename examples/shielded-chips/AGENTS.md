@@ -38,6 +38,8 @@
 - `src/test/privacy.test.ts` — one round, then mechanically asserts that the
   captured secrets (escrow nonce, payout nonce, wallet key) are absent from
   both contracts' public ledger state.
+- `ui/` — browser frontend (generated with `--contract roulette`; the chips
+  token is the second contract, wired in its seed files). See `ui/README.md`.
 - `TUTORIAL.md` (walkthrough of writing both contracts), `LESSONS.md` (privacy
   audit of an earlier version), `privacy-tests.md` (what the privacy suite
   checks, latest results). Keep them in sync when contracts or tests change.
@@ -66,7 +68,10 @@ yarn env:down
 - The contract never stores a player's escrowed coin, so the player replays it
   from private state at claim/forfeit time. Its `mt_index` is recovered from the
   bet transaction's `zswapStartIndex` via the indexer (`escrowMtIndex` in the
-  tests) and written with `rememberEscrow`.
+  tests) and written with `rememberEscrow`. That assumes the escrow is the
+  tx's first output, which holds when the bet coin is exactly the bet (as in
+  the tests). With a change output it can come second; the UI finds the
+  position by commitment (`escrowMtIndex` in `ui/src/midnight/shielded-chips-api.ts`).
 - Wallet roles: Alice (house) / Bob / Charlie via
   `resolveWallet(network, role)`. Both test files share Alice and Bob, so
   `vitest.config.ts` sets `fileParallelism: false`.

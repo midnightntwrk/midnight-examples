@@ -100,7 +100,7 @@ nothing behind it yet.
 | 4 | Test on local devnet, **in the background** | script | The pipeline starts `yarn validate --keep-net --report .gates/devnet.json` ([`scripts/validate-example.mjs`](../scripts/validate-example.mjs)) detached, after the in-memory gate, the full compile and step 5's `yarn install`: `env:up` → `wait:dust` → `test:local`. By hand, `yarn validate [--keep-net]` runs the same steps in the foreground (compiling first if needed) and takes the network down | `examples/<name>/compose.yml` (proof server, indexer, node) | `.gates/devnet.json` (steps, failing tests, log tails), `logs/devnet.log`, `logs/compose.log` on failure | Runs while steps 5–6 happen; must pass on the current sources before step 7. On failure the pipeline writes a fix plan (`.gates/devnet-fix.md`): back to 3c/3a, or retry for an infrastructure failure. See [Background devnet](#background-devnet) |
 | 5 | UI generator | script | `yarn new:ui <name> [--contract <managed-dir>] [--private-state memory\|persistent]` ([`scripts/new-ui.mjs`](../scripts/new-ui.mjs)); preview with `--dry-run` | `contract/managed/<c>/compiler/contract-info.json`, `contract/managed/<c>/contract/index.d.ts`, `contract/witnesses.ts`, `contract/<c>.compact`, and [`templates/ui/`](../templates/ui/) | `examples/<name>/ui/` (Vite + React): template-owned files, seed files, `new-ui.json`, `verification.json` | Refuses without an in-memory gate stamp for the current sources (`--skip-gate` overrides), when the contract isn't compiled, `ui/` already exists, or `witnesses.ts` lacks a `create<X>PrivateState` factory |
 | 6 | Add MN-specific UI code | reason | Model edits seed files only | [`templates/ui/AGENTS.md`](../templates/ui/AGENTS.md) (copied into every `ui/AGENTS.md`); existing `examples/*/ui/` | `src/midnight/<name>-api.ts`, `src/components/<name>-panel.tsx`, `src/__tests__/<name>-circuits.test.ts`, `README.md` | `typecheck`, `test:unit` and `build` pass; `yarn new:ui <name> --check` shows no template drift; on failure, back to 6 |
-| 7 | Serve to user | output | `yarn workspace @midnight-ntwrk/example-<name>-ui dev` (runs `copy:zk`, then Vite on :5173); `yarn fund:wallet` funds a browser wallet on devnet | Built UI, managed ZK assets | Running DApp | The devnet passed on the current sources (the pipeline's join); browser and Lace checks recorded in `ui/verification.json`. The background run leaves the devnet up for this step |
+| 7 | Serve to user | output | `yarn workspace @midnight-ntwrk/example-<name>-ui dev` (runs `copy:zk`, then Vite on :5173); `yarn fund:wallet` funds a browser wallet on devnet | Built UI, managed ZK assets | Running DApp | The devnet passed on the current sources (the pipeline's join); browser and wallet checks recorded in `ui/verification.json`. The background run leaves the devnet up for this step |
 
 ## Running it: `yarn pipeline`
 
@@ -221,7 +221,7 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
   can still show local copies.
 - **Serving (step 7).** Serving stops at the local Vite dev server; there is no
   deploy target in this repo.
-- **Browser verification.** The checks in `verification.json` (Lace, browser)
+- **Browser verification.** The checks in `verification.json` (wallet, browser)
   are run by hand. Decide which of them a pipeline can run automatically before
   serving.
 - **Stale devnet runs are cancelled, not resumed.** Each contract-level edit

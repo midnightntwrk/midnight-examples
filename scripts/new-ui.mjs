@@ -334,7 +334,9 @@ if (managed === null) {
   if (compiled.length > 1) {
     fail(
       `examples/${name} compiles ${compiled.length} contracts (${compiled.join(', ')}). ` +
-        'Pick one with --contract <dir>; multi-contract UIs are not scaffolded.',
+        'Pick the primary one with --contract <dir>: the UI is generated for it, and the ' +
+        'others are wired in the seed files (useMidnightProviders().providersFor; copy:zk ' +
+        'serves every compiled contract).',
     );
   }
   managed = compiled[0];

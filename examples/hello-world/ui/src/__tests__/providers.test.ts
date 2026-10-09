@@ -33,7 +33,7 @@ const { dappConnectorProofProvider } = await import(
 const { httpClientProofProvider } = await import(
   "@midnight-ntwrk/midnight-js-http-client-proof-provider"
 );
-const { createProviders } = await import("../midnight/providers");
+const { createContractProviders, createProviders } = await import("../midnight/providers");
 const { persistentPrivateStateProvider } = await import("../midnight/private-state");
 
 // 32-byte keys in hex. parse*ToHex passes hex through unchanged.
@@ -121,5 +121,49 @@ describe("createProviders", () => {
       accountId: COIN_PK,
       passphrase: "Correct-Horse-Battery-9",
     });
+  });
+});
+
+describe("createContractProviders", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    storage.mode = "memory";
+  });
+
+  it("serves another contract's ZK assets and proves with them", async () => {
+    const api = fakeApi();
+    const providers = await createContractProviders<"other">(
+      api,
+      { mode: "local", proofServerUrl: "http://localhost:9999" },
+      null,
+      "managed/other",
+    );
+
+    const zk = providers.zkConfigProvider as unknown as { baseURL: string };
+    expect(zk.baseURL).toBe(`${window.location.origin}/managed/other`);
+    expect(httpClientProofProvider).toHaveBeenCalledWith(
+      "http://localhost:9999",
+      providers.zkConfigProvider,
+    );
+  });
+
+  it("gives every bundle its own private-state store", async () => {
+    storage.mode = "persistent";
+    const proving = { mode: "wallet", proofServerUrl: "" } as const;
+    const main = await createProviders(fakeApi(), proving, "Correct-Horse-Battery-9");
+    const other = await createContractProviders<"other">(
+      fakeApi(),
+      proving,
+      "Correct-Horse-Battery-9",
+      "managed/other",
+    );
+
+    // Same encrypted store (account + passphrase), opened once per bundle, so
+    // one bundle's setContractAddress can't redirect the other's writes.
+    expect(persistentPrivateStateProvider).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(persistentPrivateStateProvider).mock.calls[1]).toEqual([
+      { accountId: COIN_PK, passphrase: "Correct-Horse-Battery-9" },
+    ]);
+    expect(main.zkConfigProvider).not.toBe(other.zkConfigProvider);
   });
 });

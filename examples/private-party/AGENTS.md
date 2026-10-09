@@ -39,7 +39,7 @@ yarn env:down
   `ui/src/midnight/private-party-api.ts`, and
   `ui/src/__tests__/private-party-circuits.test.ts` replays this example's
   Node test in memory.
-- **TODO:** the UI has not been run end to end with Lace. The checklist is
-  in `ui/README.md` ("TODO: end-to-end verification with Lace"). Don't
+- **TODO:** the UI has not been run end to end with a wallet. The checklist
+  is in `ui/README.md` ("TODO: end-to-end verification with a wallet"). Don't
   describe the UI as verified against a wallet until it's done, especially
   `checkIn`'s NIGHT payment and `claimFees`'s payout.
