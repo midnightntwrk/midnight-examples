@@ -113,7 +113,8 @@ yarn test:preprod        # every suite, sequentially (they share those wallets)
 | `private-bid` | The docs guide "How to build a private smart contract": prove a bid meets a public `sealed` minimum without revealing it, store a salted `persistentCommit` under a hashed, contract-bound bidder key (`kernel.self()`), reveal later; the minimal `disclose()` boundary |
 | `private-tip-jar` | Anonymous shielded tips into a contract-held pot: `receiveShielded` then a re-nonce to `kernel.self()` so only contract-owned coins reach `pot` (tipper's coin nonce and wallet stay off chain; tip values stay public), owner-only `withdraw` gated by a hashed witness key, a demo faucet token minted for the tests, a privacy test over the public ledger |
 
-Each example has its own `AGENTS.md` with specifics.
+Each example has its own `AGENTS.md` with specifics. The order to read them in
+for a newcomer is the [Learning path](README.md#learning-path) in the root README.
 
 ## Conventions for new/edited examples
 
@@ -161,6 +162,11 @@ Each example has its own `AGENTS.md` with specifics.
   as `contract/<it>.compact`. The template's compile scripts
   (`scripts/compile-contracts.mjs`) compile every contract, and `--derive`
   wires it.
+- A tutorial lives in `tutorials/*.mdx`, starting with `index.mdx` (the
+  scaffold copies a stub). This repo is its source of truth: the
+  `sync-tutorials` workflow mirrors it into midnight-docs. Open with the
+  previous learning-path step, use this repo's commands, never
+  `git clone example-*`. See [`docs/tutorials.md`](docs/tutorials.md).
 - Extend `../../tsconfig.base.json` in the example `tsconfig.json`.
 - Provide `compile`, `compile:fast`, `typecheck`, `test`, `test:sim`,
   `test:local`, `env:up`, `env:down`, `wait:dust` and `validate` scripts so the

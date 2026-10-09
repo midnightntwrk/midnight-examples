@@ -156,6 +156,41 @@ jobs:
           done
           [ "$found" = 1 ] || { echo "no generated UIs found"; exit 1; }
 
+  # Tutorial conventions (docs/tutorials.md): every tutorials/ folder has an
+  # index.mdx, and no tutorial sends readers to a standalone example-* repo
+  # (those repos are being archived; tutorials use this repo's commands).
+  tutorials:
+    name: tutorial conventions
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  #v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Check tutorials
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          dirs=(examples/*/tutorials templates/example/tutorials)
+          status=0
+          for dir in "${dirs[@]}"; do
+            if [ ! -f "$dir/index.mdx" ]; then
+              echo "::error file=$dir::$dir has no index.mdx"
+              status=1
+            fi
+          done
+          if [ "${#dirs[@]}" -gt 0 ] && grep -rnE 'git clone.*example-[a-z]|midnightntwrk/example-[a-z]' "${dirs[@]}"; then
+            echo "::error::A tutorial points at a standalone example-* repo. Use this repo's commands and links (see docs/tutorials.md)."
+            status=1
+          fi
+          # Titled code blocks must quote their file verbatim.
+          node scripts/check-tutorial-code.mjs || status=1
+          exit "$status"
+
   # The scaffolding itself: packages/sim's own tests (including the negative
   # control for assertNotInPublicState), and a throwaway example taken through
   # new:example → compile:fast → --derive twice. The second --derive must
