@@ -11,13 +11,13 @@
   "dependencies": {
     "@midnight-ntwrk/compact-js": "3.0.0-rc.3",
     "@midnight-ntwrk/compact-runtime": "0.20.0",
-    "@midnight-ntwrk/midnight-js-bundled-contract-module-provider": "5.0.0-rc.2",
+    "@midnight-ntwrk/midnight-js-bundled-contract-module-provider": "5.0.0-rc.4",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
     "@q3/harness": "workspace:^"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^22.20.4",
     "typescript": "^5.8.0",
     "vitest": "^4.1.0"
   }
