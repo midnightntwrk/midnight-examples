@@ -39,6 +39,9 @@ const git = (...args: string[]) => {
   }
 };
 
+// Read once, before this script writes anything: each deliverable's report
+// lands in reports/, inside the checked path, and would make the next one dirty.
+const workingTree = git('status', '--porcelain', '--', '.') === '' ? 'clean' : 'dirty';
 const startedAt = new Date().toISOString();
 const stack = { packages: packages(), compiler: compiler(), images: imageDigests() };
 const date = startedAt.slice(0, 10);
@@ -88,7 +91,7 @@ for (const d of DELIVERABLES) {
       network: 'local (compose.yml, undeployed)',
       gitCommit: git('rev-parse', '--short', 'HEAD'),
       gitBranch: git('rev-parse', '--abbrev-ref', 'HEAD'),
-      workingTree: git('status', '--porcelain', '--', '.') === '' ? 'clean' : 'dirty',
+      workingTree,
       host: `${process.platform} ${process.arch}, node ${process.version}`,
     },
     stack,
