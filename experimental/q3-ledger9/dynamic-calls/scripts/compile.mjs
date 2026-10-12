@@ -7,3 +7,4 @@ import { compile } from '../../harness/scripts/compact.mjs';
 compile('contract/standard_token.compact', 'contract/managed/standard_token');
 compile('contract/audited_token.compact', 'contract/managed/audited_token');
 compile('contract/token_registry.compact', 'contract/managed/token_registry');
+compile('contract/pure_interface_caller.compact', 'contract/managed/pure_interface_caller');
