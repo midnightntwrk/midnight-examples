@@ -8,8 +8,8 @@ declare global {
     // redeclaration keeps `window.midnight` typed project-wide. It must use the
     // SAME index signature as the package (`[key: string]: InitialAPI` — no
     // `| undefined` and no extra named keys) or TypeScript raises TS2717.
-    // Each wallet is installed under its own key (a UUID); Lace also aliases
-    // itself at `mnLace`.
+    // Each wallet is installed under its own key (a UUID); a wallet may also
+    // alias itself under a second key (Lace adds `mnLace`, for example).
     midnight?: { [key: string]: InitialAPI };
   }
 }

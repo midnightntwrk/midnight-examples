@@ -9,8 +9,8 @@
 //   zkConfigProvider      NodeZkConfigProvider (disk)   FetchZkConfigProvider (HTTP, /managed/…)
 //   proofProvider         local proof server            wallet-delegated OR local proof server
 //   privateStateProvider  LevelDB (disk)                LevelDB on IndexedDB, or in-memory (./private-state.ts)
-//   walletProvider        wallet-sdk WalletFacade       Lace via the DApp Connector API
-//   midnightProvider      wallet-sdk WalletFacade       Lace via the DApp Connector API
+//   walletProvider        wallet-sdk WalletFacade       the wallet, via the DApp Connector API
+//   midnightProvider      wallet-sdk WalletFacade       the wallet, via the DApp Connector API
 import type { ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
 import { dappConnectorProofProvider } from "@midnight-ntwrk/midnight-js-dapp-connector-proof-provider";
 import { FetchZkConfigProvider } from "@midnight-ntwrk/midnight-js-fetch-zk-config-provider";
@@ -43,8 +43,15 @@ import {
 } from "./contract";
 import { inMemoryPrivateStateProvider, persistentPrivateStateProvider } from "./private-state";
 
-export type CalculatorProviders = MidnightProviders<
-  CalculatorCircuits,
+export type CalculatorProviders = ContractProviders<CalculatorCircuits>;
+
+/**
+ * A providers bundle for any compiled contract of this example, keyed by its
+ * circuit ids. CalculatorProviders is the one for the contract this UI was
+ * generated for; createContractProviders builds one for another contract.
+ */
+export type ContractProviders<C extends string> = MidnightProviders<
+  C,
   typeof PRIVATE_STATE_ID,
   CalculatorPrivateState
 >;
@@ -78,6 +85,27 @@ export async function createProviders(
   proving: ProvingOptions,
   passphrase: string | null = null,
 ): Promise<CalculatorProviders> {
+  return createContractProviders<CalculatorCircuits>(api, proving, passphrase, ZK_ASSETS_PATH);
+}
+
+/**
+ * Build the providers for one compiled contract, whose keys and zkir are
+ * served from `zkAssetsPath` (`managed/<contract>`; scripts/copy-zk.mjs copies
+ * every compiled contract). An example with several contracts calls this once
+ * per extra contract, from its seed files (via useMidnightProviders().providersFor).
+ *
+ * Every call gets its own private-state provider. The store's contract address
+ * is one mutable field: midnight-js sets it when a call starts and writes the
+ * next private state when the call finalizes, minutes later. A store shared by
+ * two contracts' bundles could switch address in between and file one
+ * contract's state under the other's address.
+ */
+export async function createContractProviders<C extends string>(
+  api: ConnectedAPI,
+  proving: ProvingOptions,
+  passphrase: string | null,
+  zkAssetsPath: string,
+): Promise<ContractProviders<C>> {
   // The wallet decides which network we're on. Everything below (indexer
   // endpoints, network id for address encoding) follows from its config, so
   // the same build works on local `undeployed`, preview, and preprod.
@@ -97,8 +125,8 @@ export async function createProviders(
 
   // Fetches keys/<circuit>.{prover,verifier} and zkir/<circuit>.bzkir for
   // each circuit from the page's own origin. scripts/copy-zk.mjs puts them there.
-  const zkConfigProvider = new FetchZkConfigProvider<CalculatorCircuits>(
-    new URL(ZK_ASSETS_PATH, window.location.origin).toString(),
+  const zkConfigProvider = new FetchZkConfigProvider<C>(
+    new URL(zkAssetsPath, window.location.origin).toString(),
     fetch.bind(window),
   );
 
@@ -120,9 +148,9 @@ export async function createProviders(
     // midnight-js hands us a proven but *unbound* transaction
     // (Transaction<SignatureEnabled, Proof, PreBinding>). The Node harness
     // balances it with WalletFacade.balanceUnboundTransaction. In the browser
-    // Lace does the same job: it adds DUST fee inputs, signs, and binds. The
-    // connector speaks hex strings, so we serialize, hand it over, and
-    // deserialize the result as a FinalizedTransaction
+    // the connected wallet does the same job: it adds DUST fee inputs, signs,
+    // and binds. The connector speaks hex strings, so we serialize, hand it
+    // over, and deserialize the result as a FinalizedTransaction
     // (Transaction<SignatureEnabled, Proof, Binding>). The TTL is up to the
     // wallet; the connector has no ttl parameter.
     balanceTx: async (tx, _ttl) => {
@@ -168,16 +196,16 @@ async function createPrivateStateProvider(accountId: string, passphrase: string 
   if (passphrase === null) {
     throw new Error("The private-state store is locked: enter its passphrase first.");
   }
-  // Scoped per wallet account: switching accounts in Lace switches stores.
+  // Scoped per wallet account: switching accounts in the wallet switches stores.
   return persistentPrivateStateProvider<typeof PRIVATE_STATE_ID, CalculatorPrivateState>({
     accountId,
     passphrase,
   });
 }
 
-async function createProofProvider(
+async function createProofProvider<C extends string>(
   api: ConnectedAPI,
-  zkConfigProvider: FetchZkConfigProvider<CalculatorCircuits>,
+  zkConfigProvider: FetchZkConfigProvider<C>,
   proving: ProvingOptions,
 ): Promise<ProofProvider> {
   if (proving.mode === "local") {

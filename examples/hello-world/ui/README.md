@@ -1,7 +1,7 @@
 # Hello World — browser frontend
 
 A minimal React dApp for the hello-world contract. It connects a Midnight
-wallet (Lace), deploys a hello-world contract or joins an existing one, shows
+wallet, deploys a hello-world contract or joins an existing one, shows
 the public `message` ledger field live, and calls `storeMessage`.
 
 Everything Midnight-specific lives in [`src/midnight/`](src/midnight/). Each
@@ -11,7 +11,7 @@ file is the browser counterpart of a piece of the Node test harness in
 | Browser (`src/midnight/`) | Node harness (`../src/`) | What changes |
 |---|---|---|
 | `contract.ts` | `../contract/index.ts` | Imports the generated contract JS directly; no `node:path` |
-| `providers.ts` | `providers.ts`, `wallet.ts` | Wallet = Lace via the DApp Connector; keys fetched over HTTP; wallet or local proving; in-memory private state |
+| `providers.ts` | `providers.ts`, `wallet.ts` | Wallet = the browser wallet via the DApp Connector; keys fetched over HTTP; wallet or local proving; in-memory private state |
 | `hello-world-api.ts` | `test/hw.test.ts` | `deployContract` / `findDeployedContract` / `callTx.storeMessage`, plus a live `message$` stream |
 
 It is the reference output of `yarn new:ui` (Vite, React 19, Tailwind v4,
@@ -24,7 +24,7 @@ if the two drift apart (see `AGENTS.md`).
 
 ## Prerequisites
 
-- Chrome with a Midnight wallet extension (Lace). If several Midnight wallets
+- Chrome with a Midnight wallet extension. If several Midnight wallets
   are installed, pick one in the header.
 - DUST in that wallet on the network you'll use, to pay fees.
 - The compiled contract. From the repo root:
@@ -97,14 +97,14 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
   store stay on mainnet's ledger. Don't store anything you wouldn't publish.
 - **Prove with the wallet** (the default), or with a proof server you run
   yourself. Never use a hosted proof server you don't control.
-- **Use your own Lace wallet.** Never use the repo's fast-sync or seeded test
+- **Use your own browser wallet.** Never use the repo's fast-sync or seeded test
   wallets (`.env.<network>`, `yarn wallets:new`) on mainnet.
 - **Versions must match.** This UI is built against the repo's pinned
   toolchain (see the version matrix in the root `README.md`). If mainnet runs a
   different ledger or protocol version, transactions fail at proving or
   submission. That is fixed with a repo-wide version pass, not here.
 
-Set Lace to Mainnet, pick `mainnet` in the header, connect, deploy, then store a
+Set your wallet to Mainnet, pick `mainnet` in the header, connect, deploy, then store a
 message. Record what you ran under `mainnet` in `verification.json`.
 
 ## Proving: wallet vs local proof server
@@ -147,8 +147,9 @@ the UI must not join CI's local-network runs.
   `export *`s ledger-v8) are excluded. Excluding `compact-runtime` too breaks
   its CommonJS `object-inspect` import in dev.
 - **Several wallets.** `window.midnight` can hold more than one wallet (and
-  Lace adds an `mnLace` alias). Taking the first entry can pick the wrong
-  wallet, so the UI lists them and defaults to Lace.
+  Lace adds an `mnLace` alias). The first entry isn't necessarily the one
+  you meant, so the UI lists them, defaults to your last pick (else the
+  first found), and prefers no wallet vendor.
 - **Unfunded wallets fail with an empty message.** Lace reports fee failures
   as an Effect `FiberFailure` whose top-level `message` is `""`. The real
   reason is in `cause.failure`. `src/lib/errors.ts` unwraps it.

@@ -66,9 +66,9 @@ export interface DetectedWallet {
 
 /**
  * Every Midnight wallet injects itself into `window.midnight` under its own
- * key (a UUID; Lace also adds an `mnLace` alias pointing at the same object).
- * Several can be installed at once, so list them all, drop aliases, and let
- * the user pick.
+ * key (a UUID). A wallet may also alias itself under a second key pointing at
+ * the same object (Lace adds `mnLace`, for example). Several can be installed
+ * at once, so list them all, drop aliases, and let the user pick.
  */
 export function detectWallets(): DetectedWallet[] {
   if (typeof window === "undefined" || !window.midnight) return [];
@@ -82,11 +82,15 @@ export function detectWallets(): DetectedWallet[] {
   return wallets;
 }
 
-/** Remembered choice first, then Lace, then whatever is there. */
+/**
+ * The user's remembered choice if that wallet is still installed, otherwise
+ * the first one found, in `window.midnight` order. No wallet vendor is
+ * preferred: when several are installed, the widget shows a picker so the
+ * user can see and change which one connects.
+ */
 function preferredWalletKey(wallets: DetectedWallet[], saved: string | null): string | null {
   if (saved && wallets.some((w) => w.key === saved)) return saved;
-  const lace = wallets.find((w) => /lace/i.test(`${w.api.rdns} ${w.name}`));
-  return (lace ?? wallets[0])?.key ?? null;
+  return wallets[0]?.key ?? null;
 }
 
 function initialNetworkId(): NetworkId {
@@ -136,7 +140,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         ...DISCONNECTED,
         status: "error",
         error:
-          "No Midnight wallet extension found. Install a Midnight wallet (e.g. Lace) to continue.",
+          "No Midnight wallet extension found. Install a Midnight wallet to continue.",
       });
       return;
     }

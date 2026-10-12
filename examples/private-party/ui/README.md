@@ -1,6 +1,6 @@
 # Private Party UI
 
-Browser frontend for `examples/private-party`: connect a Midnight wallet (Lace),
+Browser frontend for `examples/private-party`: connect a Midnight wallet,
 deploy or join the contract, watch its public ledger, and call its circuits.
 
 Scaffolded by `yarn new:ui private-party` from `templates/ui/`. See
@@ -30,17 +30,17 @@ NIGHT, so a guest's wallet needs NIGHT as well as DUST. On the local devnet,
 `yarn fund:wallet <mn_dust_…> <mn_addr_…>` arranges both: the page's "no DUST"
 hint prints the command with your addresses.
 
-## TODO: end-to-end verification with Lace
+## TODO: end-to-end verification with a wallet
 
 Not yet run. Everything below needs a human to approve wallet prompts. What *has* been
 verified is in `templates/ui/VERIFIED.md`, generated from this UI's
 `verification.json`. When you run these, tick them off. Once all pass, set
-`laceDeploy` and `laceCalls` to `verified` in `verification.json` (with the
+`walletDeploy` and `walletCalls` to `verified` in `verification.json` (with the
 date and what ran), run `yarn new:ui private-party --sync`, and delete this section.
 
 Setup: `yarn env:up && yarn wait:dust` in `examples/private-party`, `yarn
 workspace @midnight-ntwrk/example-private-party-ui dev`, and two Chrome
-profiles: O (organizer) and G (guest), each with its own Lace wallet on
+profiles: O (organizer) and G (guest), each with its own browser wallet on
 `undeployed`. Fund both, NIGHT included, with `yarn fund:wallet <mn_dust_…>
 <mn_addr_…>`; the page's "no DUST" hint prints the command.
 
@@ -51,7 +51,7 @@ profiles: O (organizer) and G (guest), each with its own Lace wallet on
 - [ ] **Join + RSVP:** G joins by address, sets its own passphrase, RSVPs.
       RSVPs shows 1 of 2 and G sees "You're on the list"; O can't tell who.
 - [ ] **Start:** O starts the party; G's "Check in and pay" enables.
-- [ ] **Check in (unshielded NIGHT in):** G checks in. Lace must add the
+- [ ] **Check in (unshielded NIGHT in):** G checks in. The wallet must add the
       5 STAR input while balancing. Checked in shows 1, and G's NIGHT
       balance drops by the fee.
 - [ ] **Close + claim (unshielded NIGHT out):** O closes the doors, then claims

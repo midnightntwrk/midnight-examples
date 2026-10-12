@@ -1,0 +1,7 @@
+{
+  "contract": "roulette",
+  "privateState": "persistent",
+  "networks": [
+    "mainnet"
+  ]
+}

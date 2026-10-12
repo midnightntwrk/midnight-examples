@@ -47,4 +47,4 @@ yarn env:down
   It has no `compile`/`test`/`test:local` scripts on purpose (root aggregates
   run on every workspace). Keep `vite` pinned to the hoisted 6.4.3 and the
   Midnight packages on the repo pins. The full wallet flow needs a human
-  (Lace approvals), so there's no automated E2E test.
+  (wallet approvals), so there's no automated E2E test.

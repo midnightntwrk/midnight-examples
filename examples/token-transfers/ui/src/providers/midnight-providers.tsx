@@ -3,12 +3,15 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
 import {
+  createContractProviders,
   createProviders,
   DEFAULT_PROOF_SERVER_URL,
+  type ContractProviders,
   type TokenTransfersProviders,
   type ProvingMode,
   type ProvingOptions,
@@ -35,6 +38,13 @@ interface MidnightProvidersContextValue {
   /** Why the last unlock() failed (e.g. wrong passphrase), if it did. */
   unlockError: string | null;
   unlock: (passphrase: string) => void;
+  /**
+   * Builds a providers bundle for another compiled contract of this example
+   * (`managed/<contract>`), with the same wallet, proving settings and
+   * passphrase as `providers`. Null until `providers` is ready; it changes
+   * whenever they are rebuilt, so depend on it in an effect.
+   */
+  providersFor: (<C extends string>(zkAssetsPath: string) => Promise<ContractProviders<C>>) | null;
 }
 
 const MidnightProvidersContext =
@@ -102,6 +112,12 @@ export function MidnightProvidersProvider({ children }: { children: ReactNode })
     };
   }, [connectedApi, status, proving, passphrase, locked]);
 
+  const providersFor = useMemo(() => {
+    if (!providers || !connectedApi) return null;
+    return <C extends string>(zkAssetsPath: string) =>
+      createContractProviders<C>(connectedApi, proving, passphrase, zkAssetsPath);
+  }, [providers, connectedApi, proving, passphrase]);
+
   const unlock = useCallback((next: string) => {
     setUnlockError(null);
     setPassphrase(next);
@@ -118,6 +134,7 @@ export function MidnightProvidersProvider({ children }: { children: ReactNode })
         locked,
         unlockError,
         unlock,
+        providersFor,
       }}
     >
       {children}

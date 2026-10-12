@@ -1,6 +1,6 @@
 # __Title__ UI
 
-Browser frontend for `examples/__name__`: connect a Midnight wallet (Lace),
+Browser frontend for `examples/__name__`: connect a Midnight wallet,
 deploy or join the contract, watch its public ledger, and call its circuits.
 
 Scaffolded by `yarn new:ui __name__` from `templates/ui/`. See
