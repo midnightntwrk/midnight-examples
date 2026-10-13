@@ -3,6 +3,11 @@ name: Sync tutorials to docs
 # Mirrors every examples/<name>/tutorials/ into midnight-docs
 # docs/tutorials/<name>/ and opens (or updates) one PR there. See
 # docs/tutorials.md for the conventions.
+#
+# Auth: DOCS_SYNC_TOKEN, a repo secret holding a fine-grained PAT owned by
+# DevRel, scoped to midnightntwrk/midnight-docs only (Contents and Pull
+# requests: read & write). It is an interim credential: a personal token leaves
+# with its owner, so an org-owned GitHub App should replace it.
 
 # Lock down top-level permissions. Grant per-job.
 permissions: {}
@@ -29,14 +34,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: read              # checkout this repo; the docs repo uses the PAT
+      contents: read              # checkout this repo; the docs repo uses DOCS_SYNC_TOKEN
     steps:
       - name: Verify docs token is configured
         env:
-          DOCS_TOKEN: ${{ secrets.DEVREL_DOCS_PR_TOKEN }}
+          DOCS_TOKEN: ${{ secrets.DOCS_SYNC_TOKEN }}
         run: |
           if [ -z "$DOCS_TOKEN" ]; then
-            echo "::error::DEVREL_DOCS_PR_TOKEN is not set. Add it as a repository or org secret with permission to push branches and open PRs on midnightntwrk/midnight-docs."
+            echo "::error::DOCS_SYNC_TOKEN is not set. Add it as a repository secret: a token that can push branches and open PRs on midnightntwrk/midnight-docs (see docs/tutorials.md)."
             exit 1
           fi
 
@@ -50,10 +55,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: midnightntwrk/midnight-docs
-          token: ${{ secrets.DEVREL_DOCS_PR_TOKEN }}
+          token: ${{ secrets.DOCS_SYNC_TOKEN }}
           path: docs
           # create-pull-request receives the token explicitly; don't leave the
-          # PAT sitting in docs/.git/config for the rest of the job.
+          # token sitting in docs/.git/config for the rest of the job.
           persist-credentials: false
 
       # One rsync per example, into that example's own docs folder, so docs
@@ -112,7 +117,7 @@ jobs:
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           path: docs
-          token: ${{ secrets.DEVREL_DOCS_PR_TOKEN }}
+          token: ${{ secrets.DOCS_SYNC_TOKEN }}
           commit-message: 'docs: update tutorials from ${{ github.repository }}@${{ github.sha }}'
           title: 'docs: update tutorials from midnight-examples'
           body: |
