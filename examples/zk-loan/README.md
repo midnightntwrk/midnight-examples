@@ -20,6 +20,11 @@ Requesting more than your tier allows creates a `Proposed` loan at the tier
 maximum, which you then accept (`Approved`) or decline (`NotAccepted`) with
 `respondToLoan`.
 
+For a guided walkthrough of the contract, the attestation API and the on-chain tests, see the
+[ZK Loan tutorial](./tutorials/index.mdx), also published at
+[docs.midnight.network](https://docs.midnight.network/tutorials/zk-loan). It is step 5 of the
+[learning path](../../README.md#learning-path).
+
 ## Set up
 
 Install dependencies (from the repo root — one lockfile for the whole workspace):

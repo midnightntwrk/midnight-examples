@@ -1,0 +1,477 @@
+---
+SPDX-License-Identifier: Apache-2.0
+copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+sidebar_label: "Attestation API"
+title: "Attestation API"
+description: "Read the attestation API for the ZK loan DApp: a REST server that Schnorr-signs credit data so the contract can verify it inside the proof."
+sidebar_position: 20
+toc_max_heading_level: 3
+---
+
+# Attestation API
+
+The [contract](/tutorials/zk-loan/smart-contract) only trusts a credit profile that a registered
+provider has signed. This part walks through that provider: the attestation API in
+`examples/zk-loan/attestation-api/`. It is a small REST server that signs credit data with Schnorr
+signatures on the Jubjub curve. In production this would be a bank's or a credit bureau's
+service. Here it stands in for one.
+
+## Prerequisites
+
+- The [ZK Loan contract](/tutorials/zk-loan/smart-contract) part of this tutorial.
+
+## The endpoints
+
+The API has three endpoints:
+
+- `POST /attest` takes credit data and the hash of a borrower's identity, and returns a Schnorr
+  signature over them.
+- `GET /provider-info` returns the provider's ID and public key. The admin registers these on
+  chain with `registerProvider`.
+- `GET /health` returns the server's status.
+
+## Wire types
+
+`attestation-api/types.ts` defines the request and response shapes:
+
+```typescript title="attestation-api/types.ts"
+// Wire types for the attestation API. JSON has no bigint, so every field-sized
+// value travels as a decimal string; clients convert with BigInt(...).
+
+export interface AttestationRequest {
+  creditScore: number;
+  monthlyIncome: number;
+  monthsAsCustomer: number;
+  // transientHash(deriveUserPublicKey(secret, pin)) as a decimal string. The
+  // borrower computes it locally, so the API never learns the secret or PIN.
+  userPubKeyHash: string;
+}
+
+export interface AttestationResponse {
+  signature: {
+    announcement: { x: string; y: string };
+    response: string;
+  };
+  message: {
+    creditScore: string;
+    monthlyIncome: string;
+    monthsAsCustomer: string;
+    userPubKeyHash: string;
+  };
+}
+
+export interface ProviderInfoResponse {
+  providerId: number;
+  publicKey: { x: string; y: string };
+}
+
+export interface HealthResponse {
+  status: string;
+  providerId: number;
+}
+```
+
+- `AttestationRequest` takes the credit data as numbers and `userPubKeyHash` as a string. The hash
+  is a field element, too large for a JSON number, so it travels as a decimal string.
+- `AttestationResponse` returns the signature's announcement point and response scalar as strings
+  for the same reason. `message` echoes back what was signed.
+
+The borrower computes `userPubKeyHash` locally, from their secret and PIN, so the provider never
+learns either of them.
+
+## Signing
+
+`attestation-api/signing.ts` is the off-chain half of `contract/schnorr.compact`. It starts with
+two constants: the order of the Jubjub subgroup, and 2^248 for the challenge truncation.
+
+```typescript title="attestation-api/signing.ts"
+import * as crypto from 'node:crypto';
+import { ecMulGenerator, type JubjubPoint } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import { pureCircuits, type Schnorr_SchnorrSignature } from '../contract/index.js';
+
+// Order of the Jubjub prime-order subgroup. Scalars passed to ecMulGenerator
+// must be below this or it throws "out of bounds for prime field".
+export const JUBJUB_ORDER = 6554484396890773809930967563523245729705921265872317281365359162392183254199n;
+// The circuit truncates the BLS12-381 challenge hash to 248 bits so it is a
+// valid Jubjub scalar; the signer must truncate the same way.
+export const TWO_248 = 452312848583266388373324160190187140051835877600158453279131187530910662656n;
+
+const reduce = (x: bigint): bigint => ((x % JUBJUB_ORDER) + JUBJUB_ORDER) % JUBJUB_ORDER;
+```
+
+The signer imports `pureCircuits` from `contract/index.ts`. That is the TypeScript the compiler
+generated from the contract's pure circuits, including `schnorrChallenge`.
+
+Key generation picks a random scalar below the Jubjub order:
+
+```typescript title="attestation-api/signing.ts"
+// A uniformly-ish random scalar. 256 random bits reduced mod the ~2^252 order
+// has negligible bias for a demo; a production signer would use rejection
+// sampling and HSM-held keys.
+function randomScalar(): bigint {
+  return BigInt('0x' + crypto.randomBytes(32).toString('hex')) % JUBJUB_ORDER;
+}
+
+export function generateKeyPair(): { sk: bigint; pk: JubjubPoint } {
+  const sk = randomScalar();
+  return { sk, pk: ecMulGenerator(sk) };
+}
+
+export function getPublicKey(sk: bigint): JubjubPoint {
+  return ecMulGenerator(reduce(sk));
+}
+```
+
+Then the signature itself:
+
+```typescript title="attestation-api/signing.ts"
+// Sign a 4-element message. The nonce k is fresh per signature — reusing a
+// nonce across two messages leaks the secret key.
+export function sign(sk: bigint, msg: bigint[]): Schnorr_SchnorrSignature {
+  sk = reduce(sk);
+  const pk = ecMulGenerator(sk);
+  const k = randomScalar();
+  const R = ecMulGenerator(k);
+  // pureCircuits.schnorrChallenge returns the full transientHash output; the
+  // circuit reduces it mod 2^248 before the EC ops, so do the same here.
+  const c = pureCircuits.schnorrChallenge(R.x, R.y, pk.x, pk.y, msg) % TWO_248;
+  // s must be reduced mod the Jubjub order (not the BLS12-381 field), because
+  // the circuit feeds it to ecMulGenerator.
+  const s = reduce(k + c * sk);
+  return { announcement: R, response: s };
+}
+```
+
+Step by step:
+
+1. Reduce the secret key into the Jubjub scalar field with `reduce`. `ecMulGenerator` only accepts
+   scalars below the Jubjub order, and throws "out of bounds for prime field" otherwise. So a key
+   loaded from any 32-byte value, which is usually larger than the order, still works.
+2. Pick a fresh random nonce `k`, and compute the announcement `R = k*G`.
+3. Compute the challenge with `pureCircuits.schnorrChallenge`, the same hash the circuit uses,
+   and truncate it to 248 bits.
+4. Compute the response `s = k + c*sk`, reduced modulo the Jubjub order, because the circuit
+   passes `s` to `ecMulGenerator`.
+
+The circuit then checks `s*G == R + c*pk`. Step 3 is the critical one. Because the signer calls the
+contract's own compiled `schnorrChallenge`, it computes exactly the hash the circuit does. With any
+other hash, every signature would fail verification.
+
+:::caution
+Never reuse a nonce. Two signatures with the same `k` over different messages reveal the secret
+key. `sign` draws a fresh `k` every time.
+:::
+
+`signCreditData` lays the message out exactly as `evaluateApplicant` rebuilds it inside the
+circuit:
+
+```typescript title="attestation-api/signing.ts"
+// The exact message layout `evaluateApplicant` rebuilds in-circuit:
+// [creditScore, monthlyIncome, monthsAsCustomer, userPubKeyHash]. The last
+// element binds the attestation to one borrower identity, so it cannot be
+// replayed by anyone else.
+export function signCreditData(
+  sk: bigint,
+  creditScore: number | bigint,
+  monthlyIncome: number | bigint,
+  monthsAsCustomer: number | bigint,
+  userPubKeyHash: bigint,
+): Schnorr_SchnorrSignature {
+  return sign(sk, [BigInt(creditScore), BigInt(monthlyIncome), BigInt(monthsAsCustomer), userPubKeyHash]);
+}
+```
+
+The last element, `userPubKeyHash`, binds the signature to one borrower identity. Another borrower
+can't replay it, because their own identity hashes to a different value.
+
+## The REST server
+
+`attestation-api/server.ts` wires the endpoints to the signer. It uses
+[Restify](https://restify.com/) and allows any origin, so a browser DApp can call it directly:
+
+```typescript title="attestation-api/server.ts"
+export function createServer(providerSk: bigint, providerId: number): restify.Server {
+  const server = restify.createServer({ name: 'zkloan-attestation-api' });
+  server.use(restify.plugins.bodyParser());
+
+  // Permissive CORS so a browser DApp can call the API directly.
+  server.pre((req: restify.Request, res: restify.Response, next: restify.Next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.send(204);
+      return next(false);
+    }
+    return next();
+  });
+
+  const providerPk: JubjubPoint = getPublicKey(providerSk);
+```
+
+`POST /attest` checks the four fields are present, signs them with the provider's secret key, and
+returns the signature and the signed message, with every bigint as a decimal string:
+
+```typescript title="attestation-api/server.ts"
+  server.post('/attest', (req: restify.Request, res: restify.Response, next: restify.Next) => {
+    try {
+      const body = req.body as AttestationRequest;
+
+      if (
+        body?.creditScore == null ||
+        body.monthlyIncome == null ||
+        body.monthsAsCustomer == null ||
+        body.userPubKeyHash == null
+      ) {
+        res.send(400, {
+          error: 'Missing required fields: creditScore, monthlyIncome, monthsAsCustomer, userPubKeyHash',
+        });
+        return next();
+      }
+
+      const userPubKeyHash = BigInt(body.userPubKeyHash);
+      const signature = signCreditData(
+        providerSk,
+        body.creditScore,
+        body.monthlyIncome,
+        body.monthsAsCustomer,
+        userPubKeyHash,
+      );
+
+      const response: AttestationResponse = {
+        signature: {
+          announcement: {
+            x: signature.announcement.x.toString(),
+            y: signature.announcement.y.toString(),
+          },
+          response: signature.response.toString(),
+        },
+        message: {
+          creditScore: body.creditScore.toString(),
+          monthlyIncome: body.monthlyIncome.toString(),
+          monthsAsCustomer: body.monthsAsCustomer.toString(),
+          userPubKeyHash: userPubKeyHash.toString(),
+        },
+      };
+      res.send(200, response);
+    } catch (err) {
+      res.send(500, { error: err instanceof Error ? err.message : String(err) });
+    }
+    return next();
+  });
+```
+
+`GET /provider-info` returns what the admin needs to register this provider on chain, and
+`GET /health` is a standard health check:
+
+```typescript title="attestation-api/server.ts"
+  server.get('/provider-info', (_req: restify.Request, res: restify.Response, next: restify.Next) => {
+    const response: ProviderInfoResponse = {
+      providerId,
+      publicKey: { x: providerPk.x.toString(), y: providerPk.y.toString() },
+    };
+    res.send(200, response);
+    return next();
+  });
+
+  server.get('/health', (_req: restify.Request, res: restify.Response, next: restify.Next) => {
+    const response: HealthResponse = { status: 'ok', providerId };
+    res.send(200, response);
+    return next();
+  });
+
+  return server;
+}
+```
+
+:::warning Demo-grade
+This server signs whatever credit data it is sent. A real provider would authenticate the caller
+and look the figures up in its own records, rather than trust the request body. The contract only
+proves that *this* provider vouched for the data, so the provider is the trust anchor.
+:::
+
+## The entry point
+
+`attestation-api/index.ts` loads or generates the provider key and starts the server:
+
+```typescript title="attestation-api/index.ts"
+setNetworkId(process.env['NETWORK_ID'] || 'undeployed');
+
+const PORT = parseInt(process.env['PORT'] || '4000', 10);
+const PROVIDER_ID = parseInt(process.env['PROVIDER_ID'] || '1', 10);
+
+let providerSk: bigint;
+const secretHex = process.env['PROVIDER_SECRET_KEY'];
+if (secretHex) {
+  // Reduce so any 32-byte hex value is a valid Jubjub scalar.
+  providerSk = BigInt('0x' + secretHex) % JUBJUB_ORDER;
+  console.log('Loaded provider secret key from environment');
+} else {
+  providerSk = generateKeyPair().sk;
+  console.log('Generated ephemeral provider key pair');
+}
+
+const pk = getPublicKey(providerSk);
+console.log(`Provider ID: ${PROVIDER_ID}`);
+console.log('Provider public key:');
+console.log(`  x: ${pk.x}`);
+console.log(`  y: ${pk.y}`);
+console.log(`Register this provider on-chain with: registerProvider(${PROVIDER_ID}, {x: ${pk.x}n, y: ${pk.y}n})`);
+
+createServer(providerSk, PROVIDER_ID).listen(PORT, () => {
+  console.log(`Attestation API listening on port ${PORT}`);
+});
+```
+
+It reads four environment variables:
+
+- `PORT`: the listen port. Default 4000.
+- `PROVIDER_ID`: the on-chain ID the key is registered under. Default 1.
+- `PROVIDER_SECRET_KEY`: a hex Jubjub secret key. Without it the server generates a fresh key on
+  every start, which then has to be registered on chain again. With it, the public key stays the
+  same across restarts. The value is reduced modulo the Jubjub order first, because most random
+  32-byte values are larger than the order.
+- `NETWORK_ID`: default `undeployed`, the local network. Set it to target another network, such
+  as `preprod`.
+
+## Run it
+
+From `examples/zk-loan`:
+
+```bash
+yarn attestation:start
+```
+
+The server prints its key and a ready-made `registerProvider` call:
+
+```
+Generated ephemeral provider key pair
+Provider ID: 1
+Provider public key:
+  x: 34011401554120741160298202835178627774966657519840293748374731768831074333877
+  y: 20561868703134644164447864025937537271049689058944105758742005191640850207216
+Register this provider on-chain with: registerProvider(1, {x: 34011401554120741160298202835178627774966657519840293748374731768831074333877n, y: 20561868703134644164447864025937537271049689058944105758742005191640850207216n})
+Attestation API listening on port 4000
+```
+
+Your key differs, since it's generated fresh. In a second terminal, check the endpoints:
+
+```bash
+curl http://localhost:4000/health
+curl http://localhost:4000/provider-info
+```
+
+```
+{"status":"ok","providerId":1}
+{"providerId":1,"publicKey":{"x":"34011401554120741160298202835178627774966657519840293748374731768831074333877","y":"20561868703134644164447864025937537271049689058944105758742005191640850207216"}}
+```
+
+Then ask for a signature. Any decimal string works as `userPubKeyHash` here; a borrower sends the
+hash of their identity.
+
+```bash
+curl -X POST http://localhost:4000/attest \
+  -H 'Content-Type: application/json' \
+  -d '{"creditScore": 720, "monthlyIncome": 2500, "monthsAsCustomer": 24, "userPubKeyHash": "12345"}'
+```
+
+The response holds the signature and echoes the signed message:
+
+```json
+{
+  "signature": {
+    "announcement": {
+      "x": "31540621476077479166376266535540036184142785888380769319902548457379701327240",
+      "y": "44823578977567077845389280972004925387492839733725374129431623294795868131990"
+    },
+    "response": "6414907552153898933550119210015492650698244154133242502297393619952011729853"
+  },
+  "message": {
+    "creditScore": "720",
+    "monthlyIncome": "2500",
+    "monthsAsCustomer": "24",
+    "userPubKeyHash": "12345"
+  }
+}
+```
+
+Stop the server with Ctrl+C. You don't need it running for the next part: the test suite starts
+its own copy of the same server, in-process, on a free port.
+
+The API has its own unit tests, for the HTTP handlers and for the signer. They need no network:
+
+```bash
+yarn test src/test/attestation-api
+```
+
+## The attestation flow
+
+Here is how attestation works across the three parties:
+
+```plaintext
+┌──────────┐     ┌────────────────┐     ┌───────────────┐
+│ Borrower │     │  Attestation   │     │   Midnight    │
+│ (DApp)   │     │      API       │     │   Network     │
+└────┬─────┘     └───────┬────────┘     └───────┬───────┘
+     │                   │                      │
+     │  1. Admin registers provider PK on-chain │
+     │─────────────────────────────────────────>│
+     │                   │                      │
+     │  2. POST /attest  │                      │
+     │  {creditScore,    │                      │
+     │   monthlyIncome,  │                      │
+     │   monthsAsCustomer│                      │
+     │   userPubKeyHash} │                      │
+     │──────────────────>│                      │
+     │                   │                      │
+     │  3. Returns signed│                      │
+     │  Schnorr signature│                      │
+     │<──────────────────│                      │
+     │                   │                      │
+     │  4. Submit loan request with signature   │
+     │  (signature in private state, never      │
+     │   visible on-chain)                      │
+     │─────────────────────────────────────────>│
+     │                   │                      │
+     │                   │  5. ZK circuit       │
+     │                   │  verifies signature  │
+     │                   │  against registered  │
+     │                   │  PK (all in zero-    │
+     │                   │  knowledge)          │
+     │                   │                      │
+     │  6. Only loan status + amount on ledger  │
+     │<─────────────────────────────────────────│
+```
+
+1. **Register the provider.** The admin calls `registerProvider`, storing the API's public key in
+   the contract's `providers` map. This is the only step of the setup that touches the chain.
+2. **Request an attestation.** The borrower derives their identity with the
+   `deriveUserPublicKey` pure circuit, from the secret in their private state and their PIN, and
+   hashes it. They send that hash and their credit data to the API.
+3. **Sign and return.** The API signs all four values as one Schnorr signature. Including the
+   identity hash binds the attestation to this borrower.
+4. **Submit the loan request.** The borrower stores the signature in their private state and calls
+   `requestLoan`. The signature goes to the proof server as part of the witness. It never appears
+   in the transaction that reaches the chain.
+5. **Verify in ZK.** Inside the circuit, `evaluateApplicant` takes the signature from the witness,
+   looks up the provider's public key on the ledger, and runs `schnorrVerify`. If the data was
+   tampered with, a different provider signed it, or the attestation belongs to someone else, the
+   assert fails and no transaction is submitted.
+6. **Record the outcome.** Only the loan's status and authorized amount are written to the ledger.
+   The credit score, income, tenure, PIN and signature stay private.
+
+What each party learns:
+
+- **The borrower can't lie.** The contract verifies the provider's signature inside the circuit,
+  so made-up credit data fails.
+- **The chain learns only the outcome.** The credit data and the signature are private inputs to
+  the proof. Observers see the loan's status and amount under a derived key, and nothing else.
+- **The provider sees what it signs, and can link it.** The provider already knows the figures:
+  it is their source. It never learns the borrower's secret or PIN. But `userPubKeyHash` is a
+  plain hash of the borrower's derived key, and that key is public in `loans`. So a provider that
+  watches the ledger can match its attestation to the borrower's loans.
+
+## Next
+
+The [ZK Loan tests](/tutorials/zk-loan/test-suite) run the whole flow on a local devnet: deploy the
+contract, register this API's key, borrow, and check that every cheat is rejected.
