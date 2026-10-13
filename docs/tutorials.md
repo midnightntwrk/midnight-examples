@@ -38,8 +38,13 @@ edit examples/<name>/tutorials/ → PR merged to main → workflow opens a midni
   marker line from the scaffold is skipped, so a stub never reaches the docs.
 - All synced examples share one docs branch, `sync/examples-tutorials`, so
   successive merges here update a single open docs PR.
-- The workflow needs the `DEVREL_DOCS_PR_TOKEN` secret, a token that can push
-  branches and open PRs on midnight-docs.
+- The workflow authenticates to midnight-docs with the `DOCS_SYNC_TOKEN` repo
+  secret: a fine-grained PAT owned by DevRel, scoped to midnight-docs only,
+  with Contents and Pull requests set to read & write. The sync PR is authored
+  by the token's owner, so someone else must approve it. A personal token
+  expires and leaves with its owner, so this is interim: an org-owned GitHub
+  App should replace it. Until then, rotate the token before it expires
+  (`gh secret set DOCS_SYNC_TOKEN -R midnightntwrk/midnight-examples`).
 
 ## Writing a tutorial
 
