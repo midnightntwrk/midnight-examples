@@ -105,6 +105,7 @@ Vendor QA runs only at L2, plus refusals before a circuit runs, so L1 is new cov
 | Gap | Test | Layer |
 |---|---|---|
 | AC-1 | the single `pay` call site runs standard code for one address and audited code for another; only the audited counter moves | L1, L2 |
+| AC-1 | re-listing id 1 from the standard to the audited address makes the same `pay(1, …)` run audited code, with no redeploy or recompile | L1, L2 |
 | 03-G1 | no provider: `ModuleProviderAbsent` | L1, L2 |
 | 03-G2 | unbound address: `UnsupportedImplementation` | L1, L2 |
 | 03-G3 | the standard module bound to the audited address: `ImplementationMismatch` | L1, L2 |
@@ -114,14 +115,15 @@ Vendor QA runs only at L2, plus refusals before a circuit runs, so L1 is new cov
 | 03-G7 | `swap` runs both implementations in one transaction | L1, L2 |
 | 03-G9 | cross-contract calls in memory | L1 |
 | 03-G10 | generated modules carry `declaredInterfaces` / `circuitSignatures` / `expectedVk`; same signature, different fingerprints | L1 |
+| 03-G12 | a `pure` circuit in a contract type compiles, then every call is refused: `PureInterfaceCircuit` | L1 |
+| 03-G13 | a module with malformed `circuitSignatures` (unknown tag, `Struct` without `elements`, `Vector` of 2^30, `Alias` nested 100 000 deep, `transfer` only on the prototype) is a `ModuleResolutionError`, in under 1 s. **The deep `Alias` case fails** (see observations) | L1 |
 | 03-G8 | verifier-key change at an address: **not done** (stretch) | — |
 
-Two of the eleven `ModuleResolutionError` kinds are not driven: `PureInterfaceCircuit` and
-`UnreadableModule`.
+All eleven `ModuleResolutionError` kinds are driven at L1.
 
 ## Observations and findings
 
-These are results of the runs recorded in `reports/`. Latest run, 2026-10-01: SOW-01 L1 50/50, L2 6/6; SOW-03 L1 16/16, L2 6/6, on the record's images, digests verified. They are what we saw happen; we did
+These are results of the runs recorded in `reports/`. Latest runs, on the record's images, digests verified: SOW-01 2026-10-01, L1 50/50, L2 6/6; SOW-03 2026-10-12, L1 22/23 (the failure is observation 15), L2 7/7. They are what we saw happen; we did
 not assume any of them in advance.
 
 | # | Observation | Status |
@@ -138,6 +140,9 @@ not assume any of them in advance.
 | 10 | **The record's indexer image path names the wrong org.** It and compact-end-2-end's `infra/pins.ts` write `ghcr.io/midnight-ntwrk/indexer-standalone`. ghcr refuses that path (401 anonymous, 403 logged in with `read:packages`), and the GitHub packages API reports no such package under `midnight-ntwrk`. The image is **public** at `ghcr.io/midnightntwrk/indexer-standalone` (no hyphen), with the record's digest `sha256:5c717d83…2d64458`. Docker Hub stops at `4.4.0-rc.2` | doc error to raise; fixed in `compose.yml` |
 | 11 | Yarn 4.18's default 24-hour minimum package age quarantines release candidates on the day they ship. Fixed here by preapproving only the two first-party Midnight scopes in `.yarnrc.yml` | workaround |
 | 12 | `from` and `to` are reserved words in Compact and cannot be parameter names | minor |
+| 13 | A contract type may declare a `pure` circuit (`contract Peekable { pure circuit peek(): Uint<64>; }`) and compactc 0.35.0 compiles a call to it, proving keys included, but the runtime refuses every such call with `PureInterfaceCircuit` before resolving the module. The caller itself must be impure: a call from a circuit the compiler infers as pure is rejected with "cross-contract call from a pure circuit is not yet supported" | L1 (03-G12); spec gap to raise |
+| 14 | Malformed `circuitSignatures` from a module provider: an unknown tag and a `Struct` without `elements` are refused as **`UnreadableModule`**; a `Vector` of length 2^30 is a readable type (any safe integer length is), so it is refused as **`NonconformantImplementation`** against `Bytes<32>`. All three are refused in about 3 ms; none throws a raw `TypeError`/`RangeError`. A `transfer` signature present only on the prototype of `circuitSignatures` is `NonconformantImplementation` (own properties only) | L1 (03-G13) |
+| 15 | **A deeply nested signature type escapes the error vocabulary.** A module whose `transfer` argument is a readable `Alias` chain about 10 000–12 500 levels deep or more makes compact-runtime 0.20.0 throw a raw `RangeError: Maximum call stack size exceeded` from the recursive `firstUnreadableTag` (`dist/conformance.js:62`), not a `ModuleResolutionError`. The module is still never accepted. The compiler emits nothing near that depth, so only a hostile or broken module provider reaches it | L1 (03-G13); finding |
 
 ## Layout
 

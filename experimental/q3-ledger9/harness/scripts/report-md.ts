@@ -80,14 +80,17 @@ const CURATED: Record<string, Curated> = {
       '03-G6': 'dynamic resolution: implementation found from on-chain verifier keys; lookup deferred into the module thunk',
       '03-G7': 'two implementations in one transaction (swap)',
       '03-G10': 'generated modules carry `declaredInterfaces` / `circuitSignatures` / `expectedVk`',
+      '03-G12': 'a `pure` circuit in a contract type compiles, then every call is refused: `PureInterfaceCircuit`',
+      '03-G13': 'a module with malformed `circuitSignatures` is refused as a `ModuleResolutionError`, never a raw JS error',
     },
     notCovered: [
       '03-G8: a verifier-key change at an address (contract maintenance) after which an old mapping fails (stretch goal).',
-      '`PureInterfaceCircuit` and `UnreadableModule`, 2 of the runtime\'s 11 `ModuleResolutionError` kinds, are not driven.',
-      '`NonconformantImplementation` and the five 03-G5 kinds were only tested in memory, where the runtime runs the same checks it runs before submitting to a network.',
+      '`NonconformantImplementation`, the five 03-G5 kinds, `PureInterfaceCircuit` and `UnreadableModule` were only tested in memory, where the runtime runs the same checks it runs before submitting to a network.',
     ],
     findings: [
       'CoIP 4 (@ca9da303) lists 10 failure kinds, but compact-runtime 0.20.0 has 11. `PureInterfaceCircuit` is missing from the spec.',
+      'A contract type may declare a `pure` circuit, and compactc 0.35.0 compiles a call to one, proving keys included. compact-runtime 0.20.0 then refuses every such call with `PureInterfaceCircuit`. CoIP 2 describes `pure` circuits in contract types as supported, and a TODO in the compiler says the declaration should not compile (03-G12).',
+      'A module whose signature type is nested about 10 000 levels deep or more makes compact-runtime 0.20.0 throw a raw `RangeError: Maximum call stack size exceeded` instead of a `ModuleResolutionError`. The module is still never accepted, and the compiler emits nothing that deep, so only a hostile or broken module provider reaches it (03-G13, the one failing test).',
       'The Midnight.js v5.0.0-rc.2 migration guide does not mention `contractModuleProvider`. A DApp that made cross-contract calls before 0.35 fails with `ModuleProviderAbsent` and gets no pointer to the fix.',
       '`ContractModuleProvider.resolve` is synchronous. The record\'s "fully dynamic, online lookup" works, but only by resolving ahead of time or deferring into the thunk, and the two report failures differently (`UnsupportedImplementation` vs `ModuleLoadRejected`).',
       "A calling contract compiles with no callee source beside it; only its `contract Token { … }` declaration is needed. compact-end-2-end's \"callee managed dir named after the interface\" convention predates 0.35.",
@@ -102,13 +105,13 @@ const COMMON_FINDINGS = [
   "Yarn 4.18's default 24-hour minimum package age quarantines same-day release candidates. The test workspace exempts only the first-party Midnight scopes.",
 ];
 
-const NOTICE = `> [!WARNING]
+const notice = (committed: boolean) => `> [!WARNING]
 > **Preliminary. Not for formal acceptance.**
 >
 > These are early engineering tests by the Midnight Foundation, run on a single local
 > development network (\`undeployed\`) against release-candidate components. They have
 > not been reviewed, run on a shared network (qanet, preview, preprod), or repeated on
-> a released stack. The code that produced them was not yet committed when they ran.
+> a released stack.${committed ? '' : ' The code that produced them was not yet committed when they ran.'}
 >
 > Do **not** use this report as evidence to accept or reject this deliverable. The
 > delivering team's QA evidence and the Foundation's formal acceptance process remain
@@ -127,11 +130,12 @@ function render(r: Report): string {
   const L: string[] = [];
 
   L.push(`# ${r.deliverable} preliminary test report (${date})`, '');
-  L.push(NOTICE, '');
+  const committed = r.run.workingTree === 'clean';
+  L.push(notice(committed), '');
   L.push(`**Deliverable:** ${r.deliverable} ${r.title}  `);
   L.push(`**Run:** ${r.run.startedAt} to ${r.run.finishedAt}, ${r.run.network}, ${r.run.host}  `);
   L.push(
-    `**Source:** \`experimental/q3-ledger9/${c.folder}\` in mn-examples, branch \`${r.run.gitBranch}\` @ \`${r.run.gitCommit}\`, working tree **${r.run.workingTree}** (test code not yet committed)  `,
+    `**Source:** \`experimental/q3-ledger9/${c.folder}\` in mn-examples, branch \`${r.run.gitBranch}\` @ \`${r.run.gitCommit}\`, working tree **${r.run.workingTree}**${committed ? '' : ' (test code not yet committed)'}  `,
   );
   L.push('**Plan:** the Foundation\'s SOW3 testing strategy (internal)', '');
 

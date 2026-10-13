@@ -22,6 +22,7 @@ import { outcome, SIM_COIN_PK, Simulator } from '@q3/harness/sim';
 import { Contract as Registry, ledger as registryLedger } from '../../contract/managed/token_registry/contract/index.js';
 import * as Standard from '../../contract/managed/standard_token/contract/index.js';
 import * as Audited from '../../contract/managed/audited_token/contract/index.js';
+import { Contract as PureInterfaceCaller } from '../../contract/managed/pure_interface_caller/contract/index.js';
 import { loadModule, ref, verifierKey, type Implementation } from '../modules.js';
 import { deferredProvider, discoverByVerifierKey } from '../module-providers.js';
 
@@ -122,6 +123,21 @@ describe('AC-1: one call site, the implementation deployed at each address', () 
     expect(Audited.ledger(ctx.queryContexts[w.aud.address].state).balances.lookup(ALICE)).toBe(40n);
     expect(Audited.ledger(ctx.queryContexts[w.aud.address].state).audited_transfers).toBe(1n);
   });
+
+  it('AC-1: the same id runs different code once the value it holds changes', async () => {
+    // AC-1's second sentence, literally: one call site, one id, and the callee
+    // code follows the value `tokens[1]` holds at the time of the call.
+    // Nothing is redeployed or recompiled between the two calls.
+    const sim = await registry(w, bundled(w, { [w.std.address]: 'standard_token', [w.aud.address]: 'audited_token' }));
+
+    expect(await sim.call('pay', 1n, ALICE, BOB, 10n)).toBe(990n);
+    expect(sim.lastContext.queryContexts).not.toHaveProperty(w.aud.address);
+
+    await sim.call('list', 1n, ref(w.aud.address));
+    expect(await sim.call('pay', 1n, ALICE, BOB, 25n)).toBe(975n);
+    expect(sim.lastContext.queryContexts).not.toHaveProperty(w.std.address);
+    expect(Audited.ledger(calleeState(sim, w.aud.address)).audited_transfers).toBe(1n);
+  });
 });
 
 describe('ModuleResolutionError kinds a DApp can reach', () => {
@@ -186,6 +202,72 @@ describe('ModuleResolutionError kinds a DApp can reach', () => {
     const before = registryLedger(sim.state).payments;
     await outcome(() => sim.call('pay', 1n, ALICE, BOB, 1n));
     expect(registryLedger(sim.state).payments).toBe(before);
+  });
+});
+
+describe('pure interface circuits and untrusted module shapes', () => {
+  let w: World;
+  beforeEach(async () => (w = await world()));
+
+  it('03-G12 PureInterfaceCircuit: a `pure` circuit in a contract type compiles, then every call is refused', async () => {
+    // That this test runs at all records that `pure_interface_caller.compact`
+    // compiles under 0.35.0. The runtime refuses on the declaration alone,
+    // before it asks the provider, so a provider that binds the address to a
+    // real module changes nothing.
+    const sim = await Simulator.deploy<undefined>(new PureInterfaceCaller({}) as never, undefined, [], {
+      parentBlockHash: BLOCK,
+      crossContract: {
+        stateProvider: { getContractState: async (_block: string, address: string) => w.chain.get(address) },
+        moduleProvider: bundled(w, { [w.std.address]: 'standard_token' }),
+      },
+    });
+    expect(await failureKind(() => sim.call('callPeek', ref(w.std.address)))).toBe('PureInterfaceCircuit');
+  });
+
+  // A readable type nested far deeper than any compiler emits. The runtime
+  // walks signature types recursively, so this probes its stack.
+  let deep: unknown = { tag: 'Field' };
+  for (let i = 0; i < 100_000; i += 1) deep = { tag: 'Alias', name: 'A', type: deep };
+
+  // A module from an untrusted source with `transfer`'s first argument type
+  // replaced. Each must be refused as a ModuleResolutionError, never a raw JS
+  // error, a hang or acceptance. The kind seen is recorded in the README.
+  const tampered = {
+    'unknown tag': { tag: 'NotAType' },
+    'Struct without elements': { tag: 'Struct' },
+    'Vector of 2^30 Fields': { tag: 'Vector', length: 2 ** 30, type: { tag: 'Field' } },
+    'Alias nested 100000 deep': deep,
+  };
+  for (const [name, argumentType] of Object.entries(tampered)) {
+    it(`03-G13 malformed circuitSignatures (${name}) is a ModuleResolutionError`, async () => {
+      const sim = await registry(w, {
+        resolve: () => async () => {
+          const m = await loadModule.standard_token();
+          const circuitSignatures = structuredClone(m.circuitSignatures) as unknown as Record<string, { argumentTypes: unknown[] }>;
+          circuitSignatures['transfer'].argumentTypes[0] = argumentType;
+          return { ...m, circuitSignatures } as never;
+        },
+      });
+      const started = performance.now();
+      const kind = await failureKind(() => sim.call('pay', 1n, ALICE, BOB, 1n));
+      const elapsed = performance.now() - started;
+      console.log(`03-G13 ${name}: failure.kind = ${kind} (${elapsed.toFixed(1)} ms)`);
+      expect(elapsed).toBeLessThan(1_000);
+    });
+  }
+
+  it('03-G13 a `transfer` signature inherited through the prototype does not count', async () => {
+    // Only the module's OWN properties may implement the declaration;
+    // otherwise anything on a prototype chain would read as an implementation.
+    const sim = await registry(w, {
+      resolve: () => async () => {
+        const m = await loadModule.standard_token();
+        return { ...m, circuitSignatures: Object.create(m.circuitSignatures) } as never;
+      },
+    });
+    const kind = await failureKind(() => sim.call('pay', 1n, ALICE, BOB, 1n));
+    console.log(`03-G13 inherited signature: failure.kind = ${kind}`);
+    expect(kind).toBe('NonconformantImplementation');
   });
 });
 

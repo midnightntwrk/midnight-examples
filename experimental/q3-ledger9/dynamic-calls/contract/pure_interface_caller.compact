@@ -1,0 +1,34 @@
+// SOW-Q3-03 · pure_interface_caller: a `pure` circuit in a contract type
+// (gap 03-G12).
+//
+// CoIP 2 (LFDT-Minokawa/compact coips/coip-0002.md) allows a contract type to
+// declare `pure` circuits. A pure circuit touches no ledger, so the callee
+// never deploys it as an operation and it has no verifier key. compact-runtime
+// 0.20.0 therefore refuses every call to one with `PureInterfaceCircuit`,
+// before it asks the module provider anything. The test records whether this
+// file compiles at all, and then what a call to `peek` does.
+//
+// This contract exists only to drive that refusal. A production contract
+// should not declare `pure` circuits in a contract type until the toolchain
+// supports calling them (or rejects the declaration at compile time).
+pragma language_version 0.27;
+
+import CompactStandardLibrary;
+
+// The interface under test: a single pure circuit.
+contract Peekable {
+  pure circuit peek(): Uint<64>;
+}
+
+// The caller must itself be impure: 0.35.0 rejects a cross-contract call from
+// a circuit it infers as pure ("cross-contract call from a pure circuit is not
+// yet supported"). Touching this counter makes `callPeek` impure, so what is
+// under test is the pure DECLARATION in `Peekable`, not the caller.
+export ledger calls: Counter;
+
+// The only call site. Any `Peekable` value will do: the runtime refuses on the
+// declaration alone, whatever address `t` holds.
+export circuit callPeek(t: Peekable): Uint<64> {
+  calls.increment(1);
+  return disclose(t).peek();
+}

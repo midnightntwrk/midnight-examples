@@ -114,4 +114,19 @@ describe('token_registry on the local ledger 9 network', () => {
     expect(err, 'the call should have been refused').toBeDefined();
     expect(resolutionKind(err), String(err)).toBe(kind);
   });
+
+  // Last, because it re-points id 1.
+  it('AC-1: re-listing id 1 makes the same `pay` call run the audited code', async () => {
+    // One call site, one id; only the value `tokens[1]` holds changes, by an
+    // ordinary `list` transaction. Nothing is redeployed or recompiled.
+    const provider = staticProvider({ [std]: 'standard_token', [aud]: 'audited_token' });
+    const stdBefore = standardLedger(await stateOf(std)).balances.lookup(BOB);
+    const auditedBefore = auditedLedger(await stateOf(aud)).audited_transfers;
+
+    await callRegistry(undefined, 'list', 1n, ref(aud));
+    await callRegistry(provider, 'pay', 1n, BOB, ALICE, 1n);
+
+    expect(auditedLedger(await stateOf(aud)).audited_transfers).toBe(auditedBefore + 1n);
+    expect(standardLedger(await stateOf(std)).balances.lookup(BOB)).toBe(stdBefore);
+  });
 });
