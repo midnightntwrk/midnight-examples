@@ -310,6 +310,9 @@ export circuit withdraw(tipKey: Bytes<32>): [] {
   withdraw. The owner check does that. `ownPublicKey()` only says where the owner wants the coin to
   go.
 
+This is the same role check as Battleship's: the caller proves knowledge of a secret whose hash
+the contract stored, rather than being trusted because of who submitted the transaction.
+
 `withdraw` moves one coin per call, which keeps the circuit small. To empty the jar, the owner
 calls it once for each pot entry.
 
