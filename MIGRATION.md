@@ -24,6 +24,7 @@ Each now lives in `examples/<name>/tutorials/` and syncs back to midnight-docs
 | Tutorial | Source | Source commit | Changes |
 |---|---|---|---|
 | `examples/battleship/tutorials/` | `midnightntwrk/midnight-docs` `docs/tutorials/bship/` (`index.mdx`, `smart-contract.mdx`, `test-suite.mdx`) | `6af8c96f29a363f005417357f6066e1baf6a56bc` | Rewritten as a tour of this repo's code, organized around defensive programming. The build-from-scratch steps and the standalone project setup were replaced by the monorepo commands and shared harness. Published path moves from `/tutorials/bship` to `/tutorials/battleship`. |
+| `examples/shielded-chips/tutorials/` | `examples/shielded-chips/TUTORIAL.md` in this repo, imported in `2628de2` and adapted from `nstanford5/shielded-chips` `TUTORIAL.md` | `89a9a7641cd1566285773a75b842f33e25e708fb` | Split into five pages along its parts: `index.mdx` (set-up and the nonce rule), `chips-token.mdx`, `roulette.mdx` (with the compile step), `test-suite.mdx` and `cheat-sheet.mdx`. Rewritten as a tour of this repo's code: every quote is now a verbatim, titled excerpt of `contract/` or `src/`, and the compile and devnet output come from a fresh run. The prerequisite is now Private Tip Jar, step 4 of the learning path. `TUTORIAL.md` is removed. It had no docs page, so `/tutorials/shielded-chips` is new. |
 
 ## Changes applied during migration
 

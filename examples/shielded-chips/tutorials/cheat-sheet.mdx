@@ -1,0 +1,91 @@
+---
+SPDX-License-Identifier: Apache-2.0
+copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+sidebar_label: "Shielded-token cheat-sheet"
+title: "Shielded-token cheat-sheet"
+description: "The shielded-token operations the shielded chips example uses, with the coin types each takes and returns, and its privacy rules in one place."
+sidebar_position: 40
+toc_max_heading_level: 3
+tags:
+  - tutorials
+  - shielded-chips
+  - compact
+  - shielded-tokens
+  - privacy
+  - advanced
+  - midnight-network
+---
+
+# Shielded-token cheat-sheet
+
+A reference for the operations and rules this tutorial uses. Each one is explained where it first
+appears, in [the chips token](/tutorials/shielded-chips/chips-token) or
+[the roulette contract](/tutorials/shielded-chips/roulette).
+
+## Operations
+
+| Operation | Function | Coin in | Coin out |
+|-----------|----------|---------|----------|
+| Create a coin | `mintShieldedToken(domainSep, value: Uint<64>, nonce, recipient)` | none | `ShieldedCoinInfo` |
+| Derive a token color | `tokenType(domainSep, contractAddress)` | none | `Bytes<32>` |
+| Fresh nonce from a seed | `evolveNonce(index: Uint<128>, seed)` | none | `Bytes<32>` |
+| Accept an incoming coin | `receiveShielded(coin)` | `ShieldedCoinInfo` | `[]` |
+| Store a coin in a ledger `Map` | `map.insertCoin(key, coin, owner)` | `ShieldedCoinInfo` | stored as `QualifiedShieldedCoinInfo` |
+| Spend a coin already in the tree | `sendShielded(coin, recipient, value: Uint<128>)` | `QualifiedShieldedCoinInfo` | `ShieldedSendResult` |
+| Spend a coin created in this transaction | `sendImmediateShielded(coin, recipient, value: Uint<128>)` | `ShieldedCoinInfo` | `ShieldedSendResult` |
+| Combine two coins | `mergeCoin(a, b)` | two `QualifiedShieldedCoinInfo` | `ShieldedCoinInfo` |
+| Destroy a coin | send to `shieldedBurnAddress()` | | |
+| Commit to a coin | `persistentCommit<...>([nonce, color, value], salt)` | none | `Bytes<32>` |
+| This contract's address | `kernel.self()`, wrapped with `right(...)` | | |
+| Caller's wallet key (a witness) | `ownPublicKey()`, wrapped with `left(...)` | | |
+
+`tokenType` in a circuit and `rawTokenType` in TypeScript compute the same color, so a deployer
+can learn a token's color without a transaction.
+
+The spend-path rule, straight from MIP-0011: a coin whose commitment was created by an output of
+the **current** transaction is not in the global tree yet, and MUST be spent with
+`sendImmediateShielded`. A coin already in the tree needs `sendShielded` and a valid `mt_index`.
+Conflating them yields unsatisfiable circuits, or circuits that trust a caller-supplied tree
+index.
+
+## Types
+
+- `ShieldedCoinInfo` is `{ nonce, color, value }`: a coin in hand, such as one created or
+  received in this transaction.
+- `QualifiedShieldedCoinInfo` is `{ nonce, color, value, mt_index }`: a coin the ledger has
+  already committed, spendable with `sendShielded`. In this example `mt_index: 0` appears only for
+  a coin received or created in the current transaction, such as the re-nonce in
+  `reNonceToSelf`.
+- `ShieldedSendResult` is `{ change: Maybe<ShieldedCoinInfo>, sent: ShieldedCoinInfo }`.
+- Recipients are `Either<ZswapCoinPublicKey, ContractAddress>`: `left` is a wallet key and `right`
+  is a contract address.
+
+## Privacy rules, in one place
+
+- **Coin values in a transfer never reach public state.** A send publishes a commitment, not an
+  amount.
+- **Mint amounts do.** `mintShieldedToken` records the value in the transaction's shielded-mint
+  effects. Minting hides the recipient, not the amount.
+- **Circuit arguments are not published.** A `ZswapCoinPublicKey` passed as an argument does not
+  appear on chain.
+- **Ledger writes are what publish**, along with the values exported circuits return and the
+  transaction's effects. `disclose(...)` is a compiler acknowledgment at a trust boundary, not a
+  statement that a value went on chain. Read the state to find out which values did.
+- **Never write a user's coin nonce to public state.** It identifies the wallet that funded the
+  coin and the wallet paid out of it. Store a commitment and reopen it from a witness.
+- **`sendShielded` and `mergeCoin` derive the output nonce from the input nonce alone**, and
+  `mergeCoin` from its *first* argument. Ordering is a privacy decision, and derivation chains are
+  only as private as their root.
+- **Re-noncing protects inbound, not outbound.** Sending to `kernel.self()` breaks the link to the
+  sender's wallet. It does nothing for whoever you later pay out of the re-nonced coin.
+- **A pseudonym is only as private as the coins recorded under it.** An unrelated `sk` is necessary
+  and not sufficient.
+- **Burn amounts are private until you count them.** A bare burn publishes only commitments.
+  MIP-0011's supply counter write is the one thing that puts the amount in the transcript. An
+  on-chain `totalSupply` and private burn amounts are mutually exclusive, so pick deliberately.
+- **A derived nonce is a public nonce.** MIP-0011's derived-nonce mint is *recipient-public* by its
+  own documentation, because its inputs are public ledger state. Use a caller-supplied secret
+  nonce when recipients matter.
+
+The audit behind these rules, including the first fix that turned out to be wrong, is in
+[`LESSONS.md`](https://github.com/midnightntwrk/midnight-examples/blob/main/examples/shielded-chips/LESSONS.md).

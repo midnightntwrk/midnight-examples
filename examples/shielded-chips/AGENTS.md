@@ -40,9 +40,11 @@
   both contracts' public ledger state.
 - `ui/` — browser frontend (generated with `--contract roulette`; the chips
   token is the second contract, wired in its seed files). See `ui/README.md`.
-- `TUTORIAL.md` (walkthrough of writing both contracts), `LESSONS.md` (privacy
-  audit of an earlier version), `privacy-tests.md` (what the privacy suite
-  checks, latest results). Keep them in sync when contracts or tests change.
+- `tutorials/*.mdx` (the learning-path tutorial, synced to midnight-docs; its
+  titled code blocks must quote the files verbatim, see `docs/tutorials.md`),
+  `LESSONS.md` (privacy audit of an earlier version), `privacy-tests.md` (what
+  the privacy suite checks, latest results). Keep them in sync when contracts
+  or tests change.
 
 ## Run
 

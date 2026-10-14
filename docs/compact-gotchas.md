@@ -60,13 +60,13 @@ trust recalled APIs over it.
   or applied.
   ([stdlib 0.31.1](https://github.com/LFDT-Minokawa/compact/blob/compactc-v0.31.1/compiler/standard-library.compact#L199-L205),
   [zswap transients](https://github.com/midnightntwrk/midnight-ledger/blob/ledger-8.1.2/zswap/src/construct.rs#L386-L412),
-  [TUTORIAL cheat-sheet](../examples/shielded-chips/TUTORIAL.md#shielded-token-cheat-sheet))
+  [shielded-token cheat-sheet](../examples/shielded-chips/tutorials/cheat-sheet.mdx#operations))
 - **`sendShielded` and `mergeCoin` derive the output nonce from the input
   nonce alone** (`mergeCoin` from its *first* argument), so the argument order
   decides what can be linked. ([LESSONS §5](../examples/shielded-chips/LESSONS.md#5-patterns-that-worked))
 - **Mint amounts are public; transfer amounts are not.** Recipients are
   `left(walletKey)` or `right(kernel.self())`.
-  ([TUTORIAL privacy rules](../examples/shielded-chips/TUTORIAL.md#privacy-rules-in-one-place))
+  ([cheat-sheet privacy rules](../examples/shielded-chips/tutorials/cheat-sheet.mdx#privacy-rules-in-one-place))
 
 ## Harness and tests
 
