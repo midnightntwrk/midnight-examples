@@ -12,7 +12,7 @@ This example aims to demonstrate several key features of Compact and Midnight JS
 
 For a guided walkthrough of the contract and its cheat-check tests, see the
 [Battleship tutorial](./tutorials/index.mdx), also published at
-[docs.midnight.network](https://docs.midnight.network/tutorials/battleship). It is step 4 of the
+[docs.midnight.network](https://docs.midnight.network/tutorials/battleship). It is step 3 of the
 [learning path](../../README.md#learning-path).
 
 ## Set up
