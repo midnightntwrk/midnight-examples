@@ -1,0 +1,421 @@
+---
+SPDX-License-Identifier: Apache-2.0
+copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+sidebar_label: "Private party contract"
+title: "Private party contract"
+description: "Read a Compact contract that keeps party guests private behind salted commitments and a DApp-specific key, then makes them public at one point: an unshielded NIGHT entry fee."
+sidebar_position: 10
+toc_max_heading_level: 2
+tags:
+  - tutorials
+  - private-party
+  - compact
+  - beginner
+  - unshielded-tokens
+  - privacy
+  - midnight-network
+---
+
+# Private party contract
+
+This part walks through `contract/private-party.compact`, circuit by circuit, in the order a
+party happens. The contract has no witnesses, so the whole DApp's on-chain logic is in this one
+file.
+
+## Prerequisites
+
+- The [set-up steps](/tutorials/private-party) of this tutorial, so you have midnight-examples
+  installed and compiled.
+- The [Compact toolchain](/getting-started/installation) and Node.js 22.
+
+Open `examples/private-party/contract/private-party.compact` in your editor and keep it beside
+this page.
+
+## The party
+
+The organizer wants to collect RSVPs for a party while keeping the guest list private. Guests
+pay an entry fee in NIGHT when they arrive, and the organizer collects the fees afterwards.
+
+In order, the contract has to:
+
+1. Let the organizer deploy it with a party size and an entry fee.
+2. Let guests RSVP privately.
+3. Let the organizer, and only the organizer, start the party.
+4. Let guests who RSVP'd check in and pay the entry fee.
+5. Let the organizer close the doors.
+6. Pay the collected fees out to the organizer.
+
+## The privacy boundary
+
+In Compact, data is private by default. As the DApp developer, you choose what crosses from
+private to public, and the compiler makes you mark the places where it happens. Some things are
+**always public**, though:
+
+- ledger fields, and the values a circuit reads from or writes to them;
+- values returned from exported circuits;
+- contract-to-contract calls;
+- unshielded token transfers;
+- which circuit a transaction calls.
+
+Hashes and commitments let you put data in the first three places without revealing it. An
+unshielded transfer can't be hidden that way. Its sender, recipient and amount are public.
+
+That makes the NIGHT entry fee the **privacy boundary** of this DApp. A guest is private until
+they pay it at check-in, and the organizer is private until the contract pays the fees out to
+them.
+
+| Public (on the ledger or in a transaction) | Private (never leaves the user's machine) |
+| --- | --- |
+| The organizer's DApp-specific public key | The organizer's secret |
+| A commitment for each RSVP | Each guest's secret, and their address until check-in |
+| The addresses of checked-in guests | |
+| The party size, entry fee and party state | |
+| Each NIGHT payment, in and out | |
+
+## The state machine
+
+Every exported circuit is a public entry point that anyone can call at any time. The contract
+uses an `enum` to say which circuits are open at each stage of the party:
+
+```compact title="contract/private-party.compact"
+export enum PartyState {
+    NOT_STARTED,
+    READY,
+    STARTED,
+    DOORS_CLOSED,
+    FEES_CLAIMED
+}
+```
+
+Each circuit checks the current state with an `assert` before it does anything else, and some
+move the party to the next state:
+
+| From | Circuit | To |
+| --- | --- | --- |
+| `NOT_STARTED` | `rsvp` fills the list | `READY` |
+| `NOT_STARTED` or `READY` | `startParty` (organizer) | `STARTED` |
+| `STARTED` | `checkIn` checks in the last guest | `DOORS_CLOSED` |
+| `STARTED` | `closeEntry` (organizer) | `DOORS_CLOSED` |
+| `DOORS_CLOSED` | `claimFees` (organizer) | `FEES_CLAIMED` |
+
+## The ledger
+
+These are the contract's public ledger fields:
+
+```compact title="contract/private-party.compact"
+export sealed ledger organizer: Bytes<32>;
+export sealed ledger maxListSize: Uint<16>;
+export sealed ledger entryFee: Uint<16>;
+export ledger partyState: PartyState;
+export ledger hashedPartyGoers: Set<Bytes<32>>;
+export ledger checkedInParty: Set<UserAddress>;
+```
+
+`sealed` fields can only be set by the constructor. Nothing can change the organizer, the party
+size or the entry fee after deployment.
+
+`hashedPartyGoers` is the RSVP list. It holds commitments, not addresses. `checkedInParty` holds
+the addresses of guests who have paid, because by then they are public anyway.
+
+## Private state: a secret, and no witnesses
+
+Each user, organizer or guest, holds one private value: a 32-byte secret. It lives in their
+private state, in `contract/witnesses.ts`:
+
+```typescript title="contract/witnesses.ts"
+export type PartyPrivateState = {
+    secret: Uint8Array,
+}
+
+export const createPartyPrivateState = (secret: Uint8Array) => ({
+    secret
+});
+```
+
+Many contracts read private state through witness functions. This one doesn't need any. The
+caller passes the secret straight in as a circuit argument. Circuit arguments are inputs to the
+proof and are not published, so the secret never leaves the caller's machine. Only what the
+circuit does with it, a hash or a commitment, can reach the ledger.
+
+To see witnesses in action, see the [Battleship tutorial](/tutorials/battleship/smart-contract#the-witnesses).
+
+## Identity: a DApp-specific public key
+
+The contract doesn't identify anyone by their wallet. It identifies each caller by a secret they
+can prove they know, hashed into a public key used only by this DApp:
+
+```compact title="contract/private-party.compact"
+// hash a publicKey specific to this DApp so that users cannot be tracked
+// the _secret should be 32 random bytes: anyone who can guess it holds the key
+circuit getDappPublicKey(_secret: Bytes<32>): Bytes<32> {
+    return persistentHash<Vector<2, Bytes<32>>>([pad(32, "private-party:pk:"), _secret]);
+}
+```
+
+`persistentHash` is a one-way hash, so the key doesn't reveal the secret. The
+`"private-party:pk:"` prefix is a domain separator. It makes the key different from any other
+hash of the same secret, including the hash another DApp might use as a key. The key isn't tied
+to the organizer's wallet address, so it is safe to store on the ledger.
+
+The organizer deploys the contract. The constructor checks its inputs, stores the organizer's key
+and sets the remaining fields:
+
+```compact title="contract/private-party.compact"
+constructor (partySize: Uint<16>, fee: Uint<16>, _secret: Bytes<32>) {
+    assert(partySize > 0, "The party size must be greater than zero");
+    assert(fee > 0, "Fee must be greater than zero");
+
+    const pubKey = getDappPublicKey(_secret);
+    organizer = disclose(pubKey);
+
+    entryFee = disclose(fee);
+    maxListSize = disclose(partySize);
+    partyState = PartyState.NOT_STARTED;
+}
+```
+
+The `_secret` argument is private. `pubKey` is derived from it, so the compiler requires
+`disclose()` before it is written to the ledger. The same goes for `fee` and `partySize`, which
+are constructor arguments.
+
+:::note[What disclose() does]
+`disclose()` doesn't make a value public by itself. It tells the compiler that you, the
+developer, accept that a value derived from private input crosses into the public domain. The
+value is published only when it is written to the ledger or otherwise leaves the circuit.
+:::
+
+## RSVP: a salted commitment
+
+Guests call `rsvp` with their address and their secret:
+
+```compact title="contract/private-party.compact"
+// called by party goers
+export circuit rsvp(_address: UserAddress, _secret: Bytes<32>): [] {
+    const pubKey = getDappPublicKey(_secret);
+    // caller authentication check
+    assert(pubKey != organizer, "Organizer cannot RSVP to the party");
+
+    // state verification check
+    assert(partyState == PartyState.NOT_STARTED, "The party has already started");
+    assert(hashedPartyGoers.size() < maxListSize, "The list is full");
+```
+
+The organizer can't RSVP to their own party, at least not with their organizer secret. RSVPs are
+open only before the party starts, and only while the list has room.
+
+Then the guest goes on the list as a commitment:
+
+```compact title="contract/private-party.compact"
+    // party goer address remains private
+    const commitHash = commitAddress(_secret, _address.bytes);
+    assert(!hashedPartyGoers.member(commitHash), "You are already on the list");
+    hashedPartyGoers.insert(commitHash);// doesn't need disclose bc persistentCommit
+```
+
+`commitAddress` is a one-line helper:
+
+```compact title="contract/private-party.compact"
+// commit to the guest's address, salted with their secret: the commitment
+// hides the address, and only someone holding the same secret can recompute it
+circuit commitAddress(_secret: Bytes<32>, _address: Bytes<32>): Bytes<32> {
+    return persistentCommit<Bytes<32>>(_address, _secret);
+}
+```
+
+`persistentCommit(value, rand)` commits to `value` using `rand` as randomness. Here the value is
+the guest's address and the randomness is their secret.
+
+A plain hash of an address would not hide it. Addresses aren't secret, so anyone could hash every
+address they know and compare the results with the list. The salt stops that. Without the guest's
+secret, nobody can recompute the commitment, so the list reveals nothing about who is on it.
+That's also why the compiler accepts the commitment on the ledger without a `disclose()`. It
+treats a commitment as revealing nothing, on the assumption that its randomness really is random.
+That assumption is yours to keep: each guest's secret must be 32 random bytes.
+
+When the list fills up, the party moves to `READY`:
+
+```compact title="contract/private-party.compact"
+    if (hashedPartyGoers.size() == maxListSize) {
+        // @TODO -- In the future, emit an event to the organizer here (MIP-0002)
+        partyState = PartyState.READY;
+    }
+}
+```
+
+## Starting the party
+
+Only the organizer can start the party:
+
+```compact title="contract/private-party.compact"
+// start the party (organizer)
+export circuit startParty(_secret: Bytes<32>): [] {
+    const pubKey = getDappPublicKey(_secret);
+    assert(organizer == pubKey, "Only the organizer can start the party");
+    assert(partyState == PartyState.READY || partyState == PartyState.NOT_STARTED,
+        "The party is not in the correct state for this operation");
+
+    partyState = PartyState.STARTED;
+}
+```
+
+This is the access-control pattern for every organizer-only circuit. The caller passes a secret,
+the circuit hashes it, and the result has to match the `organizer` key stored at deployment. Only
+the holder of the organizer's secret can produce a proof that passes this `assert`.
+
+The organizer can start the party before the list is full, from `NOT_STARTED`, or after, from
+`READY`.
+
+## Check-in: crossing the boundary
+
+Guests check in with the same address and secret they used to RSVP:
+
+```compact title="contract/private-party.compact"
+// called by the party goer, so the payment can be prompted to the caller
+// after the execution of this circuit, party goers are public
+export circuit checkIn(address: UserAddress, _secret: Bytes<32>): [] {
+    // state verification checks
+    assert(partyState == PartyState.STARTED, "The party has not been started. Call the party police");
+    assert(checkedInParty.size() < hashedPartyGoers.size(), "All guests have already checked in");
+
+    const commitHash = commitAddress(_secret, address.bytes);
+
+    // caller verification checks
+    assert(hashedPartyGoers.member(commitHash), "You are not on the list");
+    assert(!checkedInParty.member(disclose(address)), "You have already checked in");
+```
+
+The circuit recomputes the commitment from the arguments. `persistentCommit` is deterministic, so
+the same address and secret produce the same commitment as at RSVP time. A caller who gives a
+different address or secret produces a different commitment, which isn't on the list.
+
+Then the guest pays, and becomes public:
+
+```compact title="contract/private-party.compact"
+    // take in unshielded payment, party goers are now public
+    receiveUnshielded(nativeToken(), entryFee as Uint<128>);
+    checkedInParty.insert(disclose(address));
+```
+
+`nativeToken()` is the token type of NIGHT. `receiveUnshielded` makes the transaction pay
+`entryFee` NIGHT into the contract. The caller's wallet supplies those funds when it balances the
+transaction. This is an unshielded transfer, so it is public. The guest's address goes onto
+`checkedInParty` too, which is why it needs `disclose()`.
+
+This is the privacy boundary. Up to here, nothing on chain tied the guest to the party. Now their
+address is public, and so is the link to their RSVP. To check membership, the circuit reads
+`hashedPartyGoers` with `commitHash`, and ledger reads are public like ledger writes. Anyone can
+see which commitment on the list belongs to the address that just paid.
+
+When the last guest on a full list checks in, the doors close on their own:
+
+```compact title="contract/private-party.compact"
+    if(checkedInParty.size() == maxListSize) {
+        partyState = PartyState.DOORS_CLOSED;
+    }
+}
+```
+
+## Closing the doors
+
+If the list never fills, or not every guest turns up, the organizer closes the doors by hand:
+
+```compact title="contract/private-party.compact"
+export circuit closeEntry(_secret: Bytes<32>): [] {
+    const pubKey = getDappPublicKey(_secret);
+    assert(organizer == pubKey, "Only organizer can close the doors");
+    assert(partyState == PartyState.STARTED, "Party in wrong state");
+
+    partyState = PartyState.DOORS_CLOSED;
+}
+```
+
+## Claiming the fees
+
+The contract now holds the entry fees in NIGHT. The organizer claims them, and in doing so gives
+an address to be paid at:
+
+```compact title="contract/private-party.compact"
+export circuit claimFees(address: UserAddress, _secret: Bytes<32>): [] {
+    const pubKey = getDappPublicKey(_secret);
+    assert(organizer == pubKey, "You are not the organizer");
+
+    // state verification checks
+    assert(partyState == PartyState.DOORS_CLOSED, "The doors are not yet closed");
+    assert(checkedInParty.size() > 0, "No fees to claim");
+
+    // calculate contract balance of NIGHT tokens
+    const totalCollected = checkedInParty.size() * entryFee;
+    assert(unshieldedBalanceGte(nativeToken(), totalCollected), "Contract balance wrong");
+
+    // send to organizer, they are now public
+    sendUnshielded(
+        nativeToken(),
+        disclose(totalCollected) as Uint<128>,
+        right<ContractAddress, UserAddress>(disclose(address))
+    );
+    partyState = PartyState.FEES_CLAIMED;
+}
+```
+
+The circuit works out what it should hold, one entry fee per checked-in guest, and checks with
+`unshieldedBalanceGte` that its NIGHT balance covers it before sending anything.
+
+`sendUnshielded` pays that amount to a recipient. The recipient is an `Either`: a contract address
+on the left, or a user address on the right, which is what `right<ContractAddress, UserAddress>`
+builds. The payout is an unshielded transfer, so the organizer's address becomes public here, the
+organizer's own privacy boundary.
+
+## What this contract doesn't stop
+
+The contract is a teaching example for the privacy boundary, not a hardened DApp. Before you
+reuse it, know what it leaves open:
+
+- **One person can RSVP many times.** Each fresh secret gives a fresh commitment, so a guest can
+  fill the list with RSVPs of their own.
+- **The organizer can RSVP under a second secret.** The `pubKey != organizer` check only stops
+  the organizer's own key.
+- **Check-in links a guest to their RSVP.** As shown above, check-in publishes the guest's
+  address and the commitment it matched. The RSVP list stays private only for guests who haven't
+  checked in.
+- **The organizer's key is the same in every party.** The key is a hash of the secret alone, so
+  an organizer who reuses a secret across deployments is recognizable in all of them. Adding the
+  contract's own address, `kernel.self()`, to the hash would give each deployment a different
+  key.
+- **Activity is public.** Which circuit each transaction calls is public, so anyone can see when
+  someone RSVPs and how many guests are on the list, though not who they are.
+
+Closing gaps like these is the subject of the [Battleship tutorial](/tutorials/battleship) later
+in the learning path: a state machine, role checks and assertions on every assumption.
+
+## Compile
+
+From `examples/private-party`:
+
+```bash
+yarn compile
+```
+
+This runs `compact compile contract/private-party.compact contract/managed/private-party` and
+generates the proving keys:
+
+```
+Compiling 5 circuits:
+  circuit "checkIn" (k=13, rows=4530)
+  circuit "claimFees" (k=13, rows=4512)
+  circuit "closeEntry" (k=13, rows=4203)
+  circuit "rsvp" (k=14, rows=8423)
+  circuit "startParty" (k=13, rows=4232)
+Overall progress [====================] 5/5
+```
+
+Five circuits, one for each exported circuit. `commitAddress` and `getDappPublicKey` are not
+exported, so they get no proving keys of their own. They are compiled into the circuits that call
+them.
+
+If compilation fails, read the compiler's error message carefully. It names the line and usually
+the fix.
+
+## Next
+
+In the [Private party tests](/tutorials/private-party/test-suite), you'll run the party on a
+local devnet with MidnightJS.
