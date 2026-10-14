@@ -1,0 +1,392 @@
+---
+SPDX-License-Identifier: Apache-2.0
+copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+sidebar_label: "Private tip jar tests"
+title: "Private tip jar tests"
+description: "Run the tip jar in memory and on a local devnet with MidnightJS: mint a demo token, tip it anonymously, check the public ledger for leaks, and withdraw."
+sidebar_position: 20
+toc_max_heading_level: 3
+tags:
+  - tutorials
+  - private-tip-jar
+  - midnight-js
+  - testing
+  - shielded-tokens
+  - beginner
+  - midnight-network
+---
+
+# Private tip jar tests
+
+The example has two test files. `src/test/private-tip-jar.sim.test.ts` runs the compiled jar in
+memory, with no network and no proofs, and finishes in under a second.
+`src/test/private-tip-jar.test.ts` runs the whole story on a local devnet with two people: Alice,
+who owns the jar and mints the demo token, and Bob, who tips. This part walks through both.
+
+## Prerequisites
+
+- The [Private tip jar contracts](/tutorials/private-tip-jar/smart-contract) part of this tutorial.
+- Docker, running, for the local devnet.
+
+## In memory first
+
+From `examples/private-tip-jar`, run the in-memory tests:
+
+```bash
+yarn test:sim
+```
+
+They need no Docker and no proving keys, so they are the quickest way to check a change to the
+contract. All five pass:
+
+```
+ ✓ src/test/private-tip-jar.sim.test.ts (5 tests) 97ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+```
+
+The tests use `@midnight-ntwrk/example-sim`, a small helper package in midnight-examples that runs
+a compiled contract in memory. `Sim.deploy` runs the constructor with an owner secret, a made-up
+token color and a made-up coin public key for the deployer:
+
+```typescript title="src/test/private-tip-jar.sim.test.ts"
+const deploy = () =>
+  Sim.deploy({
+    contract: new Contract(witnesses),
+    ledger,
+    privateState: createPrivateTipJarPrivateState(OWNER_SK),
+    args: [TIP_COLOR],
+    coinPublicKey: OWNER_COIN_PK,
+  });
+```
+
+In memory, a coin is just an object. The tests make up coins of any color and value:
+
+```typescript title="src/test/private-tip-jar.sim.test.ts"
+const coin = (value: bigint, color = TIP_COLOR) => ({ nonce: bytes32(), color, value });
+```
+
+`expectRejects` checks that a call fails with the `assert` message you expect. Swapping the private
+state for a random secret makes the caller a non-owner:
+
+```typescript title="src/test/private-tip-jar.sim.test.ts"
+    sim.privateState = createPrivateTipJarPrivateState(bytes32());
+    expectRejects(() => sim.call('withdraw', key), 'Only the owner can withdraw');
+
+    sim.privateState = createPrivateTipJarPrivateState(OWNER_SK);
+    expectRejects(() => sim.call('withdraw', bytes32()), 'No such tip in the jar');
+
+    expect(sim.as(OWNER_COIN_PK).call('withdraw', key).ledger.pot.isEmpty()).toBe(true);
+```
+
+The last in-memory test is the privacy test. `SPEC.md` lists the jar's privacy invariants, each a
+"never on chain" line, and the test has one entry for each. `assertNotInPublicState` searches the
+whole public ledger for each value and fails if it finds one:
+
+```typescript title="src/test/private-tip-jar.sim.test.ts"
+    const l = sim.ledger();
+    expect(Object.keys(l).sort()).toEqual(['owner', 'pot', 'tipColor']);
+    // Control: the contract's own (re-nonced) coin is public, and is found.
+    const [[, held]] = [...l.pot];
+    expect(findInPublicState(l, held.nonce)).toBe('pot[0].key');
+    assertNotInPublicState(l, {
+      ownerSecretKey: OWNER_SK,
+      ownerCoinPublicKey: Buffer.from(OWNER_COIN_PK, 'hex'),
+      tipperCoinPublicKey0: tippers[0]!,
+      tipperCoinPublicKey1: tippers[1]!,
+      tipperCoinNonce0: tips[0]!.nonce,
+      tipperCoinNonce1: tips[1]!.nonce,
+    });
+```
+
+The control line matters. It checks that the search does find something that *is* public, the
+re-nonced pot coin, so a passing privacy test means the secrets really are absent, not that the
+search looked in the wrong place.
+
+What the in-memory tests can't show is real coins moving between real wallets. That needs the
+devnet.
+
+## Run the devnet suite
+
+Start the local network, wait until the test wallets have DUST to pay fees with, and run the
+suite:
+
+```bash
+yarn env:up
+yarn wait:dust
+yarn test:local
+```
+
+`yarn env:up` starts a Midnight node, an indexer and a proof server from `compose.yml`. The proof
+server generates the zero-knowledge proof for each transaction. Leave the network running while
+you work through this page. Every successful call generates a real proof, so expect the suite to
+take a few minutes.
+
+When it finishes, all 10 tests pass, including the ones that expect a rejection:
+
+```
+ ✓ src/test/private-tip-jar.test.ts (10 tests) 167615ms
+     ✓ deploys the demo token and mints Bob one coin to tip with  35519ms
+     ✓ Alice deploys the jar for that token; only a hash of her key is stored  17524ms
+     ✓ Bob re-nonces his coin with a self-transfer, splitting it into two tips  19458ms
+     ✓ Bob tips twice; the pot holds two contract-owned coins  47123ms
+     ✓ the owner withdraws every tip into her own shielded wallet  46310ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+```
+
+Vitest lists only tests that take longer than 300 ms, so five tests pass without a line of their
+own: the privacy test, which only reads the ledger, and the four rejection tests. A rejected call
+takes milliseconds. A failing `assert` stops the circuit on the caller's own machine, so no proof
+is generated and nothing is submitted. The successful transactions take 15–20 seconds each, mostly
+proving time. The first test deploys a contract and mints, and the tip and withdrawal tests each
+submit two transactions, so they take longer.
+
+Tear the network down when you're done:
+
+```bash
+yarn env:down
+```
+
+## The test harness
+
+Everything above the comment that begins `Everything above is generated boilerplate` in the test
+file is the shared harness, the same in every example in
+midnight-examples. `src/config.ts` holds each network's endpoints, `src/wallet.ts` builds and syncs
+the wallets, and `src/providers.ts` bundles the MidnightJS providers. On `local`, Alice and Bob are
+the devnet's pre-funded wallets, so there is nothing to set up.
+
+Two contracts change one thing: the providers. A provider set includes the ZK configuration, the
+proving keys for one contract, so the suite builds one provider set for each wallet and contract
+pair it uses:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+    aliceJarProv = buildProviders(aliceWallet, zkConfigPath, config);
+    bobJarProv = buildProviders(bobWallet, zkConfigPath, config);
+    aliceTokenProv = buildProviders(aliceWallet, tipTokenZkConfigPath, config);
+```
+
+Alice talks to both contracts, and Bob only to the jar. Each provider set also gets its own
+private-state store, so Alice's jar secret and Bob's random key never mix.
+
+## The story
+
+The devnet tests run in order, and each builds on the one before.
+
+### 1. Deploy the token and mint Bob a coin
+
+Alice deploys the demo token, then computes its color from the token's domain separator and its
+new address:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+    tokenAddress = deployed.deployTxData.public.contractAddress;
+    tipColorHex = rawTokenType(TOKEN_DOMAIN, tokenAddress);
+    tipColorBytes = encodeRawTokenType(tipColorHex);
+```
+
+`TOKEN_DOMAIN` is the same `pad(32, "private-tip-jar:demo-token:")` that `tip-token.compact`
+mints with, built in TypeScript.
+
+Then Alice mints Bob one coin of 100:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+    const bobCoinPk = bobWallet.getCoinPublicKey();
+    await (submitCallTx<TipTokenContract, 'mint'>)(aliceTokenProv, {
+      compiledContract: CompiledTipTokenContract,
+      contractAddress: tokenAddress,
+      circuitId: 'mint',
+      args: [{ bytes: encodeCoinPublicKey(bobCoinPk) }, MINTED, new Uint8Array(randomBytes(32))],
+      // Alice builds an output for Bob's wallet, so she needs his encryption key.
+      additionalCoinEncPublicKeyMappings: new Map([[bobCoinPk, bobWallet.getEncryptionPublicKey()]]),
+    });
+```
+
+Alice's transaction creates a shielded coin for Bob's wallet, and the coin is encrypted to Bob so
+that his wallet can find it. MidnightJS knows Alice's own encryption key, but not Bob's.
+`additionalCoinEncPublicKeyMappings` maps Bob's coin public key to his encryption key. Without it,
+the call fails while the transaction is being built, with `Unable to resolve encryption public key
+for recipient`.
+
+Alice chose the coin's nonce, so she knows it. The test records it, for the privacy test later.
+
+### 2. Deploy the jar
+
+Alice deploys the jar for that color, with a fresh random owner secret in her private state:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+    const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(aliceJarProv, {
+      compiledContract: CompiledPrivateTipJarContract,
+      privateStateId: ALICE_JAR_STATE_ID,
+      initialPrivateState: createPrivateTipJarPrivateState(aliceOwnerSk),
+      args: [tipColorBytes],
+    });
+```
+
+The test then checks that the ledger's `owner` is exactly `ownerKey` of her secret, computed off
+chain with the contract's pure circuit:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+    expect(hex(state.owner)).toEqual(hex(pureCircuits.ownerKey(aliceOwnerSk)));
+```
+
+### 3. Bob re-nonces his coin
+
+Alice minted Bob's coin, so she knows its nonce, and she owns the jar. If Bob tipped that coin
+as it is, Alice could recompute its pot entry and know the tip was his. Bob first sends 40 of his
+100 to himself:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+    await bobWallet.splitShieldedCoin(tipColorHex, FIRST_TIP);
+```
+
+`splitShieldedCoin`, in `src/wallet.ts`, is an ordinary shielded transfer from Bob's wallet to its
+own shielded address. It spends the minted coin and creates two new ones, 40 and 60, with fresh
+nonces that only Bob's wallet has seen. The test checks exactly that:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+    const coins = await tokenCoins(bobWallet);
+    expect(coins.map((c) => c.value).sort()).toEqual([FIRST_TIP, SECOND_TIP].sort());
+    const issued = new Set(bobIssuedNonces.map(hex));
+    for (const c of coins) expect(issued.has(hex(c.nonce))).toBe(false);
+```
+
+The split also gives Bob coins of the exact amounts he wants to tip, because a tip is always a
+whole coin.
+
+### 4. Bob tips twice
+
+`tip` takes a `ShieldedCoinInfo` argument, so the test turns a coin in Bob's wallet into one.
+`tokenCoins` reads the wallet's available shielded coins of the jar's color:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+  async function tokenCoins(w: MidnightWalletProvider): Promise<ShieldedCoinArg[]> {
+    const state = await w.wallet.waitForSyncedState();
+    return state.shielded.availableCoins
+      .filter((c) => c.coin.type === tipColorHex)
+      .map((c) => ({
+        nonce: Uint8Array.from(Buffer.from(c.coin.nonce, 'hex')),
+        color: tipColorBytes,
+        value: c.coin.value,
+      }));
+  }
+```
+
+and `takeCoin` picks the one with the value Bob wants to tip. Each tip is a plain call:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+  async function bobTips(coin: ShieldedCoinArg): Promise<void> {
+    await (submitCallTx<Contract, 'tip'>)(bobJarProv, {
+      compiledContract: CompiledPrivateTipJarContract,
+      contractAddress: jarAddress,
+      privateStateId: BOB_JAR_STATE_ID,
+      circuitId: 'tip',
+      args: [coin],
+    });
+  }
+```
+
+After both tips, the pot holds two coins. Their values are public, and each is keyed by its own
+new nonce:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+    // Tip VALUES are public by design: the contract must hold whole coins to
+    // spend them later. What they don't carry is who paid them.
+    const values = [...state.pot].map(([, coin]) => coin.value).sort();
+    expect(values).toEqual([FIRST_TIP, SECOND_TIP].sort());
+    for (const [key, coin] of state.pot) {
+      expect(hex(coin.color)).toEqual(tipColorHex);
+      expect(hex(key)).toEqual(hex(coin.nonce));
+    }
+```
+
+### 5. The privacy test
+
+This is the devnet version of the in-memory privacy test, run against the real ledger after real
+tips. `collectPublicBytes` gathers every byte string in the jar's public state, labeled with the
+field it came from:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+function collectPublicBytes(l: Ledger): Labeled[] {
+  const out: Labeled[] = [
+    { label: 'owner', bytes: l.owner },
+    { label: 'tipColor', bytes: l.tipColor },
+  ];
+  for (const [key, coin] of l.pot) {
+    out.push({ label: 'pot.key', bytes: key });
+    out.push({ label: 'pot.coin.nonce', bytes: coin.nonce });
+    out.push({ label: 'pot.coin.color', bytes: coin.color });
+  }
+  return out;
+}
+```
+
+If a value isn't in that list, the contract never put it on chain. The test then lists everything
+the design promises to keep off chain, including the nonce of the coin Alice minted and the nonces
+of the coins Bob actually tipped:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+    const secrets: Labeled[] = [
+      { label: "Bob's wallet coin public key", bytes: encodeCoinPublicKey(bobWallet.getCoinPublicKey()) },
+      { label: "Bob's jar secret", bytes: bobSk },
+      { label: "Alice's owner secret", bytes: aliceOwnerSk },
+      { label: "Alice's wallet coin public key", bytes: encodeCoinPublicKey(aliceWallet.getCoinPublicKey()) },
+      ...bobIssuedNonces.map((n) => ({ label: 'nonce of the coin Alice minted to Bob', bytes: n })),
+      ...bobTippedNonces.map((n) => ({ label: 'nonce of a coin Bob tipped', bytes: n })),
+    ];
+```
+
+and checks that none of them appears in any public field. `findLeak` matches substrings too, in
+case a secret was ever packed into a wider value:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+    for (const s of secrets) {
+      const leak = findLeak(pool, s.bytes);
+      expect(leak, `${s.label} found in public field ${leak}`).toBeNull();
+    }
+```
+
+If you added a ledger field to the contract, you would add it to `collectPublicBytes` too. A field
+left out of that list is a field the privacy test can't see.
+
+### 6. The rejections
+
+Four tests check each `assert` in the jar:
+
+- **Wrong token.** Bob tips a made-up coin of a random color, and the call is rejected with
+  `Tips must be paid in the jar's token`.
+- **Zero value.** A coin of the right color but value 0 is rejected with `A tip must be worth
+  something`.
+- **Not the owner.** Bob calls `withdraw` with his own random secret in his private state. It is
+  rejected with `Only the owner can withdraw`, and the pot and Bob's balance are unchanged.
+- **No such tip.** After the withdrawals, Alice tries a key she has already withdrawn and a random
+  key. Both are rejected with `No such tip in the jar`.
+
+The tip rejections can pass made-up coins because both guards run before `receiveShielded`. The
+call fails while the transaction is being built, before any coin from Bob's wallet is involved.
+
+### 7. The owner withdraws
+
+Alice reads the pot and withdraws each coin in turn:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+    for (const [key] of [...(await queryLedger()).pot]) {
+      await aliceWithdraws(key);
+      withdrawnKeys.push(key);
+    }
+
+    expect((await queryLedger()).pot.isEmpty()).toBe(true);
+    await syncWallet(logger, aliceWallet.wallet, syncTimeoutMs);
+    expect(await tokenBalance(aliceWallet)).toEqual(MINTED);
+```
+
+The pot is empty, and all 100 tokens are now in Alice's shielded wallet. That is the full shielded
+tip, end to end: minted to Bob, re-nonced in his wallet, received and re-nonced by the jar, and
+paid out to the owner. At no point did the jar's public state hold anything that names Bob.
+
+## Next
+
+You have now seen both kinds of token on Midnight: unshielded NIGHT in Private Party, and a
+shielded token here. Next, the [Battleship tutorial](/tutorials/battleship) is about defensive
+programming: a contract that has to protect itself from players who cheat.
