@@ -22,7 +22,7 @@ maximum, which you then accept (`Approved`) or decline (`NotAccepted`) with
 
 For a guided walkthrough of the contract, the attestation API and the on-chain tests, see the
 [ZK Loan tutorial](./tutorials/index.mdx), also published at
-[docs.midnight.network](https://docs.midnight.network/tutorials/zk-loan). It is step 5 of the
+[docs.midnight.network](https://docs.midnight.network/tutorials/zk-loan). It is step 6 of the
 [learning path](../../README.md#learning-path).
 
 ## Set up
