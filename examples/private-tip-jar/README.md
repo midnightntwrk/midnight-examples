@@ -12,6 +12,11 @@ the owner's shielded wallet. Tip *values* stay public, so an observer can see
 also ships a tiny demo token (`contract/tip-token.compact`) because a fresh
 devnet has no shielded tokens to tip with.
 
+Step 3 of the [learning path](../../README.md#learning-path). The tutorial in
+[`tutorials/`](tutorials/index.mdx) walks through both contracts and the tests,
+and is published at
+[docs.midnight.network/tutorials/private-tip-jar](https://docs.midnight.network/tutorials/private-tip-jar).
+
 ## Set up
 
 Install dependencies (from the repo root — one lockfile for the whole workspace):
