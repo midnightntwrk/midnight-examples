@@ -38,7 +38,7 @@ yarn wait:dust
 yarn test:local src/test/party.test.ts
 ```
 
-`yarn env:up` starts a Midnight node, an indexer and a proof server from `compose.yml`. The proof
+`yarn env:up` starts a Midnight node, an indexer, and a proof server from `compose.yml`. The proof
 server generates the zero-knowledge proof for each transaction. Leave the network running while
 you work through this page. Every successful call generates a real proof, so expect the suite to
 take a few minutes.
@@ -90,7 +90,7 @@ test file is shared harness. It is the same in every example in midnight-example
   package, returns the wallet secret for a role. On `local` these are the devnet's pre-funded
   wallets, so there is nothing to set up. On a remote network they come from a repo-root
   `.env.<network>` file.
-- **`src/wallet.ts`** builds, starts and syncs each wallet. **`src/providers.ts`** bundles the
+- **`src/wallet.ts`** builds, starts, and syncs each wallet. **`src/providers.ts`** bundles the
   MidnightJS providers a user needs: public data from the indexer, private state, ZK artifacts
   and proving, and the wallet itself.
 
@@ -141,7 +141,7 @@ reads the contract's public ledger, the other reads a wallet's NIGHT balance:
 ### Alice deploys
 
 Alice creates her private state with a fresh random secret and deploys a party for ten guests,
-with an entry fee of 5:
+with an entry fee of 5 STAR:
 
 ```typescript title="src/test/party.test.ts"
     it('Deploys a contract (the easy way)', async () => {
@@ -307,7 +307,7 @@ her NIGHT balance before and after:
         logger.info(`Alice NIGHT balance delta:            ${balanceAfter - balanceBefore}`);
 ```
 
-Only Bob checked in, so the contract holds one entry fee, and the log shows a delta of 5. The
+Only Bob checked in, so the contract holds one entry fee, and the log shows a delta of 5 STAR. The
 test asserts on the final `FEES_CLAIMED` state. It logs the delta rather than asserting on it.
 
 ## Deploying the hard way
@@ -395,8 +395,8 @@ This tutorial put the privacy boundary in one place:
 - **A state machine** decides which circuits can run at each stage.
 
 Paying in unshielded NIGHT is what exposes the guests. As an exercise, think about how the
-contract would change if the entry fee were paid in a shielded token instead. The next tutorial
-introduces shielded tokens.
+contract would change if the entry fee were paid in a shielded token instead. The private tip
+jar tutorial, later in the learning path, introduces shielded tokens.
 
 The full example, including a browser UI for the party, is
 [`examples/private-party`](https://github.com/midnightntwrk/midnight-examples/tree/main/examples/private-party)
@@ -405,5 +405,5 @@ in midnight-examples.
 ## Next
 
 The next step in the learning path is the [Battleship](/tutorials/battleship) tutorial:
-defensive programming with a state machine, role checks and on-chain verification of off-chain
+defensive programming with a state machine, role checks, and on-chain verification of off-chain
 data that catches cheating.

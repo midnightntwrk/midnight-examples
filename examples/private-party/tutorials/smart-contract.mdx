@@ -3,7 +3,7 @@ SPDX-License-Identifier: Apache-2.0
 copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 sidebar_label: "Private party contract"
 title: "Private party contract"
-description: "Read a Compact contract that keeps party guests private behind salted commitments and a DApp-specific key, then makes them public at one point: an unshielded NIGHT entry fee."
+description: "Read a Compact contract that keeps party guests private behind salted commitments, then makes them public at one point: an unshielded NIGHT entry fee."
 sidebar_position: 10
 toc_max_heading_level: 2
 tags:
@@ -52,13 +52,14 @@ private to public, and the compiler makes you mark the places where it happens. 
 **always public**, though:
 
 - ledger fields, and the values a circuit reads from or writes to them;
-- values returned from exported circuits;
-- contract-to-contract calls;
 - unshielded token transfers;
 - which circuit a transaction calls.
 
-Hashes and commitments let you put data in the first three places without revealing it. An
-unshielded transfer can't be hidden that way. Its sender, recipient and amount are public.
+A value an exported circuit returns isn't on this list. It goes back to the code that called the
+circuit. The transaction carries only a randomized commitment to the call's inputs and outputs.
+
+Hashes and commitments let you put data in a ledger field without revealing it. An unshielded
+transfer can't be hidden that way. Its sender, recipient, and amount are public.
 
 That makes the NIGHT entry fee the **privacy boundary** of this DApp. A guest is private until
 they pay it at check-in, and the organizer is private until the contract pays the fees out to
@@ -69,7 +70,7 @@ them.
 | The organizer's DApp-specific public key | The organizer's secret |
 | A commitment for each RSVP | Each guest's secret, and their address until check-in |
 | The addresses of checked-in guests | |
-| The party size, entry fee and party state | |
+| The party size, entry fee, and party state | |
 | Each NIGHT payment, in and out | |
 
 ## The state machine
@@ -94,7 +95,7 @@ move the party to the next state:
 | --- | --- | --- |
 | `NOT_STARTED` | `rsvp` fills the list | `READY` |
 | `NOT_STARTED` or `READY` | `startParty` (organizer) | `STARTED` |
-| `STARTED` | `checkIn` checks in the last guest | `DOORS_CLOSED` |
+| `STARTED` | `checkIn` checks in the last guest on a full list | `DOORS_CLOSED` |
 | `STARTED` | `closeEntry` (organizer) | `DOORS_CLOSED` |
 | `DOORS_CLOSED` | `claimFees` (organizer) | `FEES_CLAIMED` |
 
@@ -141,7 +142,7 @@ To see witnesses in action, see the [Battleship tutorial](/tutorials/battleship/
 
 ## Identity: a DApp-specific public key
 
-The contract doesn't identify anyone by their wallet. It identifies each caller by a secret they
+The contract doesn't identify the organizer by their wallet. It identifies them by a secret they
 can prove they know, hashed into a public key used only by this DApp:
 
 ```compact title="contract/private-party.compact"
@@ -180,8 +181,9 @@ are constructor arguments.
 
 :::note[What disclose() does]
 `disclose()` doesn't make a value public by itself. It tells the compiler that you, the
-developer, accept that a value derived from private input crosses into the public domain. The
-value is published only when it is written to the ledger or otherwise leaves the circuit.
+developer, accept that a value derived from private input leaves the circuit. The value becomes
+public when the circuit uses it in a ledger read or write, or in a public operation such as an
+unshielded transfer.
 :::
 
 ## RSVP: a salted commitment
@@ -297,9 +299,10 @@ Then the guest pays, and becomes public:
 ```
 
 `nativeToken()` is the token type of NIGHT. `receiveUnshielded` makes the transaction pay
-`entryFee` NIGHT into the contract. The caller's wallet supplies those funds when it balances the
-transaction. This is an unshielded transfer, so it is public. The guest's address goes onto
-`checkedInParty` too, which is why it needs `disclose()`.
+`entryFee` into the contract, in STAR, NIGHT's smallest unit (1 NIGHT = 1,000,000 STAR). The
+caller's wallet supplies those funds when it balances the transaction. This is an unshielded
+transfer, so it is public. The guest's address goes onto `checkedInParty` too, which is why it
+needs `disclose()`.
 
 This is the privacy boundary. Up to here, nothing on chain tied the guest to the party. Now their
 address is public, and so is the link to their RSVP. To check membership, the circuit reads
@@ -377,6 +380,10 @@ reuse it, know what it leaves open:
 - **Check-in links a guest to their RSVP.** As shown above, check-in publishes the guest's
   address and the commitment it matched. The RSVP list stays private only for guests who haven't
   checked in.
+- **Nothing ties the address to the caller.** `rsvp` and `checkIn` take the address as an
+  argument, and the entry fee comes from whichever wallet balances the transaction. A guest can
+  RSVP and check in under someone else's address. `checkedInParty` then lists the addresses guests
+  gave, not who paid, and the real owner of that address can no longer check in.
 - **The organizer's key is the same in every party.** The key is a hash of the secret alone, so
   an organizer who reuses a secret across deployments is recognizable in all of them. Adding the
   contract's own address, `kernel.self()`, to the hash would give each deployment a different
@@ -384,8 +391,8 @@ reuse it, know what it leaves open:
 - **Activity is public.** Which circuit each transaction calls is public, so anyone can see when
   someone RSVPs and how many guests are on the list, though not who they are.
 
-Closing gaps like these is the subject of the [Battleship tutorial](/tutorials/battleship) later
-in the learning path: a state machine, role checks and assertions on every assumption.
+The [Battleship tutorial](/tutorials/battleship), next in the learning path, goes further into
+defending a contract: a state machine, role checks, and assertions on every assumption.
 
 ## Compile
 
