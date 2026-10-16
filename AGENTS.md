@@ -53,6 +53,12 @@ truth over your own recollection of Midnight/Compact APIs.
   wallet's funds. Omitting it is always safe: that wallet just does a full sync.
 - **Remote suites share four wallets** (Alice/Bob/Charlie/Dave, aliased per
   suite in `packages/fast-sync/src/resolve.ts`). Never run them in parallel.
+- **`midnight-examples-mirror` is a one-way private copy.** `mirror.yml` keeps
+  its `main` equal to this repo's and gives every PR here a twin there
+  (`pr/<number>`). Never push, commit or merge in the mirror: the next sync
+  overwrites it. The mirror runs every workflow it receives, so a workflow
+  that needs secrets or writes outside this repo must be guarded with
+  `if: github.repository == 'midnightntwrk/midnight-examples'`.
 
 ## Common commands
 
