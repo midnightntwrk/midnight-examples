@@ -10,9 +10,10 @@
 pragma language_version 0.23;
 import CompactStandardLibrary;
 
-// How many mints have happened. It is here so `mint` writes public state;
-// a circuit that never touches the ledger compiles without a proving key and
-// cannot be submitted (see docs/compact-gotchas.md).
+// How many mints have happened. The first devnet test reads it back to
+// confirm the mint landed. It is not what makes `mint` provable:
+// mintShieldedToken already touches the ledger, so `mint` gets a proving key
+// with or without this counter.
 export ledger mintCount: Counter;
 
 // Mint `amount` of this contract's shielded token straight to `recipient`'s

@@ -12,7 +12,7 @@ tags:
   - midnight-js
   - testing
   - shielded-tokens
-  - beginner
+  - intermediate
   - midnight-network
 ---
 
@@ -48,7 +48,7 @@ contract. All five pass:
 
 The tests use `@midnight-ntwrk/example-sim`, a small helper package in midnight-examples that runs
 a compiled contract in memory. `Sim.deploy` runs the constructor with an owner secret, a made-up
-token color and a made-up coin public key for the deployer:
+token color, and a made-up coin public key for the deployer:
 
 ```typescript title="src/test/private-tip-jar.sim.test.ts"
 const deploy = () =>
@@ -118,7 +118,7 @@ yarn wait:dust
 yarn test:local
 ```
 
-`yarn env:up` starts a Midnight node, an indexer and a proof server from `compose.yml`. The proof
+`yarn env:up` starts a Midnight node, an indexer, and a proof server from `compose.yml`. The proof
 server generates the zero-knowledge proof for each transaction. Leave the network running while
 you work through this page. Every successful call generates a real proof, so expect the suite to
 take a few minutes.
