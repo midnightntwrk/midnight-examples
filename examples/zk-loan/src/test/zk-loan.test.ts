@@ -362,7 +362,7 @@ describe(`Zk Loan Contract (${network})`, () => {
   });
 
   // ---------------------------------------------------------------------------
-  // PIN rotation — batched migration to a new, unlinkable identity.
+  // PIN rotation — batched migration to the identity derived from a new PIN.
   // ---------------------------------------------------------------------------
 
   it('migrates all loans to the identity derived from a new PIN', async () => {

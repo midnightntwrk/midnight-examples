@@ -96,9 +96,10 @@ witness getAttestedScoringWitness(): [Applicant, Schnorr_SchnorrSignature, Uint<
 witness getUserSecret(): UserSecretKey;
 
 // Per-user identity, PIN-rotatable. Changing the PIN yields a new derived
-// public key, breaking linkability to the old identity. Used as the loan map
-// key and the blacklist key. `pure` so the same derivation is exported to
-// TypeScript (`pureCircuits.deriveUserPublicKey`) for off-chain lookups.
+// public key, but not an unlinkable one: `changePin` names the old and new
+// keys in the same transaction. Used as the loan map key and the blacklist
+// key. `pure` so the same derivation is exported to TypeScript
+// (`pureCircuits.deriveUserPublicKey`) for off-chain lookups.
 // The string literal is a domain separator: it keeps this hash from ever
 // colliding with `deriveAdminPublicKey` for the same secret.
 export pure circuit deriveUserPublicKey(sk: UserSecretKey, pin: Uint<16>): UserPublicKey {

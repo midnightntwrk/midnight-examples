@@ -38,9 +38,9 @@ export type SchnorrSignature = {
 // equality assertion inside the proof.
 //
 // The credit fields plus `attestationSignature`/`attestationProviderId` are
-// what a registered provider signed off-chain (in upstream, the attestation
-// API; here, the test signs with src/test/utils/test-data.ts). They never
-// reach the ledger.
+// what a registered provider signed off-chain: the attestation API for the
+// devnet tests and the UI, src/test/utils/test-data.ts for the simulator
+// tests. They never reach the ledger.
 export type ZkLoanPrivateState = {
   creditScore: bigint;
   monthlyIncome: bigint;

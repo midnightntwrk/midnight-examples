@@ -3,7 +3,7 @@ SPDX-License-Identifier: Apache-2.0
 copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 sidebar_label: "ZK Loan tests"
 title: "ZK Loan tests"
-description: "Run the ZK loan DApp end to end on a local devnet with MidnightJS: deploy, register the attestation provider, borrow, and prove that tampered data, blacklisted borrowers and an ex-admin are rejected."
+description: "Run the ZK loan DApp on a local devnet with MidnightJS, and check that tampered credit data, blacklisted borrowers, and an ex-admin are rejected."
 sidebar_position: 30
 toc_max_heading_level: 3
 ---
@@ -75,7 +75,8 @@ yarn env:down
 ## The test harness
 
 Everything above the line `// Everything above is generated boilerplate. Your tests begin here.`
-in the test file is shared harness. It is the same in every example in midnight-examples:
+in the test file is the test harness. Most of it is the same in every example in
+midnight-examples:
 
 - **`src/config.ts`** holds the endpoints for each network. `MIDNIGHT_NETWORK` picks one:
   `yarn test:local` sets it to `local`, and `yarn test:preview` and `yarn test:preprod` run the
@@ -83,7 +84,7 @@ in the test file is shared harness. It is the same in every example in midnight-
 - **`resolveWallet(network)`**, from the shared `@midnight-ntwrk/example-fast-sync` package,
   returns the wallet secret. On `local` it is the devnet's pre-funded wallet, so there is nothing to
   set up. On a remote network it comes from a repo-root `.env.<network>` file.
-- **`src/wallet.ts`** builds, starts and syncs the wallet. **`src/providers.ts`** bundles the
+- **`src/wallet.ts`** builds, starts, and syncs the wallet. **`src/providers.ts`** bundles the
   MidnightJS providers a party needs: public data from the indexer, private state, ZK artifacts
   and proving, and the wallet itself.
 
@@ -301,7 +302,7 @@ merely that it threw.
 
 ### A Tier 1 loan
 
-Alice gets her profile signed, a score of 720, an income of 2,500 and 24 months as a customer,
+Alice gets her profile signed (a score of 720, an income of 2,500, and 24 months as a customer)
 and asks for 5,000:
 
 ```typescript title="src/test/zk-loan.test.ts"
@@ -440,8 +441,9 @@ Alice moves to a new PIN:
 ```
 
 Alice has two loans, fewer than the batch size of five, so one `changePin` call moves both and
-clears the migration cursor. Her old key is gone from `loans`. Her loans are now under a new key
-that no one can link to the old one without her secret.
+clears the migration cursor. Her old key is gone from `loans`, and her loans are now under the new
+key. The `changePin` transaction names both keys, though, so anyone watching the chain can link
+them.
 
 ### Handing over the admin role
 
@@ -497,8 +499,9 @@ This tutorial covered private computation over data you can't trust by itself:
 - **Witness-derived identity.** Admin and borrower identities are domain-separated hashes of a
   private secret, never `ownPublicKey()`.
 - **Fixed-size batching** to work over a variable number of records, with a cursor on the ledger.
-- **Only the outcome on chain:** the status and amount of each loan, under a key no one can link
-  to the borrower without their secret and PIN.
+- **Only the outcome on chain:** the status and amount of each loan, under a derived key rather
+  than a wallet address. The provider that signed the attestation can still match that key to the
+  borrower.
 
 The full example is
 [`examples/zk-loan`](https://github.com/midnightntwrk/midnight-examples/tree/main/examples/zk-loan)
@@ -508,4 +511,4 @@ wallet. See its README.
 ## Next
 
 The last step in the learning path is the [Leaderboard](/tutorials/leaderboard) tutorial:
-a full-stack DApp with a browser UI, Lace wallet integration and a deployment to Vercel.
+a full-stack DApp with a browser UI, Lace wallet integration, and a deployment to Vercel.

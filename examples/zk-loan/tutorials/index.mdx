@@ -3,7 +3,7 @@ SPDX-License-Identifier: Apache-2.0
 copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 title: ZK Loan
 description: "A ZK loan DApp that privately evaluates credit data against a Schnorr-signed attestation, verified inside the circuit, with only the loan outcome on chain."
-sidebar_position: 50
+sidebar_position: 39
 tags:
   - tutorials
   - zk-loan
@@ -18,13 +18,14 @@ import PersonaTiles from '@site/src/components/PersonaTiles';
 
 **Prerequisites:** work through the
 [shielded chips](https://github.com/midnightntwrk/midnight-examples/tree/main/examples/shielded-chips)
-example first. This tutorial assumes you can already compile a contract, run a local devnet and
+example first. This tutorial assumes you can already compile a contract, run a local devnet, and
 read a MidnightJS test, and that you know why a contract must check every value a witness returns
 (the subject of the [Battleship](/tutorials/battleship) tutorial).
 
 This tutorial is a real use case: **private credit scoring**. A borrower proves they qualify for a
-loan tier without revealing their credit score, income or employment tenure. Only the outcome, the
-loan's status and authorized amount, reaches the ledger.
+loan tier without revealing their credit score, income, or employment tenure. Only the outcome, the
+loan's status and authorized amount, reaches the ledger. The contract records that decision and
+moves no tokens.
 
 A witness alone can't be trusted with that data. It runs on the borrower's machine, so a borrower
 could claim any credit score they like. The fix is an **attestation**: a trusted provider, standing
@@ -46,7 +47,7 @@ in midnight-examples.
 
 ## Set up
 
-Clone midnight-examples, install the workspace and compile every contract:
+Clone midnight-examples, install the workspace, and compile every contract:
 
 ```bash
 git clone https://github.com/midnightntwrk/midnight-examples.git
@@ -65,7 +66,7 @@ You'll start the local network in the third part, when you run the tests.
 <PersonaTiles tiles={[
   {
     title: "ZK Loan contract",
-    body: "Read a Compact contract that verifies a signed attestation in-circuit, scores the applicant privately and records only the outcome.",
+    body: "Read a Compact contract that verifies a signed attestation in-circuit, scores the applicant privately, and records only the outcome.",
     to: "/tutorials/zk-loan/smart-contract",
     cta: "Read the contract",
   },
@@ -77,7 +78,7 @@ You'll start the local network in the third part, when you run the tests.
   },
   {
     title: "ZK Loan tests",
-    body: "Run the full flow on a local devnet with MidnightJS: deploy, register the provider, borrow, and watch tampered data, blacklisted borrowers and an ex-admin get rejected.",
+    body: "Run the full flow on a local devnet with MidnightJS: deploy, register the provider, borrow, and watch tampered data, blacklisted borrowers, and an ex-admin get rejected.",
     to: "/tutorials/zk-loan/test-suite",
     cta: "Run the tests",
   },

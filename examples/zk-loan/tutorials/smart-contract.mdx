@@ -3,7 +3,7 @@ SPDX-License-Identifier: Apache-2.0
 copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 sidebar_label: "ZK Loan contract"
 title: "ZK Loan contract"
-description: "Read a Compact contract that verifies a Schnorr-signed credit attestation inside the ZK proof, scores the applicant privately, and records only the loan outcome."
+description: "Read a Compact contract that verifies a Schnorr-signed credit attestation inside the ZK proof, scores the applicant privately, and records only the outcome."
 sidebar_position: 10
 toc_max_heading_level: 3
 ---
@@ -55,7 +55,7 @@ The loan flow in order:
 | Credit score, income, tenure | Private (witness) | Only checked inside the proof |
 | Secret PIN | Private (circuit argument) | Hashed with the secret into the borrower's identity, never stored |
 | Attestation signature | Private (witness) | Verified inside the proof |
-| Derived user public key | Public (ledger) | The key of the borrower's loans. Unlinkable without both the secret and the PIN |
+| Derived user public key | Public (ledger) | The key of the borrower's loans. It reveals neither the secret nor the PIN |
 | Loan status and authorized amount | Public (ledger) | The outcome |
 | `contractAdmin`, `providers`, `blacklist` | Public (ledger) | Contract governance |
 
@@ -82,7 +82,10 @@ A signature is an announcement point `R` and a response scalar `s`:
 
 `schnorrVerify` starts by hashing everything the signature commits to: the announcement, the
 public key, and the message. Hashing the public key and announcement, not only the message,
-prevents key-substitution attacks.
+prevents key-substitution attacks. It uses `transientHash`, not the `persistentHash` you met in
+[Private Party](/tutorials/private-party). `transientHash` is the circuit-efficient hash: it returns
+a `Field`, and its output isn't guaranteed to stay the same across upgrades, so it suits checks
+inside a proof rather than data kept on the ledger.
 
 ```compact title="contract/schnorr.compact"
   export circuit schnorrVerify<#n>(
@@ -200,7 +203,7 @@ access and no witnesses, so the compiler also generates a TypeScript version of 
   }
 ```
 
-## Types, ledger and constructor
+## Types, ledger, and constructor
 
 `zk-loan.compact` pins the language version and imports the standard library and the Schnorr
 module. `prefix Schnorr_` namespaces every name the module exports, so `schnorrVerify` becomes
@@ -329,9 +332,10 @@ Two pure circuits turn the secret into the contract's two kinds of identity:
 
 ```compact title="contract/zk-loan.compact"
 // Per-user identity, PIN-rotatable. Changing the PIN yields a new derived
-// public key, breaking linkability to the old identity. Used as the loan map
-// key and the blacklist key. `pure` so the same derivation is exported to
-// TypeScript (`pureCircuits.deriveUserPublicKey`) for off-chain lookups.
+// public key, but not an unlinkable one: `changePin` names the old and new
+// keys in the same transaction. Used as the loan map key and the blacklist
+// key. `pure` so the same derivation is exported to TypeScript
+// (`pureCircuits.deriveUserPublicKey`) for off-chain lookups.
 // The string literal is a domain separator: it keeps this hash from ever
 // colliding with `deriveAdminPublicKey` for the same secret.
 export pure circuit deriveUserPublicKey(sk: UserSecretKey, pin: Uint<16>): UserPublicKey {
@@ -355,7 +359,8 @@ export pure circuit deriveAdminPublicKey(sk: UserSecretKey): AdminPublicKey {
 ```
 
 - `deriveUserPublicKey(sk, pin)` is the borrower's identity. It is bound to a PIN, so a new PIN
-  gives the borrower a new identity that can't be linked to the old one.
+  gives the borrower a new key. It isn't an unlinkable fresh start, though: `changePin` names the
+  old and new keys in the same transaction, so anyone watching the chain can link them.
 - `deriveAdminPublicKey(sk)` is the admin identity. It has no PIN, so the admin role survives the
   admin's PIN changes.
 
@@ -406,9 +411,11 @@ export circuit requestLoan(amountRequested: Uint<16>, secretPin: Uint<16>): [] {
 
 :::important
 `disclose()` doesn't publish anything by itself. It is a compile-time annotation that marks a
-witness-derived value as allowed to leave the private domain. A value becomes public only when it
-crosses a public boundary: a ledger write, or the return value of an exported circuit. The credit
-score, income and tenure are never disclosed and never cross one, so they stay private.
+witness-derived value as allowed to leave the circuit. The value becomes public when a ledger read
+or write uses it. An exported circuit's return value needs `disclose()` too, but it isn't
+published: the transaction carries only a randomized commitment to the call's inputs and outputs.
+The credit score, income, and tenure are never disclosed and never reach the ledger, so they stay
+private.
 :::
 
 ### The private evaluation
@@ -459,7 +466,7 @@ circuit evaluateApplicant(userPubKeyHash: Field): [Uint<16>, LoanStatus] {
 }
 ```
 
-It takes the profile, signature and provider ID from the witness, checks the provider is
+It takes the profile, signature, and provider ID from the witness, checks the provider is
 registered, and rebuilds the signed message element for element. `Schnorr_schnorrVerify` fails the
 whole transaction if the signature isn't valid for that provider over that exact message. Only
 then is the profile trusted, and scored:
@@ -702,7 +709,14 @@ export pure circuit schnorrChallenge(
 The private state holds the signed profile and the user secret:
 
 ```typescript title="contract/witnesses.ts"
-
+export type ZkLoanPrivateState = {
+  creditScore: bigint;
+  monthlyIncome: bigint;
+  monthsAsCustomer: bigint;
+  attestationSignature: SchnorrSignature;
+  attestationProviderId: bigint;
+  userSecretKey: Uint8Array;
+};
 ```
 
 `SchnorrSignature` mirrors the generated `Schnorr_SchnorrSignature`: a `JubjubPoint` crosses into
@@ -713,17 +727,65 @@ deploy and to call the admin circuits. `requestLoan` also needs a signed profile
 [tests](/tutorials/zk-loan/test-suite) get from the attestation API.
 
 ```typescript title="contract/witnesses.ts"
-
+// A private state holding only a user secret and an empty (unsigned) profile.
+// Enough to deploy and to call admin circuits; `requestLoan` additionally needs
+// a signed profile (see `createCustomSignedProfile` in the test utilities).
+export const createZkLoanPrivateState = (userSecretKey: Uint8Array): ZkLoanPrivateState => ({
+  creditScore: 0n,
+  monthlyIncome: 0n,
+  monthsAsCustomer: 0n,
+  attestationSignature: { announcement: { x: 0n, y: 0n }, response: 0n },
+  attestationProviderId: 0n,
+  userSecretKey,
+});
 ```
 
 Each witness receives a `WitnessContext` and returns a tuple of the next private state and the
 value the circuit asked for:
 
 ```typescript title="contract/witnesses.ts"
+// The `Witnesses<ZkLoanPrivateState>` annotation is load-bearing: leaving it to
+// inference collapses the private-state type parameter to `never` and breaks
+// the deploy/call overloads.
+export const witnesses: Witnesses<ZkLoanPrivateState> = {
+  // Hands the circuit the private profile, the provider's signature over it,
+  // and which provider signed. The circuit re-derives the message and verifies
+  // the signature before trusting any of it.
+  getAttestedScoringWitness: ({ privateState }) => [
+    privateState,
+    [
+      {
+        creditScore: privateState.creditScore,
+        monthlyIncome: privateState.monthlyIncome,
+        monthsAsCustomer: privateState.monthsAsCustomer,
+      },
+      privateState.attestationSignature,
+      privateState.attestationProviderId,
+    ],
+  ],
 
+  // Witness-assisted division: cheap here, and the circuit checks
+  // `q * 2^248 + r == challengeHash` with q bounded, so a dishonest answer is
+  // rejected rather than trusted.
+  getSchnorrReduction: ({ privateState }, challengeHash) => {
+    const q = challengeHash / TWO_248;
+    const r = challengeHash % TWO_248;
+    return [privateState, [q, r]];
+  },
+
+  // The single source of caller identity. Validate the length so a malformed
+  // private state fails loudly at proof time rather than as an opaque
+  // circuit error.
+  getUserSecret: ({ privateState }) => {
+    if (!privateState.userSecretKey || privateState.userSecretKey.length !== 32) {
+      throw new Error('getUserSecret: userSecretKey is missing or wrong length');
+    }
+    return [privateState, privateState.userSecretKey];
+  },
+};
 ```
 
-- `getAttestedScoringWitness` returns the profile, the signature and the provider ID. The circuit
+- `getAttestedScoringWitness` returns the profile, the signature, and the provider ID. The circuit
   verifies the signature before it trusts any of them.
 - `getSchnorrReduction` divides the challenge hash by 2^248. The honest quotient is always between
   0 and 115, so it passes the circuit's range check.
@@ -762,7 +824,7 @@ Overall progress [====================] 8/8
 ```
 
 Eight circuits, one for each exported impure circuit. The pure circuits `deriveUserPublicKey`,
-`deriveAdminPublicKey` and `schnorrChallenge` don't need one, and `evaluateApplicant` and
+`deriveAdminPublicKey`, and `schnorrChallenge` don't need one, and `evaluateApplicant` and
 `createLoan` are compiled into `requestLoan`. `changePin` is the largest because its five-step
 loop is unrolled into the circuit.
 

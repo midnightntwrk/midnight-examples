@@ -66,8 +66,8 @@ edit examples/<name>/tutorials/ → PR merged to main → workflow opens a midni
 - **Code blocks:** quote the example's current files, and give each quoted block
   a `title` naming its file relative to the example, e.g.
   ` ```compact title="contract/battleship.compact" `. CI
-  (`node scripts/check-tutorial-code.mjs`) fails if a titled block's lines no
-  longer appear verbatim in that file (trailing whitespace aside), so when the
+  (`node scripts/check-tutorial-code.mjs`) fails if a titled block is empty or
+  its lines no longer appear verbatim in that file (trailing whitespace aside), so when the
   code changes, update the tutorial in the same PR. Docusaurus options such as
   `showLineNumbers` or `{2-4}` may sit before or after `title=`. Leave commands and sample output untitled.
 - **Docs components:** `@site/…` imports such as `PersonaTiles` resolve on the
