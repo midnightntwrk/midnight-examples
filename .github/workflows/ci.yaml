@@ -8,6 +8,10 @@ on:
 
 permissions: {}
 
+# Every job is guarded to this repo: midnight-examples-mirror (private, kept
+# in sync by mirror.yml) receives this file too, and is for review and
+# scanning, not a second copy of these devnet runs on billed minutes.
+
 concurrency:
   group:
     ${{ github.event_name != 'merge_group' && format('{0}-{1}', github.workflow, github.head_ref) || github.run_id }}
@@ -19,6 +23,7 @@ jobs:
   # example must compile and run on each toolchain release.
   example:
     name: ${{ matrix.example }}
+    if: github.repository == 'midnightntwrk/midnight-examples'
     runs-on: ubuntu-latest
     # The slowest suite (shielded-chips) takes about 20 minutes; the rest under 10.
     timeout-minutes: 45
@@ -110,6 +115,7 @@ jobs:
   # human (Lace approvals), so there is no E2E step.
   ui:
     name: generated UIs
+    if: github.repository == 'midnightntwrk/midnight-examples'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -161,6 +167,7 @@ jobs:
   # (those repos are being archived; tutorials use this repo's commands).
   tutorials:
     name: tutorial conventions
+    if: github.repository == 'midnightntwrk/midnight-examples'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -197,6 +204,7 @@ jobs:
   # change nothing, and the derived stubs must type-check.
   scaffold:
     name: scaffold and sim harness
+    if: github.repository == 'midnightntwrk/midnight-examples'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
