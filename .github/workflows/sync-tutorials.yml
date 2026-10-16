@@ -30,7 +30,9 @@ jobs:
   sync-tutorials:
     # Guard manual dispatches: running from a stale branch would force-push
     # that branch's tutorials over the reused sync/examples-tutorials PR branch.
-    if: github.ref == 'refs/heads/main'
+    # The repository guard keeps it inert in midnight-examples-mirror, which
+    # receives this file through mirror.yml but has no DOCS_SYNC_TOKEN.
+    if: github.repository == 'midnightntwrk/midnight-examples' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
