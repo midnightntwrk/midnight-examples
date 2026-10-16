@@ -20,7 +20,7 @@ published on [docs.midnight.network](https://docs.midnight.network/tutorials)
 | # | Example | Teaches |
 |---|---|---|
 | 1 | [`hello-world`](./examples/hello-world) | Environment smoke test: a minimal contract, the test harness, devnet and fast-sync wallets |
-| 2 | [`private-bid`](./examples/private-bid) | First real contract: prove a bid meets a sealed minimum without revealing it, commit and reveal, the minimal `disclose()` boundary |
+| 2 | [`private-party`](./examples/private-party/tutorials/index.mdx) | First real contract: the privacy boundary. Guests RSVP privately with a salted commitment, then become public when they pay the unshielded NIGHT entry fee; a DApp-specific key gates the organizer's actions |
 | 3 | [`private-tip-jar`](./examples/private-tip-jar) | Two contracts (jar and tip token), still simple; a first shielded token: anonymous tips into a contract-held pot |
 | 4 | [`battleship`](./examples/battleship/tutorials/index.mdx) | Defensive programming: a state machine, role checks, and on-chain verification of off-chain data that catches cheating |
 | 5 | [`zk-loan`](./examples/zk-loan) | Real use case: private credit scoring against a signed attestation from an off-chain API |
