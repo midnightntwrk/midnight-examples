@@ -3,7 +3,7 @@ SPDX-License-Identifier: Apache-2.0
 copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 sidebar_label: "The roulette contract"
 title: "The roulette contract"
-description: "Read roulette.compact, a game that custodies shielded chip coins: re-noncing the house's deposits, committing to a player's escrowed coin instead of storing it, a private 2× payout in one circuit, and the cost of a private escrow."
+description: "Read roulette.compact: how a game holds players' shielded chips without putting them in public state, pays 2× privately in one circuit, and what that costs."
 sidebar_position: 20
 toc_max_heading_level: 3
 tags:
@@ -279,26 +279,13 @@ export circuit houseDeposit(coin: ShieldedCoinInfo): [] {
 }
 ```
 
-This is the receive side of shielded tokens:
-
-1. `receiveShielded(coin)` accepts an incoming coin into the contract's custody. A shielded coin
-   sent to a contract is not automatically the contract's: the receiving circuit must explicitly
-   call `receiveShielded` to claim it.
-
-   The coin comes in as a plain `ShieldedCoinInfo`, because the caller's wallet built it as an
-   input to this transaction. Note the guard `coin.color == chipColor`: the contract refuses
-   anything that isn't a roulette chip.
-
-2. `reNonceToSelf` swaps it for an equivalent contract-owned coin, as described above.
-
-3. `houseCoins.insertCoin(key, coin, owner)` records the coin in ledger state so the contract can
-   find and spend it in a later transaction. `insertCoin` is a ledger `Map` method specific to
-   coin storage: it takes a `ShieldedCoinInfo` and stores it as a `QualifiedShieldedCoinInfo`,
-   with the `mt_index` needed to spend it later and ownership attributed to
-   `right(kernel.self())`, the contract itself. It finds that index among the outputs of the
-   current transaction, so it only works for a coin this transaction created, like the re-nonced
-   coin here. Keying by the coin's own nonce is unique, so you
-   need no separate deposit counter.
+This is the private tip jar's [`tip`](/tutorials/private-tip-jar/smart-contract#tipping) again,
+behind a house check: the color guard refuses anything that isn't a roulette chip,
+`receiveShielded` claims the incoming coin for the contract, `reNonceToSelf` swaps it for a
+contract-owned coin, and `houseCoins.insertCoin` stores that as a `QualifiedShieldedCoinInfo`
+under its own nonce. The nonce is unique, so the contract needs no deposit counter. `insertCoin`
+finds the `mt_index` among this transaction's outputs, so it only works for a coin the
+transaction created, like the re-nonced coin here.
 
 Now the player side. Same custody problem, different privacy requirement:
 
@@ -340,7 +327,7 @@ The natural thing to write is the same receive and insert pair as `houseDeposit`
 betCoins.insertCoin(pubPlayer, disclose(coin), right(kernel.self()));
 ```
 
-That publishes `nonce`, `color`, `value` and `mt_index` for a coin the player's wallet owned,
+That publishes `nonce`, `color`, `value`, and `mt_index` for a coin the player's wallet owned,
 keyed by their pseudonym. Anyone with a candidate wallet key can then confirm who is behind the
 pseudonym, and, because the payout nonce derives from the escrow nonce, who got paid later.
 Measured on a live devnet, this single line was enough to resolve both test players to their
@@ -552,8 +539,8 @@ to the house's wallet, and no player resolves to anything.
 ## 2.9 The wheel and identity helpers
 
 ```compact title="contract/roulette.compact"
-// Standard single-zero roulette wheel: odd numbers are RED, even are BLACK,
-// and zero is GREEN.
+// A simplified single-zero wheel: odd numbers are RED, even are BLACK, and
+// zero is GREEN. (A real wheel's colors don't follow odd and even.)
 circuit getOdd(num: Uint<8>): Boolean {
     if (
         num == 1 ||
@@ -643,16 +630,19 @@ Compiling 6 circuits:
 Overall progress [====================] 6/6
 ```
 
-The row counts are worth reading as a cost signal:
+`k` is a circuit's size class, room for up to 2^k rows, and the proving key follows `k` rather
+than the exact row count: in this build every k=16 key is about 19.5 MB and every k=15 key about
+10 MB. The row counts are worth reading as a cost signal:
 
-- **Reads are almost free.** `name`, `symbol`, `decimals`, `totalMinted` and `totalBurned` are 26
+- **Reads are almost free.** `name`, `symbol`, `decimals`, `totalMinted`, and `totalBurned` are 26
   rows each. MIP-0011 specifies them as circuits so on-chain consumers can call them. Off chain you
   just read the ledger directly and pay nothing. `tokenColor` costs more (3,969 rows) because it
   hashes.
 - **Coin operations dominate everything else.** `revealWinningNumber` moves no coins: 8,500 rows.
-  `betColor` receives one coin and commits: 17,000. Anything that *spends* jumps to k=16 and
+  `betColor` receives one coin and commits: 17,000. Most circuits that *spend* jump to k=16 and
   33,000–46,000 rows: `houseDeposit` and `forfeit` (a re-nonce), `claimWinnings` (a merge and a
-  send) and `burn` (a receive and two transient sends).
+  send), and `burn` (a receive and two transient sends). The exception is `houseClaimMatch`, a
+  single send with no other coin work, at k=15 and 16,756 rows.
 - **Cheaper is sometimes also more standard.** `mint` is 14,775 rows here, against 30,828 in an
   earlier draft that minted to the contract and then sent the coin on. MIP-0011's `_mint` goes
   straight to the recipient: one fewer coin operation, half the circuit.

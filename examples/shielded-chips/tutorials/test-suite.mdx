@@ -3,7 +3,7 @@ SPDX-License-Identifier: Apache-2.0
 copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 sidebar_label: "Run the game"
 title: "Run the game"
-description: "The player's side of a private escrow, then a full roulette round on a local devnet with MidnightJS: mint, bet, reveal, claim, forfeit, sweep and burn, and reading the chain back to check the privacy claims."
+description: "The player's side of a private escrow, then a full roulette round on a local devnet: mint, bet, reveal, claim, forfeit, sweep, burn, and read the chain back."
 sidebar_position: 30
 toc_max_heading_level: 3
 tags:
@@ -189,7 +189,7 @@ The new nonce is not *any* derivation of the old one: the wallet builds the self
 with fresh randomness rather than ratcheting, so the chain of derivation the issuer could follow
 simply stops.
 
-`splitShieldedCoin` in `src/wallet.ts` builds, signs and submits an ordinary shielded transfer to
+`splitShieldedCoin` in `src/wallet.ts` builds, signs, and submits an ordinary shielded transfer to
 the wallet's own address. Then it waits:
 
 ```typescript title="src/wallet.ts"

@@ -291,8 +291,8 @@ export circuit houseClaimMatch(matchKey: Bytes<32>): [] {
     houseCoins.remove(disclose(matchKey));
 }
 
-// Standard single-zero roulette wheel: odd numbers are RED, even are BLACK,
-// and zero is GREEN.
+// A simplified single-zero wheel: odd numbers are RED, even are BLACK, and
+// zero is GREEN. (A real wheel's colors don't follow odd and even.)
 circuit getOdd(num: Uint<8>): Boolean {
     if (
         num == 1 ||

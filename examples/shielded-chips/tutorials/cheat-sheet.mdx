@@ -42,11 +42,14 @@ appears, in [the chips token](/tutorials/shielded-chips/chips-token) or
 `tokenType` in a circuit and `rawTokenType` in TypeScript compute the same color, so a deployer
 can learn a token's color without a transaction.
 
-The spend-path rule, straight from MIP-0011: a coin whose commitment was created by an output of
-the **current** transaction is not in the global tree yet, and MUST be spent with
-`sendImmediateShielded`. A coin already in the tree needs `sendShielded` and a valid `mt_index`.
-Conflating them yields unsatisfiable circuits, or circuits that trust a caller-supplied tree
-index.
+The spend-path rule: a coin whose commitment was created by an output of the **current**
+transaction is not in the global tree yet, so it is spent as a Zswap transient, at `mt_index: 0`.
+A coin already in the tree needs `sendShielded` and its real `mt_index`. In the standard library
+this repo pins (0.31.1), `sendImmediateShielded` is exactly `sendShielded` with `mt_index: 0`, so
+`reNonceToSelf` and `claimWinnings` can `sendShielded` a same-transaction coin, as the private tip
+jar's [`tip`](/tutorials/private-tip-jar/smart-contract#tipping) does. `_burn` uses
+`sendImmediateShielded` for that case, as MIP-0011 asks, because its `ShieldedCoinInfo` parameter
+can't carry a caller-supplied index.
 
 ## Types
 

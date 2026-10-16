@@ -2,7 +2,7 @@
 SPDX-License-Identifier: Apache-2.0
 copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 title: Shielded Chips
-description: "Shielded tokens end to end: a MIP-0011 native shielded token, a roulette contract that custodies and pays out its coins, and where a coin's nonce decides who can be identified."
+description: "Shielded tokens end to end: a MIP-0011 native shielded token, a roulette contract that holds and pays out its coins, and how a coin's nonce can name a wallet."
 sidebar_position: 38
 tags:
   - tutorials
@@ -33,8 +33,8 @@ subject. This tutorial walks through the two Compact contracts at the heart of t
 2. `roulette.compact`, a RED/BLACK betting game that takes chip coins as bets and pays winners 2×.
 
 The repo provides everything else. The tutorial focuses on the shielded-token operations
-(minting, sending, receiving, custodying and burning coins) and stays brief on the parts that
-aren't token-specific: enum plumbing, the roulette wheel's color table and identity hashing.
+(minting, sending, receiving, custodying, and burning coins) and stays brief on the parts that
+aren't token-specific: enum plumbing, the roulette wheel's color table, and identity hashing.
 
 It also spends real time on one thing that is easy to get wrong and hard to notice: **where a
 coin's nonce ends up**. Two contracts can use the same token primitives, look equally "shielded",
@@ -109,7 +109,7 @@ The mental model for the two contracts:
           contract address)      ──────► winners get 2× back via sendShielded
 ```
 
-The roulette contract never mints chips. It only receives, holds and sends chip coins that the
+The roulette contract never mints chips. It only receives, holds, and sends chip coins that the
 chips contract created, which is exactly what makes the shielded-token plumbing the interesting
 part.
 
@@ -129,9 +129,11 @@ reveals nothing.
 outputNonce = hash("midnight:kernel:nonce_evolve", sourceNonce)
 ```
 
-Nothing about the recipient, the value or the transaction enters that derivation. So if you know
-a coin's nonce, you know the nonce of the coin it is spent into, and the coin after that,
-indefinitely.
+Nothing about the recipient, the value, or the transaction enters that derivation. So if you know
+a coin's nonce, you know the nonce of the coin a contract spends it into, and the coin after that,
+for as long as contracts keep spending it. The chain ends when a wallet spends the coin, because a
+wallet picks a fresh random nonce for each output it builds. It also ends when the coin is the
+second argument to `mergeCoin`, which derives the merged nonce from its first argument only.
 
 Put those two facts together and you get the rule:
 
@@ -175,7 +177,7 @@ under it. You will see this shape the code three times:
   },
   {
     title: "Run the game",
-    body: "The player's side of the escrow, then a full round on a local devnet: mint, bet, reveal, claim, forfeit, sweep and burn, and reading the chain back to check the privacy claims.",
+    body: "The player's side of the escrow, then a full round on a local devnet: mint, bet, reveal, claim, forfeit, sweep, burn, and read the chain back to check the privacy claims.",
     to: "/tutorials/shielded-chips/test-suite",
     cta: "Run the tests",
   },

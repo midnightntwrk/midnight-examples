@@ -3,7 +3,7 @@ SPDX-License-Identifier: Apache-2.0
 copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 sidebar_label: "The chips token"
 title: "The chips token"
-description: "Read chips.compact, a MIP-0011 native shielded token: required state, a recipient-private mint, two burn circuits with different spend paths, gating, and the privacy cost of supply accounting."
+description: "Read chips.compact, a MIP-0011 native shielded token: a recipient-private mint, two burn circuits, house-only gating, and why supply accounting costs privacy."
 sidebar_position: 10
 toc_max_heading_level: 3
 tags:
@@ -159,7 +159,7 @@ export circuit tokenColor(): Bytes<32> {
 }
 ```
 
-MIP-0011 does not prescribe *how* you initialize, only that name, symbol, decimals and the domain
+MIP-0011 does not prescribe *how* you initialize, only that name, symbol, decimals, and the domain
 are set at construction and immutable after. Doing it in the constructor is the simplest way to
 satisfy that.
 
@@ -294,8 +294,9 @@ Conflating them is one of the failure modes the standard was written to prevent.
 | Change | forwarded to `refundTo` | auto-received, returned |
 
 A coin created by an output of the current transaction is not yet in the global commitment tree,
-so it **must** be spent transiently. Trying to spend it with a Merkle proof gives you an
-unsatisfiable circuit, or one that trusts a caller-supplied tree index.
+so it **must** be spent transiently. `_burn` takes it as a `ShieldedCoinInfo` and spends it with
+`sendImmediateShielded`, so the burn never accepts a caller-supplied tree index. The
+[cheat-sheet](/tutorials/shielded-chips/cheat-sheet#operations) explains how the two calls relate.
 
 ```compact title="contract/chips.compact"
 // Burn from a coin provided in the current transaction. A same-tx coin is not
@@ -392,7 +393,7 @@ is what the `_treasury` bookkeeping in [1.5](#15-gating-and-the-treasury) is for
 
 ## 1.5 Gating, and the treasury
 
-MIP-0011 ships `_mint`, `_burn` and `_burnFromContract` as an **unrestricted** module: they have
+MIP-0011 ships `_mint`, `_burn`, and `_burnFromContract` as an **unrestricted** module: they have
 no authorization of their own, and the standard states plainly that a consuming contract MUST
 gate them. This file is a standalone contract rather than a module to compose, so the standard
 circuits stay internal and the exported entry points are gated wrappers:
@@ -622,5 +623,5 @@ That's the entire chips contract.
 ## Next
 
 [The roulette contract](/tutorials/shielded-chips/roulette) takes these chips as bets: it
-receives, holds and pays out coins the chips contract created, without ever writing a player's
+receives, holds, and pays out coins the chips contract created, without ever writing a player's
 coin to public state.
