@@ -68,9 +68,11 @@ index.
   effects. Minting hides the recipient, not the amount.
 - **Circuit arguments are not published.** A `ZswapCoinPublicKey` passed as an argument does not
   appear on chain.
-- **Ledger writes are what publish**, along with the values exported circuits return and the
-  transaction's effects. `disclose(...)` is a compiler acknowledgment at a trust boundary, not a
-  statement that a value went on chain. Read the state to find out which values did.
+- **Ledger reads and writes are what publish**, along with the transaction's effects, such as
+  mint amounts. An exported circuit's return value is not published: the transaction carries only
+  a randomized commitment to the call's inputs and outputs. `disclose(...)` is a compiler
+  acknowledgment at a trust boundary, not a statement that a value went on chain. Read the state
+  to find out which values did.
 - **Never write a user's coin nonce to public state.** It identifies the wallet that funded the
   coin and the wallet paid out of it. Store a commitment and reopen it from a witness.
 - **`sendShielded` and `mergeCoin` derive the output nonce from the input nonce alone**, and
