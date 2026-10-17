@@ -216,9 +216,11 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
   neither: `Sim` takes made-up coins (`simCoin`).
 - **Two-wallet setup is still per example.** A suite with a second wallet
   (tipper and owner) copies `private-tip-jar`'s `buildWallet(role)`.
-- **Older examples keep their own coin helpers.** `private-tip-jar` and
-  `shielded-chips` weren't moved to `example-coins`, so the nearest example
-  can still show local copies.
+- **Older examples keep some coin helpers of their own.** `private-tip-jar`
+  and `shielded-chips` take their coin arguments (`freshCoin`, `simCoin`) and
+  the escrow index (`contractCoinMtIndex`) from `example-coins`, but still read
+  wallet coins and balances with local helpers, so the nearest example can
+  still show local copies of those.
 - **Serving (step 7).** Serving stops at the local Vite dev server; there is no
   deploy target in this repo.
 - **Browser verification.** The checks in `verification.json` (wallet, browser)
@@ -230,6 +232,17 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
 
 ## Changelog
 
+- 2026-10-17: A `ShieldedCoinInfo` argument is a new coin the transaction
+  creates, which the wallet pays for, so tests pass `freshCoin(color, value)`
+  (new in `@midnight-ntwrk/example-coins`) instead of a wallet coin.
+  `takeCoin` is deprecated, `--derive`'s devnet hints, the pipeline and the
+  devnet triage name `freshCoin`, and a `QualifiedShieldedCoinInfo` argument
+  is hinted as a coin the contract holds. The template's `splitShieldedCoin`
+  stays, but nothing needs it before paying a contract.
+  `private-tip-jar` and `shielded-chips` dropped their in-contract re-send to
+  `kernel.self()` and use `freshCoin`. `example-coins` also gained
+  `contractCoinMtIndex`: the tree index of a coin a transaction created for a
+  contract that doesn't store it (shielded-chips' escrow).
 - 2026-10-07: Phase 4. Shielded-coin helpers live in a shared package,
   `@midnight-ntwrk/example-coins` (`packages/coins`): `tokenColor`,
   `takeCoin`, `shieldedBalance`, `waitForShieldedBalance`, `recipientOf`,

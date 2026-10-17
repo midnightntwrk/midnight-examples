@@ -24,6 +24,7 @@ Each now lives in `examples/<name>/tutorials/` and syncs back to midnight-docs
 | Tutorial | Source | Source commit | Changes |
 |---|---|---|---|
 | `examples/battleship/tutorials/` | `midnightntwrk/midnight-docs` `docs/tutorials/bship/` (`index.mdx`, `smart-contract.mdx`, `test-suite.mdx`) | `6af8c96f29a363f005417357f6066e1baf6a56bc` | Rewritten as a tour of this repo's code, organized around defensive programming. The build-from-scratch steps and the standalone project setup were replaced by the monorepo commands and shared harness. Published path moves from `/tutorials/bship` to `/tutorials/battleship`. |
+| `examples/private-tip-jar/tutorials/` | New. `midnightntwrk/midnight-tip-jar` `TUTORIAL.md` was reference only | `0fcd18120a528d070f58dc33d96f21e57c339762` | Written new for this repo. The old tutorial builds a frontend tip jar, a different design; this one tours `examples/private-tip-jar` (the jar and its demo token, `SPEC.md`, the privacy test). Published at `/tutorials/private-tip-jar`. |
 
 ## Changes applied during migration
 

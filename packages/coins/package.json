@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Shielded-coin helpers for the examples' tests: token colors, picking a wallet's coins as circuit arguments, balances and waiting for them, and the arguments a mint to another wallet needs.",
+  "description": "Shielded-coin helpers for the examples' tests: token colors, fresh coins as circuit arguments, a wallet's coins and balances and waiting for them, and the arguments a mint to another wallet needs.",
   "engines": {
     "node": ">=22.0.0"
   },

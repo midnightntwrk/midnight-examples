@@ -50,6 +50,23 @@ trust recalled APIs over it.
   the wallets that funded it and were paid from it. Store
   `persistentCommit([nonce, color, value], salt)` and reopen it from a
   witness. ([LESSONS §1](../examples/shielded-chips/LESSONS.md#1-the-one-rule))
+- **The coin you pass to `receiveShielded` is a new coin, not a wallet coin.**
+  The circuit creates a Zswap output to the contract, and the wallet balances
+  it from whichever of its coins it selects, making change. So build the
+  argument with `freshCoin(color, amount)` from `@midnight-ntwrk/example-coins`
+  (it wraps the ledger's `createShieldedCoinInfo`: a uniform random nonce), never
+  from `availableCoins`. Its nonce is then in no commitment but the contract's,
+  so storing the coin publicly links to nobody, and any amount works without a
+  split. Copying a wallet coin's nonce is what makes a stored coin leak, and
+  re-noncing it to `kernel.self()` on the way in doesn't fully undo that:
+  whoever knows the old nonce can derive the new one.
+  ([private-tip-jar `tip`](../examples/private-tip-jar/contract/private-tip-jar.compact);
+  wallet balancing: `@midnight-ntwrk/wallet-sdk-shielded` 1.2.0,
+  `dist/v1/Transacting.js`, `#balanceGuaranteedSection`)
+- **Keying a `Map` by a caller-chosen nonce?** Assert `!map.member(nonce)`
+  first. A coin with the same nonce and a different value is a different coin,
+  so Zswap accepts it, and `insertCoin` would overwrite the entry and strand
+  the coin already there.
 - **A coin the contract received in this transaction** (`receiveShielded`)
   has no tree index yet and is spent as a zswap transient, with `mt_index: 0`.
   `sendImmediateShielded` is exactly `sendShielded` with `mt_index: 0`, so
