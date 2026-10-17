@@ -37,13 +37,13 @@ yarn test:sim
 ```
 
 They need no Docker and no proving keys, so they are the quickest way to check a change to the
-contract. All five pass:
+contract. All six pass:
 
 ```
- ✓ src/test/private-tip-jar.sim.test.ts (5 tests) 97ms
+ ✓ src/test/private-tip-jar.sim.test.ts (6 tests) 91ms
 
  Test Files  1 passed (1)
-      Tests  5 passed (5)
+      Tests  6 passed (6)
 ```
 
 The tests use `@midnight-ntwrk/example-sim`, a small helper package in midnight-examples that runs
@@ -61,10 +61,15 @@ const deploy = () =>
   });
 ```
 
-In memory, a coin is just an object. The tests make up coins of any color and value:
+In memory, a coin is just an object, and the simulator doesn't check that anyone paid for it.
+The tests make up coins of any color and value with `simCoin`, from the repo's
+`@midnight-ntwrk/example-coins` package, which gives each one a random nonce. That is also what a
+tipper's client does on a real network, as you'll see in the devnet suite:
 
 ```typescript title="src/test/private-tip-jar.sim.test.ts"
-const coin = (value: bigint, color = TIP_COLOR) => ({ nonce: bytes32(), color, value });
+// What a tipper's client passes to `tip`: a new coin with a fresh random nonce
+// (on the devnet, `freshCoin(color, value)`).
+const coin = (value: bigint, color = TIP_COLOR) => simCoin(value, color);
 ```
 
 `expectRejects` checks that a call fails with the `assert` message you expect. Swapping the private
@@ -80,6 +85,18 @@ state for a random secret makes the caller a non-owner:
     expect(sim.as(OWNER_COIN_PK).call('withdraw', key).ledger.pot.isEmpty()).toBe(true);
 ```
 
+The tipper chooses a tip's nonce, and the pot is keyed by it, so one test checks the guard that
+stops a tip from reusing a pot key and overwriting that entry:
+
+```typescript title="src/test/private-tip-jar.sim.test.ts"
+    const first = coin(5n);
+    sim.call('tip', first);
+    // Same nonce, different value: a different coin, but the same pot key.
+    expectRejects(() => sim.call('tip', { ...first, value: 1n }), 'A tip with that nonce is already in the jar');
+    const [[, held]] = [...sim.ledger().pot];
+    expect(held.value).toBe(5n);
+```
+
 The last in-memory test is the privacy test. `SPEC.md` lists the jar's privacy invariants, each a
 "never on chain" line, and the test has one entry for each. `assertNotInPublicState` searches the
 whole public ledger for each value and fails if it finds one:
@@ -87,22 +104,23 @@ whole public ledger for each value and fails if it finds one:
 ```typescript title="src/test/private-tip-jar.sim.test.ts"
     const l = sim.ledger();
     expect(Object.keys(l).sort()).toEqual(['owner', 'pot', 'tipColor']);
-    // Control: the contract's own (re-nonced) coin is public, and is found.
-    const [[, held]] = [...l.pot];
-    expect(findInPublicState(l, held.nonce)).toBe('pot[0].key');
+    // Control: the tipped coin itself is public by design, and is found.
+    expect(findInPublicState(l, tips[0]!.nonce)).toMatch(/^pot\[\d\]\.key$/);
     assertNotInPublicState(l, {
       ownerSecretKey: OWNER_SK,
       ownerCoinPublicKey: Buffer.from(OWNER_COIN_PK, 'hex'),
       tipperCoinPublicKey0: tippers[0]!,
       tipperCoinPublicKey1: tippers[1]!,
-      tipperCoinNonce0: tips[0]!.nonce,
-      tipperCoinNonce1: tips[1]!.nonce,
+      tipperWalletCoinNonce0: walletCoinNonces[0]!,
+      tipperWalletCoinNonce1: walletCoinNonces[1]!,
     });
 ```
 
 The control line matters. It checks that the search does find something that *is* public, the
-re-nonced pot coin, so a passing privacy test means the secrets really are absent, not that the
-search looked in the wrong place.
+tipped coin's own nonce, so a passing privacy test means the secrets really are absent, not that
+the search looked in the wrong place. The `tipperWalletCoinNonce` entries stand in for the coins
+in a tipper's wallet. The simulator has no wallet, so here they only show that `tip` never puts
+anything else in the pot; the devnet suite checks the same invariant against Bob's real coins.
 
 What the in-memory tests can't show is real coins moving between real wallets. That needs the
 devnet.
@@ -126,19 +144,18 @@ take a few minutes.
 When it finishes, all 10 tests pass, including the ones that expect a rejection:
 
 ```
- ✓ src/test/private-tip-jar.test.ts (10 tests) 167615ms
-     ✓ deploys the demo token and mints Bob one coin to tip with  35519ms
-     ✓ Alice deploys the jar for that token; only a hash of her key is stored  17524ms
-     ✓ Bob re-nonces his coin with a self-transfer, splitting it into two tips  19458ms
-     ✓ Bob tips twice; the pot holds two contract-owned coins  47123ms
-     ✓ the owner withdraws every tip into her own shielded wallet  46310ms
+ ✓ src/test/private-tip-jar.test.ts (10 tests) 160668ms
+     ✓ deploys the demo token and mints Bob one coin to tip with  41757ms
+     ✓ Alice deploys the jar for that token; only a hash of her key is stored  18922ms
+     ✓ Bob tips twice from his one coin; the pot holds exactly the coins he made  49260ms
+     ✓ the owner withdraws every tip into her own shielded wallet  49034ms
 
  Test Files  1 passed (1)
       Tests  10 passed (10)
 ```
 
-Vitest lists only tests that take longer than 300 ms, so five tests pass without a line of their
-own: the privacy test, which only reads the ledger, and the four rejection tests. A rejected call
+Vitest lists only tests that take longer than 300 ms, so six tests pass without a line of their
+own: the privacy test, which only reads the ledger, and the five rejection tests. A rejected call
 takes milliseconds. A failing `assert` stops the circuit on the caller's own machine, so no proof
 is generated and nothing is submitted. The successful transactions take 15–20 seconds each, mostly
 proving time. The first test deploys a contract and mints, and the tip and withdrawal tests each
@@ -209,7 +226,8 @@ that his wallet can find it. MidnightJS knows Alice's own encryption key, but no
 the call fails while the transaction is being built, with `Unable to resolve encryption public key
 for recipient`.
 
-Alice chose the coin's nonce, so she knows it. The test records it, for the privacy test later.
+Alice chose the coin's nonce, so she knows it, and she owns the jar. The test records the nonce,
+so the privacy test can check later that it never reaches the pot.
 
 ### 2. Deploy the jar
 
@@ -231,34 +249,50 @@ chain with the contract's pure circuit:
     expect(hex(state.owner)).toEqual(hex(pureCircuits.ownerKey(aliceOwnerSk)));
 ```
 
-### 3. Bob re-nonces his coin
+### 3. Bob tips twice
 
-Alice minted Bob's coin, so she knows its nonce, and she owns the jar. If Bob tipped that coin
-as it is, Alice could recompute its pot entry and know the tip was his. Bob first sends 40 of his
-100 to himself:
+Bob tips 40 and then 60, both from the single 100-coin Alice minted him. Each tip is a new coin,
+made up by the test with `freshCoin` from `@midnight-ntwrk/example-coins`: the jar's color, the
+tip's value, and a random nonce. It is not a coin from Bob's wallet. His wallet pays for it while
+it balances the `tip` transaction, spending the minted coin and taking the change back under a new
+nonce. So Bob needs no coin of the exact value first, and Alice, who knows the minted coin's
+nonce, has never seen the nonce of either tip:
 
 ```typescript title="src/test/private-tip-jar.test.ts"
-    await bobWallet.splitShieldedCoin(tipColorHex, FIRST_TIP);
+    const first = freshCoin(tipColorHex, FIRST_TIP);
+    tipNonces.push(first.nonce);
+    await bobTips(first);
 ```
 
-`splitShieldedCoin`, in `src/wallet.ts`, is an ordinary shielded transfer from Bob's wallet to its
-own shielded address. It spends the minted coin and creates two new ones, 40 and 60, with fresh
-nonces that only Bob's wallet has seen. The test checks exactly that:
+Each tip is a plain call:
 
 ```typescript title="src/test/private-tip-jar.test.ts"
-    const coins = await tokenCoins(bobWallet);
-    expect(coins.map((c) => c.value).sort()).toEqual([FIRST_TIP, SECOND_TIP].sort());
+  async function bobTips(coin: ShieldedCoinArg): Promise<void> {
+    await (submitCallTx<Contract, 'tip'>)(bobJarProv, {
+      compiledContract: CompiledPrivateTipJarContract,
+      contractAddress: jarAddress,
+      privateStateId: BOB_JAR_STATE_ID,
+      circuitId: 'tip',
+      args: [coin],
+    });
+  }
+```
+
+`submitCallTx` resolves once the transaction is accepted, a little before Bob's wallet sees his
+change. Before the second tip, the test waits for his balance to read 60, then records the
+nonces of the coins now in his wallet and checks that the minted coin is gone:
+
+```typescript title="src/test/private-tip-jar.test.ts"
+    await waitForTokenBalance(bobWallet, MINTED - FIRST_TIP);
+    const change = await tokenCoins(bobWallet);
+    for (const c of change) bobWalletNonces.push(c.nonce);
+    // The issued coin is spent; what is left is change under a new nonce.
     const issued = new Set(bobIssuedNonces.map(hex));
-    for (const c of coins) expect(issued.has(hex(c.nonce))).toBe(false);
+    expect(change.some((c) => issued.has(hex(c.nonce)))).toBe(false);
 ```
 
-The split also gives Bob coins of the exact amounts he wants to tip, because a tip is always a
-whole coin.
-
-### 4. Bob tips twice
-
-`tip` takes a `ShieldedCoinInfo` argument, so the test turns a coin in Bob's wallet into one.
-`tokenCoins` reads the wallet's available shielded coins of the jar's color:
+`tokenCoins` reads the wallet's available shielded coins of the jar's color. The test only uses it
+to read nonces. It never passes one of these coins to `tip`:
 
 ```typescript title="src/test/private-tip-jar.test.ts"
   async function tokenCoins(w: MidnightWalletProvider): Promise<ShieldedCoinArg[]> {
@@ -273,35 +307,23 @@ whole coin.
   }
 ```
 
-and `takeCoin` picks the one with the value Bob wants to tip. Each tip is a plain call:
-
-```typescript title="src/test/private-tip-jar.test.ts"
-  async function bobTips(coin: ShieldedCoinArg): Promise<void> {
-    await (submitCallTx<Contract, 'tip'>)(bobJarProv, {
-      compiledContract: CompiledPrivateTipJarContract,
-      contractAddress: jarAddress,
-      privateStateId: BOB_JAR_STATE_ID,
-      circuitId: 'tip',
-      args: [coin],
-    });
-  }
-```
-
-After both tips, the pot holds two coins. Their values are public, and each is keyed by its own
-new nonce:
+After both tips, the pot holds two coins. Their values are public, and each pot entry is the tip
+coin itself, keyed by the nonce Bob drew for it:
 
 ```typescript title="src/test/private-tip-jar.test.ts"
     // Tip VALUES are public by design: the contract must hold whole coins to
     // spend them later. What they don't carry is who paid them.
     const values = [...state.pot].map(([, coin]) => coin.value).sort();
     expect(values).toEqual([FIRST_TIP, SECOND_TIP].sort());
+    // Each pot entry is the tip coin itself, under the nonce Bob drew for it.
+    expect([...state.pot].map(([key]) => hex(key)).sort()).toEqual(tipNonces.map(hex).sort());
     for (const [key, coin] of state.pot) {
       expect(hex(coin.color)).toEqual(tipColorHex);
       expect(hex(key)).toEqual(hex(coin.nonce));
     }
 ```
 
-### 5. The privacy test
+### 4. The privacy test
 
 This is the devnet version of the in-memory privacy test, run against the real ledger after real
 tips. `collectPublicBytes` gathers every byte string in the jar's public state, labeled with the
@@ -324,7 +346,7 @@ function collectPublicBytes(l: Ledger): Labeled[] {
 
 If a value isn't in that list, the contract never put it on chain. The test then lists everything
 the design promises to keep off chain, including the nonce of the coin Alice minted and the nonces
-of the coins Bob actually tipped:
+of the coins in Bob's wallet:
 
 ```typescript title="src/test/private-tip-jar.test.ts"
     const secrets: Labeled[] = [
@@ -333,7 +355,7 @@ of the coins Bob actually tipped:
       { label: "Alice's owner secret", bytes: aliceOwnerSk },
       { label: "Alice's wallet coin public key", bytes: encodeCoinPublicKey(aliceWallet.getCoinPublicKey()) },
       ...bobIssuedNonces.map((n) => ({ label: 'nonce of the coin Alice minted to Bob', bytes: n })),
-      ...bobTippedNonces.map((n) => ({ label: 'nonce of a coin Bob tipped', bytes: n })),
+      ...bobWalletNonces.map((n) => ({ label: "nonce of a coin in Bob's wallet", bytes: n })),
     ];
 ```
 
@@ -350,23 +372,26 @@ case a secret was ever packed into a wider value:
 If you added a ledger field to the contract, you would add it to `collectPublicBytes` too. A field
 left out of that list is a field the privacy test can't see.
 
-### 6. The rejections
+### 5. The rejections
 
-Four tests check each `assert` in the jar:
+Five tests check each `assert` in the jar:
 
 - **Wrong token.** Bob tips a made-up coin of a random color, and the call is rejected with
   `Tips must be paid in the jar's token`.
 - **Zero value.** A coin of the right color but value 0 is rejected with `A tip must be worth
   something`.
+- **A reused pot key.** Bob tips a coin whose nonce is already a pot key, with a different value.
+  It is rejected with `A tip with that nonce is already in the jar`, and the pot still holds two
+  coins.
 - **Not the owner.** Bob calls `withdraw` with his own random secret in his private state. It is
   rejected with `Only the owner can withdraw`, and the pot and Bob's balance are unchanged.
 - **No such tip.** After the withdrawals, Alice tries a key she has already withdrawn and a random
   key. Both are rejected with `No such tip in the jar`.
 
-The tip rejections can pass made-up coins because both guards run before `receiveShielded`. The
-call fails while the transaction is being built, before any coin from Bob's wallet is involved.
+The tip rejections can pass made-up coins because all three guards run before `receiveShielded`.
+The call fails while the transaction is being built, before Bob's wallet pays for anything.
 
-### 7. The owner withdraws
+### 6. The owner withdraws
 
 Alice reads the pot and withdraws each coin in turn:
 
@@ -382,8 +407,8 @@ Alice reads the pot and withdraws each coin in turn:
 ```
 
 The pot is empty, and all 100 tokens are now in Alice's shielded wallet. That is the full shielded
-tip, end to end: minted to Bob, re-nonced in his wallet, received and re-nonced by the jar, and
-paid out to the owner. At no point did the jar's public state hold anything that names Bob.
+tip, end to end: minted to Bob, paid by his wallet into fresh coins the jar received and stored,
+and paid out to the owner. At no point did the jar's public state hold anything that names Bob.
 
 ## Next
 

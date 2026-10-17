@@ -34,14 +34,16 @@ Along the way you will see:
 - **Two contracts.** `private-tip-jar.compact` is the jar. `tip-token.compact` is a tiny demo
   token that exists only because a fresh devnet has no shielded tokens to tip with. The test suite
   deploys both and connects them by the token's color.
-- **`receiveShielded` and a re-nonce to `kernel.self()`.** `tip` takes custody of the tipper's
-  coin, then immediately sends it to the contract itself, so the public pot holds only
-  contract-owned coins. As long as the tipper first moves the coin with a self-transfer, the
-  pot's nonces don't lead back to their wallet.
+- **`receiveShielded` and a fresh coin.** The coin a tipper passes to `tip` is not one of their
+  wallet's coins. It describes a new coin the transaction creates for the contract, and the
+  wallet pays for it from whatever coins it holds, making change. Because the tipper gives that
+  coin a fresh random nonce, the contract can store it in the public pot as it is, and the pot's
+  nonces don't lead back to anyone's wallet.
 - **An owner-only `withdraw`.** The owner is a hash of a secret key, and `withdraw` proves
   knowledge of that secret through a witness before it pays a coin to the caller's wallet.
 - **A privacy test over the public ledger.** The tests collect every byte the contract makes
-  public and assert that no tipper key, tipped coin nonce, or owner secret is among them.
+  public and assert that no tipper key, nonce of a tipper's wallet coin, or owner secret is among
+  them.
 
 The source for this tutorial is
 [`examples/private-tip-jar`](https://github.com/midnightntwrk/midnight-examples/tree/main/examples/private-tip-jar)
@@ -69,7 +71,7 @@ You'll start the local network in the second part, when you run the tests.
 <PersonaTiles tiles={[
   {
     title: "Private tip jar contracts",
-    body: "Read both contracts: the jar's anonymous tip, its re-nonce to the contract, and the owner-only withdrawal, then the demo token that mints coins to tip with.",
+    body: "Read both contracts: the jar's anonymous tip, the fresh coin it stores, and the owner-only withdrawal, then the demo token that mints coins to tip with.",
     to: "/tutorials/private-tip-jar/smart-contract",
     cta: "Read the contracts",
   },
