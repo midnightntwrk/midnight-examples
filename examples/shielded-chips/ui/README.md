@@ -26,13 +26,12 @@ template-owned and which are yours, and for the verification checklist.
   same key, so both contracts know the same house. The winning number isn't
   stored: only `H(number, key)` is on chain, and the house recovers the number
   from its key at reveal time (`recoverWinningNumber`, 37 candidates).
-- **Fresh coins as circuit arguments.** The Node test passes a coin it finds
-  in the wallet SDK's `availableCoins`, which the DApp Connector doesn't
-  expose. A `receiveShielded` argument describes the output the transaction
-  creates for the contract, so the UI passes a fresh coin (random nonce) and
-  the wallet funds it from the chips it holds, adding change when its coin is
-  bigger. That also gives every escrowed coin a nonce the issuer never saw,
-  which the Node test gets from `splitShieldedCoin`.
+- **Fresh coins as circuit arguments.** The DApp Connector can't list a
+  wallet's coins, and doesn't need to. A `receiveShielded` argument describes
+  the output the transaction creates for the contract, so the UI passes a
+  fresh coin (random nonce) and the wallet funds it from the chips it holds,
+  adding change when its coin is bigger. That also gives every escrowed coin a
+  nonce the issuer never saw. The Node tests do the same.
 - **The escrow's Merkle index.** The table never stores a player's escrowed
   coin, so the player's browser keeps it (encrypted private state) and
   replays it to claim or forfeit, with its `mt_index`: the bet tx's

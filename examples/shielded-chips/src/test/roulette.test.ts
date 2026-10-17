@@ -28,6 +28,7 @@ import {
   encodeRawTokenType,
 } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+import { contractCoinMtIndex, freshCoin, type TxWithOutputs } from '@midnight-ntwrk/example-coins';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
@@ -156,67 +157,36 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
   const bobSk = new Uint8Array(randomBytes(32));
   const charlieSk = new Uint8Array(randomBytes(32));
 
-  // Each player's blinding factor for their escrow commitment. This is what
-  // stops the chip issuer — who knows the coin it minted you — from
-  // recomputing your commitment and unmasking your pseudonym.
+  // Each player's blinding factor for their escrow commitment. The fresh bet
+  // nonce already makes the commitment unguessable; the salt keeps it so even
+  // for a client that reused a nonce someone else knows.
   const bobSalt = new Uint8Array(randomBytes(32));
   const charlieSalt = new Uint8Array(randomBytes(32));
 
+  // Every coin passed to houseDeposit, betColor and burn is
+  // `freshCoin(chipColorHex, value)`: not a wallet coin, but the NEW coin the
+  // transaction creates for the contract, with a random nonce. The wallet pays
+  // for it from whichever chips it selects and takes change back under fresh
+  // nonces, so no split or exact-value coin is needed, and nobody (the chip
+  // issuer included) has seen the nonce before.
+
   /**
-   * Find the Zswap tree index of the coin the contract took custody of in a
-   * given bet transaction.
+   * Persist the escrowed coin so claimWinnings/forfeit can reopen it.
    *
    * The contract deliberately does not store the escrowed coin, so nothing on
-   * chain carries its `mt_index`. The player has to recover it themselves, and
-   * it is simply the index of the shielded output their own bet transaction
-   * created — `zswapStartIndex` on that transaction.
+   * chain carries its `mt_index`. The player recovers it from their own bet
+   * transaction: its zswapStartIndex plus the escrow output's position, found
+   * by commitment (`contractCoinMtIndex`).
    */
-  async function escrowMtIndex(blockHeight: number, entryPoint: string): Promise<bigint> {
-    const query = `{ block(offset:{height:${blockHeight}}) { transactions {
-      ... on RegularTransaction { zswapStartIndex }
-      contractActions { address ... on ContractCall { entryPoint } } } } }`;
-    const res = await fetch(config.indexer, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
-    });
-    const body = (await res.json()) as {
-      data: {
-        block: {
-          transactions: {
-            zswapStartIndex?: number;
-            contractActions: { address: string; entryPoint?: string }[];
-          }[];
-        } | null;
-      };
-    };
-    const txs = body.data.block?.transactions ?? [];
-    const match = txs.find((t) =>
-      t.contractActions?.some(
-        (a) => a.address === rouletteAddress && a.entryPoint === entryPoint,
-      ),
-    );
-    if (match?.zswapStartIndex === undefined) {
-      throw new Error(`No ${entryPoint} tx with a zswap index in block ${blockHeight}`);
-    }
-    return BigInt(match.zswapStartIndex);
-  }
-
-  /** Persist the escrowed coin so claimWinnings/forfeit can reopen it. */
   async function recordEscrow(
     providers: ShieldedChipsProviders,
     privateStateId: string,
     base: RoulettePrivateState,
-    coin: ShieldedCoinArg,
-    blockHeight: number,
+    chip: ShieldedCoinArg,
+    tx: TxWithOutputs,
   ): Promise<QualifiedCoin> {
-    const mtIndex = await escrowMtIndex(blockHeight, 'betColor');
-    const escrowed: QualifiedCoin = {
-      nonce: coin.nonce,
-      color: coin.color,
-      value: coin.value,
-      mt_index: mtIndex,
-    };
+    const mtIndex = await contractCoinMtIndex(config.indexer, tx, chip, rouletteAddress);
+    const escrowed: QualifiedCoin = { ...chip, mt_index: mtIndex };
     await providers.privateStateProvider.set(privateStateId, rememberEscrow(base, escrowed));
     logger.info(`Escrow recorded at mt_index=${mtIndex}`);
     return escrowed;
@@ -227,25 +197,6 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
       await aliceRouletteProv.publicDataProvider.queryContractState(rouletteAddress);
     expect(state).not.toBeNull();
     return rouletteLedger(state!.data);
-  }
-
-  async function takeChipCoin(
-    walletProvider: MidnightWalletProvider,
-  ): Promise<ShieldedCoinArg> {
-    const facadeState = await walletProvider.wallet.waitForSyncedState();
-    const coins = facadeState.shielded.availableCoins;
-    const chip = coins.find((c) => c.coin.type === chipColorHex);
-    if (!chip) {
-      const seen = coins.map((c) => c.coin.type).join(', ');
-      throw new Error(
-        `No chip coin (type=${chipColorHex}) in wallet. Saw types: [${seen}]`,
-      );
-    }
-    return {
-      nonce: Uint8Array.from(Buffer.from(chip.coin.nonce, 'hex')),
-      color: chipColorBytes,
-      value: chip.coin.value,
-    };
   }
 
   async function chipBalance(w: MidnightWalletProvider): Promise<bigint> {
@@ -412,8 +363,7 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
   });
 
   it('Alice deposits two match coins so the house can cover both bets', async () => {
-    const match1 = await takeChipCoin(aliceWallet);
-    expect(match1.value).toEqual(BET_SIZE);
+    const match1 = freshCoin(chipColorHex, BET_SIZE);
     logger.info(`Alice depositing match coin #1 (value=${match1.value})...`);
     await (submitCallTx<RouletteContract, 'houseDeposit'>)(aliceRouletteProv, {
       compiledContract: CompiledRouletteContract,
@@ -424,8 +374,7 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
     });
 
     await syncWallet(logger, aliceWallet.wallet, 600_000);
-    const match2 = await takeChipCoin(aliceWallet);
-    expect(match2.value).toEqual(BET_SIZE);
+    const match2 = freshCoin(chipColorHex, BET_SIZE);
     logger.info(`Alice depositing match coin #2 (value=${match2.value})...`);
     await (submitCallTx<RouletteContract, 'houseDeposit'>)(aliceRouletteProv, {
       compiledContract: CompiledRouletteContract,
@@ -437,32 +386,29 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
 
     const state = await queryRoulette();
     expect(state.houseCoins.size()).toEqual(2n);
+    // Each pool entry is the deposited coin itself, under its fresh nonce.
+    const keys = [...state.houseCoins].map(([key]) => Buffer.from(key).toString('hex')).sort();
+    expect(keys).toEqual([match1, match2].map((m) => Buffer.from(m.nonce).toString('hex')).sort());
 
     await syncWallet(logger, aliceWallet.wallet, 600_000);
     expect(await chipBalance(aliceWallet)).toEqual(0n);
   });
 
-  it('Bob re-nonces his chips in his own wallet before betting', async () => {
-    // The chip issuer (Alice) knows the exact coin she minted to Bob: same
-    // nonce, same value. The contract never publishes Bob's coin, but Alice
-    // could still recognise it if Bob bet it untouched — every coin derived
-    // from it, including his payout, follows deterministically from that
-    // nonce. A self-transfer replaces it with a coin whose nonce Alice has
-    // never seen, which closes that last thread.
-    const before = await takeChipCoin(bobWallet);
-    await bobWallet.splitShieldedCoin(chipColorHex, BET_SIZE);
-    await syncWallet(logger, bobWallet.wallet, 600_000);
-    const after = await takeChipCoin(bobWallet);
-
-    logger.info(`Bob's chip nonce before split: ${Buffer.from(before.nonce).toString('hex')}`);
-    logger.info(`Bob's chip nonce after split:  ${Buffer.from(after.nonce).toString('hex')}`);
-
-    // Same value, different coin identity.
-    expect(after.value).toEqual(BET_SIZE);
-    expect(Buffer.from(after.nonce).toString('hex')).not.toEqual(
-      Buffer.from(before.nonce).toString('hex'),
-    );
-    expect(await chipBalance(bobWallet)).toEqual(BET_SIZE);
+  it('A deposit cannot reuse a pool key, so no match coin can be overwritten', async () => {
+    // Same nonce as a pool coin, different value: a different coin Zswap
+    // would accept, so only the contract's guard stops it. Rejected while the
+    // transaction is built, so nothing is spent.
+    const [key] = [...(await queryRoulette()).houseCoins][0]!;
+    await expect(
+      (submitCallTx<RouletteContract, 'houseDeposit'>)(aliceRouletteProv, {
+        compiledContract: CompiledRouletteContract,
+        contractAddress: rouletteAddress,
+        privateStateId: ALICE_ROULETTE_PRIVATE_ID,
+        circuitId: 'houseDeposit',
+        args: [{ nonce: key, color: chipColorBytes, value: 1n }],
+      }),
+    ).rejects.toThrow(/already deposited/);
+    expect((await queryRoulette()).houseCoins.size()).toEqual(2n);
   });
 
   it('Bob bets RED with a 100-chip coin', async () => {
@@ -470,8 +416,11 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
     bobRouletteProv.privateStateProvider.setContractAddress(rouletteAddress);
     await bobRouletteProv.privateStateProvider.set(BOB_ROULETTE_PRIVATE_ID, bobPS);
 
-    const chip = await takeChipCoin(bobWallet);
-    logger.info(`Bob is betting a chip coin (value=${chip.value}) on RED`);
+    // A fresh coin, paid for from the chip coin Alice minted him. No
+    // self-transfer first: the escrowed coin's nonce is new, so the issuer
+    // has never seen it.
+    const chip = freshCoin(chipColorHex, BET_SIZE);
+    logger.info(`Bob is betting a fresh chip coin (value=${chip.value}) on RED`);
 
     const tx = await (submitCallTx<RouletteContract, 'betColor'>)(bobRouletteProv, {
       compiledContract: CompiledRouletteContract,
@@ -481,13 +430,7 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
       args: [chip, Color.RED],
     });
 
-    await recordEscrow(
-      bobRouletteProv,
-      BOB_ROULETTE_PRIVATE_ID,
-      bobPS,
-      chip,
-      tx.public.blockHeight,
-    );
+    await recordEscrow(bobRouletteProv, BOB_ROULETTE_PRIVATE_ID, bobPS, chip, tx.public);
 
     const state = await queryRoulette();
     expect(state.betCommits.size()).toEqual(1n);
@@ -501,8 +444,8 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
     charlieRouletteProv.privateStateProvider.setContractAddress(rouletteAddress);
     await charlieRouletteProv.privateStateProvider.set(CHARLIE_ROULETTE_PRIVATE_ID, charliePS);
 
-    const chip = await takeChipCoin(charlieWallet);
-    logger.info(`Charlie is betting a chip coin (value=${chip.value}) on BLACK`);
+    const chip = freshCoin(chipColorHex, BET_SIZE);
+    logger.info(`Charlie is betting a fresh chip coin (value=${chip.value}) on BLACK`);
 
     const tx = await (submitCallTx<RouletteContract, 'betColor'>)(charlieRouletteProv, {
       compiledContract: CompiledRouletteContract,
@@ -512,13 +455,7 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
       args: [chip, Color.BLACK],
     });
 
-    await recordEscrow(
-      charlieRouletteProv,
-      CHARLIE_ROULETTE_PRIVATE_ID,
-      charliePS,
-      chip,
-      tx.public.blockHeight,
-    );
+    await recordEscrow(charlieRouletteProv, CHARLIE_ROULETTE_PRIVATE_ID, charliePS, chip, tx.public);
 
     const state = await queryRoulette();
     expect(state.betCommits.size()).toEqual(2n);
@@ -633,8 +570,9 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
     const supplyBefore = await chipsLedgerState();
 
     // Partial burn: half the coin goes to the burn address, the change comes
-    // back to the caller's own key.
-    const coin = await takeChipCoin(aliceWallet);
+    // back to the caller's own key. The coin is fresh like any other
+    // receiveShielded argument; Alice's wallet pays for it from a swept chip.
+    const coin = freshCoin(chipColorHex, BET_SIZE);
     const half = coin.value / 2n;
 
     logger.info(`Alice burning ${half} of a ${coin.value}-chip coin...`);
@@ -669,7 +607,7 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
     expect(bobBefore).toEqual(2n * BET_SIZE);
     const supplyBefore = await chipsLedgerState();
 
-    const coin = await takeChipCoin(bobWallet);
+    const coin = freshCoin(chipColorHex, BET_SIZE);
     bobChipsProv.privateStateProvider.setContractAddress(chipsAddress);
 
     await expect(async () => {
@@ -774,7 +712,7 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
   });
 
   it('The house cannot burn more than a coin holds', async () => {
-    const coin = await takeChipCoin(aliceWallet);
+    const coin = freshCoin(chipColorHex, BET_SIZE);
     await expect(async () => {
       await (submitCallTx<ChipsContract, 'burn'>)(aliceChipsProv, {
         compiledContract: CompiledChipsContract,

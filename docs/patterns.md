@@ -57,9 +57,9 @@ Entries name a symbol rather than a line number, so search the file for it.
 | Shielded mint, send and receive | token-transfers | `mintShieldedToSelf`, `mintAndSendShielded`, `sendShieldedToUser` |
 | A full shielded token (MIP-0011: mint, both burn paths, treasury) | shielded-chips | `chips.compact` → `mint`, `burn`, `mintToTreasury`, `burnFromTreasury` |
 | Contract custody of coins, commitment escrow, `mergeCoin` order | shielded-chips | `roulette.compact` → `betColor`, `claimWinnings`, `escrowCommit` |
-| Anonymous deposits into a contract-held pot; owner-only withdrawal | private-tip-jar | `private-tip-jar.compact` → `tip`, `reNonceToSelf`, `withdraw` |
-| Shielded self-transfer to re-nonce a coin before using it | every example (from the template) | `src/wallet.ts` → `splitShieldedCoin` |
-| A wallet's coins as circuit arguments, a token's color, minting to a wallet, waiting for a coin to arrive | shared package (new examples) | [`packages/coins/src/index.ts`](../packages/coins/src/index.ts) → `takeCoin`, `tokenColor`, `recipientOf`, `encryptionKeys`, `waitForShieldedBalance`, `simCoin` |
+| Anonymous deposits into a contract-held pot (a fresh-nonce coin per deposit); owner-only withdrawal | private-tip-jar | `private-tip-jar.compact` → `tip`, `withdraw`; `src/test/private-tip-jar.test.ts` → `freshCoin` |
+| A fresh coin as a `receiveShielded` argument (the wallet pays for it and makes change), a token's color, minting to a wallet, waiting for a coin to arrive | shared package (new examples) | [`packages/coins/src/index.ts`](../packages/coins/src/index.ts) → `freshCoin`, `tokenColor`, `recipientOf`, `encryptionKeys`, `waitForShieldedBalance`, `simCoin` |
+| A contract coin's Merkle index from the transaction that created it (for an escrow the contract doesn't store) | shared package; shielded-chips | [`packages/coins/src/index.ts`](../packages/coins/src/index.ts) → `contractCoinMtIndex`, used by `src/test/roulette.test.ts` → `recordEscrow`; browser copy: `ui/src/midnight/shielded-chips-api.ts` → `escrowMtIndex` |
 | DUST fee sponsorship (one wallet pays another's fees) | private-party | `src/sponsor.ts`, `src/test/sponsorship.test.ts` |
 
 ## Test patterns

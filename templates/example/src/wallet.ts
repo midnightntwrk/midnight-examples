@@ -111,16 +111,16 @@ export class MidnightWalletProvider implements MidnightProvider, WalletProvider 
   /**
    * Send `amount` of `tokenType` from this wallet back to itself.
    *
-   * Also the way to make a coin of an exact value: a contract call that takes
-   * a whole coin (a tip, a bet, a deposit) spends all of it.
+   * You don't need this to pay a contract. A coin a circuit `receiveShielded`s
+   * is a NEW coin the transaction creates: pass `freshCoin(color, value)` from
+   * @midnight-ntwrk/example-coins, and the wallet pays for it from whichever
+   * coins it selects and makes change. That pays an exact amount, and since
+   * the nonce is fresh, nobody who knows your wallet's coins (whoever minted or
+   * sent them) can recognise it. Earlier examples did a self-transfer like
+   * this before every deposit to get the same effect.
    *
-   * PRIVACY: whoever minted or paid you a shielded coin knows its nonce. If
-   * you spend that coin into a contract, they can recognise it, even when the
-   * contract only records a contract-owned coin re-nonced from it (that nonce
-   * is derived from the old one). A self-transfer first replaces it with a
-   * coin carrying a wallet-chosen nonce they have never seen. Cheap, and worth
-   * doing before any action you want unlinkable. Shared by every example that
-   * moves shielded coins; see shielded-chips and private-tip-jar.
+   * What it is for: reshaping the wallet itself, for example to hold a coin of
+   * an exact value for a test.
    */
   async splitShieldedCoin(
     tokenType: string,
