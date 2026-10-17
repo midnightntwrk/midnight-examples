@@ -23,6 +23,7 @@
     "validate": "node ../../scripts/validate-example.mjs"
   },
   "dependencies": {
+    "@midnight-ntwrk/example-coins": "workspace:^",
     "@midnight-ntwrk/example-fast-sync": "workspace:^",
     "@midnight-ntwrk/example-sim": "workspace:^",
     "@midnight-ntwrk/midnight-js-contracts": "4.1.1",

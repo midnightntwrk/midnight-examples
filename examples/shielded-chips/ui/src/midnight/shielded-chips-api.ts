@@ -1,19 +1,17 @@
 // Contract operations the UI calls. Each one is the browser counterpart of a
 // step in the Node test (examples/shielded-chips/src/test/roulette.test.ts);
-// the differences are where `providers` came from and the three things the
-// Node test reads from the wallet SDK, which the DApp Connector doesn't expose:
+// the differences are where `providers` came from and the three things that
+// need care in a browser, where the DApp Connector exposes less than the
+// wallet SDK:
 //
-//  1. **Coin arguments.** The test passes a coin it finds in
-//     `wallet.shielded.availableCoins` to houseDeposit / betColor / burn. The
-//     connector can't list a wallet's coins. It doesn't need to: the
-//     `ShieldedCoinInfo` a circuit `receiveShielded`s describes the *output*
-//     this transaction creates for the contract, so a fresh coin
+//  1. **Coin arguments.** The connector can't list a wallet's coins. It doesn't
+//     need to: the `ShieldedCoinInfo` a circuit `receiveShielded`s describes
+//     the *output* this transaction creates for the contract, so a fresh coin
 //     (`createShieldedCoinInfo`, random nonce) works, and the wallet funds it
 //     from whatever chips it holds while balancing, adding change if its coin
 //     is bigger. Checked on the local devnet for houseDeposit, betColor (with
-//     and without change) and burn. This also gives every escrowed coin a
-//     nonce the chip issuer has never seen, which the test gets from
-//     `splitShieldedCoin`.
+//     and without change) and burn. It also gives every escrowed coin a
+//     nonce the chip issuer has never seen. The Node tests do the same.
 //  2. **The escrow's Merkle index.** The contract never stores a player's
 //     escrowed coin, so claimWinnings / forfeit replay it from private state,
 //     with its `mt_index`. See `escrowMtIndex`.
@@ -414,6 +412,10 @@ export async function placeBet(
 
 /**
  * The Zswap Merkle-tree index of the coin a bet escrowed.
+ *
+ * The Node tests use the same logic from `@midnight-ntwrk/example-coins`
+ * (`contractCoinMtIndex`). This copy stays because that package is Node-only
+ * (it imports `node:crypto`), and the UI's package.json is template-owned.
  *
  * Every output of a transaction is appended to the tree in order, starting at
  * the transaction's `zswapStartIndex` (the indexer has it). So the escrow's

@@ -2,9 +2,10 @@
 
 A private tip jar. Anyone can drop a shielded coin into the jar without saying
 who they are, and only the jar's owner can take coins out. The `tip` circuit
-takes no identity at all: it receives the tipper's coin and immediately re-sends
-it to the contract itself, so the public pot only ever holds contract-owned
-coins whose nonces don't point back at a tipper's wallet. `withdraw` checks a
+takes no identity at all. A tip is a new coin with a fresh random nonce, which
+the tipper's wallet pays for from its own coins. The contract stores that coin
+in the public pot, and since no wallet coin shares its nonce, it doesn't point
+back at the tipper. `withdraw` checks a
 hash of the owner's secret key (supplied by a witness) and pays one pot coin to
 the owner's shielded wallet. Tip *values* stay public, so an observer can see
 "someone tipped 40" but not who. The full list of what is and isn't public is in

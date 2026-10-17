@@ -285,16 +285,22 @@ export function derive(exampleDir, name, names) {
       '};',
     ].join('\n');
 
-  // A coin argument gets a hint naming the helper that makes one.
+  // A coin argument gets a hint naming the helper that makes one. `how` maps
+  // the argument to it. On the devnet a ShieldedCoinInfo is a new coin the
+  // transaction creates (the wallet pays for it), so it comes from freshCoin,
+  // never from the wallet's own coins; a QualifiedShieldedCoinInfo is a coin
+  // the contract already holds.
   const coinHint = (c, how) => {
-    const coins = c.arguments.filter(isCoinArg).map((a) => a.name);
-    return coins.length ? ` — ${coins.map((n) => `${n}: ${how}`).join(', ')}` : '';
+    const coins = c.arguments.filter(isCoinArg);
+    return coins.length ? ` — ${coins.map((a) => `${a.name}: ${how(a)}`).join(', ')}` : '';
   };
+  const devnetCoinHow = (a) =>
+    isShieldedCoinInfo(a.type) ? 'freshCoin(color, value)' : "a coin the contract holds, from its ledger (insertCoin)";
   const devnetTodos = (indent) =>
-    impure.map((c) => `${indent}it.todo(${quote(signature(c) + coinHint(c, 'takeCoin(wallet, color, value)'))});`).join('\n');
+    impure.map((c) => `${indent}it.todo(${quote(signature(c) + coinHint(c, devnetCoinHow))});`).join('\n');
   const simTodos = (indent) =>
     [
-      ...impure.map((c) => `${indent}it.todo(${quote(signature(c) + coinHint(c, 'simCoin(value, color)'))});`),
+      ...impure.map((c) => `${indent}it.todo(${quote(signature(c) + coinHint(c, () => 'simCoin(value, color)'))});`),
       ...pure.map((c) => `${indent}it.todo(${quote(`${signature(c)} (pure)`)});`),
     ].join('\n');
   const ledgerComment = (indent) =>
@@ -378,10 +384,10 @@ export function derive(exampleDir, name, names) {
       .join('\n\n');
   const COIN_HELPERS = [
     'encryptionKeys',
+    'freshCoin',
     'mintNonce',
     'recipientOf',
     'shieldedBalance',
-    'takeCoin',
     'tokenColor',
     'waitForShieldedBalance',
   ];

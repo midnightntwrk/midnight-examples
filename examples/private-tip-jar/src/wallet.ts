@@ -110,17 +110,17 @@ export class MidnightWalletProvider implements MidnightProvider, WalletProvider 
 
   /**
    * Send `amount` of `tokenType` from this wallet back to itself.
-   * (Ported from examples/shielded-chips/src/wallet.ts.)
    *
-   * PRIVACY: this is the tipper-side half of the anonymity story. Whoever
-   * paid you a shielded coin (here: the demo token's issuer, who is also the
-   * jar owner) knows that coin's nonce. The tip jar never publishes the coin
-   * you tip, only a contract-owned coin re-nonced from it, but that new nonce
-   * is derived deterministically from the old one, so anyone who knows your
-   * old nonce could recompute it and spot your tip in the pot. A
-   * self-transfer replaces the coin with one whose nonce only your wallet
-   * has seen, which cuts that thread. The output for `amount` and the change
-   * output both get fresh nonces.
+   * You don't need this to pay a contract. A coin a circuit `receiveShielded`s
+   * is a NEW coin the transaction creates: pass `freshCoin(color, value)` from
+   * @midnight-ntwrk/example-coins, and the wallet pays for it from whichever
+   * coins it selects and makes change. That pays an exact amount, and since
+   * the nonce is fresh, nobody who knows your wallet's coins (whoever minted or
+   * sent them) can recognise it. Earlier examples did a self-transfer like
+   * this before every deposit to get the same effect.
+   *
+   * What it is for: reshaping the wallet itself, for example to hold a coin of
+   * an exact value for a test.
    */
   async splitShieldedCoin(
     tokenType: string,
