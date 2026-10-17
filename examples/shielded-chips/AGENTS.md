@@ -15,6 +15,15 @@
   (`sendShielded`) for a contract-held one.
 - `ShieldedCoinInfo` vs `QualifiedShieldedCoinInfo`, and
   `Either<ZswapCoinPublicKey, ContractAddress>` recipients.
+- **A `receiveShielded` argument is a new coin, not a wallet coin.** It
+  describes the output the transaction creates for the contract; the wallet
+  pays for it from whichever coins it selects and makes change. So the tests
+  pass `freshCoin(color, amount)` from `@midnight-ntwrk/example-coins` (a
+  fresh random nonce) to `houseDeposit`, `betColor` and `burn`, and the UI
+  does the same with `createShieldedCoinInfo` (`freshChip`). No wallet coin shares that
+  nonce and the issuer never saw it, so `houseDeposit` stores the coin as it
+  is, with no re-send to `kernel.self()` and no client-side self-transfer
+  first.
 - **Keeping coin nonces out of public state.** Any coin nonce on the ledger is a
   linkability oracle for the wallet that funded or received it. Roulette stores
   a `persistentCommit` of the escrowed coin (not the coin), and `claimWinnings`
@@ -32,8 +41,8 @@
 - `contract/roulette.compact` — RED/BLACK game; custodies chip coins, pays 2×.
 - `contract/index.ts` — `CompiledChipsContract` / `CompiledRouletteContract`
   and their zk-config paths; `contract/witnesses.ts` — shared witnesses.
-- `src/wallet.ts` adds `splitShieldedCoin` (a self-transfer that re-nonces a
-  coin so the issuer can no longer recognise it).
+- `src/wallet.ts` keeps the template's `splitShieldedCoin` (a self-transfer);
+  the tests don't use it.
 - `src/test/roulette.test.ts` — the full functional round (3 wallets).
 - `src/test/privacy.test.ts` — one round, then mechanically asserts that the
   captured secrets (escrow nonce, payout nonce, wallet key) are absent from
@@ -67,11 +76,14 @@ yarn env:down
   MIP-0011 forbids precomputing it in the constructor.
 - The contract never stores a player's escrowed coin, so the player replays it
   from private state at claim/forfeit time. Its `mt_index` is recovered from the
-  bet transaction's `zswapStartIndex` via the indexer (`escrowMtIndex` in the
-  tests) and written with `rememberEscrow`. That assumes the escrow is the
-  tx's first output, which holds when the bet coin is exactly the bet (as in
-  the tests). With a change output it can come second; the UI finds the
-  position by commitment (`escrowMtIndex` in `ui/src/midnight/shielded-chips-api.ts`).
+  bet transaction's `zswapStartIndex` plus the escrow output's position in
+  that transaction, found by commitment because the wallet's change output can
+  come first (`contractCoinMtIndex` from `@midnight-ntwrk/example-coins` in the
+  tests; `escrowMtIndex` in `ui/src/midnight/shielded-chips-api.ts`, a browser
+  copy, since that package is Node-only), and written with `rememberEscrow`.
+- Pool keys in `houseCoins` are deposit nonces, chosen by the caller and
+  public, so `houseDeposit` refuses a nonce that is already a key. Otherwise a
+  deposit could overwrite a pool entry and strand its coin.
 - Wallet roles: Alice (house) / Bob / Charlie via
   `resolveWallet(network, role)`. Both test files share Alice and Bob, so
   `vitest.config.ts` sets `fileParallelism: false`.

@@ -1016,7 +1016,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@midnight-ntwrk/example-coins@workspace:packages/coins":
+"@midnight-ntwrk/example-coins@workspace:^, @midnight-ntwrk/example-coins@workspace:packages/coins":
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-coins@workspace:packages/coins"
   dependencies:
@@ -1253,6 +1253,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-private-tip-jar@workspace:examples/private-tip-jar"
   dependencies:
+    "@midnight-ntwrk/example-coins": "workspace:^"
     "@midnight-ntwrk/example-fast-sync": "workspace:^"
     "@midnight-ntwrk/example-sim": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
@@ -1354,6 +1355,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-shielded-chips@workspace:examples/shielded-chips"
   dependencies:
+    "@midnight-ntwrk/example-coins": "workspace:^"
     "@midnight-ntwrk/example-fast-sync": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
