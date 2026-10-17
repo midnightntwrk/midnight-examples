@@ -1,0 +1,403 @@
+---
+SPDX-License-Identifier: Apache-2.0
+copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+sidebar_label: "Run the game"
+title: "Run the game"
+description: "The player's side of a private escrow, then a full roulette round on a local devnet: mint, bet, reveal, claim, forfeit, sweep, burn, and read the chain back."
+sidebar_position: 30
+toc_max_heading_level: 3
+tags:
+  - tutorials
+  - shielded-chips
+  - midnight-js
+  - testing
+  - shielded-tokens
+  - privacy
+  - advanced
+  - midnight-network
+---
+
+# Run the game
+
+This part covers the TypeScript a player needs because the roulette contract never stores their
+coin, then runs a full round on a local devnet.
+
+## Prerequisites
+
+- [The roulette contract](/tutorials/shielded-chips/roulette), in particular the escrow
+  commitment in `betColor` and its reopening in `claimWinnings`.
+- Docker, with the engine running.
+
+## The player's side of a private escrow
+
+Storing a commitment instead of a coin moves work to the client. Two pieces of the TypeScript
+exist for that.
+
+### Recovering `mt_index`
+
+`escrowCommit` deliberately excludes `mt_index`, and the contract never stores the coin, so
+nothing on chain carries it. But `claimWinnings` needs it to spend the coin. The claimant recovers
+it themselves from their own bet transaction. The indexer reports `zswapStartIndex` for each
+transaction: the commitment-tree index of the first coin commitment that transaction added. In
+this test's bet transactions the contract's coin is that first commitment, and the successful
+claim and forfeit prove it. A transaction with more shielded outputs, such as wallet change in the
+chip color, would need the coin's position among them.
+
+```typescript title="src/test/roulette.test.ts"
+  /**
+   * Find the Zswap tree index of the coin the contract took custody of in a
+   * given bet transaction.
+   *
+   * The contract deliberately does not store the escrowed coin, so nothing on
+   * chain carries its `mt_index`. The player has to recover it themselves, and
+   * it is simply the index of the shielded output their own bet transaction
+   * created — `zswapStartIndex` on that transaction.
+   */
+  async function escrowMtIndex(blockHeight: number, entryPoint: string): Promise<bigint> {
+    const query = `{ block(offset:{height:${blockHeight}}) { transactions {
+      ... on RegularTransaction { zswapStartIndex }
+      contractActions { address ... on ContractCall { entryPoint } } } } }`;
+    const res = await fetch(config.indexer, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+    const body = (await res.json()) as {
+      data: {
+        block: {
+          transactions: {
+            zswapStartIndex?: number;
+            contractActions: { address: string; entryPoint?: string }[];
+          }[];
+        } | null;
+      };
+    };
+    const txs = body.data.block?.transactions ?? [];
+    const match = txs.find((t) =>
+      t.contractActions?.some(
+        (a) => a.address === rouletteAddress && a.entryPoint === entryPoint,
+      ),
+    );
+    if (match?.zswapStartIndex === undefined) {
+      throw new Error(`No ${entryPoint} tx with a zswap index in block ${blockHeight}`);
+    }
+    return BigInt(match.zswapStartIndex);
+  }
+```
+
+The test then writes the full coin into private state, so the `escrowedCoin` witness can serve it
+later:
+
+```typescript title="src/test/roulette.test.ts"
+  /** Persist the escrowed coin so claimWinnings/forfeit can reopen it. */
+  async function recordEscrow(
+    providers: ShieldedChipsProviders,
+    privateStateId: string,
+    base: RoulettePrivateState,
+    coin: ShieldedCoinArg,
+    blockHeight: number,
+  ): Promise<QualifiedCoin> {
+    const mtIndex = await escrowMtIndex(blockHeight, 'betColor');
+    const escrowed: QualifiedCoin = {
+      nonce: coin.nonce,
+      color: coin.color,
+      value: coin.value,
+      mt_index: mtIndex,
+    };
+    await providers.privateStateProvider.set(privateStateId, rememberEscrow(base, escrowed));
+    logger.info(`Escrow recorded at mt_index=${mtIndex}`);
+    return escrowed;
+  }
+```
+
+`rememberEscrow` in `contract/witnesses.ts` just replaces the placeholder coin in the private
+state. Bob's bet calls `recordEscrow` with the block height of his `betColor` transaction:
+
+```typescript title="src/test/roulette.test.ts"
+  it('Bob bets RED with a 100-chip coin', async () => {
+    const bobPS = createRoulettePrivateState(bobSk, bobSalt);
+    bobRouletteProv.privateStateProvider.setContractAddress(rouletteAddress);
+    await bobRouletteProv.privateStateProvider.set(BOB_ROULETTE_PRIVATE_ID, bobPS);
+
+    const chip = await takeChipCoin(bobWallet);
+    logger.info(`Bob is betting a chip coin (value=${chip.value}) on RED`);
+
+    const tx = await (submitCallTx<RouletteContract, 'betColor'>)(bobRouletteProv, {
+      compiledContract: CompiledRouletteContract,
+      contractAddress: rouletteAddress,
+      privateStateId: BOB_ROULETTE_PRIVATE_ID,
+      circuitId: 'betColor',
+      args: [chip, Color.RED],
+    });
+
+    await recordEscrow(
+      bobRouletteProv,
+      BOB_ROULETTE_PRIVATE_ID,
+      bobPS,
+      chip,
+      tx.public.blockHeight,
+    );
+
+    const state = await queryRoulette();
+    expect(state.betCommits.size()).toEqual(1n);
+    // The bet size is public by design; the coin behind it is not.
+    expect(state.betValues.lookup(state.betCommits[Symbol.iterator]().next().value![0]))
+      .toEqual(BET_SIZE);
+  });
+```
+
+`mt_index` is not secret: it is a public tree position. It just isn't known until the transaction
+lands, which is why it stays out of the commitment and comes in through a witness.
+
+### `splitShieldedCoin`: closing the issuer's view
+
+One residual link survives everything in the roulette contract, and it belongs to exactly one
+party: **the chip issuer knows the precise coin it minted you.** Same nonce, same value. The
+roulette contract never publishes your coin, but Alice minted it, so Alice can still recognize
+it, and derive your payout coin from it.
+
+The fix is client-side and cheap: spend the coin before you bet with it. A self-transfer replaces
+it with a coin whose nonce the issuer has never seen. The test does this for Bob and asserts that
+the nonce actually changes:
+
+```typescript title="src/test/roulette.test.ts"
+  it('Bob re-nonces his chips in his own wallet before betting', async () => {
+    // The chip issuer (Alice) knows the exact coin she minted to Bob: same
+    // nonce, same value. The contract never publishes Bob's coin, but Alice
+    // could still recognise it if Bob bet it untouched — every coin derived
+    // from it, including his payout, follows deterministically from that
+    // nonce. A self-transfer replaces it with a coin whose nonce Alice has
+    // never seen, which closes that last thread.
+    const before = await takeChipCoin(bobWallet);
+    await bobWallet.splitShieldedCoin(chipColorHex, BET_SIZE);
+    await syncWallet(logger, bobWallet.wallet, 600_000);
+    const after = await takeChipCoin(bobWallet);
+
+    logger.info(`Bob's chip nonce before split: ${Buffer.from(before.nonce).toString('hex')}`);
+    logger.info(`Bob's chip nonce after split:  ${Buffer.from(after.nonce).toString('hex')}`);
+
+    // Same value, different coin identity.
+    expect(after.value).toEqual(BET_SIZE);
+    expect(Buffer.from(after.nonce).toString('hex')).not.toEqual(
+      Buffer.from(before.nonce).toString('hex'),
+    );
+    expect(await chipBalance(bobWallet)).toEqual(BET_SIZE);
+  });
+```
+
+The new nonce is not *any* derivation of the old one: the wallet builds the self-transfer's output
+with fresh randomness rather than ratcheting, so the chain of derivation the issuer could follow
+simply stops.
+
+`splitShieldedCoin` in `src/wallet.ts` builds, signs, and submits an ordinary shielded transfer to
+the wallet's own address. Then it waits:
+
+```typescript title="src/wallet.ts"
+    const finalized = await this.wallet.finalizeRecipe(signed);
+    await this.wallet.submitTransaction(finalized);
+
+    // submitTransaction returns once the transaction is accepted, not once it
+    // is on chain and indexed. Until then the input coin is spent and the
+    // replacement is not visible yet, so wait for the balance to reappear
+    // before anyone tries to use the new coin.
+    const deadline = Date.now() + 300_000;
+    for (;;) {
+      if ((await balanceOf()) === expected) {
+        this.logger.info('Re-nonced coin is visible; split complete');
+        return;
+      }
+      if (Date.now() > deadline) {
+        throw new Error(`Split of ${tokenType} did not settle within 300s`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+    }
+```
+
+`submitTransaction` resolves when the transaction is accepted, not when it is on chain. In between,
+the old coin is spent while the new one isn't visible yet, so betting straight away would find no
+chip to bet.
+
+## Run the game end to end
+
+The end-to-end test in `src/test/roulette.test.ts` plays a full round against a local devnet:
+
+1. Alice, the house, deploys the chips contract and mints 100 chips each to herself (twice),
+   Bob and Charlie.
+2. She deploys roulette bound to the chip color and deposits two match coins.
+3. Bob re-nonces his chips and bets RED. Charlie bets BLACK.
+4. Alice reveals RED. Bob claims 2× in a single call, Charlie forfeits, and Alice sweeps the pool.
+5. It then exercises both MIP-0011 burn paths, both house-only. Alice burns half a swept coin
+   (transient), then mints into the treasury and burns part of it (Merkle), checking that the
+   change is persisted rather than stranded.
+6. Finally it proves the gate holds: Bob cannot burn a coin he owns, and cannot mint, mint to the
+   treasury, or burn from it.
+
+Make sure the Docker engine is running, then start the local devnet from `examples/shielded-chips`:
+
+```bash
+yarn env:up
+yarn wait:dust     # wait until the genesis wallet has DUST to pay fees
+```
+
+Run the tests:
+
+```bash
+yarn test:local
+```
+
+This runs both suites one after the other: `roulette.test.ts`, then `privacy.test.ts`, which
+checks the privacy claims against live chain state (see
+[`privacy-tests.md`](https://github.com/midnightntwrk/midnight-examples/blob/main/examples/shielded-chips/privacy-tests.md)).
+Tear the devnet down with `yarn env:down` when you are done.
+
+Successful output looks like this, with wallet-sync chatter trimmed:
+
+```
+[19:35:27.606] INFO (92511): All providers initialized.
+[19:35:27.607] INFO (92511): Deploying chips contract...
+[19:35:45.173] INFO (92511): Chips contract deployed at f259774010ad83ab421c10a55a0ce0afbfbc63d207a102f44cf3745330cb7477
+[19:35:45.183] INFO (92511): Chip token color: 60fb9cfdcaecf65d047862040c6987354b2eb3542d7061d8075dcbd18fe33add
+[19:35:45.328] INFO (92511): Alice minting 100 chips to herself (coin #1)...
+[19:36:07.926] INFO (92511): Alice minting 100 chips to herself (coin #2)...
+[19:36:26.594] INFO (92511): Alice minting 100 chips to Bob...
+[19:36:44.049] INFO (92511): Alice minting 100 chips to Charlie...
+[19:37:02.892] INFO (92511): Deploying roulette contract bound to chip color 60fb9cfdcaecf65d047862040c6987354b2eb3542d7061d8075dcbd18fe33add...
+[19:37:20.277] INFO (92511): Roulette deployed at f8f0709f52d529daeb1c06c1e50c8aeffb9ff53dccb771f9f92195e1932915bf
+[19:37:20.287] INFO (92511): Alice depositing match coin #1 (value=100)...
+[19:37:51.007] INFO (92511): Alice depositing match coin #2 (value=100)...
+[19:38:13.841] INFO (92511): Self-transferring 100 of 60fb9cfdcaecf65d… to re-nonce
+[19:38:33.566] INFO (92511): Re-nonced coin is visible; split complete
+[19:38:33.571] INFO (92511): Bob's chip nonce before split: 376e39ef7e1e4d9a8b903bc23915604e3bb1f379847cc4bd671b9fd36b5d6c79
+[19:38:33.571] INFO (92511): Bob's chip nonce after split:  b5a388a098dbcc4e9bf31e03925daab82e184a2b83614264a596228bfb025134
+[19:38:33.652] INFO (92511): Bob is betting a chip coin (value=100) on RED
+[19:38:56.712] INFO (92511): Escrow recorded at mt_index=37
+[19:38:56.790] INFO (92511): Charlie is betting a chip coin (value=100) on BLACK
+[19:39:20.855] INFO (92511): Escrow recorded at mt_index=38
+[19:39:20.861] INFO (92511): Alice revealing the winning number...
+[19:39:38.286] INFO (92511): Bob claiming with match key=4284ac8224529e395baab2d131ee29f068b30bddba21735d9ce386552280d200
+[19:40:02.475] INFO (92511): Bob chip balance after claimWinnings: 200
+[19:40:26.469] INFO (92511): Alice sweeping first pool coin=2f9146def3e0fdbe3b18cfc1b8ae939ade521d3fad4a8275b94529e850afce00
+[19:40:50.618] INFO (92511): Alice sweeping second pool coin=6c33270d890655b62a54f7c39bfbfca6afb37c901d53bf93fa5a149afc8d0d00
+[19:41:14.753] INFO (92511): Alice chip balance after sweeping the pool: 200
+[19:41:14.850] INFO (92511): Alice burning 50 of a 100-chip coin...
+[19:41:44.242] INFO (92511): Alice chip balance after burning 50: 150
+[19:41:44.356] INFO (92511): Alice minting 60 chips into the treasury...
+[19:42:08.414] INFO (92511): Alice burning 25 of the 60 treasury chips...
+ ✓ src/test/roulette.test.ts (17 tests) 424715ms
+     ✓ Alice deploys the chips contract  17423ms
+     ✓ Alice mints chips to herself (2 for matches), Bob, and Charlie  77284ms
+     ✓ Alice deploys the roulette contract bound to the chip color  17392ms
+     ✓ Alice deposits two match coins so the house can cover both bets  53271ms
+     ✓ Bob re-nonces his chips in his own wallet before betting  19602ms
+     ✓ Bob bets RED with a 100-chip coin  23144ms
+     ✓ Charlie bets BLACK with a 100-chip coin  24008ms
+     ✓ Alice reveals the winning number (RED)  17275ms
+     ✓ Bob claims his 2x in a single call (escrow coin merged with a match coin)  24027ms
+     ✓ Charlie forfeits her losing bet into the house pool  23980ms
+     ✓ Alice sweeps both pool coins (unused match + forfeited bet)  48021ms
+     ✓ Alice burns half of her swept chips — the same-tx transient burn path  29272ms
+     ✓ Alice mints into the treasury and burns it — the Merkle-spend burn path  47900ms
+ ✓ src/test/privacy.test.ts (12 tests) 183768ms
+     ✓ sets up: deploy chips, mint to Alice+Bob, deploy roulette, house deposit  98331ms
+     ✓ P8: Bob re-nonces his chip so the coin he bets is not the coin he was minted  19585ms
+     ✓ Bob bets RED; the escrowed coin nonce is captured as a secret  21824ms
+     ✓ Alice reveals; Bob claims his 2x  42603ms
+
+ Test Files  2 passed (2)
+      Tests  29 passed (29)
+```
+
+`Bob chip balance after claimWinnings: 200` is the 2× arriving as a single merged coin, and
+`after burning 50: 150` is the transient burn taking half of a swept coin back out of existence.
+Proof generation dominates the runtime: the roulette suite takes about 7 minutes, and the
+privacy suite about 3 more.
+
+Vitest lists only the tests that take longer than 300 ms, so the privacy suite shows 4 of its 12
+tests, because the other eight only read state. Four of the seventeen roulette tests are missing
+too. They are fast rejection checks that fail before any transaction
+is submitted: a loser cannot claim, Bob cannot burn a coin he owns, Bob cannot mint, mint to the
+treasury or burn from it, and the house cannot burn more than a coin holds. The gate checks assert
+on the *specific* revert message, `/Only the house/` or `/burn amount exceeds coin value/`, rather
+than merely that something threw:
+
+```typescript title="src/test/roulette.test.ts"
+  it('The house cannot burn more than a coin holds', async () => {
+    const coin = await takeChipCoin(aliceWallet);
+    await expect(async () => {
+      await (submitCallTx<ChipsContract, 'burn'>)(aliceChipsProv, {
+        compiledContract: CompiledChipsContract,
+        circuitId: 'burn',
+        contractAddress: chipsAddress,
+        privateStateId: ALICE_CHIPS_PRIVATE_ID,
+        args: [coin, coin.value + 1n],
+      });
+    }).rejects.toThrow(/burn amount exceeds coin value/);
+  });
+```
+
+That distinction matters more than it looks. A gate test written as a bare `rejects.toThrow()`
+will happily pass on a typo in its own arguments and tell you nothing about the gate. (The loser's
+claim check is the one bare `rejects.toThrow()`; it also asserts that Charlie's balance stays at
+zero.)
+
+### Reading the chain back
+
+The habit worth building: don't infer what's public from the `disclose` calls, read the chain.
+Every contract's state is readable from the indexer, so you can check your own privacy claims
+directly. Between the reveal and the claims, the roulette state of one run looked like this:
+
+```
+theHouse       = 12ff5b093f1d54acb8f02b7cc8792284394552ecbcf8c1c5bb10b71d0cf10b0c
+chipColor      = 8487ed1df634a057d44ee84b789fb45f692e23cafb4d1a62414b6c547499b822
+winningNumHash = 56ae8ecd83e61036610ef23904eb40cc16dc232096d93ae3eb2cbcc4cba9b271
+betState = CLOSED   winningColor = RED
+
+bets[e67e3482…]       = RED        bets[7ed8d598…]       = BLACK
+betValues[e67e3482…]  = 100        betValues[7ed8d598…]  = 100
+betCommits[e67e3482…] = b82ed733…  betCommits[7ed8d598…] = 9b6bd1a9…
+houseCoins[d2cea124…] = value 100, mt_index 91
+houseCoins[37f1dbd2…] = value 100, mt_index 89
+```
+
+Two things to notice. The pseudonyms and their behavior are fully legible: who bet what, and who
+won. And there is no coin nonce anywhere for a player, so there is nothing to test a candidate
+wallet key against. That is the whole design in one screen: **behavior public, identity private.**
+
+`privacy.test.ts` automates part of that check. It collects the contracts' public state and
+asserts that Bob's escrowed coin nonce, his payout coin nonce and his wallet's coin public key are
+not in it. If you want to check more thoroughly, take the attacker's position. For each public
+nonce, and each wallet key you can guess, recompute the commitment across a few generations of
+nonce derivation and search the chain for it. Done against this contract, players resolve to
+nothing, and the only hits are the house's own sweeps.
+
+## Things to try
+
+Roughly in order of how much they'll teach you:
+
+1. **Break it on purpose.** Put a `betCoins.insertCoin(...)` back into `betColor`, re-run the
+   round, then compute `commitment(nonce, color, value, walletKey)` for each test wallet and
+   search the chain for it. Watching a pseudonym resolve to a wallet exactly is the fastest way to
+   internalize [the nonce rule](/tutorials/shielded-chips#01-the-rule-that-shapes-both-contracts).
+2. **Swap the `mergeCoin` arguments** in `claimWinnings` and re-run the same check. Nothing about
+   the game changes, and the winner becomes identifiable.
+3. **Hide the bet value.** Commit to `colorBet` and the value alongside the coin, and re-prove them
+   on claim. This is the same commit and reveal shape as the escrow, applied twice more, and it
+   removes the last public behavior.
+4. **Fix the leftover rough edges** noted along the way: give `winningNumHash` a blinding witness
+   separate from the identity secret, and mix `kernel.self()` into `getDappPublicKey` for
+   per-deployment unlinkability.
+5. **Give `forfeit` teeth.** Design an incentive that makes a losing player settle, such as a bond
+   at bet time or a deadline-based fallback, without putting the escrowed coin back into public
+   state.
+6. **Run multiple rounds per deployment**, which will force you to think about round-scoped
+   pseudonyms and clearing state between rounds.
+
+The [cheat-sheet](/tutorials/shielded-chips/cheat-sheet) collects every shielded-token operation
+and privacy rule from this tutorial in one place.
+
+## Next
+
+You have now taken a shielded token from mint to burn, custodied its coins in a contract, and
+checked on chain that no player's wallet can be named. The next step in the learning path is
+[ZK Loan](/tutorials/zk-loan): a real use case, private credit scoring against a signed
+attestation from an off-chain API.

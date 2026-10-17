@@ -286,10 +286,13 @@ worth recording:
 Two things the standard taught us that this audit had not surfaced:
 
 - **Spend paths are not interchangeable.** A coin created by an output of the
-  current transaction is not in the commitment tree yet and MUST be spent with
-  `sendImmediateShielded`; a tree-resident coin needs `sendShielded` and a valid
-  `mt_index`. Conflating them gives unsatisfiable circuits, or circuits that
-  trust a caller-supplied index. That is why MIP-0011 has two burn variants.
+  current transaction is not in the commitment tree yet, so it is spent as a
+  Zswap transient at `mt_index: 0`; a tree-resident coin needs `sendShielded`
+  and its real `mt_index`. In the pinned stdlib (0.31.1) `sendImmediateShielded`
+  is exactly `sendShielded` with `mt_index: 0`, so `reNonceToSelf` can use
+  either. What MIP-0011 guards against is a burn that trusts a caller-supplied
+  tree index: `_burn` takes an unqualified `ShieldedCoinInfo` and spends it
+  with `sendImmediateShielded`, and that is why it has two burn variants.
 - **Contract-tracked supply is an upper bound, not a measurement.** Holders can
   destroy coins without the contract — a burn-address send or an imbalanced Zswap
   offer — so `totalSupply` over-reports by construction. Naming it exact

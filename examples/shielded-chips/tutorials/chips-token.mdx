@@ -1,0 +1,627 @@
+---
+SPDX-License-Identifier: Apache-2.0
+copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+sidebar_label: "The chips token"
+title: "The chips token"
+description: "Read chips.compact, a MIP-0011 native shielded token: a recipient-private mint, two burn circuits, house-only gating, and why supply accounting costs privacy."
+sidebar_position: 10
+toc_max_heading_level: 3
+tags:
+  - tutorials
+  - shielded-chips
+  - compact
+  - shielded-tokens
+  - mip-0011
+  - privacy
+  - advanced
+  - midnight-network
+---
+
+# The chips token
+
+This part walks through `contract/chips.compact`, the token the game is played with.
+
+## Prerequisites
+
+- The [set-up steps](/tutorials/shielded-chips) of this tutorial, so you have midnight-examples
+  installed and compiled.
+- [The rule that shapes both contracts](/tutorials/shielded-chips#01-the-rule-that-shapes-both-contracts):
+  any coin nonce in public ledger state lets an observer test a guessed wallet key.
+
+Open `examples/shielded-chips/contract/chips.compact` in your editor and keep it beside this page.
+
+## A standard, not an invented interface
+
+Rather than invent a token interface, this contract implements
+[MIP-0011, the Native Shielded Token Standard](https://github.com/midnightntwrk/midnight-improvement-proposals/blob/main/mips/mip-0011-native-shielded-token.md).
+A *native shielded token* is an asset that exists **only** as Zswap shielded UTXOs, never as a
+balance in contract state. The issuing contract mints and burns. It is not a balance keeper.
+That is why there is no `balanceOf` here, and there never can be: once a player holds a chip, it
+moves wallet to wallet at the protocol level, with no contract call and nothing for the contract
+to observe.
+
+The standard asks you to state two choices up front:
+
+- **Profile: Fungible.** MIP-0011 defines a *Fungible* profile (one token type, domain fixed at
+  construction) and a *Family* profile (many token types, domain as a per-call parameter). Chips
+  are one asset, so Fungible. The Family profile exists because Midnight has no cheap
+  clone-factory deployment, since a contract cannot instantiate another, so a multi-asset issuer
+  must mint every color from one contract.
+- **Extensions: supply accounting, yes. Derived-nonce minting, no.** The reason for the second is
+  [the nonce rule](/tutorials/shielded-chips#01-the-rule-that-shapes-both-contracts), and
+  [`mint`](#13-mint-and-why-this-contract-refuses-the-derived-nonce-extension) below dwells on it.
+
+## 1.1 Required state
+
+```compact title="contract/chips.compact"
+pragma language_version 0.23;
+import CompactStandardLibrary;
+
+// --- MIP-0011 required state (Fungible profile) ----------------------------
+export sealed ledger _name: Opaque<"string">;
+export sealed ledger _symbol: Opaque<"string">;
+export sealed ledger _decimals: Uint<8>;
+export sealed ledger _domain: Bytes<32>;
+```
+
+The metadata block is the standard's core state, and it is all `sealed`: immutable after
+construction. In the Fungible profile the sealed `_domain` is what forces token setup into the
+constructor, because a sealed field can only be written there.
+
+Note the underscore prefixes. They are the standard's convention for state and for the
+unrestricted building-block circuits, and keeping them makes it obvious which parts of the file
+are the standard and which are this contract's own.
+
+```compact title="contract/chips.compact"
+// --- MIP-0011 supply accounting extension (scalar) ------------------------
+// totalMinted is exact; totalBurned is a lower bound (contract-mediated burns
+// only); totalSupply is therefore an upper bound on circulating supply. Coins
+// can be destroyed without touching this contract — a burn-address send or an
+// imbalanced Zswap offer — so exact circulating supply is unknowable.
+//
+// PRIVACY COST, per the MIP: composing this extension makes contract-mediated
+// burn *amounts* public, because the counter write is the one thing that puts
+// the amount into the transcript. A bare burn keeps it private. Mint amounts
+// are public either way, via the `shieldedMints` effect.
+export ledger _totalMinted: Uint<128>;
+export ledger _totalBurned: Uint<128>;
+```
+
+`_totalMinted` and `_totalBurned` come from the optional supply extension. `Uint<128>` is not
+decoration: the standard requires the counters to revert on overflow, which the `Uint<128>` cast
+in the update circuits gives you for free.
+
+```compact title="contract/chips.compact"
+// --- consumer state: treasury --------------------------------------------
+// Chips this contract minted to itself and still holds, keyed by coin nonce.
+// MIP-0011's `_burnFromContract` operates on coins the contract already owns,
+// and this is what makes that path reachable: without somewhere to hold a
+// contract-owned coin, the Merkle-spend burn variant would be dead code.
+//
+// These are contract-owned coins with contract-chosen nonces, so publishing
+// them links nothing back to any user's wallet.
+export ledger _treasury: Map<Bytes<32>, QualifiedShieldedCoinInfo>;
+
+// --- consumer state: authorization ---------------------------------------
+// MIP-0011 requires the consumer to gate mint and burn. theHouse is the dapp
+// pseudonym of the deployer, derived the same way as in roulette.compact so
+// the same operator has one identity across both contracts.
+export sealed ledger theHouse: Bytes<32>;
+
+witness localSecretKey(): Bytes<32>;
+```
+
+`_treasury` and `theHouse` are not part of MIP-0011. They are this contract's own additions.
+`theHouse` gates minting ([1.5](#15-gating-and-the-treasury)), and `_treasury` holds chips the
+contract minted to itself, so the second burn variant has something to burn
+([1.4](#14-the-two-burn-circuits)).
+
+## 1.2 Construction and metadata
+
+```compact title="contract/chips.compact"
+constructor(
+    name_: Opaque<"string">,
+    symbol_: Opaque<"string">,
+    decimals_: Uint<8>,
+    domain_: Bytes<32>
+) {
+    _name = disclose(name_);
+    _symbol = disclose(symbol_);
+    _decimals = disclose(decimals_);
+    _domain = disclose(domain_);
+
+    const _sk = localSecretKey();
+    theHouse = disclose(getDappPublicKey(_sk));
+}
+
+// --- MIP-0011 metadata ----------------------------------------------------
+
+export circuit name(): Opaque<"string"> {
+    return _name;
+}
+
+export circuit symbol(): Opaque<"string"> {
+    return _symbol;
+}
+
+// Display convention only; the protocol operates on integers.
+export circuit decimals(): Uint<8> {
+    return _decimals;
+}
+
+// MUST be computed at call time, never precomputed in the constructor:
+// kernel.self() resolves differently during construction. Off chain the same
+// value comes from `rawTokenType(domain, contractAddress)`, which is how
+// roulette.compact gets bound to this color at deploy time without a
+// transaction.
+export circuit tokenColor(): Bytes<32> {
+    return tokenType(_domain, kernel.self());
+}
+```
+
+MIP-0011 does not prescribe *how* you initialize, only that name, symbol, decimals, and the domain
+are set at construction and immutable after. Doing it in the constructor is the simplest way to
+satisfy that.
+
+`decimals` is a display convention only. The protocol operates on integers. Chips are whole
+units, so this example passes `0`.
+
+`tokenColor` has one MUST worth memorizing: **it has to be computed at call time, never
+precomputed in the constructor**, because `kernel.self()` resolves differently during
+construction. A color cached at deploy time is simply wrong.
+
+That raises a practical question. If there's no stored color field, how does roulette bind to the
+color at deploy time? Off chain, from the same inputs:
+
+```typescript title="src/test/roulette.test.ts"
+    // The color is tokenType(domain, contractAddress). MIP-0011 forbids
+    // precomputing it in the constructor because kernel.self() resolves
+    // differently there, so there is no stored color field to read —
+    // derive it off chain instead of paying for a `tokenColor()` call.
+    chipColorHex = rawTokenType(CHIP_DOMAIN, chipsAddress);
+```
+
+`tokenType(domain, address)` in a circuit and `rawTokenType(domain, address)` in TypeScript
+compute the same value, so no transaction is needed to learn the color. The end-to-end test
+derives it this way and the whole game runs on it, which is also a decent check that the two
+derivations really do agree.
+
+## 1.3 `mint`, and why this contract refuses the derived-nonce extension
+
+MIP-0011's core mint is:
+
+```compact title="contract/chips.compact"
+circuit _mint(
+    recipient: Either<ZswapCoinPublicKey, ContractAddress>,
+    amount: Uint<64>,
+    nonce: Bytes<32>
+): ShieldedCoinInfo {
+    assert(!isZeroTarget(recipient), "NativeShieldedToken: mint to the zero address");
+    return mintShieldedToken(_domain, disclose(amount), disclose(nonce), disclose(recipient));
+}
+```
+
+Three requirements are packed in here:
+
+1. **Reject the zero recipient.** The zero key *is* the burn address, so a zeroed recipient would
+   silently destroy the mint. The standard requires checking both arms of the `Either`, which
+   `isZeroTarget` at the bottom of the file does.
+2. **`Uint<64>` for the amount.** This cap is the ledger's, not Compact's: a contract's shielded
+   mints are recorded with a 64-bit value. Larger issuance needs multiple mints.
+3. **The caller owns nonce uniqueness.** Reuse a nonce for the same `(domain, value, recipient)`
+   and you produce a duplicate commitment, which the ledger rejects.
+
+That third point is where the interesting decision lives. MIP-0011 offers an optional
+**derived-nonce** extension, `_mintWithDerivedNonce`, which keeps a nonce chain in ledger state so
+callers don't have to manage nonces at all. It is convenient, and this contract does not use it.
+The standard says why, in its own words:
+
+> Its derivation inputs are public state, so the commitment is recomputable by enumerating
+> candidate recipient keys: implementations SHOULD document this circuit as
+> **recipient-public**, and an issuer needing recipient privacy uses the base `_mint` with a
+> secret nonce.
+
+That is [the nonce rule](/tutorials/shielded-chips#01-the-rule-that-shapes-both-contracts),
+arrived at from the other direction. An earlier version of *this very contract* kept exactly such
+a public nonce chain (`nonceSeed` on the ledger, ratcheted per mint), and every single mint
+recipient could be identified from chain data alone, as the standard warns. The fix and the
+standard's advice are the same thing: **base `_mint`, secret nonce.**
+
+So the caller supplies a fresh random nonce. It is a circuit argument, so it is never published,
+and without it nobody can rebuild a recipient's commitment:
+
+```typescript title="src/test/roulette.test.ts"
+  /**
+   * A fresh, uniformly random mint nonce.
+   *
+   * MIP-0011 puts nonce uniqueness on the caller, and a *secret* nonce is
+   * what makes the base `_mint` recipient-private: the nonce is a circuit
+   * argument, so it never reaches the chain, and without it nobody can
+   * recompute a recipient's coin commitment. The alternative — MIP-0011's
+   * derived-nonce extension — is recipient-public by design.
+   */
+  const mintNonce = (): Uint8Array => new Uint8Array(randomBytes(32));
+```
+
+One consequence of minting straight to a wallet, which the standard flags: contract-initiated
+outputs carry no coin ciphertext at the protocol level, so a recipient's wallet may not be able to
+find the coin by scanning the chain. The returned `ShieldedCoinInfo` is then the recipient's only
+copy, and the standard says callers SHOULD deliver it out of band.
+
+MidnightJS closes that gap when it builds the transaction. For an output addressed to a wallet
+key, it attaches a ciphertext encrypted to that wallet. It knows the caller's own encryption key,
+and takes any other from `additionalCoinEncPublicKeyMappings`. If it can't resolve a recipient's
+key, the call fails. The test maps all three players' keys before Alice mints to them:
+
+```typescript title="src/test/roulette.test.ts"
+    const encMap = new Map<string, string>([
+      [aliceCoinPk, aliceWallet.getEncryptionPublicKey()],
+      [bobCoinPk, bobWallet.getEncryptionPublicKey()],
+      [charlieCoinPk, charlieWallet.getEncryptionPublicKey()],
+    ]);
+
+    // Each mint takes a fresh random nonce. MIP-0011 puts uniqueness on the
+    // caller, and secrecy is what keeps the recipient unlinkable.
+    const mintTo = async (
+      who: string,
+      recipient: { bytes: Uint8Array },
+    ): Promise<void> => {
+      logger.info(`Alice minting ${BET_SIZE} chips to ${who}...`);
+      await (submitCallTx<ChipsContract, 'mint'>)(aliceChipsProv, {
+        compiledContract: CompiledChipsContract,
+        contractAddress: chipsAddress,
+        privateStateId: ALICE_CHIPS_PRIVATE_ID,
+        circuitId: 'mint',
+        args: [recipient, BET_SIZE, mintNonce()],
+        additionalCoinEncPublicKeyMappings: encMap,
+      });
+    };
+```
+
+The exported `mint` wrapper that this calls is in [1.5](#15-gating-and-the-treasury).
+
+## 1.4 The two burn circuits
+
+MIP-0011 requires two, because the correct Zswap spend path depends on where the coin lives.
+Conflating them is one of the failure modes the standard was written to prevent.
+
+| | `_burn` | `_burnFromContract` |
+|---|---|---|
+| Coin location | provided in this transaction | already held by the contract |
+| Coin type | `ShieldedCoinInfo` | `QualifiedShieldedCoinInfo` |
+| Receive step | `receiveShielded(coin)` | none: already owned |
+| Spend path | `sendImmediateShielded` (transient) | `sendShielded` (Merkle) |
+| Change | forwarded to `refundTo` | auto-received, returned |
+
+A coin created by an output of the current transaction is not yet in the global commitment tree,
+so it **must** be spent transiently. `_burn` takes it as a `ShieldedCoinInfo` and spends it with
+`sendImmediateShielded`, so the burn never accepts a caller-supplied tree index. The
+[cheat-sheet](/tutorials/shielded-chips/cheat-sheet#operations) explains how the two calls relate.
+
+```compact title="contract/chips.compact"
+// Burn from a coin provided in the current transaction. A same-tx coin is not
+// yet in the global commitment tree, so it MUST be spent transiently
+// (sendImmediateShielded), and it is deliberately taken unqualified: a same-tx
+// coin has no meaningful mt_index, and accepting one would let the caller
+// supply an arbitrary value.
+//
+// Returns none when the whole coin is burned, or some(refundCoin) for a
+// partial burn. Contract-initiated outputs carry no coin ciphertext, so the
+// returned coin info is the recipient's only copy — deliver it out of band.
+circuit _burn(
+    coin: ShieldedCoinInfo,
+    amount: Uint<128>,
+    refundTo: Either<ZswapCoinPublicKey, ContractAddress>
+): Maybe<ShieldedCoinInfo> {
+    // The only barrier stopping a contract from burning one token while
+    // accounting it against another. The protocol-level receive does not
+    // validate color.
+    assert(coin.color == tokenType(_domain, kernel.self()),
+           "NativeShieldedToken: wrong token color");
+    assert(disclose(amount) <= disclose(coin.value),
+           "NativeShieldedToken: burn amount exceeds coin value");
+    // The zero key IS the burn address, so a zeroed refundTo would silently
+    // burn the change too.
+    assert(!isZeroTarget(refundTo), "NativeShieldedToken: refund to the zero address");
+
+    receiveShielded(disclose(coin));
+    const burned = sendImmediateShielded(
+        disclose(coin),
+        shieldedBurnAddress(),
+        disclose(amount)
+    );
+
+    if (burned.change.is_some) {
+        const refunded = sendImmediateShielded(
+            burned.change.value,
+            disclose(refundTo),
+            burned.change.value.value as Uint<128>
+        );
+        return some<ShieldedCoinInfo>(refunded.sent);
+    } else {
+        return none<ShieldedCoinInfo>();
+    }
+}
+```
+
+The color check is the load-bearing assertion. It is the only barrier stopping a multi-domain
+contract from burning token A while accounting it against token B. The protocol-level receive
+does **not** validate color for you.
+
+Note that the coin comes in *unqualified*, deliberately. A same-transaction coin has no
+meaningful `mt_index`, so accepting a qualified one would just invite the caller to supply an
+arbitrary value.
+
+Burning is a send to `shieldedBurnAddress()`: the all-zero key, which has no known secret, so the
+coins are unspendable forever. That is also why `refundTo` gets a zero check of its own. The zero
+key is that same burn address, so a zeroed `refundTo` would silently burn the change too.
+
+The contract-held variant is shorter:
+
+```compact title="contract/chips.compact"
+// Burn from a coin the contract already holds. Its commitment is in the tree,
+// so it is spent with a Merkle proof (sendShielded). No receiveShielded: the
+// coin is already owned, and claiming a receive would need a fresh output that
+// does not exist.
+//
+// Change is auto-received by the contract and returned. A consumer SHOULD
+// persist it — it replaces `coin` as the contract's holding and is not
+// otherwise recoverable.
+circuit _burnFromContract(
+    coin: QualifiedShieldedCoinInfo,
+    amount: Uint<128>
+): Maybe<ShieldedCoinInfo> {
+    assert(coin.color == tokenType(_domain, kernel.self()),
+           "NativeShieldedToken: wrong token color");
+    assert(disclose(amount) <= disclose(coin.value),
+           "NativeShieldedToken: burn amount exceeds coin value");
+
+    const burned = sendShielded(
+        disclose(coin),
+        shieldedBurnAddress(),
+        disclose(amount)
+    );
+    return burned.change;
+}
+```
+
+There is no `receiveShielded`: the coin is already owned, and claiming a receive would require a
+fresh output that does not exist. The change is auto-received by the contract and returned, and
+the standard says the consumer SHOULD persist it. It replaces `coin` as the contract's holding and
+is not otherwise recoverable. Drop it and the remainder is stranded in the contract forever. That
+is what the `_treasury` bookkeeping in [1.5](#15-gating-and-the-treasury) is for.
+
+## 1.5 Gating, and the treasury
+
+MIP-0011 ships `_mint`, `_burn`, and `_burnFromContract` as an **unrestricted** module: they have
+no authorization of their own, and the standard states plainly that a consuming contract MUST
+gate them. This file is a standalone contract rather than a module to compose, so the standard
+circuits stay internal and the exported entry points are gated wrappers:
+
+```compact title="contract/chips.compact"
+// Only the house can issue chips. `nonce` must be a fresh, uniformly random
+// 32-byte value from the caller's wallet; it is a circuit argument, so it is
+// never published, which is what keeps the recipient private.
+export circuit mint(
+    recipient: ZswapCoinPublicKey,
+    amount: Uint<64>,
+    nonce: Bytes<32>
+): ShieldedCoinInfo {
+    requireHouse();
+    assert(disclose(amount) > 0, "Mint amount must be positive");
+
+    const coin = _mint(
+        left<ZswapCoinPublicKey, ContractAddress>(recipient),
+        amount,
+        nonce
+    );
+    // MIP-0011: a consumer composing the supply extension MUST pair every
+    // successful mint with the minted counter.
+    _addMinted(disclose(amount) as Uint<128>);
+    return coin;
+}
+```
+
+Every successful mint MUST be paired with the minted counter. That is what makes `totalMinted`
+exact.
+
+**The privileged surface is every circuit that changes supply**: `mint`, `mintToTreasury`, `burn`
+and `burnFromTreasury`. All four call `requireHouse()`. Nothing else in the contract writes state,
+so that is the whole of it. The seven metadata and supply getters are deliberately open, since
+they only read and all ledger state is public regardless.
+
+```compact title="contract/chips.compact"
+circuit requireHouse(): [] {
+    const _sk = localSecretKey();
+    assert(getDappPublicKey(_sk) == theHouse, "Only the house can do that");
+}
+```
+
+One authentication rule in the standard is worth quoting, because it is easy to get backwards:
+implementations **MUST NOT** authenticate callers with `ownPublicKey()`, since it is a
+caller-supplied witness not bound to the proof. Anyone could pass someone else's key. That is why
+`requireHouse()` checks `getDappPublicKey(localSecretKey()) == theHouse` instead. The caller
+proves knowledge of the secret behind `theHouse` inside the circuit, so the check is bound to the
+proof. This is the hash-based commitment pattern MIP-0004 describes, which MIP-0011 points at for
+exactly this purpose.
+
+Using `ownPublicKey()` as a *payout or refund destination* is a completely different thing, and
+it is fine. Nothing is authorized by it, and in `burn` the caller has already been authenticated
+by `requireHouse()` before it is used:
+
+```compact title="contract/chips.compact"
+// House-only. The house redeems chips by taking them back and destroying them;
+// a player cashes out through the house rather than burning unilaterally.
+//
+// The coin still has to be one the caller can actually spend — `_burn` calls
+// receiveShielded, so zswap enforces ownership — so this gate is not about
+// stopping theft. It is about who is allowed to move the token's accounted
+// supply. See the note above requireHouse on what this does and does not buy.
+//
+// Change returns to the caller's own wallet key. Note the distinction the MIP
+// draws: implementations MUST NOT *authenticate* with ownPublicKey(), because
+// it is a caller-supplied witness not bound to the proof. Using it as a refund
+// destination is a different thing and is fine — nothing is authorized by it,
+// and the caller is already authenticated by requireHouse().
+export circuit burn(coin: ShieldedCoinInfo, amount: Uint<128>): Maybe<ShieldedCoinInfo> {
+    requireHouse();
+    const refund = _burn(
+        coin,
+        amount,
+        left<ZswapCoinPublicKey, ContractAddress>(ownPublicKey())
+    );
+    _addBurned(disclose(amount));
+    return refund;
+}
+```
+
+Be precise about what the gate buys, because it is easy to over-read:
+
+- **It does not stop chips being destroyed.** A holder can always send a coin to
+  `shieldedBurnAddress()` straight from their wallet, or submit an imbalanced Zswap offer. Neither
+  path touches this contract. So gating `burn` makes `totalBurned` a *weaker* lower bound, not a
+  complete one. You are choosing who may perform an *accounted* burn, not who may destroy value.
+- **It does not stop chips moving.** Once minted, a coin transfers wallet to wallet at the
+  protocol level with no contract call. That is what a native shielded token is.
+- **It is only as strong as the house's witness secret.** In this example that same `sk` is also
+  the roulette contract's identity *and* the blinding factor for its winning-number commitment, so
+  publishing that opening to prove fairness would hand over mint authority with it. Use a separate
+  blinding witness in real code.
+
+Gating `burn` is a product decision as much as a security one: players cash out through the house
+rather than destroying chips themselves. If you want the opposite, so holders may redeem their own
+chips, drop `requireHouse()` from `burn` only. That is safe: `_burn` calls `receiveShielded`, so
+Zswap already enforces that the caller can actually spend the coin. The gate is about who moves
+accounted supply, not about preventing theft.
+
+The treasury pair exists so the Merkle-spend burn is real code rather than unreachable:
+
+```compact title="contract/chips.compact"
+// Mint chips into this contract's own treasury rather than out to a wallet.
+// MIP-0011 allows the ContractAddress arm of `recipient` for the *issuing*
+// contract (mint-to-self needs no receiveShielded); a coin addressed to a
+// different contract would be rejected by the node until C2C calls land.
+export circuit mintToTreasury(amount: Uint<64>, nonce: Bytes<32>): [] {
+    requireHouse();
+    assert(disclose(amount) > 0, "Mint amount must be positive");
+
+    const coin = _mint(
+        right<ZswapCoinPublicKey, ContractAddress>(kernel.self()),
+        amount,
+        nonce
+    );
+    // insertCoin turns the fresh ShieldedCoinInfo into a spendable
+    // QualifiedShieldedCoinInfo, filling in the mt_index the ledger assigns.
+    _treasury.insertCoin(
+        disclose(coin.nonce),
+        disclose(coin),
+        right<ZswapCoinPublicKey, ContractAddress>(kernel.self())
+    );
+    _addMinted(disclose(amount) as Uint<128>);
+}
+```
+
+Minting to `kernel.self()` is allowed, because mint-to-self needs no `receiveShielded`. Minting to
+a *different* contract is not, with the compiler this repo pins (0.31.1). The recipient contract
+would have to claim the coin with `receiveShielded` in the same transaction, and this Compact
+version has no cross-contract calls, so the node rejects the transaction (error `186`). So mint to
+a wallet or to the issuing contract.
+
+`burnFromTreasury` then closes the loop, and persisting the change is the point:
+
+```compact title="contract/chips.compact"
+// The house destroys chips held in the treasury. This is the Merkle-spend burn
+// variant: the coin's commitment is already in the global tree.
+export circuit burnFromTreasury(key: Bytes<32>, amount: Uint<128>): [] {
+    requireHouse();
+    assert(_treasury.member(disclose(key)), "No treasury coin under that key");
+
+    const coin = _treasury.lookup(disclose(key));
+    const change = _burnFromContract(coin, amount);
+    _addBurned(disclose(amount));
+
+    // MIP-0011: the consumer SHOULD persist the returned change. It replaces
+    // `coin` as the contract's holding and is not otherwise recoverable — drop
+    // it and the remainder is stranded in the contract forever.
+    _treasury.remove(disclose(key));
+    if (change.is_some) {
+        _treasury.insertCoin(
+            disclose(change.value.nonce),
+            disclose(change.value),
+            right<ZswapCoinPublicKey, ContractAddress>(kernel.self())
+        );
+    }
+}
+```
+
+Publishing these treasury coins is safe for the reason
+[the nonce rule](/tutorials/shielded-chips#01-the-rule-that-shapes-both-contracts) gives: they
+are contract-owned coins with contract-chosen nonces, so there is no user wallet on either side to
+link. The audit in `LESSONS.md` confirms it: the treasury nonces match no candidate wallet at any
+generation of derivation.
+
+## 1.6 Supply accounting is a privacy trade
+
+```compact title="contract/chips.compact"
+// --- MIP-0011 supply getters ---------------------------------------------
+// These do not gate on initialization: a counter reading 0 pre-init is correct.
+
+export circuit totalMinted(): Uint<128> {
+    return _totalMinted;
+}
+
+export circuit totalBurned(): Uint<128> {
+    return _totalBurned;
+}
+
+export circuit totalSupply(): Uint<128> {
+    return _totalMinted - _totalBurned;
+}
+```
+
+The standard is unusually careful about what these mean, and the honesty is the useful part:
+
+- `totalMinted` is **exact**. Color derivation guarantees every coin of this contract's color came
+  from one of its mints.
+- `totalBurned` is a **lower bound**. It counts only contract-mediated burns.
+- `totalSupply` is therefore an **upper bound** on circulating supply.
+
+Exact circulating supply is *not knowable* for a native shielded token, on chain or off. Two
+destruction paths bypass the contract entirely: a holder can send to the burn address themselves,
+or submit an imbalanced Zswap offer. A standard presenting a contract-tracked total as exact would
+mislead its indexers.
+
+And composing this extension costs privacy, precisely:
+
+> `disclose()` is a compiler permission marker, **not** a disclosure. […] the **only** thing that
+> puts a burned amount into the public transcript is the supply counter's ledger write.
+
+Coin operations emit commitments and nullifiers, never values. So a bare burn hides the amount,
+and adding the counter publishes it. That is the trade this contract accepts in exchange for an
+on-chain `totalSupply`. It is the same distinction, `disclose` is not publication, that roulette's
+[`houseDeposit`](/tutorials/shielded-chips/roulette#24-housedeposit-and-betcolor-two-ways-to-take-custody)
+draws, arrived at independently by the standard.
+
+Mint amounts are public either way, through the transaction's shielded-mint effects. The extension
+changes burn visibility, not mint visibility.
+
+## 1.7 Where this deviates from the standard
+
+Worth being explicit, since "conforms to MIP-0011" should be checkable:
+
+- The standard's circuits are **internal**, reached through gated exported wrappers (`mint`,
+  `burn`, `burnFromTreasury`, `mintToTreasury`). The MIP's reference implementation exports them
+  as an unrestricted module for a consumer to gate. A standalone contract has no module to
+  compose, and exporting them ungated would let anyone mint.
+- `_treasury` and `theHouse` are additions, not part of the standard.
+
+Everything an external caller reads (`name`, `symbol`, `decimals`, `tokenColor`, `totalMinted`,
+`totalBurned`, `totalSupply`) matches the standard exactly, as do the mint and burn semantics.
+
+That's the entire chips contract.
+
+## Next
+
+[The roulette contract](/tutorials/shielded-chips/roulette) takes these chips as bets: it
+receives, holds, and pays out coins the chips contract created, without ever writing a player's
+coin to public state.
