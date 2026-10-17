@@ -3,7 +3,7 @@ SPDX-License-Identifier: Apache-2.0
 copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 sidebar_label: "Private tip jar contracts"
 title: "Private tip jar contracts"
-description: "Read the tip jar's two Compact contracts: an anonymous shielded tip re-nonced to the contract, an owner-only withdrawal, and a demo token to tip with."
+description: "Read the tip jar's two Compact contracts: an anonymous shielded tip stored as a fresh contract-owned coin, an owner-only withdrawal, and a demo token to tip with."
 sidebar_position: 10
 toc_max_heading_level: 3
 tags:
@@ -46,8 +46,8 @@ The jar works in three steps:
 
 1. The owner deploys the jar with the token it accepts. The contract stores a hash of the owner's
    secret key, never the key itself and never the owner's wallet.
-2. A tipper calls `tip` with a shielded coin from their own wallet. The contract takes custody of
-   the coin and stores it in a public pot.
+2. A tipper calls `tip` with a new shielded coin that their wallet pays for. The contract takes
+   custody of the coin and stores it in a public pot.
 3. The owner calls `withdraw` once for each coin in the pot, and each call pays that coin to the
    owner's shielded wallet.
 
@@ -76,10 +76,10 @@ export sealed ledger owner: Bytes<32>;
 export sealed ledger tipColor: Bytes<32>;
 
 // The coins the jar currently holds, keyed by each coin's own nonce.
-// Every coin here is contract-owned and was re-nonced on the way in (see
-// `reNonceToSelf`), so publishing it links nothing back to a tipper's wallet.
-// The coin value IS public: that is the price of letting the contract spend
-// these coins without anyone having to hand it a secret later.
+// Every coin here is contract-owned and was created by its `tip` transaction
+// under a fresh nonce, so publishing it links nothing back to a tipper's
+// wallet. The coin value IS public: that is the price of letting the contract
+// spend these coins without anyone having to hand it a secret later.
 export ledger pot: Map<Bytes<32>, QualifiedShieldedCoinInfo>;
 ```
 
@@ -175,23 +175,27 @@ value they expect from a secret.
 
 ```compact title="contract/private-tip-jar.compact"
 export circuit tip(coin: ShieldedCoinInfo): [] {
-    // Both guards run before any coin moves. A failing assert is rejected
+    // The guards run before any coin moves. A failing assert is rejected
     // while the transaction is being built, so a bad tip costs nothing.
     assert(coin.color == tipColor, "Tips must be paid in the jar's token");
     assert(coin.value > 0, "A tip must be worth something");
+    // Pot keys are public and the tipper picks the nonce, so without this a
+    // tip that reused a pot key with a different value (a different coin, so
+    // Zswap would accept it) would overwrite that entry and strand its coin
+    // in the contract for good.
+    assert(!pot.member(disclose(coin.nonce)), "A tip with that nonce is already in the jar");
 
-    // `disclose` here does not write the tipper's coin to the ledger. It
-    // acknowledges that the coin flows into a public effect (the Zswap offer
-    // that moves it into the contract), which only carries commitments and
-    // nullifiers. What reaches the ledger is the re-nonced coin below.
+    // `disclose` here acknowledges that the coin flows into a public effect
+    // (the Zswap output to this contract, which carries only its commitment)
+    // and, below, into the ledger. Both are fine: the nonce is fresh.
     receiveShielded(disclose(coin));
 
-    // Never `insertCoin` the incoming coin itself: its nonce is the tipper's
-    // nonce, and a coin nonce is enough to test which wallet funded it.
-    const held = reNonceToSelf(coin);
+    // insertCoin records the coin as a QualifiedShieldedCoinInfo, filling in
+    // the commitment-tree index the ledger assigns when this transaction
+    // lands, so `withdraw` can spend it later with sendShielded.
     pot.insertCoin(
-        disclose(held.nonce),
-        disclose(held),
+        disclose(coin.nonce),
+        disclose(coin),
         right<ZswapCoinPublicKey, ContractAddress>(kernel.self())
     );
 }
@@ -202,75 +206,60 @@ Read it in four steps.
 **1. No identity.** `tip` has no caller check and calls no witness. It doesn't ask who is tipping,
 so it has nothing about the tipper to leak. Anyone can tip.
 
-**2. Guards first.** Two `assert`s check the coin's color against `tipColor` and refuse a zero
-value. They run before any coin moves. A failing `assert` stops the circuit on the tipper's own
-machine, while the transaction is being built, so no proof is generated, nothing is submitted, and
-a bad tip costs nothing.
+**2. Guards first.** The first two `assert`s check the coin's color against `tipColor` and refuse
+a zero value. They run before any coin moves. A failing `assert` stops the circuit on the tipper's
+own machine, while the transaction is being built, so no proof is generated, nothing is
+submitted, and a bad tip costs nothing. The third guard is covered in step 4.
 
-**3. `receiveShielded`.** This claims `coin` for the contract. The ledger only accepts the
-transaction if it also contains a Zswap output of that coin to the contract. The tipper passes
-the coin as a circuit argument, and that output is funded from the tipper's own wallet. In the
-tests, Bob's balance drops to zero after his two tips. The `disclose()` here does not write the coin to the
-ledger. It acknowledges that the coin flows into a public effect: the Zswap offer that moves it to
-the contract, which carries commitments and nullifiers only.
+**3. `receiveShielded`, and what `coin` really is.** `coin` is not one of the tipper's wallet
+coins. It describes a *new* coin, and `receiveShielded` claims it for the contract: the ledger
+only accepts the transaction if it also contains a Zswap output creating that coin for the
+contract. The tipper's wallet adds that output and pays for it while it balances the transaction.
+It spends whichever of its coins of that color its coin selection picks, and takes any change back
+under fresh nonces. So the tipper can tip any amount without first making a coin of exactly that
+value. In the tests, Bob tips 40 and then 60 from the single 100-coin he was minted.
 
-**4. Re-nonce, then store.** The obvious next line would be `pot.insertCoin(coin.nonce, coin, …)`.
-The contract deliberately doesn't do that. The incoming coin's nonce came from the tipper's
-wallet, and a coin nonce is enough for someone who knows it to recognize the coin. So `tip` first
-re-sends the coin to the contract itself, and stores the result:
+The tipper's client makes the coin up, with a fresh random nonce (the tests use `freshCoin` from
+the repo's `@midnight-ntwrk/example-coins` package, which calls the ledger's
+`createShieldedCoinInfo`). The `disclose()` here does not write anything secret to the ledger. It
+acknowledges that the coin flows into a public effect, the Zswap output that moves it to the
+contract, which carries only the coin's commitment.
 
-```compact title="contract/private-tip-jar.compact"
-circuit reNonceToSelf(coin: ShieldedCoinInfo): ShieldedCoinInfo {
-    const qualified = QualifiedShieldedCoinInfo {
-        nonce: coin.nonce,
-        color: coin.color,
-        value: coin.value,
-        mt_index: 0 as Uint<64>
-    };
-    const result = sendShielded(
-        disclose(qualified),
-        right<ZswapCoinPublicKey, ContractAddress>(kernel.self()),
-        disclose(coin.value) as Uint<128>
-    );
-    return result.sent;
-}
-```
+**4. Store the coin as it is.** `pot.insertCoin` stores the coin under its own nonce. `insertCoin`
+is a `Map` operation for coins, available when the value type is `QualifiedShieldedCoinInfo`. As
+well as the key and a `ShieldedCoinInfo`, it takes the coin's recipient, here the contract itself:
+`kernel.self()` is the contract's own address, and the recipient is an `Either` where `left` is a
+user's coin public key and `right` is a contract address. (`sendUnshielded` in Private Party takes
+them the other way round, with a contract address on the left.) While the transaction runs,
+`insertCoin` looks up the coin's real `mt_index` in the commitment tree and stores the qualified
+coin. That only works for a coin created in the same transaction, as a tip is. It's how
+`withdraw` can spend the coin later.
 
-- **`kernel.self()`** is the contract's own address. `sendShielded`'s recipient is an `Either`:
-  `left` is a user's coin public key, `right` is a contract address. Here it is `right`, the jar
-  itself. `sendUnshielded` in Private Party takes them the other way round, with a contract
-  address on the left.
-- **`mt_index: 0`.** `sendShielded` spends a `QualifiedShieldedCoinInfo`, which needs a position
-  in the commitment tree. The incoming coin has no position yet, because this very transaction is
-  creating it. The ledger handles a coin that is created and spent in the same transaction as a
-  *transient*, proven against a tree of its own in which the coin sits at index 0. A coin from an
-  earlier transaction would need its real index. The standard library's `sendImmediateShielded`
-  is shorthand for this: it takes a `ShieldedCoinInfo` and calls `sendShielded` with `mt_index` 0.
-  `shielded-chips` calls it by name to burn a coin provided in the same transaction.
-- **`result.sent`** is the new coin: same color and value, now owned by the contract, with a nonce
-  the contract derived. That is the coin `tip` stores.
+Publishing the coin is safe because its nonce is fresh. A coin's commitment is a hash of its
+nonce, color, value, and owner, so a published nonce lets anyone test a guessed wallet key against
+the chain. Here that test can only ever match the contract's own coin, because no wallet coin
+shares the nonce.
 
-`reNonceToSelf` isn't exported, so it isn't an entry point of its own. It is compiled into `tip`.
-The same technique appears in `shielded-chips`, later on the learning path.
+The pot keys are public, though, and the tipper chooses them. A coin with an existing key's nonce
+and a different value is a different coin, so Zswap would accept it, and `insertCoin` would
+overwrite that pot entry and strand its coin in the contract for good. That is what the third
+`assert` refuses.
 
-Finally, `pot.insertCoin` stores the re-nonced coin under its own nonce. `insertCoin` is a `Map`
-operation for coins, available when the value type is `QualifiedShieldedCoinInfo`. As well as the
-key and a `ShieldedCoinInfo`, it takes the coin's recipient, here the contract again. While the
-transaction runs, it looks up the coin's real `mt_index` in the commitment tree and stores the
-qualified coin. That only works for a coin created in the same transaction, as the re-nonced coin
-is. It's how `withdraw` can spend the coin later.
+An earlier version of this contract re-sent each tip to `kernel.self()` before storing it (the
+standard library's `sendImmediateShielded` is exactly that send, a `sendShielded` at `mt_index`
+0). It existed because the tests passed one of the tipper's wallet coins as `coin`. A fresh coin
+makes it unnecessary, and saves the circuit a coin spend.
 
-### What the tipper's wallet still has to do
+### What the tipper's client has to do
 
-The re-nonce hides the tipper's coin from the public, but not from everyone. `sendShielded`
-derives the new coin's nonce from the input coin's nonce alone. So anyone who knows the nonce of
-the coin a tipper tips can recompute the pot entry and recognize the tip. That includes whoever
-minted or sent the coin to the tipper.
-
-The tipper closes that gap in their own wallet, before tipping: a shielded self-transfer
-replaces the coin with one whose nonce only their wallet has seen. The tests do this with
-`splitShieldedCoin`, which you'll see in the [test suite](/tutorials/private-tip-jar/test-suite).
-In the tests the token's minter is also the jar's owner, which is exactly the case that matters.
+The contract can't tell a fresh nonce from a reused one, so keeping the tip unlinkable is the
+client's job. If a client builds `coin` from one of its wallet's coins instead, that nonce is in
+two commitments: the wallet coin's and the contract's. Publishing it in the pot then lets anyone
+who can guess the wallet's key confirm the tip was theirs. That includes whoever minted or sent
+the coin to the tipper, who knows its nonce outright. In the tests the token's minter is also the
+jar's owner, which is exactly the case that matters. The
+[test suite](/tutorials/private-tip-jar/test-suite) checks that none of Bob's wallet coins'
+nonces reach the pot.
 
 ## Withdrawing
 
@@ -350,7 +339,8 @@ export circuit mint(recipient: ZswapCoinPublicKey, amount: Uint<64>, nonce: Byte
 - **`mintCount`** counts mints, and the first devnet test reads it back to confirm the mint landed.
   `mint` would get a proving key without it, because `mintShieldedToken` already touches the ledger.
 - **The minter knows the coin.** Whoever calls `mint` chooses `nonce`, so they know the minted
-  coin. This is why the tipper in the tests re-nonces a coin before tipping it.
+  coin. This is why a tipper never passes the minted coin to `tip`: the tests tip fresh coins,
+  and Bob's wallet spends the minted coin to pay for them.
 
 For a real shielded token, with an issuer and burn paths, see the `shielded-chips` example later on
 the learning path.
@@ -396,10 +386,11 @@ Read the ledger, not the `disclose()` calls, to see what is public. The jar's le
 
 **Hidden**, and checked by the tests' privacy test:
 
-- **Who tipped.** No field is derived from a tipper's wallet key, a tipper secret, or the coin the
-  tipper spent. That coin is spent through Zswap, which publishes a nullifier and commitments, not
-  the coin or its owner.
-- **The coins tippers spent.** The pot holds re-nonced, contract-owned coins only.
+- **Who tipped.** No field is derived from a tipper's wallet key, a tipper secret, or any of the
+  tipper's wallet coins. The wallet coins that pay for a tip are spent through Zswap, which
+  publishes nullifiers and commitments, not the coins or their owner.
+- **The coins tippers spent.** The pot holds only the coins each tip created for the contract,
+  under nonces no wallet coin shares.
 - **The owner's secret key.** Only its domain-separated hash, `owner`, is stored.
 
 **Public by design**, the accepted leaks listed in `SPEC.md`:
@@ -410,8 +401,8 @@ Read the ledger, not the `disclose()` calls, to see what is public. The jar's le
 - **The count and timing of tips and withdrawals.** Which circuit each transaction calls is
   public, along with when it ran.
 - **The accepted color and the owner hash.** One owner secret used in two jars links them.
-- **Issuer linkage, if the tipper skips the self-transfer.** Whoever knows the tipped coin's nonce
-  can recognize the tip, as described above.
+- **The tipped coin, nonce included.** That is safe only because the nonce is fresh, and the
+  contract can't check that, so it is the client's job, as described above.
 - **Where the owner's money goes**, to anyone who guesses the owner's wallet. A withdrawal's payout
   nonce is derived from a public pot nonce. The owner is a public role in this design.
 - **Fee payment.** Each tipper pays their own transaction fees in DUST. The example doesn't analyze
@@ -432,7 +423,7 @@ token has one:
 
 ```
 Compiling 2 circuits:
-  circuit "tip" (k=15, rows=30328)
+  circuit "tip" (k=14, rows=12437)
   circuit "withdraw" (k=15, rows=16756)
 Overall progress [====================] 2/2
 Compiling 1 circuits:
@@ -440,8 +431,9 @@ Compiling 1 circuits:
 Overall progress [====================] 1/1
 ```
 
-`ownerKey` is pure and `reNonceToSelf` isn't exported, so neither gets a proving key of its own.
-`tip` is the largest circuit, because it both receives a coin and sends one.
+`ownerKey` is pure, so it gets no proving key of its own. `tip` is the smallest of the three
+proven circuits, because it only receives a coin. `withdraw` sends one, and `mint` creates one.
+(When `tip` also re-sent each coin to the contract, it was the largest: k=15, 30,328 rows.)
 
 For the tests and type-checking alone, `yarn compile:fast` skips proving-key generation and
 finishes in seconds. A devnet run needs the full `yarn compile`.
