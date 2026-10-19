@@ -254,8 +254,9 @@ export circuit mint(
 // House-only. The house redeems chips by taking them back and destroying them;
 // a player cashes out through the house rather than burning unilaterally.
 //
-// The coin still has to be one the caller can actually spend — `_burn` calls
-// receiveShielded, so zswap enforces ownership — so this gate is not about
+// The caller still has to pay for what is burned: `coin` is a new coin this
+// transaction creates for the contract (`_burn` receives it), and the caller's
+// wallet funds it from chips it actually holds. So this gate is not about
 // stopping theft. It is about who is allowed to move the token's accounted
 // supply. See the note above requireHouse on what this does and does not buy.
 //

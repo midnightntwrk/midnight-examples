@@ -16,7 +16,7 @@ tipped. Only the jar's owner can withdraw.
 | Role | Recognised by | Can |
 |---|---|---|
 | Owner | `ownerKey(ownerSecretKey)` equals the `owner` field | withdraw any tip |
-| Tipper | nobody; `tip` has no caller check and calls no witness | tip a coin of the accepted color |
+| Tipper | nobody; `tip` has no caller check and calls no witness | tip any amount of the accepted color, as a new coin with a fresh nonce |
 
 ## Public ledger fields
 
@@ -36,7 +36,7 @@ The owner's `ownerSecretKey: Bytes<32>`, made fresh per jar by the deployer
 | Circuit | Caller | Args | Effect | Asserts |
 |---|---|---|---|---|
 | constructor | deployer (becomes owner) | `acceptedColor: Bytes<32>` | sets `owner` and `tipColor` | — |
-| `tip` | anyone | `coin: ShieldedCoinInfo` | receives the coin, re-sends it to the contract with a new nonce, stores that coin in `pot` | `Tips must be paid in the jar's token`; `A tip must be worth something` |
+| `tip` | anyone | `coin: ShieldedCoinInfo`, a new coin with a fresh random nonce (the wallet pays for it) | receives the coin and stores it in `pot` under its nonce | `Tips must be paid in the jar's token`; `A tip must be worth something`; `A tip with that nonce is already in the jar` |
 | `withdraw` | owner | `tipKey: Bytes<32>` | pays the `pot` coin at `tipKey` to the caller's coin key and removes it | `Only the owner can withdraw`; `No such tip in the jar` |
 | `ownerKey` (pure) | off chain | `sk: Bytes<32>` | `persistentHash([pad(32, "private-tip-jar:owner:"), sk])` | — |
 
@@ -54,7 +54,7 @@ Each line ends with the key (or key prefix) of its entry in the
 `src/test/private-tip-jar.test.ts`).
 
 - Never on chain: a tipper's coin public key. → `tipperCoinPublicKey`
-- Never on chain: the nonce of the coin a tipper spent. → `tipperCoinNonce`
+- Never on chain: the nonce of any coin in a tipper's wallet, including one an issuer minted it. → `tipperWalletCoinNonce`
 - Never on chain: the owner's secret key (only its hash, `owner`). → `ownerSecretKey`
 - Never on chain: the owner's coin public key. → `ownerCoinPublicKey`
 
@@ -65,8 +65,10 @@ Each line ends with the key (or key prefix) of its entry in the
   public through the indexer).
 - The accepted color, and the owner hash. The same owner secret in two jars
   gives the same `owner`, so use a fresh secret per jar.
-- Issuer linkage if the tipper skips the shielded self-transfer: the pot
-  nonce is derived from the tipped coin's nonce, which its issuer knows.
+- The tipped coin itself, nonce included (each `pot` entry). It links to
+  nobody because its nonce was drawn fresh for this one contract-owned coin.
+  A client that reuses a wallet coin's nonce instead breaks this; the contract
+  can't tell the difference, so the fresh nonce is the client's job.
 - Where the owner's payout goes, to anyone who guesses the owner's wallet.
 - Whether DUST fee payment links a tip to the tipper's wallet is not analysed.
 

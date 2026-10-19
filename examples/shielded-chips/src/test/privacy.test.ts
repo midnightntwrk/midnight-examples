@@ -38,8 +38,10 @@
 //       and it is not the number.
 //   P7  Recipient-private mint: the coin Alice minted to Bob leaves no nonce in
 //       the chips contract's public state.
-//   P8  Issuer-unlinkability residual: a self-transfer re-nonces Bob's chip, so
-//       the coin he bets is not the coin the issuer minted him.
+//   P8  Issuer unlinkability: Bob bets a fresh coin (random nonce) that his
+//       wallet pays for, so the coin he escrows is not the coin the issuer
+//       minted him, the minted coin is spent, and its nonce is nowhere in
+//       roulette public state.
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomBytes } from 'node:crypto';
@@ -55,6 +57,7 @@ import {
   encodeRawTokenType,
 } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+import { contractCoinMtIndex, freshCoin } from '@midnight-ntwrk/example-coins';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
@@ -188,7 +191,7 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
 
   // Captured secrets that MUST NOT leak into public state.
   let bobMintedNonce: Uint8Array; // nonce of the coin the issuer minted to Bob
-  let bobBetNonce: Uint8Array; // nonce of the (re-nonced) coin Bob escrowed
+  let bobBetNonce: Uint8Array; // nonce of the fresh coin Bob escrowed
   let bobPayoutNonce: Uint8Array; // nonce of the coin Bob was paid
   let bobCoinPk: Uint8Array; // Bob's Zswap wallet key
   let bobPseudonym: Uint8Array; // Bob's public dapp pseudonym (behavior-public)
@@ -230,6 +233,11 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
     return chipsLedger(s!.data);
   }
 
+  // A coin passed to houseDeposit or betColor is `freshCoin(chipColorHex, v)`:
+  // the NEW coin the transaction creates for the contract, with a random
+  // nonce, which the wallet pays for from whichever chips it selects.
+
+  /** The first chip coin in `w`'s wallet (to capture nonces the test must not see leak). */
   async function takeChipCoin(w: MidnightWalletProvider): Promise<ShieldedCoinArg> {
     const st = await w.wallet.waitForSyncedState();
     const chip = st.shielded.availableCoins.find((c) => c.coin.type === chipColorHex);
@@ -243,24 +251,6 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
   async function chipBalance(w: MidnightWalletProvider): Promise<bigint> {
     const st = await w.wallet.waitForSyncedState();
     return st.shielded.balances[chipColorHex] ?? 0n;
-  }
-
-  async function escrowMtIndex(blockHeight: number): Promise<bigint> {
-    const query = `{ block(offset:{height:${blockHeight}}) { transactions {
-        ... on RegularTransaction { zswapStartIndex }
-        contractActions { address ... on ContractCall { entryPoint } } } } }`;
-    const res = await fetch(config.indexer, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
-    });
-    const body = (await res.json()) as {
-      data: { block: { transactions: { zswapStartIndex?: number; contractActions: { address: string; entryPoint?: string }[] }[] } | null };
-    };
-    const txs = body.data.block?.transactions ?? [];
-    const match = txs.find((t) => t.contractActions?.some((a) => a.address === rouletteAddress && a.entryPoint === 'betColor'));
-    if (match?.zswapStartIndex === undefined) throw new Error(`No betColor tx in block ${blockHeight}`);
-    return BigInt(match.zswapStartIndex);
   }
 
   beforeAll(async () => {
@@ -343,8 +333,8 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
     });
     rouletteAddress = deployedRoul.deployTxData.public.contractAddress;
 
-    // house deposit one match coin
-    const match = await takeChipCoin(aliceWallet);
+    // house deposit one match coin (fresh, paid from the coin Alice minted herself)
+    const match = freshCoin(chipColorHex, BET);
     await submitCallTx<RouletteContract, 'houseDeposit'>(aliceRouletteProv, {
       compiledContract: CompiledRouletteContract,
       contractAddress: rouletteAddress,
@@ -372,20 +362,12 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
     expect(rl.winningColor).toEqual(Color.GREEN); // default, unrevealed
   });
 
-  it('P8: Bob re-nonces his chip so the coin he bets is not the coin he was minted', async () => {
-    await bobWallet.splitShieldedCoin(chipColorHex, BET);
-    await syncWallet(logger, bobWallet.wallet, 600_000);
-    const after = await takeChipCoin(bobWallet);
-    expect(hex(after.nonce)).not.toEqual(hex(bobMintedNonce));
-    expect(after.value).toEqual(BET);
-  }, 1_800_000);
-
   it('Bob bets RED; the escrowed coin nonce is captured as a secret', async () => {
     const bobPS = createRoulettePrivateState(bobSk, bobSalt);
     bobRouletteProv.privateStateProvider.setContractAddress(rouletteAddress);
     await bobRouletteProv.privateStateProvider.set(BOB_ROULETTE, bobPS);
 
-    const chip = await takeChipCoin(bobWallet);
+    const chip = freshCoin(chipColorHex, BET);
     bobBetNonce = chip.nonce; // SECRET: escrowed coin nonce
     logger.info(`Bob bet-coin nonce (secret): ${hex(bobBetNonce)}`);
 
@@ -398,8 +380,8 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
     });
 
     // persist escrow so claim can reopen it
-    const mtIndex = await escrowMtIndex(tx.public.blockHeight);
-    const escrowed: QualifiedCoin = { nonce: chip.nonce, color: chip.color, value: chip.value, mt_index: mtIndex };
+    const mtIndex = await contractCoinMtIndex(config.indexer, tx.public, chip, rouletteAddress);
+    const escrowed: QualifiedCoin = { ...chip, mt_index: mtIndex };
     await bobRouletteProv.privateStateProvider.set(BOB_ROULETTE, rememberEscrow(bobPS, escrowed));
 
     const rl = await queryRoulette();
@@ -407,6 +389,17 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
     bobPseudonym = [...rl.betCommits][0]![0]; // pseudonym = map key (public)
     logger.info(`Bob pseudonym (public): ${hex(bobPseudonym)}`);
   }, 1_800_000);
+
+  it('P8: the coin Bob escrowed is fresh, not the coin the issuer minted him', async () => {
+    // The issuer (Alice) knows the nonce she minted to Bob. Bob never passed
+    // it to the contract: his wallet spent that coin to pay for a new one.
+    expect(hex(bobBetNonce)).not.toEqual(hex(bobMintedNonce));
+    await syncWallet(logger, bobWallet.wallet, 600_000);
+    expect(await chipBalance(bobWallet)).toEqual(0n); // the minted coin is spent
+    const roul = collectRouletteBytes(await queryRoulette());
+    const leak = findLeak(roul, bobMintedNonce);
+    expect(leak, `minted-coin nonce found in roulette.${leak}`).toBeNull();
+  });
 
   it('P4: betCommits stores a commitment, not the escrowed coin', async () => {
     const rl = await queryRoulette();

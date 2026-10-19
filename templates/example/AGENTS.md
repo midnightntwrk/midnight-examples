@@ -55,12 +55,18 @@ yarn env:down
   `yarn new:example __name__ --derive`. It refreshes the `@generated-stub`
   regions nobody has edited (new circuits, constructor parameters, witnesses,
   the initial private state in both tests) and leaves the rest alone.
-- `src/wallet.ts` has `splitShieldedCoin(color, amount)`: a shielded
-  self-transfer that re-nonces a coin (and makes one of an exact value) before
-  you spend it into the contract.
 - Shielded coins in tests come from `@midnight-ntwrk/example-coins`
-  (`packages/coins/src/index.ts`). Use `tokenColor(domain, mintingContract)`,
-  `takeCoin(wallet, color, value)` for a `ShieldedCoinInfo` argument, and
+  (`packages/coins/src/index.ts`). A `ShieldedCoinInfo` argument (a tip, a
+  bet, a deposit: anything the circuit `receiveShielded`s) is a new coin the
+  transaction creates, not one of the wallet's coins. Pass
+  `freshCoin(color, value)`, which has a random nonce. The wallet pays for it
+  from whichever coins it selects and makes change, so any amount works and
+  no split comes first. Never build it from the wallet's `availableCoins`: that
+  nonce is shared with your wallet coin and known to whoever minted it. If the
+  contract keys a map by the coin's nonce, have it refuse a nonce already
+  present. If it keeps the coin off chain instead (only a commitment), the
+  depositor needs the coin's tree index to spend it later:
+  `contractCoinMtIndex(indexer, tx.public, coin, contractAddress)`. Use `tokenColor(domain, mintingContract)` for colors, and
   `shieldedBalance` / `waitForShieldedBalance` (a received coin shows up
   seconds after the transaction is accepted). For a mint, use `recipientOf`,
   `encryptionKeys` and `mintNonce`. In a sim test, `simCoin(value, color)`

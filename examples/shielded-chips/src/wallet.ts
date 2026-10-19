@@ -111,13 +111,16 @@ export class MidnightWalletProvider implements MidnightProvider, WalletProvider 
   /**
    * Send `amount` of `tokenType` from this wallet back to itself.
    *
-   * PRIVACY: this is the player-side half of the identity story. The token
-   * issuer knows the exact coin it minted for you — same nonce, same value —
-   * so if you spend that coin directly into a contract, the issuer can
-   * recognise it even though the contract only ever records a re-nonced,
-   * contract-owned coin. A self-transfer replaces it with a coin carrying a
-   * wallet-chosen nonce the issuer has never seen, which cuts that last
-   * thread. Cheap, and worth doing before any action you want unlinkable.
+   * You don't need this to pay a contract. A coin a circuit `receiveShielded`s
+   * is a NEW coin the transaction creates: pass `freshCoin(color, value)` from
+   * @midnight-ntwrk/example-coins, and the wallet pays for it from whichever
+   * coins it selects and makes change. That pays an exact amount, and since
+   * the nonce is fresh, nobody who knows your wallet's coins (whoever minted or
+   * sent them) can recognise it. Earlier examples did a self-transfer like
+   * this before every deposit to get the same effect.
+   *
+   * What it is for: reshaping the wallet itself, for example to hold a coin of
+   * an exact value for a test.
    */
   async splitShieldedCoin(
     tokenType: string,
