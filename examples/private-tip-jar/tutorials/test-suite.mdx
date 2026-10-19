@@ -157,7 +157,7 @@ When it finishes, all 10 tests pass, including the ones that expect a rejection:
 Vitest lists only tests that take longer than 300 ms, so six tests pass without a line of their
 own: the privacy test, which only reads the ledger, and the five rejection tests. A rejected call
 takes milliseconds. A failing `assert` stops the circuit on the caller's own machine, so no proof
-is generated and nothing is submitted. The successful transactions take 15–20 seconds each, mostly
+is generated and nothing is submitted. Successful transactions take 20 to 25 seconds each, mostly
 proving time. The first test deploys a contract and mints, and the tip and withdrawal tests each
 submit two transactions, so they take longer.
 
@@ -414,6 +414,6 @@ and paid out to the owner. At no point did the jar's public state hold anything 
 
 You have now seen both kinds of token on Midnight: unshielded NIGHT in Private Party, and a
 shielded token here. The next step in the learning path is
-[shielded chips](https://github.com/midnightntwrk/midnight-examples/tree/main/examples/shielded-chips):
+[Shielded Chips](/tutorials/shielded-chips):
 a native shielded token with an issuer and burn paths, a contract that custodies and pays out
 coins, and the privacy trade-offs between variations.

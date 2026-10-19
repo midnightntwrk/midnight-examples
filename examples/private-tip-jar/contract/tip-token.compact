@@ -21,9 +21,10 @@ export ledger mintCount: Counter;
 // test derives it off chain with rawTokenType(domain, address).
 //
 // PRIVACY: mint amounts are public (they are part of the mint effect), and
-// whoever chooses `nonce` knows the minted coin. That is why the tipper in
-// the tests re-nonces the coin with a self-transfer before tipping it: the
-// minter (who is also the jar owner) would otherwise recognise it.
+// whoever chooses `nonce` knows the minted coin. That is why a tipper in
+// the tests never passes the minted coin to `tip`: the minter (who is also
+// the jar owner) would recognise it. The tests tip fresh coins instead, and
+// the tipper's wallet spends the minted coin to pay for them.
 export circuit mint(recipient: ZswapCoinPublicKey, amount: Uint<64>, nonce: Bytes<32>): [] {
     mintShieldedToken(
         pad(32, "private-tip-jar:demo-token:"),
