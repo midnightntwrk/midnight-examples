@@ -24,6 +24,7 @@ Each now lives in `examples/<name>/tutorials/` and syncs back to midnight-docs
 | Tutorial | Source | Source commit | Changes |
 |---|---|---|---|
 | `examples/battleship/tutorials/` | `midnightntwrk/midnight-docs` `docs/tutorials/bship/` (`index.mdx`, `smart-contract.mdx`, `test-suite.mdx`) | `6af8c96f29a363f005417357f6066e1baf6a56bc` | Rewritten as a tour of this repo's code, organized around defensive programming. The build-from-scratch steps and the standalone project setup were replaced by the monorepo commands and shared harness. Published path moves from `/tutorials/bship` to `/tutorials/battleship`. |
+| `examples/private-party/tutorials/` | `midnightntwrk/midnight-docs` `docs/tutorials/private-party/` (`index.md`, `smart-contract.mdx`) | `008241ca3fc6ff9f4486d93ed2317b46efabef34` | Rewritten as a tour of this repo's code: `smart-contract.mdx` quotes `contract/private-party.compact` instead of having the reader type it in, and a new `test-suite.mdx` walks through `src/test/party.test.ts`. The standalone clone is replaced by the monorepo commands. DUST sponsorship stays out of the tutorial; the docs guide `guides/dust-sponsorship` covers it. The contract's `commitAddress` parameters were reordered to `(_secret, _address)`, so it now commits to the address salted with the secret, as the tutorial always said (it had committed to the secret with the address as randomness). Published paths are unchanged. |
 
 ## Changes applied during migration
 

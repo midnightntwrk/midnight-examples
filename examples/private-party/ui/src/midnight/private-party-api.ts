@@ -239,14 +239,12 @@ export function dappPublicKey(secret: Uint8Array): Uint8Array {
 }
 
 /**
- * The entry rsvp inserts into `hashedPartyGoers`. The circuits call
- * `commitAddress(_secret, address.bytes)`, and commitAddress is
- * `persistentCommit(first, second)`: so the secret is the committed value and
- * the address bytes are the opening. Keep this argument order; it is what the
- * contract does, whatever its parameter names suggest.
+ * The entry rsvp inserts into `hashedPartyGoers`: `commitAddress(_secret,
+ * address.bytes)`, which is `persistentCommit(_address, _secret)`. The address
+ * bytes are the committed value and the secret is the salt.
  */
 export function guestCommitment(secret: Uint8Array, address: UserAddressValue): Uint8Array {
-  return persistentCommit(BYTES32, secret, address.bytes);
+  return persistentCommit(BYTES32, address.bytes, secret);
 }
 
 const sameBytes = (a: Uint8Array, b: Uint8Array) =>
