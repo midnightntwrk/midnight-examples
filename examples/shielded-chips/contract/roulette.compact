@@ -32,10 +32,15 @@
 //   is why no player coin info is stored here; see `betCommits`.
 //   The `"roulette:pk:"` domain separator also prevents linkability to the
 //   same player's identity in other dapps.
-//   RESIDUAL: the chip issuer knows the exact coin it minted to you, so if
-//   you bet that coin whole, the issuer alone can still recognise it. Split
-//   or merge chips in your wallet first (see splitShieldedCoin in
-//   src/wallet.ts) and even the issuer loses the thread.
+//   CLIENT'S JOB: the coin passed to `betColor` (and `houseDeposit`) is not a
+//   wallet coin. It describes a NEW coin this transaction creates for the
+//   contract, and the wallet pays for it from whichever chips it selects,
+//   taking change back under fresh nonces. So the client makes it up with a
+//   fresh random nonce (`createShieldedCoinInfo`). Then no wallet coin shares
+//   its nonce, and nobody else, the chip issuer included, has ever seen it.
+//   A client that copies a wallet coin's nonce instead hands that nonce to
+//   whoever knows the wallet coin (the issuer, who minted it), and they can
+//   then follow the escrow and the payout derived from it.
 // - PRIVATE: the escrowed coin — nonce, and therefore every coin derived
 //   from it, including the payout.
 // - PRIVATE: the winning number, until `revealWinningNumber` runs — only
@@ -83,14 +88,16 @@ export ledger betValues: Map<Bytes<32>, Uint<64>>;
 // Players who have been paid, so a win can only be claimed once.
 export ledger paidWinners: Set<Bytes<32>>;
 // Alice's pre-deposited match coins, plus anything losers have forfeited.
-// These are contract-owned coins with contract-derived nonces, so publishing
-// them links nothing back to a wallet.
+// A deposit is stored under the fresh nonce it was created with, a forfeit
+// under a nonce the contract derived from the secret escrow coin. Neither is
+// shared with any wallet coin, so publishing them links nothing to a wallet.
 export ledger houseCoins: Map<Bytes<32>, QualifiedShieldedCoinInfo>;
 
 witness localSecretKey(): Bytes<32>;
-// The player's blinding factor for their escrow commitment. Keeping this
-// private is what stops the chip issuer — who knows the coin it minted you —
-// from recomputing your commitment and unmasking your pseudonym.
+// The player's blinding factor for their escrow commitment. With a fresh coin
+// nonce the commitment is already unguessable. The salt keeps it that way even
+// if a client reused a known nonce (say, one the chip issuer minted), which
+// the contract has no way to check.
 witness escrowSalt(): Bytes<32>;
 // The escrowed coin, replayed from the player's private state at claim time.
 // The contract cannot look this up: that is the whole point.
@@ -116,40 +123,28 @@ circuit escrowCommit(coin: QualifiedShieldedCoinInfo, salt: Bytes<32>): Bytes<32
     );
 }
 
-// Take custody of an incoming coin and hand back an equivalent coin that the
-// *contract* owns under a freshly derived nonce, safe to record publicly.
-// The caller must have already called receiveShielded on `coin`.
-circuit reNonceToSelf(coin: ShieldedCoinInfo): ShieldedCoinInfo {
-    const qualified = QualifiedShieldedCoinInfo {
-        nonce: coin.nonce,
-        color: coin.color,
-        value: coin.value,
-        mt_index: 0 as Uint<64>
-    };
-    const result = sendShielded(
-        disclose(qualified),
-        right<ZswapCoinPublicKey, ContractAddress>(kernel.self()),
-        disclose(coin.value) as Uint<128>
-    );
-    return result.sent;
-}
-
-// Alice deposits a chip coin to back a future bet. Key = the re-nonced coin's
-// nonce, which is unique but is no longer one of Alice's wallet coins.
+// Alice deposits a chip coin to back a future bet. `coin` is a fresh coin
+// (random nonce) that Alice's wallet pays for, and it is stored under its own
+// nonce. That nonce is in no commitment but this contract-owned coin's, so
+// publishing it does not point at Alice's wallet.
 export circuit houseDeposit(coin: ShieldedCoinInfo): [] {
     const _sk = localSecretKey();
     assert(getDappPublicKey(_sk) == theHouse, "Only the house can deposit match funds");
     assert(coin.color == chipColor, "Deposit must be made with roulette chips");
+    // The key is caller-chosen and public. A coin with an existing key's nonce
+    // and a different value is a different coin, so Zswap would accept it, and
+    // insertCoin would overwrite that entry and strand its coin for good.
+    assert(!houseCoins.member(disclose(coin.nonce)), "A match coin with that nonce is already deposited");
 
-    // `disclose` here does not publish the coin — it acknowledges that the coin
-    // flows into a public *effect* (the zswap offer). What actually reaches the
-    // ledger is whatever gets written below, which is why the re-nonce matters.
+    // `disclose` here acknowledges that the coin flows into a public effect
+    // (the zswap output to this contract) and, below, into the ledger. Both
+    // are fine for a fresh nonce.
     receiveShielded(disclose(coin));
-    const escrowed = reNonceToSelf(coin);
-    // .insertCoin transforms ShieldedCoinInfo into QualifiedShieldedCoinInfo
+    // .insertCoin transforms ShieldedCoinInfo into QualifiedShieldedCoinInfo,
+    // filling in the tree index the ledger assigns when this tx lands.
     houseCoins.insertCoin(
-        disclose(escrowed.nonce),
-        disclose(escrowed),
+        disclose(coin.nonce),
+        disclose(coin),
         right<ZswapCoinPublicKey, ContractAddress>(kernel.self())
     );
 }
@@ -170,7 +165,9 @@ export circuit betColor(coin: ShieldedCoinInfo, colorBet: Color): [] {
 
     // The coin is now in the contract's custody, but nothing that identifies
     // it reaches the chain — only a commitment the player can reopen later.
-    // Note there is no insertCoin call here: that is the fix.
+    // Note there is no insertCoin call here. The payout in claimWinnings is
+    // derived from this coin's nonce, so publishing it, fresh or not, would
+    // let anyone confirm which wallet was paid.
     const q = QualifiedShieldedCoinInfo {
         nonce: coin.nonce,
         color: coin.color,
@@ -256,8 +253,12 @@ export circuit forfeit(): [] {
     assert(betCommits.lookup(player) == disclose(escrowCommit(coin, escrowSalt())),
            "Escrowed coin does not match your commitment");
 
-    // Re-nonce on the way into the public pool so the coin Alice later sweeps
-    // is not the coin that was in the player's wallet.
+    // Move the coin into the public pool by spending it to the contract and
+    // storing the new coin, rather than storing the escrow coin itself. That
+    // way the escrow nonce stays private (the pool coin's nonce is derived
+    // from it one-way), and the pool entry's mt_index comes from this
+    // transaction, not from the player's unchecked witness: a pool coin with
+    // a wrong index could never be swept.
     const result = sendShielded(
         disclose(coin),
         right<ZswapCoinPublicKey, ContractAddress>(kernel.self()),

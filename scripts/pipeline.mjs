@@ -129,7 +129,7 @@ const READ = {
     'examples/calculator/src/test/calculator.sim.test.ts and examples/private-tip-jar/src/test/private-tip-jar.sim.test.ts',
     'the nearest examples’ contract/witnesses.ts and test bodies after "Your tests begin here"',
     'packages/sim/src/sim.ts and privacy.ts, only if you need more of the in-memory API',
-    'shielded coins: packages/coins/src/index.ts (token color, takeCoin, balances, minting to a wallet), not the helpers above an example’s marker',
+    'shielded coins: packages/coins/src/index.ts (token color, freshCoin for a coin argument, balances, minting to a wallet), not the helpers above an example’s marker',
     'a second contract (a test-only token): add contract/<it>.compact, then compile:fast and --derive wire it',
   ],
   gate: ['the gate output in this report first', 'docs/compact-gotchas.md', 'then the midnight-expert skills (compact-core, midnight-verify)'],

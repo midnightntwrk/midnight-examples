@@ -1,18 +1,20 @@
 // The coin helpers against a hand-built wallet state: no network, no wallet.
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   encodeCoinPublicKey,
   encodeRawTokenType,
   sampleContractAddress,
 } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
-import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+import { rawTokenType, ZswapOutput } from '@midnight-ntwrk/midnight-js-protocol/ledger';
 
 import {
   type CoinWallet,
   type ShieldedStateView,
+  contractCoinMtIndex,
   domainSeparator,
   encryptionKeys,
+  freshCoin,
   mintNonce,
   recipientOf,
   shieldedBalance,
@@ -151,5 +153,44 @@ describe('simCoin', () => {
     expect(c.nonce).toHaveLength(32);
     const nonce = new Uint8Array(32).fill(9);
     expect(simCoin(5n, RED.bytes, nonce).nonce).toBe(nonce);
+  });
+});
+
+describe('freshCoin', () => {
+  it('makes a new coin of the color and value, with a nonce no wallet coin has', async () => {
+    const a = freshCoin(RED, 7n);
+    expect(a.value).toBe(7n);
+    expect(a.color).toEqual(RED.bytes);
+    expect(a.nonce).toHaveLength(32);
+    // Fresh each time, and not one of the wallet's coins.
+    expect(freshCoin(RED.hex, 7n).nonce).not.toEqual(a.nonce);
+    const held = (await shieldedCoins(WALLET, RED)).map((c) => Buffer.from(c.nonce).toString('hex'));
+    expect(held).not.toContain(Buffer.from(a.nonce).toString('hex'));
+  });
+});
+
+describe('contractCoinMtIndex', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("is the tx's zswapStartIndex plus the coin's position among its outputs", async () => {
+    const coin = freshCoin(RED, 100n);
+    const mine = ZswapOutput.newContractOwned(
+      { type: RED.hex, nonce: Buffer.from(coin.nonce).toString('hex'), value: 100n },
+      0,
+      ADDRESS,
+    ).commitment;
+    // The wallet's change output first, as seen on the devnet.
+    const tx = { txId: 'ab', tx: { guaranteedOffer: { outputs: [{ commitment: 'change' }, { commitment: mine }] } } };
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: { transactions: [{ zswapStartIndex: 40 }] } })));
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await contractCoinMtIndex('http://indexer', tx, coin, ADDRESS)).toBe(41n);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(init.body as string).variables).toEqual({ id: 'ab' });
+  });
+
+  it('fails when the tx made no output for that coin', async () => {
+    const tx = { txId: 'ab', tx: { guaranteedOffer: { outputs: [{ commitment: 'other' }] } } };
+    await expect(contractCoinMtIndex('http://indexer', tx, freshCoin(RED, 1n), ADDRESS)).rejects.toThrow(/no output/);
   });
 });
