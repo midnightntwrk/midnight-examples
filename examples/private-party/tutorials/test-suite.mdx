@@ -161,7 +161,7 @@ with an entry fee of 5 STAR:
 
 `deployContract` takes the deployer's providers, the compiled contract from `contract/index.ts`,
 the private state ID and initial private state, and the constructor `args`: the party size, the
-fee and Alice's secret. Once the deployment succeeds, it also stores the private state in Alice's
+fee, and Alice's secret. Once the deployment succeeds, it also stores the private state in Alice's
 private state provider under `ALICE_PRIVATE_ID`, so later tests read her secret back from there.
 
 The test then checks the ledger against what the constructor should have done:

@@ -113,7 +113,7 @@ export ledger checkedInParty: Set<UserAddress>;
 ```
 
 `sealed` fields can only be set by the constructor. Nothing can change the organizer, the party
-size or the entry fee after deployment.
+size, or the entry fee after deployment.
 
 `hashedPartyGoers` is the RSVP list. It holds commitments, not addresses. `checkedInParty` holds
 the addresses of guests who have paid, because by then they are public anyway.
@@ -158,7 +158,7 @@ circuit getDappPublicKey(_secret: Bytes<32>): Bytes<32> {
 hash of the same secret, including the hash another DApp might use as a key. The key isn't tied
 to the organizer's wallet address, so it is safe to store on the ledger.
 
-The organizer deploys the contract. The constructor checks its inputs, stores the organizer's key
+The organizer deploys the contract. The constructor checks its inputs, stores the organizer's key,
 and sets the remaining fields:
 
 ```compact title="contract/private-party.compact"
