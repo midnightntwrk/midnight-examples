@@ -355,7 +355,7 @@ describe(`Private Tip Jar Contract (${network})`, () => {
     await waitForTokenBalance(bobWallet, 0n);
   });
 
-  it('public state holds no tipper identity, tipped coin, or owner secret', async () => {
+  it('public state holds no tipper identity, tipper wallet coin, or owner secret', async () => {
     const state = await queryLedger();
     const pool = collectPublicBytes(state);
 

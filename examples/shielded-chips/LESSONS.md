@@ -378,7 +378,7 @@ Everything above treats the coin a player passes to `betColor` as *their* coin.
 It isn't. `receiveShielded(coin)` creates a Zswap **output** to the contract. The
 wallet then balances the transaction by token color and amount. Its coin
 selection spends whichever coins it likes and makes change under fresh nonces
-(`wallet-sdk-shielded` 1.2.0, `dist/v1/Transacting.js`,
+(`wallet-sdk-shielded` 3.0.2, `dist/v1/Transacting.js`,
 `#balanceGuaranteedSection`), and it never matches the output's nonce to one of
 its coins. The tests built the argument from `availableCoins`, so the contract's
 coin and the player's wallet coin shared a nonce. That shared nonce is the
