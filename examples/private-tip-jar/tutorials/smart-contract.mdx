@@ -3,7 +3,7 @@ SPDX-License-Identifier: Apache-2.0
 copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 sidebar_label: "Private tip jar contracts"
 title: "Private tip jar contracts"
-description: "Read the tip jar's two Compact contracts: an anonymous shielded tip stored as a fresh contract-owned coin, an owner-only withdrawal, and a demo token to tip with."
+description: "Read the tip jar's two Compact contracts: an anonymous tip stored as a fresh contract-owned coin, an owner-only withdrawal, and a demo token to tip with."
 sidebar_position: 10
 toc_max_heading_level: 3
 tags:
@@ -214,8 +214,8 @@ submitted, and a bad tip costs nothing. The third guard is covered in step 4.
 **3. `receiveShielded`, and what `coin` really is.** `coin` is not one of the tipper's wallet
 coins. It describes a *new* coin, and `receiveShielded` claims it for the contract: the ledger
 only accepts the transaction if it also contains a Zswap output creating that coin for the
-contract. The tipper's wallet adds that output and pays for it while it balances the transaction.
-It spends whichever of its coins of that color its coin selection picks, and takes any change back
+contract. MidnightJS puts that output in the transaction, and the tipper's wallet pays for it as it
+balances it, spending whichever coins of that color its coin selection picks. Change comes back
 under fresh nonces. So the tipper can tip any amount without first making a coin of exactly that
 value. In the tests, Bob tips 40 and then 60 from the single 100-coin he was minted.
 
@@ -431,9 +431,9 @@ Compiling 1 circuits:
 Overall progress [====================] 1/1
 ```
 
-`ownerKey` is pure, so it gets no proving key of its own. `tip` is the smallest of the three
-proven circuits, because it only receives a coin. `withdraw` sends one, and `mint` creates one.
-(When `tip` also re-sent each coin to the contract, it was the largest: k=15, 30,328 rows.)
+`ownerKey` is pure, so it gets no proving key of its own. `tip` is the smaller of the jar's two
+circuits, because it only receives a coin, while `withdraw` also sends one. (When `tip` re-sent
+each coin to the contract as well, it was the largest of the three: k=15, 30,328 rows.)
 
 For the tests and type-checking alone, `yarn compile:fast` skips proving-key generation and
 finishes in seconds. A devnet run needs the full `yarn compile`.
