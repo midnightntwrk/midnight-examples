@@ -8,10 +8,11 @@
 //   ...
 //   ```
 //
-// passes if its lines appear, contiguously and unchanged, in
-// examples/<name>/contract/battleship.compact. Trailing whitespace is ignored on
-// both sides, so an editor that trims on save can't break the match. Untitled
-// blocks (commands, sample output) are not checked. See docs/tutorials.md.
+// passes if it is not empty and its lines appear, contiguously and unchanged,
+// in examples/<name>/contract/battleship.compact. Trailing whitespace is
+// ignored on both sides, so an editor that trims on save can't break the match.
+// Untitled blocks (commands, sample output) are not checked. See
+// docs/tutorials.md.
 //
 //   node scripts/check-tutorial-code.mjs [<name> ...]
 
@@ -51,6 +52,12 @@ for (const name of names) {
         continue;
       }
       const lines = body.split('\n').map(trimEnd);
+      // An empty block would match any blank line in the file, and render as
+      // an empty code box.
+      if (lines.every((line) => line === '')) {
+        problems.push(`${where}: block titled "${title}" is empty`);
+        continue;
+      }
       if (!containsRun(fs.readFileSync(src, 'utf8').split('\n').map(trimEnd), lines)) {
         problems.push(`${where}: block titled "${title}" starting ${JSON.stringify(lines[0])} doesn't match the file`);
       }
