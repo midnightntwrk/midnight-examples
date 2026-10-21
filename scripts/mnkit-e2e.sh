@@ -60,6 +60,17 @@ while [ $# -gt 0 ]; do
 done
 if [ ${#SELECTED[@]} -eq 0 ]; then SELECTED=(hello-world private-tip-jar); fi
 
+# Run on the Node in .nvmrc, as CI and most users do: its bundled npm is the
+# one `mnkit init` runs, and npm majors resolve peer dependencies differently
+# (vitest 4's optional peers crash npm 10 but not npm 11). MNKIT_E2E_ANY_NODE=1
+# skips the check.
+WANT_NODE=$(tr -d '[:space:]v' < "$REPO/.nvmrc")
+HAVE_NODE=$(node -p 'process.versions.node.split(".")[0]')
+if [ "$HAVE_NODE" != "$WANT_NODE" ] && [ "${MNKIT_E2E_ANY_NODE:-}" != 1 ]; then
+  echo "✖ Node $HAVE_NODE is on PATH but .nvmrc says $WANT_NODE (npm $(npm --version)). Switch Node (nvm use), or set MNKIT_E2E_ANY_NODE=1." >&2
+  exit 1
+fi
+
 WORK=${MNKIT_E2E_DIR:-$(mktemp -d -t mnkit-e2e-XXXXXX)}
 WORK=$(mkdir -p "$WORK" && cd "$WORK" && pwd)
 case "$WORK/" in

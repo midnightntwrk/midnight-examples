@@ -76,7 +76,7 @@ version changes happen in a coordinated pass. The pins live in
 | wallet SDK | `1.2.0` |
 | Node.js | `22` (see `.nvmrc`) |
 | Yarn | `4.18.0` (Berry, `node-modules` linker) |
-| Vitest | `4.1.0` |
+| Vitest | `5.0.4` |
 
 ## Prerequisites
 

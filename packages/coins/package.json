@@ -39,6 +39,6 @@
     "@midnight-ntwrk/midnight-js-protocol": "4.1.1",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
-    "vitest": "^4.1.0"
+    "vitest": "^5.0.4"
   }
 }

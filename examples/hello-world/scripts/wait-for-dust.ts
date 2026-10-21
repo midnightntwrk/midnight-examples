@@ -57,7 +57,7 @@ const wallet = await MidnightWalletProvider.build(logger, envConfig, {
 await wallet.start();
 try {
   await syncWallet(logger, wallet.wallet, timeoutMs);
-  await waitForDust(logger, wallet.wallet, minCoins, timeoutMs);
+  await waitForDust(logger, wallet.wallet, minCoins, timeoutMs, config.indexer);
 } catch (err) {
   logger.error(`wait-for-dust failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}`);
   process.exitCode = 1;

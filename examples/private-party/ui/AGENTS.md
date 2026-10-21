@@ -10,7 +10,7 @@ every generated UI gets an identical copy. Edit the template, then run
 `yarn new:ui --sync-all`.
 
 **Verified against:** `midnight-js-*` 4.1.1, `@midnight-ntwrk/dapp-connector-api`
-4.0.1, Vite 6.4.3, vitest 4.1, React 19, Node 22, a Midnight wallet extension
+4.0.1, Vite 6.4.3, vitest 5, React 19, Node 22, a Midnight wallet extension
 on the local devnet.
 
 ## Quick recipe

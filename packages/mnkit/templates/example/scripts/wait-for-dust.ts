@@ -16,15 +16,15 @@
 // Block until Alice has ≥1 spendable DUST coin. syncWallet's
 // progress.isStrictlyComplete() means "synced to chain tip", not "wallet has
 // funds" — on a fresh devnet it returns at block 0/1 with zero coins, so
-// the first tx fails with Wallet.InsufficientFunds.
+// the first tx fails with Wallet.InsufficientFunds. Passing the indexer also
+// waits for the first block after genesis: until then the DUST is valued at
+// the genesis timestamp, when it is worth 0.
 
 import pino from 'pino';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { firstValueFrom, throwError } from 'rxjs';
-import { filter, take, tap, timeout } from 'rxjs/operators';
 import { getConfig } from '../src/config.js';
-import { MidnightWalletProvider, syncWallet } from '@midnight-ntwrk/mnkit-wallet';
+import { MidnightWalletProvider, syncWallet, waitForDust } from '@midnight-ntwrk/mnkit-wallet';
 
 // Must match src/test/__name__.test.ts.
 const ALICE_SEED = '0000000000000000000000000000000000000000000000000000000000000001';
@@ -59,23 +59,7 @@ const wallet = await MidnightWalletProvider.build(logger, envConfig, {
 await wallet.start();
 try {
   await syncWallet(logger, wallet.wallet, timeoutMs);
-  await firstValueFrom(
-    wallet.wallet.state().pipe(
-      tap((s) =>
-        logger.info(
-          `dust: ${s.dust.availableCoins.length} coin(s), balance ${s.dust.balance(new Date())} STAR`,
-        ),
-      ),
-      filter((s) => s.dust.availableCoins.length >= minCoins),
-      take(1),
-      timeout({
-        each: timeoutMs,
-        with: () =>
-          throwError(() => new Error(`No spendable DUST coin within ${timeoutMs}ms`)),
-      }),
-    ),
-  );
-  logger.info('DUST ready');
+  await waitForDust(logger, wallet.wallet, minCoins, timeoutMs, config.indexer);
 } catch (err) {
   logger.error(`wait-for-dust failed: ${err instanceof Error ? err.stack ?? err.message : String(err)}`);
   process.exitCode = 1;

@@ -232,7 +232,7 @@ jobs:
         run: yarn test:engine
 
       - name: Compiled test fixtures match the pinned compiler
-        run: node scripts/test/fixtures/regen.mjs --check
+        run: yarn fixtures:regen --check
 
       - name: Typecheck and test the runtime packages (built by postinstall)
         run: |

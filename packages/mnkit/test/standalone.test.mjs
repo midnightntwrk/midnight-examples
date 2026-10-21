@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { packageSpecs } from '../src/commands/init.mjs';
-import { KNOWN_TOKENS, RUNTIME_PACKAGES, renderExample, selectBlocks } from '../src/lib/scaffold.mjs';
+import { KNOWN_TOKENS, RUNTIME_PACKAGES, fileHash, isTemplateOwned, renderExample, selectBlocks } from '../src/lib/scaffold.mjs';
 import { loadToolchain } from '../src/lib/toolchain.mjs';
 import { PKG_ROOT, TEMPLATE_DIR, cleanup, tmpDir } from './helpers.mjs';
 
@@ -66,7 +66,22 @@ describe('renderExample in standalone mode', () => {
     expect(Object.keys(files).filter((r) => r === '.envrc' || r.startsWith('tutorials') || r.includes('standalone'))).toEqual([]);
     expect(JSON.parse(files['tsconfig.json']).extends).toBeUndefined();
     expect(files['.gitignore']).toContain('contract/managed/');
-    expect(JSON.parse(files['mnkit.json'])).toEqual({ name: 'my-app', template: 'example', witnesses: false, mnkit: '0.1.0' });
+    expect(JSON.parse(files['mnkit.json'])).toMatchObject({ name: 'my-app', template: 'example', witnesses: false, mnkit: '0.1.0' });
+  });
+
+  it('records the toolchain and a hash of every template-owned file in mnkit.json', () => {
+    const rendered = standalone();
+    const files = byRel(rendered);
+    const manifest = JSON.parse(files['mnkit.json']);
+    expect(manifest.toolchain.images).toEqual(tc.images);
+    expect(manifest.toolchain.$comment).toBeUndefined();
+    const owned = Object.keys(files).filter(isTemplateOwned).sort();
+    expect(Object.keys(manifest.files)).toEqual(owned);
+    expect(owned).toEqual(expect.arrayContaining(['compose.yml', 'src/providers.ts', 'tsconfig.json', '.gitignore']));
+    for (const seed of ['package.json', 'mnkit.json', 'README.md', 'contract/my-app.compact', 'src/test/my-app.test.ts']) {
+      expect(owned, seed).not.toContain(seed);
+    }
+    for (const [rel, hash] of Object.entries(manifest.files)) expect(fileHash(files[rel]), rel).toBe(hash);
   });
 
   it('writes an npm package.json with mnkit scripts, pinned runtime packages and the overrides', () => {

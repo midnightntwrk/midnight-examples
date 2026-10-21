@@ -48,6 +48,7 @@ jobs:
         run: yarn install --immutable
 
       - name: Publish to a local registry, then init and test from it
-        run: bash scripts/mnkit-rehearsal.sh ${{ inputs.devnet && '--devnet' || '' }}
+        run: bash scripts/mnkit-rehearsal.sh ${DEVNET:+--devnet}
         env:
+          DEVNET: ${{ inputs.devnet && 'true' || '' }}
           MNKIT_E2E_DIR: ${{ runner.temp }}/mnkit-rehearsal

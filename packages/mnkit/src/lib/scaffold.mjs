@@ -28,6 +28,7 @@
 // from the template's (standalonePackageJson).
 // Zero dependencies — Node built-ins only.
 
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { sealRegions } from './derive.mjs';
 import { assertNoLeftoverTokens, deriveNames, fail, renderTree, substituteNames } from './template.mjs';
@@ -68,6 +69,36 @@ const MODE_FILES = {
     rename: { gitignore: '.gitignore', 'tsconfig.standalone.json': 'tsconfig.json' },
   },
 };
+
+/**
+ * The project files the developer owns from the start: the contracts, the
+ * tests, the README and SPEC. package.json is shared: `upgrade` merges the
+ * pins and mnkit's scripts into it. Every other file is template-owned:
+ * mnkit.json records its hash, and `upgrade` re-renders it if it is unedited.
+ */
+const SEED_PREFIXES = ['contract/', 'src/test/'];
+const SEED_FILES = ['README.md', 'SPEC.md', 'package.json', 'mnkit.json'];
+
+/** Whether `rel` (a project path, either separator) is template-owned. */
+export const isTemplateOwned = (rel) => {
+  const posix = rel.split(path.sep).join('/');
+  return !SEED_FILES.includes(posix) && !SEED_PREFIXES.some((p) => posix.startsWith(p));
+};
+
+/** sha256 of a file's content, as mnkit.json records it. */
+export const fileHash = (content) => createHash('sha256').update(content).digest('hex');
+
+/**
+ * The mnkit.json `files` map: POSIX path → sha256 of every template-owned file
+ * in `files` (`[{ rel, content }]`), sorted by path.
+ */
+export const ownedFileHashes = (files) =>
+  Object.fromEntries(
+    files
+      .filter((f) => isTemplateOwned(f.rel))
+      .map((f) => [f.rel.split(path.sep).join('/'), fileHash(f.content)])
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  );
 
 // A marker is a line of its own: the marker inside //, #, <!-- --> or {/* */}.
 const MARKER_RE = /^\s*(?:\/\/|#|<!--|\{\/\*)\s*@(if (monorepo|standalone)|endif)\s*(?:-->|\*\/\})?\s*$/;
@@ -189,7 +220,8 @@ export function substituteExample(content, { names, witnesses }) {
  * given, is used verbatim as SPEC.md. Every region starts sealed, so derive
  * treats it as unedited. `tc` is the toolchain (toolchain.json). Standalone
  * mode also takes `specs` (standalonePackageJson) and `mnkitVersion`, and
- * adds mnkit.json, the manifest `mnkit derive` reads the project name from.
+ * adds mnkit.json: the project name `mnkit derive` reads, the toolchain it
+ * was rendered with, and the hashes of the template-owned files (`upgrade`).
  */
 export function renderExample(
   templateDir,
@@ -215,11 +247,10 @@ export function renderExample(
     },
   }).map((f) => (rename[f.templateRel] ? { ...f, rel: rename[f.templateRel] } : f));
   if (mode === 'standalone') {
-    files.push({
-      templateRel: null,
-      rel: 'mnkit.json',
-      content: `${JSON.stringify({ name, template: 'example', witnesses, mnkit: mnkitVersion }, null, 2)}\n`,
-    });
+    // The pins a standalone project uses: not the repo's comment or Yarn.
+    const toolchain = Object.fromEntries(Object.entries(tc).filter(([k]) => k !== '$comment' && k !== 'yarn'));
+    const manifest = { name, template: 'example', witnesses, mnkit: mnkitVersion, toolchain, files: ownedFileHashes(files) };
+    files.push({ templateRel: null, rel: 'mnkit.json', content: `${JSON.stringify(manifest, null, 2)}\n` });
   }
   return files;
 }

@@ -14,7 +14,9 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "bin": "./bin/mnkit.mjs",
+  "bin": {
+    "mnkit": "bin/mnkit.mjs"
+  },
   "exports": {
     ".": "./src/index.mjs",
     "./package.json": "./package.json"
@@ -31,6 +33,6 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "vitest": "^4.1.0"
+    "vitest": "^5.0.4"
   }
 }

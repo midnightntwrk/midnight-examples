@@ -11,7 +11,7 @@
     "testkit-js": "4.1.1",
     "wallet-sdk": "1.2.0",
     "dapp-connector-api": "4.0.1",
-    "vitest": "4.1.0"
+    "vitest": "5.0.4"
   },
   "images": {
     "midnightntwrk/proof-server": "8.1.3",
