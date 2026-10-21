@@ -61,7 +61,7 @@ trust recalled APIs over it.
   re-noncing it to `kernel.self()` on the way in doesn't fully undo that:
   whoever knows the old nonce can derive the new one.
   ([private-tip-jar `tip`](../examples/private-tip-jar/contract/private-tip-jar.compact);
-  wallet balancing: `@midnight-ntwrk/wallet-sdk-shielded` 1.2.0,
+  wallet balancing: `@midnight-ntwrk/wallet-sdk-shielded` 3.0.2,
   `dist/v1/Transacting.js`, `#balanceGuaranteedSection`)
 - **Keying a `Map` by a caller-chosen nonce?** Assert `!map.member(nonce)`
   first. A coin with the same nonce and a different value is a different coin,
