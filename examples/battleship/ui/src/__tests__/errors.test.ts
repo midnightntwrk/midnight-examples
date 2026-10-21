@@ -27,6 +27,15 @@ describe("errorMessage", () => {
     ).toBe("User rejected (Rejected)");
   });
 
+  it("points a failed fetch at the indexer", () => {
+    for (const message of ["Failed to fetch", "Load failed"]) {
+      const msg = errorMessage(new TypeError(message), "x");
+      expect(msg).toContain(message);
+      expect(msg).toContain("VITE_INDEXER_URI");
+    }
+    expect(errorMessage(new Error("Failed to fetch zk config"), "x")).toBe("Failed to fetch zk config");
+  });
+
   it("follows Error.cause and falls back when nothing is readable", () => {
     expect(errorMessage(new Error("", { cause: new Error("inner") }), "x")).toBe("inner");
     expect(errorMessage({}, "fallback")).toBe("fallback");

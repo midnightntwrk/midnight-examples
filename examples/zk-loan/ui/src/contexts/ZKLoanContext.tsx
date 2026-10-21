@@ -115,6 +115,19 @@ const NETWORK_ID = import.meta.env.VITE_NETWORK_ID || 'preprod';
 const ATTESTATION_API_URL = import.meta.env.VITE_ATTESTATION_API_URL || 'http://localhost:4000';
 const bytes32Type = new CompactTypeBytes(32);
 
+// The wallet's indexer, unless VITE_INDEXER_URI and VITE_INDEXER_WS_URI
+// override it (for a wallet whose indexer is wrong or has been shut down).
+// Both or neither: HTTP and WebSocket must reach the same indexer.
+function indexerEndpoints(config: Configuration): { indexerUri: string; indexerWsUri: string } {
+  const indexerUri = import.meta.env.VITE_INDEXER_URI?.trim();
+  const indexerWsUri = import.meta.env.VITE_INDEXER_WS_URI?.trim();
+  if (indexerUri && indexerWsUri) return { indexerUri, indexerWsUri };
+  if (indexerUri || indexerWsUri) {
+    throw new Error('Set both VITE_INDEXER_URI and VITE_INDEXER_WS_URI to override the wallet\'s indexer, or neither.');
+  }
+  return { indexerUri: config.indexerUri, indexerWsUri: config.indexerWsUri };
+}
+
 // Helper functions for hex conversion
 function uint8ArrayToHex(bytes: Uint8Array): string {
   return Array.from(bytes)
@@ -301,8 +314,9 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
       logger.warn('No shieldedAddress received from wallet');
     }
 
+    const { indexerUri, indexerWsUri } = indexerEndpoints(config);
     logger.info({
-      indexerUri: config.indexerUri,
+      indexerUri,
       proverServerUri: config.proverServerUri,
     }, 'Service configuration');
 
@@ -323,8 +337,8 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
     // parameter is typed as Node's `ws` class; the browser's WebSocket
     // implements the standard interface graphql-ws actually uses.
     const publicDataProvider = indexerPublicDataProvider(
-      config.indexerUri,
-      config.indexerWsUri,
+      indexerUri,
+      indexerWsUri,
       WebSocket as unknown as Parameters<typeof indexerPublicDataProvider>[2],
     );
 

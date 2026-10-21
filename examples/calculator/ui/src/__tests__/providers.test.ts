@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
 
 // Replace the two proof-provider factories with spies. This test only checks
@@ -11,6 +11,12 @@ vi.mock("@midnight-ntwrk/midnight-js-dapp-connector-proof-provider", () => ({
 vi.mock("@midnight-ntwrk/midnight-js-http-client-proof-provider", () => ({
   httpClientProofProvider: vi.fn(() => httpProof),
 }));
+// Spy on the indexer provider (the real one, wrapped) to see which URIs it gets.
+vi.mock("@midnight-ntwrk/midnight-js-indexer-public-data-provider", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@midnight-ntwrk/midnight-js-indexer-public-data-provider")>();
+  return { ...actual, indexerPublicDataProvider: vi.fn(actual.indexerPublicDataProvider) };
+});
 
 // The storage mode is fixed per UI in contract.ts. Override it so both paths
 // are tested whichever one this UI was generated with.
@@ -33,8 +39,22 @@ const { dappConnectorProofProvider } = await import(
 const { httpClientProofProvider } = await import(
   "@midnight-ntwrk/midnight-js-http-client-proof-provider"
 );
-const { createContractProviders, createProviders } = await import("../midnight/providers");
+const { indexerPublicDataProvider } = await import(
+  "@midnight-ntwrk/midnight-js-indexer-public-data-provider"
+);
+const { createContractProviders, createProviders, indexerEndpoints } = await import(
+  "../midnight/providers"
+);
 const { persistentPrivateStateProvider } = await import("../midnight/private-state");
+
+const WALLET_INDEXER = {
+  indexerUri: "http://127.0.0.1:8088/api/v4/graphql",
+  indexerWsUri: "ws://127.0.0.1:8088/api/v4/graphql/ws",
+};
+const BLOCKFROST = {
+  indexerUri: "https://midnight-preprod.blockfrost.io/api/v0?project_id=k",
+  indexerWsUri: "wss://midnight-preprod.blockfrost.io/api/v0/ws?project_id=k",
+};
 
 // 32-byte keys in hex. parse*ToHex passes hex through unchanged.
 const COIN_PK = "11".repeat(32);
@@ -43,8 +63,7 @@ const ENC_PK = "22".repeat(32);
 function fakeApi(): ConnectedAPI {
   return {
     getConfiguration: vi.fn().mockResolvedValue({
-      indexerUri: "http://127.0.0.1:8088/api/v4/graphql",
-      indexerWsUri: "ws://127.0.0.1:8088/api/v4/graphql/ws",
+      ...WALLET_INDEXER,
       substrateNodeUri: "http://127.0.0.1:9944",
       networkId: "undeployed",
     }),
@@ -165,5 +184,51 @@ describe("createContractProviders", () => {
       { accountId: COIN_PK, passphrase: "Correct-Horse-Battery-9" },
     ]);
     expect(main.zkConfigProvider).not.toBe(other.zkConfigProvider);
+  });
+});
+
+describe("indexerEndpoints", () => {
+  beforeEach(() => {
+    storage.mode = "memory";
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const override = (uri: string, wsUri: string) => {
+    vi.stubEnv("VITE_INDEXER_URI", uri);
+    vi.stubEnv("VITE_INDEXER_WS_URI", wsUri);
+  };
+
+  it("uses the wallet's indexer when no override is set", async () => {
+    override("", " ");
+    expect(indexerEndpoints(WALLET_INDEXER)).toEqual(WALLET_INDEXER);
+
+    await createProviders(fakeApi(), { mode: "wallet", proofServerUrl: "" });
+    expect(indexerPublicDataProvider).toHaveBeenLastCalledWith(
+      WALLET_INDEXER.indexerUri,
+      WALLET_INDEXER.indexerWsUri,
+      expect.anything(),
+    );
+  });
+
+  it("uses the override when both URIs are set", async () => {
+    override(BLOCKFROST.indexerUri, BLOCKFROST.indexerWsUri);
+    expect(indexerEndpoints(WALLET_INDEXER)).toEqual(BLOCKFROST);
+
+    await createProviders(fakeApi(), { mode: "wallet", proofServerUrl: "" });
+    expect(indexerPublicDataProvider).toHaveBeenLastCalledWith(
+      BLOCKFROST.indexerUri,
+      BLOCKFROST.indexerWsUri,
+      expect.anything(),
+    );
+  });
+
+  it("refuses an override with only one of the two URIs", async () => {
+    override(BLOCKFROST.indexerUri, "");
+    expect(() => indexerEndpoints(WALLET_INDEXER)).toThrow(/both/);
+    await expect(
+      createProviders(fakeApi(), { mode: "wallet", proofServerUrl: "" }),
+    ).rejects.toThrow(/VITE_INDEXER_WS_URI/);
   });
 });

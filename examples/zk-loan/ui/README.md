@@ -40,9 +40,23 @@ does not commit `.env.<network>` files, so set them in the shell:
 | `VITE_NETWORK_ID` | `preprod` |
 | `VITE_ATTESTATION_API_URL` | `http://localhost:4000` |
 | `VITE_LOGGING_LEVEL` | `info` |
+| `VITE_INDEXER_URI` | the wallet's indexer |
+| `VITE_INDEXER_WS_URI` | the wallet's indexer |
 
 ```bash
 VITE_NETWORK_ID=preview yarn dev
+```
+
+The indexer override is for a wallet whose indexer is wrong or has been shut
+down (Midnight's hosted mainnet and preprod indexers were, on 2026-10-09;
+requests then fail with `Failed to fetch`). Set both or neither, on the
+wallet's network. Blockfrost needs your project id in both URLs. To keep the key
+out of your shell history, put the two lines in `.env.local` here, which is
+gitignored:
+
+```bash
+VITE_INDEXER_URI=https://midnight-preprod.blockfrost.io/api/v0?project_id=<key>
+VITE_INDEXER_WS_URI=wss://midnight-preprod.blockfrost.io/api/v0/ws?project_id=<key>
 ```
 
 ## Notes

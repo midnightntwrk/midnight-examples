@@ -49,5 +49,10 @@ function withHint(message: string, tag: unknown): string {
   if (tag === "Wallet.InsufficientFunds" && /dust/i.test(message)) {
     return `${message}. The wallet needs DUST to pay fees: hold NIGHT registered for DUST generation, then wait for DUST to accrue.`;
   }
+  // fetch's TypeError, as Chrome, Firefox and Safari word it. An indexer that
+  // has been shut down (HTTP 410, no CORS headers) surfaces only as this.
+  if (/^(Failed to fetch|NetworkError when attempting to fetch resource\.?|Load failed)$/.test(message)) {
+    return `${message}. A network request failed. Usually the indexer can't be reached: check the wallet's indexer setting, or override it with VITE_INDEXER_URI and VITE_INDEXER_WS_URI (see .env.example). With local proving, also check the proof server.`;
+  }
   return message;
 }

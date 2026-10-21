@@ -66,7 +66,7 @@ and swaps only the **providers** for browser versions:
 | Piece | Node harness (`examples/<name>/src/`) | Browser (`ui/src/midnight/`) |
 |---|---|---|
 | Compiled contract | `contract/index.ts` (uses `node:path`) | `contract.ts`: imports `contract/managed/<name>/contract/index.js` directly |
-| Public data | `indexerPublicDataProvider(config…)` | same, URIs from the wallet's `getConfiguration()`, **plus `window.WebSocket`** |
+| Public data | `indexerPublicDataProvider(config…)` | same, URIs from the wallet's `getConfiguration()` unless `VITE_INDEXER_*` overrides them (`indexerEndpoints`), **plus `window.WebSocket`** |
 | ZK config | `NodeZkConfigProvider(zkConfigPath)` | `FetchZkConfigProvider(origin + "/managed/<name>")` |
 | Proofs | `httpClientProofProvider(proofServer)` | `dappConnectorProofProvider(api, zk, CostModel.initialCostModel())` or `httpClientProofProvider` (user toggle) |
 | Wallet/submit | wallet-sdk `WalletFacade` | DApp Connector: `balanceUnsealedTransaction` + `submitTransaction` (hex) |
@@ -181,6 +181,10 @@ this `AGENTS.md`.
 It is still template-owned, because every value in it comes from the compiled
 contract. `providers.ts` keeps the parts that cost debugging time:
 - the explicit `window.WebSocket`
+- `indexerEndpoints`, the `VITE_INDEXER_URI` / `VITE_INDEXER_WS_URI` override
+  of the wallet's indexer. Code that queries the indexer itself (raw GraphQL)
+  takes its URI from `indexerEndpoints(config)` too, never straight from
+  `getConfiguration()`
 - `parse{Coin,Enc}PublicKeyToHex`
 - the hex round-trip through `Transaction.deserialize("signature","proof","binding", …)`
 - `tx.identifiers()[0]` for the tx id
@@ -430,6 +434,11 @@ suites' DUST. Don't copy it into an example; extend the shared one.
   `undefined` once bundled for the browser (named import from a default-only
   module). Pass `window.WebSocket`. The Vite build warning about it remains
   and is harmless.
+- **The wallet's indexer can be gone.** Midnight's hosted mainnet and preprod
+  indexers were shut down on 2026-10-09. A wallet still configured for one
+  makes every deploy fail with a bare `Failed to fetch` (the 410 has no CORS
+  headers). Set `VITE_INDEXER_URI` and `VITE_INDEXER_WS_URI` in `ui/.env.local`
+  (see `.env.example`); `errorMessage` adds a hint pointing there.
 - **`optimizeDeps.exclude`:** it must be exactly `ledger-v8`,
   `onchain-runtime-v3` and `midnight-js-protocol`.
   - Excluding `midnight-js-protocol` is required because esbuild can't
