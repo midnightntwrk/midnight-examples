@@ -104,7 +104,7 @@ jobs:
 
   # Every UI scaffolded by `yarn new:ui` (marked by its ui/new-ui.json, the same
   # marker `yarn new:ui --check-all` uses):
-  # its template-owned files must match templates/ui, and it must typecheck,
+  # its template-owned files must match packages/mnkit/templates/ui, and it must typecheck,
   # pass its unit tests and build (Vite/Rollup bundling problems only show up
   # there). No local network needed. The wallet flow needs a
   # human (Lace approvals), so there is no E2E step.
@@ -281,7 +281,7 @@ jobs:
   # typecheck, test:sim, then validate on a local network. Nothing comes from
   # npm except third-party dependencies. See scripts/mnkit-e2e.sh.
   mnkit-e2e:
-    name: mnkit e2e (${{ matrix.fixture }})
+    name: mnkit e2e (${{ matrix.fixture }}${{ matrix.upgrade && ', upgrade' || '' }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -290,11 +290,24 @@ jobs:
       fail-fast: false
       matrix:
         fixture: [hello-world, private-tip-jar]
+        upgrade: [false]
+        # The upgrade test: scaffold with the previous mnkit, then `mnkit
+        # upgrade` to this one (scripts/mnkit-e2e.sh --upgrade-from).
+        include:
+          - fixture: private-tip-jar
+            upgrade: true
+    env:
+      # The mnkit to upgrade from: 0.1.0, a commit on this branch that was
+      # never published. Once 0.2.0 is on npm, make it that version, and from
+      # then on the previous release.
+      MNKIT_UPGRADE_FROM: 7ff0a29
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  #v7.0.1
         with:
           persist-credentials: false
+          # The upgrade test packs the old mnkit from a worktree at that commit.
+          fetch-depth: ${{ matrix.upgrade && 0 || 1 }}
 
       - name: Setup Compact Compiler
         uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
@@ -314,16 +327,17 @@ jobs:
       - name: Install dependencies (whole workspace; builds the runtime packages)
         run: yarn install --immutable
 
-      - name: Pack, scaffold, derive, test:sim and validate
-        run: bash scripts/mnkit-e2e.sh --devnet ${{ matrix.fixture }}
+      - name: Pack, scaffold, derive, test:sim, add ui and validate
+        run: bash scripts/mnkit-e2e.sh --devnet ${UPGRADE:+--upgrade-from "$MNKIT_UPGRADE_FROM"} ${{ matrix.fixture }}
         env:
           MNKIT_E2E_DIR: ${{ runner.temp }}/mnkit-e2e
+          UPGRADE: ${{ matrix.upgrade && 'true' || '' }}
 
       - name: Upload service logs on failure
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  #v7.0.2
         with:
-          name: mnkit-e2e-logs-${{ matrix.fixture }}
+          name: mnkit-e2e-logs-${{ matrix.fixture }}${{ matrix.upgrade && '-upgrade' || '' }}
           path: ${{ runner.temp }}/mnkit-e2e/${{ matrix.fixture }}/logs/
           if-no-files-found: ignore
           retention-days: 7

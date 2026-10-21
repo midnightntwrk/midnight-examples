@@ -31,7 +31,7 @@
 // neither does a Bytes argument named like a secret (see scripts/new-ui.mjs);
 // the generated panel leaves a TODO for those circuits instead.
 //
-// Template-owned: edit templates/ui/src/lib/circuit-args.ts, then
+// Template-owned: edit packages/mnkit/templates/ui/src/lib/circuit-args.ts, then
 // `yarn new:ui <name> --sync`.
 import { MAX_FIELD } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
 import { coinPublicKeyFromBech32, userAddressFromBech32 } from "@/lib/addresses";

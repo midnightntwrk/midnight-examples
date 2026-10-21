@@ -124,7 +124,7 @@ yarn env:down
 
 - A browser UI is phase 2. Once `yarn validate` passes, run
   `yarn new:ui private-tip-jar` from the repo root, then build the use case into its
-  seed files. See `templates/ui/AGENTS.md`.
+  seed files. See `packages/mnkit/templates/ui/AGENTS.md`.
 
 - A tip is the coin passed to `tip`, built fresh with `freshCoin(color, amount)`
   (`@midnight-ntwrk/mnkit-coins`; the sim tests use its `simCoin`).

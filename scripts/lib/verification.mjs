@@ -25,7 +25,7 @@
 //                             "date": "YYYY-MM-DD",   // when it was run
 //                             "notes": "what exactly ran" } } }
 //
-// templates/ui/VERIFIED.md shows them as one table. The table sits between
+// packages/mnkit/templates/ui/VERIFIED.md shows them as one table. The table sits between
 // two markers and is generated: `--sync` rewrites it, and `--check` fails when
 // it's stale, when a verification.json is malformed, or when it claims the
 // wallet circuit calls are verified while ui/README.md still has its

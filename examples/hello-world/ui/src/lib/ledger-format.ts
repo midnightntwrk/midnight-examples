@@ -13,7 +13,7 @@
 //   List      { length(), head(), [Symbol.iterator] }     "N: a, b, c" (head first)
 //   Map       { size(), [Symbol.iterator] of [k, v] }     "N: k → v, ..."
 //
-// Template-owned: edit templates/ui/src/lib/ledger-format.ts, then
+// Template-owned: edit packages/mnkit/templates/ui/src/lib/ledger-format.ts, then
 // `yarn new:ui <name> --sync`.
 
 export interface LedgerField {

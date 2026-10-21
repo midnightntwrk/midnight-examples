@@ -6,7 +6,7 @@
 // indexer's contract-balance query reports balances as of the deploy, not
 // after later calls (see examples/token-transfers/src/test/).
 //
-// Template-owned: edit templates/ui/src/components/wallet-balances-card.tsx,
+// Template-owned: edit packages/mnkit/templates/ui/src/components/wallet-balances-card.tsx,
 // then `yarn new:ui --sync-all`.
 import type { ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

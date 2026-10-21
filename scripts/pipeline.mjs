@@ -135,7 +135,7 @@ const READ = {
     'a second contract (a test-only token): add contract/<it>.compact, then compile:fast and --derive wire it',
   ],
   gate: ['the gate output in this report first', 'docs/compact-gotchas.md', 'then the midnight-expert skills (compact-core, midnight-verify)'],
-  6: ['templates/ui/AGENTS.md: §3, §5 and the Gotchas', 'the nearest examples/*/ui seed files (listed under its "Worked examples")'],
+  6: ['packages/mnkit/templates/ui/AGENTS.md: §3, §5 and the Gotchas', 'the nearest examples/*/ui seed files (listed under its "Worked examples")'],
 };
 
 // --- reporting -----------------------------------------------------------------
@@ -569,7 +569,7 @@ if (opts.ui && fs.existsSync(UI_DIR)) {
           rank: 1,
           kind: 'reason',
           step: '6',
-          reason: `${id} failed${id === 'ui:check' ? ': a template-owned file was edited; move that change into a seed file or templates/ui/' : ''}`,
+          reason: `${id} failed${id === 'ui:check' ? ': a template-owned file was edited; move that change into a seed file or packages/mnkit/templates/ui/' : ''}`,
           output: trimOutput(r.output),
           edit: seedFiles.map(rel),
           read: [...READ.gate, ...READ[6]],

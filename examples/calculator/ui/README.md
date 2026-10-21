@@ -3,7 +3,7 @@
 Browser frontend for `examples/calculator`: connect a Midnight wallet,
 deploy or join the contract, watch its public ledger, and call its circuits.
 
-Scaffolded by `yarn new:ui calculator` from `templates/ui/`. See
+Scaffolded by `yarn new:ui calculator` from `packages/mnkit/templates/ui/`. See
 `AGENTS.md` next to this file for which files are template-owned and
 which are yours, and for the verification checklist.
 

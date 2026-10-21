@@ -16,7 +16,7 @@
 // Session-only (module state, not storage): a reload forgets the list, and the
 // coins themselves are unaffected.
 //
-// Template-owned: edit templates/ui/src/lib/coin-book.ts, then
+// Template-owned: edit packages/mnkit/templates/ui/src/lib/coin-book.ts, then
 // `yarn new:ui --sync-all`.
 import { useSyncExternalStore } from "react";
 import { formatScalar } from "@/lib/ledger-format";

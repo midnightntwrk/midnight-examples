@@ -63,7 +63,8 @@ export const RUNTIME_PACKAGES = ['@midnight-ntwrk/mnkit-coins', '@midnight-ntwrk
  * template ships `gitignore`).
  */
 const MODE_FILES = {
-  monorepo: { skip: ['gitignore', 'tsconfig.standalone.json'] },
+  // The repo has one root `yarn fund:wallet` for every example.
+  monorepo: { skip: ['gitignore', 'tsconfig.standalone.json', path.join('scripts', 'fund-wallet.ts')] },
   standalone: {
     skip: ['.envrc', 'tsconfig.json', `tutorials${path.sep}`],
     rename: { gitignore: '.gitignore', 'tsconfig.standalone.json': 'tsconfig.json' },
@@ -85,6 +86,9 @@ export const isTemplateOwned = (rel) => {
   return !SEED_FILES.includes(posix) && !SEED_PREFIXES.some((p) => posix.startsWith(p));
 };
 
+/** The pins a standalone project uses, as mnkit.json records them: not the repo's comment or Yarn. */
+export const projectToolchain = (tc) => Object.fromEntries(Object.entries(tc).filter(([k]) => k !== '$comment' && k !== 'yarn'));
+
 /** sha256 of a file's content, as mnkit.json records it. */
 export const fileHash = (content) => createHash('sha256').update(content).digest('hex');
 
@@ -100,27 +104,37 @@ export const ownedFileHashes = (files) =>
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
   );
 
-// A marker is a line of its own: the marker inside //, #, <!-- --> or {/* */}.
-const MARKER_RE = /^\s*(?:\/\/|#|<!--|\{\/\*)\s*@(if (monorepo|standalone)|endif)\s*(?:-->|\*\/\})?\s*$/;
+// A marker is a line of its own: the marker inside //, #, <!-- --> or {/* */},
+// or after the * of a block-comment line.
+// Other `@if <cond>` blocks (the UI template's `@if ledger`) pass through
+// untouched; the stack pairs each @endif with its own @if.
+const MARKER_RE = /^\s*(?:\/\/|#|<!--|\{\/\*|\*)\s*@(?:if (\w+)|endif)\s*(?:-->|\*\/\})?\s*$/;
 const LOOSE_MARKER_RE = /@(?:if (?:monorepo|standalone)|endif)\b/;
 
-/** Keeps the lines of `mode`'s blocks and every unmarked line; drops the marker lines. */
+/** Keeps the lines of `mode`'s blocks and every unmarked line; drops the mode marker lines. */
 export function selectBlocks(content, mode, rel = 'template') {
   const out = [];
-  let block = null;
+  const open = []; // the @if conditions around the current line, innermost last
+  const modeBlock = () => open.find((c) => MODES.includes(c));
   for (const line of content.split('\n')) {
     const marker = line.match(MARKER_RE);
-    if (!marker && LOOSE_MARKER_RE.test(line)) fail(`${rel}: a mode marker must be alone on its line: ${line.trim()}`);
-    const open = marker?.[2] ? [null, marker[2]] : null;
-    if (open) {
-      if (block) fail(`${rel}: @if ${open[1]} inside @if ${block}`);
-      block = open[1];
-    } else if (marker) {
-      if (!block) fail(`${rel}: @endif without @if`);
-      block = null;
-    } else if (!block || block === mode) out.push(line);
+    if (!marker) {
+      if (LOOSE_MARKER_RE.test(line)) fail(`${rel}: a mode marker must be alone on its line: ${line.trim()}`);
+      if (!modeBlock() || modeBlock() === mode) out.push(line);
+      continue;
+    }
+    const cond = marker[1];
+    if (cond) {
+      if (MODES.includes(cond) && modeBlock()) fail(`${rel}: @if ${cond} inside @if ${modeBlock()}`);
+      open.push(cond);
+      if (!MODES.includes(cond) && (!modeBlock() || modeBlock() === mode)) out.push(line);
+    } else {
+      if (open.length === 0) fail(`${rel}: @endif without @if`);
+      const closed = open.pop();
+      if (!MODES.includes(closed) && (!modeBlock() || modeBlock() === mode)) out.push(line);
+    }
   }
-  if (block) fail(`${rel}: @if ${block} has no @endif`);
+  if (open.length) fail(`${rel}: @if ${open.at(-1)} has no @endif`);
   return out.join('\n');
 }
 
@@ -133,6 +147,21 @@ const toolchainTokens = (mode, tc) => ({
   __TC_WALLET_SDK__: tc.npm['wallet-sdk'],
   __TC_NODE__: tc.node,
 });
+
+/**
+ * toolchain.json's overrides (Yarn `resolutions` syntax) as npm `overrides`: a
+ * `parent/child` key, which pins `child` only where `parent` depends on it,
+ * becomes `{ parent: { child } }`.
+ */
+export function npmOverrides(overrides) {
+  const out = {};
+  for (const [key, version] of Object.entries(overrides)) {
+    const m = /^((?:@[^/]+\/)?[^/@]+)\/((?:@[^/]+\/)?[^/]+)$/.exec(key);
+    if (m) out[m[1]] = { ...out[m[1]], [m[2]]: version };
+    else out[key] = version;
+  }
+  return out;
+}
 
 /**
  * The template's package.json, as a standalone npm project: named after the
@@ -152,6 +181,7 @@ export function standalonePackageJson(templatePkg, { name, specs, tc }) {
     'test:preview': `MIDNIGHT_NETWORK=preview ${test}`,
     'test:preprod': `MIDNIGHT_NETWORK=preprod ${test}`,
     validate: 'mnkit validate',
+    'fund:wallet': 'vite-node scripts/fund-wallet.ts',
   };
   const dependencies = Object.fromEntries(
     Object.entries(p.dependencies).map(([pkg, spec]) => {
@@ -173,7 +203,7 @@ export function standalonePackageJson(templatePkg, { name, specs, tc }) {
       scripts,
       dependencies,
       devDependencies,
-      overrides: tc.overrides,
+      overrides: npmOverrides(tc.overrides),
     },
     null,
     2,
@@ -247,9 +277,14 @@ export function renderExample(
     },
   }).map((f) => (rename[f.templateRel] ? { ...f, rel: rename[f.templateRel] } : f));
   if (mode === 'standalone') {
-    // The pins a standalone project uses: not the repo's comment or Yarn.
-    const toolchain = Object.fromEntries(Object.entries(tc).filter(([k]) => k !== '$comment' && k !== 'yarn'));
-    const manifest = { name, template: 'example', witnesses, mnkit: mnkitVersion, toolchain, files: ownedFileHashes(files) };
+    const manifest = {
+      name,
+      template: 'example',
+      witnesses,
+      mnkit: mnkitVersion,
+      toolchain: projectToolchain(tc),
+      files: ownedFileHashes(files),
+    };
     files.push({ templateRel: null, rel: 'mnkit.json', content: `${JSON.stringify(manifest, null, 2)}\n` });
   }
   return files;

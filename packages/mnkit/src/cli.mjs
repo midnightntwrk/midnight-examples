@@ -19,10 +19,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
+import { addContract, printAddContractNextSteps } from './commands/add-contract.mjs';
+import { addUi } from './commands/add-ui.mjs';
 import { compile } from './commands/compile.mjs';
 import { runDerive } from './commands/derive.mjs';
 import { doctor } from './commands/doctor.mjs';
 import { init, printNextSteps } from './commands/init.mjs';
+import { upgrade } from './commands/upgrade.mjs';
 import { validate } from './commands/validate.mjs';
 import { checkCompactVersion, checkDocker } from './lib/preflight.mjs';
 import { fail } from './lib/template.mjs';
@@ -38,6 +41,16 @@ Commands:
   derive            fill the generated stubs from the compiled contract (safe to re-run)
   validate          compile, start a local network, wait for DUST, run the devnet tests
                     (--keep-net: leave the network up; --report <file>: write a JSON report)
+  add contract <name>
+                    add another contract under contract/ (compile and derive wire it in)
+  add ui            add a browser UI in ui/ for the compiled contract (an npm workspace)
+                    (--contract <dir>: which contract/managed/<dir>; --private-state
+                    memory|persistent; --dry-run; --skip-gate: skip typecheck and test:sim;
+                    --skip-install)
+  upgrade           move the project to this mnkit's templates and toolchain: re-render the
+                    template-owned files you haven't edited, merge package.json
+                    (--check: report only, exit 1 if behind; --force: also replace edited
+                    files; --skip-install)
   doctor            check Node, Docker, the Compact compiler and the local ports
 
 Options:
@@ -54,7 +67,46 @@ export function projectName(dir) {
   return path.basename(dir);
 }
 
+/** `mnkit add <what>`: one entry per thing that can be added. */
+const ADD = {
+  contract: ({ args }) => {
+    if (args.length !== 1) fail('mnkit add contract takes one name: mnkit add contract my-token');
+    const dir = process.cwd();
+    addContract(dir, args[0], { project: projectName(dir) });
+    printAddContractNextSteps(args[0]);
+    return 0;
+  },
+  ui: ({ values, args }) => {
+    if (args.length) fail('mnkit add ui takes no arguments: run it in the project directory.');
+    const dir = process.cwd();
+    addUi(dir, {
+      name: projectName(dir),
+      contract: values.contract ?? null,
+      privateState: values['private-state'] ?? null,
+      dryRun: values['dry-run'],
+      skipGate: values['skip-gate'],
+      skipInstall: values['skip-install'],
+    });
+    return 0;
+  },
+};
+
 const COMMANDS = {
+  add: {
+    options: {
+      contract: { type: 'string' },
+      'private-state': { type: 'string' },
+      'dry-run': { type: 'boolean' },
+      'skip-gate': { type: 'boolean' },
+      'skip-install': { type: 'boolean' },
+    },
+    run: ({ values, positionals }) => {
+      const [what, ...args] = positionals;
+      const add = ADD[what];
+      if (!add) fail(`mnkit add takes one of: ${Object.keys(ADD).join(', ')}${what ? ` (got '${what}')` : ''}.`);
+      return add({ values, args });
+    },
+  },
   compile: {
     options: { 'skip-zk': { type: 'boolean' } },
     run: ({ values }) => compile(process.cwd(), { skipZk: values['skip-zk'], version: loadToolchain().compact.compiler }),
@@ -95,6 +147,11 @@ const COMMANDS = {
       if (!opts.dryRun) await printNextSteps(dir, opts);
       return 0;
     },
+  },
+  upgrade: {
+    options: { check: { type: 'boolean' }, force: { type: 'boolean' }, 'skip-install': { type: 'boolean' } },
+    run: ({ values }) =>
+      upgrade(process.cwd(), { check: values.check, force: values.force, skipInstall: values['skip-install'] }),
   },
   doctor: { options: {}, run: () => doctor() },
 };

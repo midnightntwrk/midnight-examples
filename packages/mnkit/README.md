@@ -51,6 +51,53 @@ npm run validate                        # compile, local network, DUST, devnet t
 wallet has DUST for fees, runs the devnet suite and takes the network down.
 `npm run validate -- --keep-net` leaves it running between fix-and-retry runs.
 
+### Add a browser UI
+
+```bash
+npm run compile                # the UI needs the proving keys, so not compile:fast
+npx mnkit add ui               # ui/: wallet connect, deploy/join, ledger view, a form per circuit
+npm run dev --workspace ui     # http://localhost:5173, against the local network
+```
+
+`add ui` runs `typecheck` and `test:sim` first and refuses if they fail. The
+UI is an npm workspace of the project, so one `npm install` covers both. Its
+seed files (`ui/src/midnight/<name>-api.ts`, `ui/src/components/<name>-panel.tsx`
+and the circuits test) are yours to build on; `ui/AGENTS.md` says which files
+are which and has a verification checklist. On the local network, give your
+browser wallet DUST with `npm run fund:wallet <mn_dust_…> [mn_addr_…]`: the
+page prints the command, with your addresses, while the wallet has none.
+
+### Add another contract
+
+```bash
+npx mnkit add contract my-token   # contract/my-token.compact
+npm run compile:fast && npx mnkit derive
+```
+
+`derive` wires every extra contract into `contract/index.ts` and the devnet
+suite (a deploy test each). One with witnesses it lists for you to wire by
+hand.
+
+### Upgrade
+
+```bash
+npm install --save-dev mnkit@latest && npx mnkit upgrade
+```
+
+`upgrade` moves the project to that mnkit's templates and pinned toolchain.
+mnkit.json records a hash of every file the template owns, so `upgrade` can
+tell what you changed:
+
+- a file only the template changed is replaced
+- a file only you changed is left alone
+- a file you both changed keeps your version, and the new one is written next
+  to it as `<file>.mnkit-new` for you to merge (`--force` replaces it)
+
+`package.json` (and `ui/package.json`) are merged: the pinned packages move to
+the new versions, new dependencies and scripts are added, and your own
+dependencies and scripts stay. `npx mnkit upgrade --check` reports what would
+change and exits 1 if the project is behind, for CI.
+
 ## What you get
 
 | Path | What it is |
@@ -62,8 +109,10 @@ wallet has DUST for fees, runs the devnet suite and takes the network down.
 | `src/test/<name>.test.ts` | The devnet suite: deploy and call on a real network |
 | `src/config.ts`, `src/providers.ts` | Network config (local, preview, preprod) and the midnight-js providers |
 | `compose.yml` | Node, indexer and proof server, at versions that work together |
+| `scripts/wait-for-dust.ts`, `scripts/fund-wallet.ts` | Wait for the test wallet's DUST; fund a browser wallet on the local network |
 | `SPEC.md`, `AGENTS.md` | A design card, and instructions for AI coding agents |
-| `mnkit.json` | The project name and the mnkit version it was made with |
+| `mnkit.json` | The project name, the mnkit version and toolchain it was made with, and the hashes `upgrade` compares against |
+| `ui/` | With `mnkit add ui`: the browser UI |
 
 The wallet provider, the in-memory harness and the coin helpers are libraries
 (`@midnight-ntwrk/mnkit-wallet`, `mnkit-sim`, `mnkit-coins`), not copied code,
@@ -77,6 +126,9 @@ so fixes reach your project with `npm update`.
 | `mnkit compile` | Compile every contract under `contract/` with the pinned compiler. `--skip-zk` skips the proving keys |
 | `mnkit derive` | Fill the `@generated-stub` regions from the compiled contract |
 | `mnkit validate` | The devnet gate: compile, network up, wait for DUST, `test:local`, network down. `--keep-net`, `--report <file>` |
+| `mnkit add ui` | A browser UI in `ui/` for the compiled contract. `--contract <dir>`, `--private-state memory\|persistent`, `--dry-run`, `--skip-gate`, `--skip-install` |
+| `mnkit add contract <name>` | Another contract under `contract/`, wired in by the next `derive` |
+| `mnkit upgrade` | Move the project to this mnkit's templates and toolchain. `--check`, `--force`, `--skip-install` |
 | `mnkit doctor` | Check Node, Docker, the Compact compiler and the local network's ports |
 
 The project's `npm run compile`, `compile:fast`, `derive` and `validate`
@@ -107,9 +159,7 @@ from genesis, which takes a while on preprod.
 
 ## Status
 
-`mnkit` is new; expect changes before 1.0. Coming next: `mnkit add ui` (a
-browser UI with wallet connect), `mnkit add contract`, and `mnkit upgrade` to
-move a project to a newer toolchain. Issues and ideas:
+`mnkit` is new; expect changes before 1.0. Issues and ideas:
 [midnight-examples#59](https://github.com/midnightntwrk/midnight-examples/issues/59).
 
 ## License

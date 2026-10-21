@@ -3,7 +3,7 @@
 Browser frontend for `examples/private-party`: connect a Midnight wallet,
 deploy or join the contract, watch its public ledger, and call its circuits.
 
-Scaffolded by `yarn new:ui private-party` from `templates/ui/`. See
+Scaffolded by `yarn new:ui private-party` from `packages/mnkit/templates/ui/`. See
 `AGENTS.md` next to this file for which files are template-owned and
 which are yours, and for the verification checklist.
 
@@ -33,7 +33,7 @@ hint prints the command with your addresses.
 ## TODO: end-to-end verification with a wallet
 
 Not yet run. Everything below needs a human to approve wallet prompts. What *has* been
-verified is in `templates/ui/VERIFIED.md`, generated from this UI's
+verified is in `packages/mnkit/templates/ui/VERIFIED.md`, generated from this UI's
 `verification.json`. When you run these, tick them off. Once all pass, set
 `walletDeploy` and `walletCalls` to `verified` in `verification.json` (with the
 date and what ran), run `yarn new:ui private-party --sync`, and delete this section.

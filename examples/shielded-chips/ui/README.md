@@ -10,7 +10,7 @@ with the house in one browser profile and each player in their own.
 | Player | share your shielded address → bet RED or BLACK → claim 2x, or forfeit a losing bet |
 
 Scaffolded by `yarn new:ui shielded-chips --contract roulette` from
-`templates/ui/`. See `AGENTS.md` next to this file for which files are
+`packages/mnkit/templates/ui/`. See `AGENTS.md` next to this file for which files are
 template-owned and which are yours, and for the verification checklist.
 
 ## What this UI adds on top of the scaffold

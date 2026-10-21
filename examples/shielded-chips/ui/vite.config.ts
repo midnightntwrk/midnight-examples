@@ -6,7 +6,7 @@ import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
-// Vite is pinned to 6.4.3 in package.json on purpose: it matches the Vite that
+// Vite is pinned to 6.4.4 in package.json on purpose: it matches the Vite that
 // Yarn hoists to the repo root (see the root AGENTS.md). Asking for a different
 // major here could change what gets hoisted and break other examples' vitest
 // configs.

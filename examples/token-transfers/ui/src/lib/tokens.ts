@@ -6,7 +6,7 @@
 // which the UI can compute with `rawTokenType` from
 // @midnight-ntwrk/midnight-js-protocol/compact-runtime (see token-transfers).
 //
-// Template-owned: edit templates/ui/src/lib/tokens.ts, then
+// Template-owned: edit packages/mnkit/templates/ui/src/lib/tokens.ts, then
 // `yarn new:ui --sync-all`.
 
 /** NIGHT's color: `default<Bytes<32>>` in Compact, all zeros. */

@@ -937,6 +937,7 @@ __metadata:
     pino-pretty: "npm:^13.0.0"
     rxjs: "npm:^7.8.2"
     typescript: "npm:^5.7.0"
+    vite: "npm:6.4.4"
     vite-node: "npm:^6.0.0"
     vitest: "npm:^5.0.4"
     ws: "npm:^8.14.2"
@@ -1010,6 +1011,7 @@ __metadata:
     pino-pretty: "npm:^13.0.0"
     rxjs: "npm:^7.8.2"
     typescript: "npm:^5.7.0"
+    vite: "npm:6.4.4"
     vite-node: "npm:^6.0.0"
     vitest: "npm:^5.0.4"
     ws: "npm:^8.14.2"
@@ -1038,6 +1040,7 @@ __metadata:
     pino-pretty: "npm:^13.0.0"
     rxjs: "npm:^7.8.2"
     typescript: "npm:^5.7.0"
+    vite: "npm:6.4.4"
     vite-node: "npm:^6.0.0"
     vitest: "npm:^5.0.4"
     ws: "npm:^8.14.2"
@@ -1111,6 +1114,7 @@ __metadata:
     pino-pretty: "npm:^13.0.0"
     rxjs: "npm:^7.8.2"
     typescript: "npm:^5.7.0"
+    vite: "npm:6.4.4"
     vite-node: "npm:^6.0.0"
     vitest: "npm:^5.0.4"
     ws: "npm:^8.14.2"
@@ -1139,6 +1143,7 @@ __metadata:
     pino-pretty: "npm:^13.0.0"
     rxjs: "npm:^7.8.2"
     typescript: "npm:^5.7.0"
+    vite: "npm:6.4.4"
     vite-node: "npm:^6.0.0"
     vitest: "npm:^5.0.4"
     ws: "npm:^8.14.2"
@@ -1211,6 +1216,7 @@ __metadata:
     pino-pretty: "npm:^13.0.0"
     rxjs: "npm:^7.8.2"
     typescript: "npm:^5.7.0"
+    vite: "npm:6.4.4"
     vite-node: "npm:^6.0.0"
     vitest: "npm:^5.0.4"
     ws: "npm:^8.14.2"
@@ -1241,6 +1247,7 @@ __metadata:
     pino-pretty: "npm:^13.0.0"
     rxjs: "npm:^7.8.2"
     typescript: "npm:^5.7.0"
+    vite: "npm:6.4.4"
     vite-node: "npm:^6.0.0"
     vitest: "npm:^5.0.4"
     ws: "npm:^8.14.2"
@@ -1269,6 +1276,7 @@ __metadata:
     pino-pretty: "npm:^13.0.0"
     rxjs: "npm:^7.8.2"
     typescript: "npm:^5.7.0"
+    vite: "npm:6.4.4"
     vite-node: "npm:^6.0.0"
     vitest: "npm:^5.0.4"
     ws: "npm:^8.14.2"
@@ -1342,6 +1350,7 @@ __metadata:
     pino-pretty: "npm:^13.0.0"
     rxjs: "npm:^7.8.2"
     typescript: "npm:^5.7.0"
+    vite: "npm:6.4.4"
     vite-node: "npm:^6.0.0"
     vitest: "npm:^5.0.4"
     ws: "npm:^8.14.2"
@@ -1370,6 +1379,7 @@ __metadata:
     pino-pretty: "npm:^13.0.0"
     rxjs: "npm:^7.8.2"
     typescript: "npm:^5.7.0"
+    vite: "npm:6.4.4"
     vite-node: "npm:^6.0.0"
     vitest: "npm:^5.0.4"
     ws: "npm:^8.14.2"
@@ -1442,6 +1452,7 @@ __metadata:
     pino-pretty: "npm:^13.0.0"
     rxjs: "npm:^7.8.2"
     typescript: "npm:^5.7.0"
+    vite: "npm:6.4.4"
     vite-node: "npm:^6.0.0"
     vitest: "npm:^5.0.4"
     ws: "npm:^8.14.2"
@@ -1475,7 +1486,7 @@ __metadata:
     react-dom: "npm:^19.2.3"
     rxjs: "npm:^7.8.1"
     typescript: "npm:^5.9.3"
-    vite: "npm:^6.3.5"
+    vite: "npm:6.4.4"
     vite-plugin-node-polyfills: "npm:^0.24.0"
     vite-plugin-top-level-await: "npm:^1.5.0"
     vite-plugin-wasm: "npm:^3.4.1"
@@ -1506,6 +1517,7 @@ __metadata:
     restify: "npm:^12.0.0"
     rxjs: "npm:^7.8.2"
     typescript: "npm:^5.7.0"
+    vite: "npm:6.4.4"
     vite-node: "npm:^6.0.0"
     vitest: "npm:^5.0.4"
     ws: "npm:^8.14.2"
@@ -1678,6 +1690,7 @@ __metadata:
     "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
     "@types/node": "npm:^22.0.0"
     typescript: "npm:^5.7.0"
+    vite: "npm:6.4.4"
     vitest: "npm:^5.0.4"
   peerDependencies:
     "@midnight-ntwrk/midnight-js-protocol": ~4.1.1
@@ -1691,6 +1704,7 @@ __metadata:
     "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
     "@types/node": "npm:^22.0.0"
     typescript: "npm:^5.7.0"
+    vite: "npm:6.4.4"
     vitest: "npm:^5.0.4"
   peerDependencies:
     "@midnight-ntwrk/midnight-js-protocol": ~4.1.1
@@ -7222,6 +7236,7 @@ __metadata:
   resolution: "mn-examples@workspace:."
   dependencies:
     bn.js: "npm:5.2.5"
+    vite: "npm:6.4.4"
     vitest: "npm:^5.0.4"
   languageName: unknown
   linkType: soft
@@ -7230,6 +7245,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "mnkit@workspace:packages/mnkit"
   dependencies:
+    vite: "npm:6.4.4"
     vitest: "npm:^5.0.4"
   bin:
     mnkit: bin/mnkit.mjs
@@ -9508,7 +9524,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"vite@npm:6.4.4, vite@npm:^6.3.5":
+"vite@npm:6.4.4":
   version: 6.4.4
   resolution: "vite@npm:6.4.4"
   dependencies:

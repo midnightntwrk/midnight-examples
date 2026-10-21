@@ -25,6 +25,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pinFor } from '../packages/mnkit/src/lib/toolchain.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const tc = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'toolchain.json'), 'utf8'));
@@ -64,6 +65,7 @@ const projects = [
     ['Node.js', /^\| Node\.js \| `([^`]+)` /m, tc.node],
     ['Yarn', /^\| Yarn \| `([^`]+)` /m, tc.yarn],
     ['Vitest', /^\| Vitest \| `([^`]+)` \|/m, tc.npm.vitest],
+    ['Vite', /^\| Vite \| `([^`]+)` \|/m, tc.npm.vite],
   ];
   for (const [label, re, want] of rows) expect('README.md toolchain table', label, re.exec(src)?.[1], want);
 }
@@ -105,26 +107,14 @@ for (const dir of projects) {
 }
 
 // --- package.json pins ---------------------------------------------------------
-// The exact pins: every midnight-js-* package, testkit-js, wallet-sdk and
-// dapp-connector-api. vitest is a caret range on the pinned floor. A runtime
-// package's peerDependencies take a tilde range on the pin, so a project can
-// pick up patch releases without a peer conflict.
-const pinFor = (pkg) => {
-  if (pkg.startsWith('@midnight-ntwrk/midnight-js-')) return tc.npm['midnight-js'];
-  if (pkg === '@midnight-ntwrk/testkit-js') return tc.npm['testkit-js'];
-  if (pkg === '@midnight-ntwrk/wallet-sdk') return tc.npm['wallet-sdk'];
-  if (pkg === '@midnight-ntwrk/dapp-connector-api') return tc.npm['dapp-connector-api'];
-  if (pkg === 'vitest') return `^${tc.npm.vitest}`;
-  return null;
-};
+// The pins: pinFor (packages/mnkit/src/lib/toolchain.mjs), shared with `mnkit upgrade`.
 for (const dir of projects) {
   const f = path.join(dir, 'package.json');
   const p = JSON.parse(read(f));
   expect(rel(f), 'engines.node', p.engines?.node, `>=${tc.node}.0.0`);
   for (const field of ['dependencies', 'devDependencies', 'peerDependencies']) {
     for (const [pkg, spec] of Object.entries(p[field] ?? {})) {
-      const pin = pinFor(pkg);
-      const want = pin && field === 'peerDependencies' && !pin.startsWith('^') ? `~${pin}` : pin;
+      const want = pinFor(tc, pkg, { peer: field === 'peerDependencies' });
       if (want) expect(rel(f), `${field}["${pkg}"]`, spec, want);
     }
   }

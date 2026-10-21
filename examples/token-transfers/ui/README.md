@@ -4,7 +4,7 @@ Browser frontend for `examples/token-transfers`: connect a Midnight wallet,
 deploy or join the contract, and move unshielded and shielded tokens between
 the contract and your wallet.
 
-Scaffolded by `yarn new:ui token-transfers` from `templates/ui/`. See
+Scaffolded by `yarn new:ui token-transfers` from `packages/mnkit/templates/ui/`. See
 `AGENTS.md` next to this file for which files are template-owned and
 which are yours, and for the verification checklist.
 
@@ -49,7 +49,7 @@ devnet, `yarn fund:wallet <mn_dust_…> <mn_addr_…>` arranges both.
 ## TODO: end-to-end verification with a wallet
 
 Not yet run. Everything below needs a human to approve wallet prompts. What *has* been
-verified is in `templates/ui/VERIFIED.md`, generated from this UI's
+verified is in `packages/mnkit/templates/ui/VERIFIED.md`, generated from this UI's
 `verification.json`. When you run these, tick them off. Once all pass, set
 `walletDeploy` and `walletCalls` to `verified` in `verification.json` (with the
 date and what ran), run `yarn new:ui token-transfers --sync`, and delete this section.

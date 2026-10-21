@@ -17,7 +17,9 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { PKG_ROOT, cleanup, scaffoldFixture, snapshot, tmpDir } from './helpers.mjs';
+import { renderExample } from '../src/lib/scaffold.mjs';
+import { writeFiles } from '../src/lib/template.mjs';
+import { FIXTURES, PKG_ROOT, TEMPLATE_DIR, cleanup, placeCompiled, scaffoldFixture, snapshot, tmpDir } from './helpers.mjs';
 
 afterEach(cleanup);
 
@@ -59,5 +61,56 @@ describe('mnkit CLI', () => {
     const r = mnkit(tmpDir(), 'derive');
     expect(r.status).toBe(1);
     expect(r.stderr).toContain('✖ no compiled contract under contract/managed/');
+  });
+
+  describe('add contract', () => {
+    /** A fresh private-tip-jar project with only its own contract written. */
+    const project = () => {
+      const dir = tmpDir();
+      writeFiles(dir, renderExample(TEMPLATE_DIR, { name: 'private-tip-jar', witnesses: true }));
+      fs.copyFileSync(
+        path.join(FIXTURES, 'private-tip-jar', 'contract', 'private-tip-jar.compact'),
+        path.join(dir, 'contract', 'private-tip-jar.compact'),
+      );
+      fs.writeFileSync(path.join(dir, 'mnkit.json'), JSON.stringify({ name: 'private-tip-jar' }));
+      return dir;
+    };
+
+    it('writes a stub that compile and derive then wire in', () => {
+      const dir = project();
+      const r = mnkit(dir, 'add', 'contract', 'tip-token');
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.stdout).toContain('✔ Created contract/tip-token.compact');
+      const stub = fs.readFileSync(path.join(dir, 'contract', 'tip-token.compact'), 'utf8');
+      expect(stub).toBe(fs.readFileSync(path.join(TEMPLATE_DIR, 'contract', '__name__.compact'), 'utf8'));
+
+      // The author writes it and compiles: stand in the fixture's source and output.
+      fs.copyFileSync(path.join(FIXTURES, 'private-tip-jar', 'contract', 'tip-token.compact'), path.join(dir, 'contract', 'tip-token.compact'));
+      placeCompiled('private-tip-jar', dir);
+      const d = mnkit(dir, 'derive');
+      expect(d.status, d.stderr).toBe(0);
+      expect(fs.readFileSync(path.join(dir, 'contract', 'index.ts'), 'utf8')).toContain('export const CompiledTipTokenContract');
+      expect(fs.readFileSync(path.join(dir, 'src', 'test', 'private-tip-jar.test.ts'), 'utf8')).toContain("it('deploys tip-token'");
+    });
+
+    it('refuses bad names, the primary contract, an existing file and a non-project directory', () => {
+      const dir = project();
+      const cases = [
+        [dir, ['add', 'contract', 'TipToken'], "invalid contract name 'TipToken'"],
+        [dir, ['add', 'contract', 'private-tip-jar'], "is the project's own contract"],
+        [dir, ['add', 'contract'], 'takes one name'],
+        [dir, ['add', 'frob'], 'mnkit add takes one of: contract'],
+        [tmpDir(), ['add', 'contract', 'tip-token'], 'run this from a project directory'],
+      ];
+      for (const [cwd, args, message] of cases) {
+        const r = mnkit(cwd, ...args);
+        expect(r.status, args.join(' ')).toBe(1);
+        expect(r.stderr).toContain(message);
+      }
+      fs.writeFileSync(path.join(dir, 'contract', 'tip-token.compact'), '// mine\n');
+      const r = mnkit(dir, 'add', 'contract', 'tip-token');
+      expect(r.stderr).toContain('contract/tip-token.compact already exists');
+      expect(fs.readFileSync(path.join(dir, 'contract', 'tip-token.compact'), 'utf8')).toBe('// mine\n');
+    });
   });
 });

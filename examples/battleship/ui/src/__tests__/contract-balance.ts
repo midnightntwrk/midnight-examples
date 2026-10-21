@@ -8,7 +8,7 @@
 // reaches a balance check must say what the chain would hold at that point,
 // e.g. `entryFee * checkedIn` after that many paid check-ins.
 //
-// Template-owned: edit templates/ui/src/__tests__/contract-balance.ts, then
+// Template-owned: edit packages/mnkit/templates/ui/src/__tests__/contract-balance.ts, then
 // `yarn new:ui --sync-all`. A module, not a test: vitest only runs *.test.ts.
 import type { CircuitContext } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
 import { nativeToken } from "@midnight-ntwrk/midnight-js-protocol/ledger";

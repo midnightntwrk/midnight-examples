@@ -18,7 +18,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { packageSpecs } from '../src/commands/init.mjs';
-import { KNOWN_TOKENS, RUNTIME_PACKAGES, fileHash, isTemplateOwned, renderExample, selectBlocks } from '../src/lib/scaffold.mjs';
+import {
+  KNOWN_TOKENS,
+  RUNTIME_PACKAGES,
+  fileHash,
+  isTemplateOwned,
+  npmOverrides,
+  renderExample,
+  selectBlocks,
+} from '../src/lib/scaffold.mjs';
 import { loadToolchain } from '../src/lib/toolchain.mjs';
 import { PKG_ROOT, TEMPLATE_DIR, cleanup, tmpDir } from './helpers.mjs';
 
@@ -36,6 +44,12 @@ describe('selectBlocks', () => {
   it('keeps the lines of the chosen mode and drops the markers', () => {
     expect(selectBlocks(src, 'monorepo')).toBe('a\nmono\nb');
     expect(selectBlocks(src, 'standalone')).toBe('a\nsolo\nb');
+  });
+
+  it('passes other @if blocks through, inside and around mode blocks', () => {
+    const text = ['// @if ledger', 'l', '// @if standalone', 'solo', '// @endif', '// @endif', '// @if monorepo', '// @if tokens', 't', '// @endif', '// @endif'].join('\n');
+    expect(selectBlocks(text, 'standalone')).toBe(['// @if ledger', 'l', 'solo', '// @endif'].join('\n'));
+    expect(selectBlocks(text, 'monorepo')).toBe(['// @if ledger', 'l', '// @endif', '// @if tokens', 't', '// @endif'].join('\n'));
   });
 
   it.each([
@@ -96,7 +110,9 @@ describe('renderExample in standalone mode', () => {
     expect(pkg.scripts['test:local']).toBe(`MIDNIGHT_NETWORK=local ${pkg.scripts.test}`);
     for (const p of RUNTIME_PACKAGES) expect(pkg.dependencies[p]).toBe('^0.1.0');
     expect(pkg.devDependencies.mnkit).toBe('^0.1.0');
-    expect(pkg.overrides).toEqual(tc.overrides);
+    expect(pkg.overrides).toEqual(npmOverrides(tc.overrides));
+    expect(pkg.overrides['vite-plugin-top-level-await']).toEqual({ '@swc/core': '1.15.47', uuid: '11.1.1' });
+    expect(pkg.overrides['@midnight-ntwrk/wallet-sdk']).toBe(tc.npm['wallet-sdk']);
     expect(pkg.engines.node).toBe(`>=${tc.node}.0.0`);
   });
 

@@ -72,8 +72,8 @@ yarn spec:lint <name> [--design]        # SPEC.md alone, then against the compil
 yarn pipeline <name> [--json]           # run the next scripts and gates; prints what to do next
 yarn pipeline <name> --wait-devnet      # block until the background devnet run finishes
 yarn new:ui <name>                      # phase 2: scaffold its browser UI (after the in-memory gate passes)
-yarn new:ui <name> --check              # template-owned UI files still match templates/ui
-yarn new:ui --sync-all                  # after editing templates/ui: sync every UI (+ yarn install)
+yarn new:ui <name> --check              # template-owned UI files still match packages/mnkit/templates/ui
+yarn new:ui --sync-all                  # after editing packages/mnkit/templates/ui: sync every UI (+ yarn install)
 yarn new:ui --check-all                 # CI's drift check for every UI, plus install --immutable
 yarn fund:wallet <mn_dust_…> [mn_addr_…]  # local devnet: DUST (and NIGHT) for a browser wallet
 ```
@@ -182,11 +182,11 @@ for a newcomer is the [Learning path](README.md#learning-path) in the root READM
   files: `src/midnight/<name>-api.ts`, `src/components/<name>-panel.tsx` and
   `src/__tests__/<name>-circuits.test.ts`. Record the checks CI can't run
   (browser, wallet, preprod) in `ui/verification.json`; `--check` keeps
-  `templates/ui/VERIFIED.md` in step with it, and it is the only place that
+  `packages/mnkit/templates/ui/VERIFIED.md` in step with it, and it is the only place that
   says what a UI has been verified to do. Generic UI changes go in
-  `templates/ui/`, followed by `yarn new:ui <name> --sync`; CI runs `--check` on
+  `packages/mnkit/templates/ui/`, followed by `yarn new:ui <name> --sync`; CI runs `--check` on
   every generated UI. Details, pins and the verification checklist are in
-  `templates/ui/AGENTS.md`, which every generated UI carries as `ui/AGENTS.md`.
+  `packages/mnkit/templates/ui/AGENTS.md`, which every generated UI carries as `ui/AGENTS.md`.
 - The scripted generation pipeline (prompt → SPEC → scaffold → contract →
   derive → witnesses and tests → `new:ui` and UI code, with the devnet in the
   background → serve), with each step's gate and fix loop, is in

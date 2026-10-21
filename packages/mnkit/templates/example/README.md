@@ -73,4 +73,18 @@ After you change the contract, run `npm run compile:fast` and then
 `npx mnkit derive`. It refreshes the generated stubs (witnesses, constructor
 arguments, a test per circuit) that you haven't edited, and leaves everything
 else alone.
+
+## Add more
+
+- `npx mnkit add ui`: a browser UI in `ui/` (run `npm run compile` first; it
+  needs the proving keys). See `ui/README.md` once it exists.
+- `npx mnkit add contract <name>`: another contract under `contract/`, wired
+  in by the next `npx mnkit derive`.
+
+## Upgrade
+
+`npm install --save-dev mnkit@latest && npx mnkit upgrade` moves the project to
+the newer mnkit's templates and toolchain. Files you haven't edited are
+replaced; for a file you and the template both changed, the new version is
+written next to yours as `<file>.mnkit-new`.
 <!-- @endif -->
