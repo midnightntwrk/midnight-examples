@@ -110,12 +110,14 @@ export circuit claimFees(address: UserAddress, _secret: Bytes<32>): [] {
     partyState = PartyState.FEES_CLAIMED;
 }
 
-circuit commitAddress(_address: Bytes<32>, _secret: Bytes<32>): Bytes<32> {
+// commit to the guest's address, salted with their secret: the commitment
+// hides the address, and only someone holding the same secret can recompute it
+circuit commitAddress(_secret: Bytes<32>, _address: Bytes<32>): Bytes<32> {
     return persistentCommit<Bytes<32>>(_address, _secret);
 }
 
 // hash a publicKey specific to this DApp so that users cannot be tracked
-// the _secret should be a highly complex one
+// the _secret should be 32 random bytes: anyone who can guess it holds the key
 circuit getDappPublicKey(_secret: Bytes<32>): Bytes<32> {
     return persistentHash<Vector<2, Bytes<32>>>([pad(32, "private-party:pk:"), _secret]);
 }

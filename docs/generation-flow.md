@@ -183,7 +183,7 @@ you have what you need.
 |---|---|---|
 | 1 (design) | [`templates/example/SPEC.md`](../templates/example/SPEC.md); [`examples/private-tip-jar/SPEC.md`](../examples/private-tip-jar/SPEC.md) as a worked example; [`patterns.md`](patterns.md) to find the nearest example | Any code |
 | 3a (contract) | [`compact-gotchas.md`](compact-gotchas.md) (~1.5K tokens); [`patterns.md`](patterns.md) (~1.5K tokens) to pick the 1–2 nearest examples; their `contract/*.compact`; this example's `SPEC.md` | `src/wallet.ts`, `src/providers.ts`, `src/config.ts`, `scripts/wait-for-dust.ts`, `compose.yml` (identical in every example); the narrative parts of `tutorials/*.mdx`, `TUTORIAL.md` and `LESSONS.md`; examples unrelated to the use case |
-| 3c (witnesses, tests) | The derived stubs; the nearest examples' `contract/witnesses.ts` and test bodies after `Your tests begin here`; `examples/calculator/src/test/calculator.sim.test.ts` and `examples/private-tip-jar/src/test/private-tip-jar.sim.test.ts` as models, and [`packages/sim/src/sim.ts`](../packages/sim/src/sim.ts) / [`privacy.ts`](../packages/sim/src/privacy.ts) if you need more of the in-memory API. Shielded coins: [`packages/coins/src/index.ts`](../packages/coins/src/index.ts) (token color, `takeCoin`, balances, minting to a wallet) instead of the coin helpers above `private-tip-jar`'s marker; read its multi-wallet setup there only if the suite needs a second wallet. A second contract (a test token) is wired by `--derive`. The template's `src/wallet.ts` already has `splitShieldedCoin` and `getShieldedAddress`, and `src/providers.ts` a unique private-state store name per provider set: no need to compare them with an example | The rest of the setup above a test's marker; `contract/managed/` beyond the generated `index.d.ts` |
+| 3c (witnesses, tests) | The derived stubs; the nearest examples' `contract/witnesses.ts` and test bodies after `Your tests begin here`; `examples/calculator/src/test/calculator.sim.test.ts` and `examples/private-tip-jar/src/test/private-tip-jar.sim.test.ts` as models, and [`packages/sim/src/sim.ts`](../packages/sim/src/sim.ts) / [`privacy.ts`](../packages/sim/src/privacy.ts) if you need more of the in-memory API. Shielded coins: [`packages/coins/src/index.ts`](../packages/coins/src/index.ts) (token color, `freshCoin` for a coin argument, balances, minting to a wallet) instead of the coin helpers above `private-tip-jar`'s marker; read its multi-wallet setup there only if the suite needs a second wallet. A second contract (a test token) is wired by `--derive`. The template's `src/wallet.ts` already has `splitShieldedCoin` and `getShieldedAddress`, and `src/providers.ts` a unique private-state store name per provider set: no need to compare them with an example | The rest of the setup above a test's marker; `contract/managed/` beyond the generated `index.d.ts` |
 | 3, on a gate failure | The failing gate's output first. If `compact-gotchas.md` doesn't explain it, then the `midnight-expert` skills (`compact-core`, `midnight-verify`) or the linked `LESSONS.md`/`TUTORIAL.md` section | Whole tutorials (`tutorials/*.mdx`, `TUTORIAL.md`) |
 | 6 (UI seed files) | [`templates/ui/AGENTS.md`](../templates/ui/AGENTS.md) §3 and §5 and the Gotchas; the nearest `examples/*/ui/` seed files (listed under its "Worked examples") | Template-owned UI files; `examples/zk-loan/ui` (hand-built, not authoritative) |
 
@@ -216,9 +216,11 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
   neither: `Sim` takes made-up coins (`simCoin`).
 - **Two-wallet setup is still per example.** A suite with a second wallet
   (tipper and owner) copies `private-tip-jar`'s `buildWallet(role)`.
-- **Older examples keep their own coin helpers.** `private-tip-jar` and
-  `shielded-chips` weren't moved to `example-coins`, so the nearest example
-  can still show local copies.
+- **Older examples keep some coin helpers of their own.** `private-tip-jar`
+  and `shielded-chips` take their coin arguments (`freshCoin`, `simCoin`) and
+  the escrow index (`contractCoinMtIndex`) from `example-coins`, but still read
+  wallet coins and balances with local helpers, so the nearest example can
+  still show local copies of those.
 - **Serving (step 7).** Serving stops at the local Vite dev server; there is no
   deploy target in this repo.
 - **Browser verification.** The checks in `verification.json` (wallet, browser)
@@ -230,6 +232,17 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
 
 ## Changelog
 
+- 2026-10-17: A `ShieldedCoinInfo` argument is a new coin the transaction
+  creates, which the wallet pays for, so tests pass `freshCoin(color, value)`
+  (new in `@midnight-ntwrk/example-coins`) instead of a wallet coin.
+  `takeCoin` is deprecated, `--derive`'s devnet hints, the pipeline and the
+  devnet triage name `freshCoin`, and a `QualifiedShieldedCoinInfo` argument
+  is hinted as a coin the contract holds. The template's `splitShieldedCoin`
+  stays, but nothing needs it before paying a contract.
+  `private-tip-jar` and `shielded-chips` dropped their in-contract re-send to
+  `kernel.self()` and use `freshCoin`. `example-coins` also gained
+  `contractCoinMtIndex`: the tree index of a coin a transaction created for a
+  contract that doesn't store it (shielded-chips' escrow).
 - 2026-10-07: Phase 4. Shielded-coin helpers live in a shared package,
   `@midnight-ntwrk/example-coins` (`packages/coins`): `tokenColor`,
   `takeCoin`, `shieldedBalance`, `waitForShieldedBalance`, `recipientOf`,

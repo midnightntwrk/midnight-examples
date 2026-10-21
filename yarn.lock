@@ -907,7 +907,7 @@ __metadata:
     tailwind-merge: "npm:^3.0.0"
     tailwindcss: "npm:^4.1.0"
     typescript: "npm:^5.7.0"
-    vite: "npm:6.4.3"
+    vite: "npm:6.4.4"
     vite-plugin-node-polyfills: "npm:^0.24.0"
     vite-plugin-top-level-await: "npm:^1.6.0"
     vite-plugin-wasm: "npm:^3.6.0"
@@ -979,7 +979,7 @@ __metadata:
     tailwind-merge: "npm:^3.0.0"
     tailwindcss: "npm:^4.1.0"
     typescript: "npm:^5.7.0"
-    vite: "npm:6.4.3"
+    vite: "npm:6.4.4"
     vite-plugin-node-polyfills: "npm:^0.24.0"
     vite-plugin-top-level-await: "npm:^1.6.0"
     vite-plugin-wasm: "npm:^3.6.0"
@@ -1016,7 +1016,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@midnight-ntwrk/example-coins@workspace:packages/coins":
+"@midnight-ntwrk/example-coins@workspace:^, @midnight-ntwrk/example-coins@workspace:packages/coins":
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-coins@workspace:packages/coins"
   dependencies:
@@ -1112,7 +1112,7 @@ __metadata:
     tailwind-merge: "npm:^3.0.0"
     tailwindcss: "npm:^4.1.0"
     typescript: "npm:^5.7.0"
-    vite: "npm:6.4.3"
+    vite: "npm:6.4.4"
     vite-plugin-node-polyfills: "npm:^0.24.0"
     vite-plugin-top-level-await: "npm:^1.6.0"
     vite-plugin-wasm: "npm:^3.6.0"
@@ -1213,7 +1213,7 @@ __metadata:
     tailwind-merge: "npm:^3.0.0"
     tailwindcss: "npm:^4.1.0"
     typescript: "npm:^5.7.0"
-    vite: "npm:6.4.3"
+    vite: "npm:6.4.4"
     vite-plugin-node-polyfills: "npm:^0.24.0"
     vite-plugin-top-level-await: "npm:^1.6.0"
     vite-plugin-wasm: "npm:^3.6.0"
@@ -1253,6 +1253,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-private-tip-jar@workspace:examples/private-tip-jar"
   dependencies:
+    "@midnight-ntwrk/example-coins": "workspace:^"
     "@midnight-ntwrk/example-fast-sync": "workspace:^"
     "@midnight-ntwrk/example-sim": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
@@ -1342,7 +1343,7 @@ __metadata:
     tailwind-merge: "npm:^3.0.0"
     tailwindcss: "npm:^4.1.0"
     typescript: "npm:^5.7.0"
-    vite: "npm:6.4.3"
+    vite: "npm:6.4.4"
     vite-plugin-node-polyfills: "npm:^0.24.0"
     vite-plugin-top-level-await: "npm:^1.6.0"
     vite-plugin-wasm: "npm:^3.6.0"
@@ -1354,6 +1355,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-shielded-chips@workspace:examples/shielded-chips"
   dependencies:
+    "@midnight-ntwrk/example-coins": "workspace:^"
     "@midnight-ntwrk/example-fast-sync": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
@@ -1453,7 +1455,7 @@ __metadata:
     tailwind-merge: "npm:^3.0.0"
     tailwindcss: "npm:^4.1.0"
     typescript: "npm:^5.7.0"
-    vite: "npm:6.4.3"
+    vite: "npm:6.4.4"
     vite-plugin-node-polyfills: "npm:^0.24.0"
     vite-plugin-top-level-await: "npm:^1.6.0"
     vite-plugin-wasm: "npm:^3.6.0"
@@ -6109,12 +6111,12 @@ __metadata:
   linkType: hard
 
 "follow-redirects@npm:^1.16.0":
-  version: 1.16.0
-  resolution: "follow-redirects@npm:1.16.0"
+  version: 1.16.1
+  resolution: "follow-redirects@npm:1.16.1"
   peerDependenciesMeta:
     debug:
       optional: true
-  checksum: 10c0/a1e2900163e6f1b4d1ed5c221b607f41decbab65534c63fe7e287e40a5d552a6496e7d9d7d976fa4ba77b4c51c11e5e9f683f10b43011ea11e442ff128d0e181
+  checksum: 10c0/544e24ccb93b7afb5dd5a2199bd556e167b84de2af7c13b2ced08494239677359d7883bae56ae43a9ca98ac5451e75cf4834a5fadd6fa79053b9248fac5447a4
   languageName: node
   linkType: hard
 
@@ -9712,9 +9714,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"vite@npm:6.4.3, vite@npm:^6.3.5":
-  version: 6.4.3
-  resolution: "vite@npm:6.4.3"
+"vite@npm:6.4.4, vite@npm:^6.3.5":
+  version: 6.4.4
+  resolution: "vite@npm:6.4.4"
   dependencies:
     esbuild: "npm:^0.25.0"
     fdir: "npm:^6.4.4"
@@ -9763,7 +9765,7 @@ __metadata:
       optional: true
   bin:
     vite: bin/vite.js
-  checksum: 10c0/23ce22e50d5c7a87321f04b155c5bc3cf915e34e6c40918975741ed5e8b0c257039a643f1bc1cd829ee814ad92a138704e82084b7ebe40b399a62d8effea630c
+  checksum: 10c0/47cdacbf7b370c7962326238bd0d206c9d56d72e1e7b14f9fb0edca369d3dfa8d0fd7f16eb3c0d448959eb7c6969ff33a126039be06f216b232c47e63c49ba9b
   languageName: node
   linkType: hard
 

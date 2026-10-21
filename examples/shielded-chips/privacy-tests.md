@@ -3,8 +3,9 @@
 Verifies that the DApp runs end-to-end on a local devnet **and** that its
 documented privacy assumptions actually hold against live on-chain state.
 
-- **Date:** 2026-09-24 (first run in the `mn-examples` monorepo; the original
-  report from the standalone repo was dated 2026-07-30 with the same results)
+- **Date:** 2026-10-17 (after switching every `receiveShielded` argument to a
+  fresh coin and dropping `houseDeposit`'s re-send; earlier runs: 2026-09-24,
+  first in the `mn-examples` monorepo, and 2026-07-30 in the standalone repo)
 - **Toolchain:** compact 0.31.1, Node 22, Yarn 4 (repo-pinned)
 - **Devnet images:** `midnight-node:1.0.0`, `indexer-standalone:4.3.3`, `proof-server:8.1.0`
 - **Language:** `pragma language_version 0.23`
@@ -17,7 +18,7 @@ documented privacy assumptions actually hold against live on-chain state.
 (`chips.compact` → 11 circuits, `roulette.compact` → 6 circuits). `yarn
 test:local` then drove the whole flow against the live devnet with real proofs.
 
-**`src/test/roulette.test.ts` — 17 passed / 17 (419 s):**
+**`src/test/roulette.test.ts` — 17 passed / 17 (408 s):**
 
 | Test | Result |
 |---|---|
@@ -25,7 +26,7 @@ test:local` then drove the whole flow against the live devnet with real proofs.
 | Alice mints chips to herself (2 for matches), Bob, and Charlie | ✅ |
 | Alice deploys the roulette contract bound to the chip color | ✅ |
 | Alice deposits two match coins so the house can cover both bets | ✅ |
-| Bob re-nonces his chips in his own wallet before betting | ✅ |
+| A deposit cannot reuse a pool key, so no match coin can be overwritten | ✅ |
 | Bob bets RED with a 100-chip coin | ✅ |
 | Charlie bets BLACK with a 100-chip coin | ✅ |
 | Alice reveals the winning number (RED) | ✅ |
@@ -49,7 +50,7 @@ should never leak, then queries the **actual on-chain public ledger state** of
 both contracts back from the indexer and asserts the secrets are absent. Run it
 with `LOG_LEVEL=info` to see the captured nonces and pseudonym logged.
 
-**`src/test/privacy.test.ts` — 12 passed / 12 (185 s):**
+**`src/test/privacy.test.ts` — 12 passed / 12 (179 s):**
 
 | # | Claim under test | Result |
 |---|---|---|
@@ -60,7 +61,7 @@ with `LOG_LEVEL=info` to see the captured nonces and pseudonym logged.
 | **P5** | behavior *is* public — pseudonym, bet color (RED), bet value (100), paid outcome all readable | ✅ |
 | **P6** | winning number private pre-reveal — only a 32-byte hash on chain, `winningColor` still default | ✅ |
 | **P7** | recipient-private mint — Bob's minted-coin nonce leaves no trace in chips public state | ✅ |
-| **P8** | issuer residual mitigated — self-transfer produces a nonce ≠ the minted one | ✅ |
+| **P8** | issuer unlinkability — Bob bets a fresh coin: its nonce ≠ the minted one, the minted coin is spent, and its nonce is absent from roulette public state | ✅ |
 
 (The remaining four of the twelve are the setup, bet, and reveal/claim steps
 that capture the secrets, plus a closing summary check.)

@@ -112,10 +112,10 @@ house), Bob, and Charlie.
 2. Alice deploys `roulette.compact`, binding it to the chip token's color, and
    commits to the winning number (`persistentHash(num, sk)`).
 3. Alice deposits her two match coins with `houseDeposit`.
-4. Bob re-nonces his chips with a self-transfer first (see
-   `splitShieldedCoin`), then bets RED; Charlie bets BLACK. Each sends their
-   chip coin into the contract, which takes custody but records only a
-   *commitment* to the coin under their pseudonym.
+4. Bob bets RED; Charlie bets BLACK. Each passes a fresh 100-chip coin (random
+   nonce) that their wallet pays for from the chips Alice minted them. The
+   contract takes custody but records only a *commitment* to the coin under
+   their pseudonym.
 5. Alice calls `revealWinningNumber(1)`; 1 is RED on a single-zero wheel, so Bob wins.
 6. Bob claims 2× in a single `claimWinnings(matchKey)` call. It reopens his
    escrow commitment from private state and merges his coin with one of
@@ -172,6 +172,8 @@ shape this code:
    from the first input. Merging the other way round would derive the payout
    nonce from a house coin sitting in public state, and the winner could be
    identified.
+3. Every coin a circuit takes (`houseDeposit`, `betColor`, `burn`) is a fresh
+   coin with a random nonce, not one of the wallet's coins. See below.
 
 ### What is private
 
@@ -194,13 +196,25 @@ shape this code:
   `theHouse` anyway. A player-facing contract should not expose a participant
   this way.
 
-### Residual: the chip issuer
+### Coins as circuit arguments are fresh
 
-The issuer knows the exact coin it minted you. If you bet that coin untouched,
-the issuer (and nobody else) can still recognise it. `splitShieldedCoin` in
-`src/wallet.ts` self-transfers first, replacing the coin with one whose nonce is
-wallet-chosen randomness the issuer has never seen. The tests do this for Bob
-and assert the nonce actually changes.
+The coin you pass to a circuit that calls `receiveShielded` is not one of your
+wallet's coins. It describes the new coin the transaction creates for the
+contract, and your wallet pays for it from whichever chips it selects, taking
+change back under fresh nonces. So the client builds it with
+`createShieldedCoinInfo(color, amount)`. Its nonce is then in no commitment but
+the contract's own, and nobody else has seen it. That includes the chip issuer,
+who knows the coin it minted you.
+
+Passing a wallet coin's nonce instead would hand the issuer (or whoever sent
+you that coin) the escrow nonce, and with it your payout. The contract can't
+tell a fresh nonce from a reused one, so this is the client's job. The tests
+and the UI both do it, and `privacy.test.ts` (P8) checks that the minted coin's
+nonce never reaches public state.
+
+The house's deposits are fresh coins too, so `houseDeposit` stores each one
+under its own nonce. The key is caller-chosen, so the circuit refuses a nonce
+that is already in `houseCoins`.
 
 ## Caveats
 

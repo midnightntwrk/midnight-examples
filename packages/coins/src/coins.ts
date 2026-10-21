@@ -1,24 +1,31 @@
 // Shielded-coin helpers for the examples' tests.
 //
 // A contract that takes a shielded coin (a tip, a bet, a deposit) declares a
-// `ShieldedCoinInfo` argument: { nonce, color, value }. The wallet holds the
-// same coin as hex strings plus a Merkle index. Every shielded example used to
-// write its own converters for that, plus the token-color derivation and the
-// balance polling. They live here instead.
+// `ShieldedCoinInfo` argument: { nonce, color, value }, and calls
+// `receiveShielded` on it. That argument is not one of the wallet's coins. It
+// describes a NEW coin the transaction creates for the contract, and the
+// wallet pays for it from whichever coins it selects, making change. So the
+// argument comes from `freshCoin(color, value)`, with a random nonce. Never
+// copy a wallet coin's nonce into it: that nonce is also in the wallet coin's
+// commitment, so publishing it (or anything derived from it) links the
+// contract's coin to that wallet coin, and whoever minted or sent it to you
+// knows it.
 //
-// The helpers take a structural wallet (CoinWallet), not an example's
-// MidnightWalletProvider, because each example owns its src/wallet.ts and they
-// drift. Any provider with `wallet.waitForSyncedState()` and the two public
-// keys fits. The re-nonce self-transfer stays in src/wallet.ts
-// (`splitShieldedCoin`): it needs the wallet's secret keys.
+// Every shielded example used to write its own converters, token-color
+// derivation and balance polling. They live here instead. The helpers take a
+// structural wallet (CoinWallet), not an example's MidnightWalletProvider,
+// because each example owns its src/wallet.ts and they drift. Any provider
+// with `wallet.waitForSyncedState()` and the two public keys fits.
 
 import { randomBytes } from 'node:crypto';
 import {
   type ContractAddress,
+  decodeShieldedCoinInfo,
   encodeCoinPublicKey,
   encodeRawTokenType,
+  encodeShieldedCoinInfo,
 } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
-import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+import { createShieldedCoinInfo, rawTokenType, ZswapOutput } from '@midnight-ntwrk/midnight-js-protocol/ledger';
 
 /** A coin as a circuit takes it: Compact's `ShieldedCoinInfo`. */
 export type ShieldedCoinArg = { nonce: Uint8Array; color: Uint8Array; value: bigint };
@@ -77,7 +84,12 @@ export function tokenColor(domain: string | Uint8Array, contractAddress: Contrac
   return { hex, bytes: encodeRawTokenType(hex) };
 }
 
-/** The wallet's spendable coins of `color`, as circuit arguments. Waits for the wallet to be synced. */
+/**
+ * The wallet's spendable coins of `color`, in circuit-argument form. Waits for
+ * the wallet to be synced. Useful for reading nonces (a privacy test checks
+ * none of them reaches public state). Don't pass one to a circuit that
+ * `receiveShielded`s it: use `freshCoin`.
+ */
 export async function shieldedCoins(w: CoinWallet, color: TokenColor | string): Promise<ShieldedCoinArg[]> {
   const hex = colorHex(color);
   const bytes = encodeRawTokenType(hex);
@@ -88,14 +100,79 @@ export async function shieldedCoins(w: CoinWallet, color: TokenColor | string): 
 }
 
 /**
- * One spendable coin of `color`: one worth exactly `value` if given, else the
- * first. A circuit that takes a whole coin spends all of it, so to pay an
- * exact amount make that coin first with `splitShieldedCoin(color, value)`
- * (src/wallet.ts).
+ * The argument for a circuit that `receiveShielded`s a coin: a new coin of
+ * `value` with a uniformly random nonce (the ledger's `createShieldedCoinInfo`).
+ * The wallet pays for it when it balances the transaction, from whichever
+ * coins of `color` it selects, and takes the change back under fresh nonces.
+ * So any amount works without making an exact-value coin first, and the nonce
+ * is in no commitment but the contract's own.
  *
- * PRIVACY: whoever minted or paid you a coin knows its nonce, and can spot it
- * (or a contract coin re-nonced from it) on chain. If the action should be
- * unlinkable, re-nonce with `splitShieldedCoin` before taking the coin.
+ * The contract can't tell a fresh nonce from a reused one. If it keys a map by
+ * this nonce, it should refuse one already present (a same-nonce coin of a
+ * different value would overwrite the entry).
+ */
+export function freshCoin(color: TokenColor | string, value: bigint): ShieldedCoinArg {
+  return encodeShieldedCoinInfo(createShieldedCoinInfo(colorHex(color), value));
+}
+
+/**
+ * The slice of a finalized transaction `contractCoinMtIndex` reads: its id and
+ * its guaranteed Zswap outputs. `FinalizedTxData` from submitCallTx's
+ * `.public` fits it.
+ */
+export interface TxWithOutputs {
+  txId: string;
+  tx: { guaranteedOffer?: { outputs: readonly { commitment: string }[] } };
+}
+
+/**
+ * The Zswap Merkle-tree index of `coin`, a coin that `tx` created for the
+ * contract at `contractAddress` (`receiveShielded`), as `mt_index` for
+ * spending it later with `sendShielded`.
+ *
+ * A contract that stores a coin with `insertCoin` gets the index for free. One
+ * that keeps the coin off chain (an escrow it holds only a commitment to)
+ * leaves its depositor to recover it. A transaction's outputs enter the tree
+ * in order from its `zswapStartIndex` (the indexer has it), so the index is
+ * that start plus the coin's position among the outputs. The position is found
+ * by commitment, because the wallet's change output can come first. A
+ * contract-owned output's commitment follows from the coin and the address.
+ */
+export async function contractCoinMtIndex(
+  indexerUri: string,
+  tx: TxWithOutputs,
+  coin: ShieldedCoinArg,
+  contractAddress: ContractAddress,
+): Promise<bigint> {
+  const expected = ZswapOutput.newContractOwned(decodeShieldedCoinInfo(coin), 0, contractAddress).commitment;
+  const position = (tx.tx.guaranteedOffer?.outputs ?? []).findIndex((o) => o.commitment === expected);
+  if (position < 0) throw new Error(`Transaction ${tx.txId} has no output for that coin to ${contractAddress}`);
+  const query = `query ($id: HexEncoded!) { transactions(offset: { identifier: $id }) {
+    ... on RegularTransaction { zswapStartIndex } } }`;
+  const res = await fetch(indexerUri, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, variables: { id: tx.txId } }),
+  });
+  if (!res.ok) throw new Error(`Indexer query failed: HTTP ${res.status}`);
+  const body = (await res.json()) as {
+    data?: { transactions?: { zswapStartIndex?: number }[] };
+    errors?: { message: string }[];
+  };
+  if (body.errors?.length) throw new Error(`Indexer query failed: ${body.errors[0]!.message}`);
+  const start = body.data?.transactions?.[0]?.zswapStartIndex;
+  if (start === undefined) throw new Error(`The indexer has no zswap index for tx ${tx.txId}`);
+  return BigInt(start + position);
+}
+
+/**
+ * One spendable coin of `color` from the wallet: one worth exactly `value` if
+ * given, else the first.
+ *
+ * @deprecated Don't pass a wallet coin to a circuit that `receiveShielded`s it.
+ * The argument describes a new coin, so use `freshCoin(color, value)`: the
+ * wallet pays for it and makes change. Passing this coin instead puts its
+ * nonce, which its minter or sender knows, into the contract's coin.
  */
 export async function takeCoin(w: CoinWallet, color: TokenColor | string, value?: bigint): Promise<ShieldedCoinArg> {
   const coins = await shieldedCoins(w, color);
@@ -121,7 +198,7 @@ export async function shieldedBalance(w: CoinWallet, color: TokenColor | string)
  * Polls until the balance of `color` equals `until` (or `until(balance)` is
  * true), and returns it. A submitted transaction is accepted before it is on
  * chain and indexed, so a coin minted or sent to a wallet shows up some
- * seconds later: wait for it before `takeCoin`.
+ * seconds later: wait for it before the next call that pays from it.
  */
 export async function waitForShieldedBalance(
   w: CoinWallet,
@@ -177,7 +254,8 @@ export function mintNonce(): Uint8Array {
 
 /**
  * A made-up coin for an in-memory (Sim) test. Sim doesn't check that a coin
- * exists, so any nonce does; a random one by default.
+ * exists or is paid for, so any nonce does; a random one by default. On the
+ * devnet use `freshCoin`.
  */
 export function simCoin(value: bigint, color: Uint8Array, nonce: Uint8Array = mintNonce()): ShieldedCoinArg {
   return { nonce, color, value };

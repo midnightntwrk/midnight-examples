@@ -7,10 +7,16 @@
 
 - **Anonymous deposits into a contract.** `tip(coin)` has no caller check and
   calls no witness, so the contract never learns who tipped. It runs
-  `receiveShielded`, then re-sends the coin to `kernel.self()` (`reNonceToSelf`,
-  the technique from `shielded-chips` roulette `houseDeposit`) and stores only
-  that contract-owned coin in `pot` with `insertCoin`. The tipper's own coin
-  nonce never reaches the ledger.
+  `receiveShielded` and stores the coin in `pot` with `insertCoin`.
+- **The coin argument is a new coin, not a wallet coin.** `receiveShielded`
+  creates a Zswap output to the contract. The tipper's wallet balances the
+  transaction from whichever of its coins it selects and makes change. So the
+  client passes `freshCoin(color, amount)` from `@midnight-ntwrk/example-coins`,
+  a coin with a fresh random nonce. That nonce is in no commitment but the contract's own, so
+  publishing it links to nobody, and any amount works without a split first.
+  There is no re-nonce to `kernel.self()`: that only repairs a client that
+  passed a wallet coin's nonce, and it doesn't hide it from whoever knows
+  that nonce.
 - **Owner-only withdrawal from a hashed witness key.** The constructor stores
   `ownerKey(sk) = persistentHash([pad(32, "private-tip-jar:owner:"), sk])` in a
   `sealed` field. `withdraw(tipKey)` recomputes it from the `ownerSecretKey`
@@ -18,17 +24,16 @@
   `ownerKey` is an exported `pure circuit`, so tests and a UI can compute the
   expected owner value off chain.
 - **One accepted color, fixed at deploy.** `tipColor` is `sealed`; tips of any
-  other color, and zero-value tips, are rejected by `assert`s before any coin
-  moves.
+  other color, zero-value tips, and tips whose nonce is already a pot key (they
+  would overwrite that entry and strand its coin) are rejected by `assert`s
+  before any coin moves.
 - **Getting shielded test coins.** `contract/tip-token.compact` is a demo
   faucet (anyone can mint) that exists only so the tests have shielded coins.
   Its color is derived off chain with `rawTokenType(domain, address)`.
-- **Tipper-side re-nonce.** `splitShieldedCoin` in `src/wallet.ts` (ported
-  from `shielded-chips`) does a shielded self-transfer so the coin a tipper
-  tips has a nonce the token's issuer has never seen.
 - **A privacy test over public state.** The test collects every byte string in
-  the jar's ledger and asserts that no tipper key, tipper secret, tipped coin
-  nonce, issuer-known coin nonce, or owner secret appears in it.
+  the jar's ledger and asserts that no tipper key, tipper secret, nonce of a
+  coin in the tipper's wallet (including the one the issuer minted), or owner
+  secret appears in it.
 
 ## Privacy: what is public and what isn't
 
@@ -38,9 +43,11 @@ is exactly `owner`, `tipColor` and `pot`.
 **Hidden (and checked by the privacy test):**
 
 - Who tipped. No field is derived from a tipper's wallet key, a tipper secret
-  or the tipper's coin nonce. The tipper's coin is spent through Zswap, which
-  publishes a nullifier and commitments, not the coin or its owner.
-- The coins tippers spent. `pot` holds re-nonced, contract-owned coins only.
+  or any of the tipper's wallet coins. The wallet coins that pay for a tip are
+  spent through Zswap, which publishes nullifiers and commitments, not the
+  coins or their owner.
+- The coins tippers spent. `pot` holds only the coins each tip created for the
+  contract, under nonces no wallet coin shares.
 - The owner's secret key. Only its domain-separated hash (`owner`) is stored.
 
 **Public by design (accepted leaks):**
@@ -57,12 +64,12 @@ is exactly `owner`, `tipColor` and `pot`.
 - **The accepted token color**, and that the jar has an owner (`owner`, a
   hash). The same owner secret in two jars gives the same `owner` value, so use
   a fresh secret per jar. `ownerKey` does not include `kernel.self()`.
-- **Issuer linkage if you skip the self-transfer.** `sendShielded` derives the
-  re-nonced coin's nonce from the tipped coin's nonce alone. Anyone who knows
-  the nonce of the coin you tip (whoever minted or sent it to you) can
-  recompute the pot entry and recognise your tip. A shielded self-transfer
-  first (`splitShieldedCoin`) closes this; the test does it. In the test the
-  issuer is also the jar owner, which is exactly the case that matters.
+- **The tipped coin, nonce included** (each `pot` entry). That is safe only
+  because the nonce is fresh. A client that passes the nonce of a coin it holds
+  puts the same nonce in its wallet coin's commitment too, and anyone who can
+  guess the wallet's key (the coin's issuer, for one) can then confirm the tip
+  was theirs. The contract cannot tell a fresh nonce from a reused one, so it
+  is the client's job: use `freshCoin`, as the tests do.
 - **Where the owner's money goes.** A withdrawal's payout nonce is derived from
   a pot nonce that is public, so anyone who guesses the owner's wallet key can
   confirm it received the payout. The owner is a public role here; this design
@@ -83,8 +90,7 @@ is exactly `owner`, `tipColor` and `pot`.
   `CompiledTipTokenContract`, `zkConfigPath`, `tipTokenZkConfigPath`).
 - `contract/witnesses.ts`: `ownerSecretKey` and
   `createPrivateTipJarPrivateState(ownerSecretKey)`. No `node:*` imports.
-- `src/` harness. It differs from the template in two places: `src/wallet.ts`
-  adds `splitShieldedCoin` (shielded self-transfer), and `src/providers.ts`
+- `src/` harness. It differs from the template in one place: `src/providers.ts`
   adds a random suffix to the private-state store name so several provider
   sets can be built in the same millisecond.
 - `SPEC.md`: the design card (the worked example for `templates/example/SPEC.md`).
@@ -92,9 +98,10 @@ is exactly `owner`, `tipColor` and `pot`.
   invariants in memory (`yarn compile:fast && yarn test:sim`, under a second),
   using `@midnight-ntwrk/example-sim`'s `assertNotInPublicState`.
 - `src/test/private-tip-jar.test.ts`: Alice (owner, token minter) and Bob
-  (tipper). Covers mint, deploy, re-nonce, two tips, the privacy test, a
-  negative test for every guard (wrong color, zero value, non-owner withdraw,
-  unknown or already-withdrawn tip) and the owner's withdrawal.
+  (tipper). Covers mint, deploy, two fresh-nonce tips paid from one minted
+  coin, the privacy test, a negative test for every guard (wrong color, zero
+  value, reused pot key, non-owner withdraw, unknown or already-withdrawn tip)
+  and the owner's withdrawal.
 
 ## Run
 
@@ -119,9 +126,12 @@ yarn env:down
   `yarn new:ui private-tip-jar` from the repo root, then build the use case into its
   seed files. See `templates/ui/AGENTS.md`.
 
-- A tip is the whole coin passed to `tip`. To tip an exact amount, make a coin
-  of that value first; `splitShieldedCoin(color, amount)` does that and
-  re-nonces it at the same time.
+- A tip is the coin passed to `tip`, built fresh with `freshCoin(color, amount)`
+  (`@midnight-ntwrk/example-coins`; the sim tests use its `simCoin`).
+  Never pass a coin from `availableCoins`: its nonce is shared with your
+  wallet coin. The wallet pays for the tip and makes change, so no split or
+  exact-value coin is needed. `splitShieldedCoin` in `src/wallet.ts` is
+  template code this example doesn't use.
 - `withdraw` moves one pot coin per call. Iterate over `ledger(...).pot` to
   empty the jar.
 - The guards in `tip` run before `receiveShielded`, so the negative tests pass

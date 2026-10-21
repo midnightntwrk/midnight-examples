@@ -166,10 +166,15 @@ describe("roulette (in memory)", () => {
     // House deposits two match coins.
     for (let i = 0; i < 2; i++) {
       const { context } = t.call(house, (ctx) => r.houseDeposit(ctx, freshChip(COLOR.hex, 100n).arg));
-      // The deposit itself, and its re-nonce to the contract (reNonceToSelf).
-      expect(context.currentQueryContext.effects.claimedShieldedReceives).toHaveLength(2);
+      // Just the deposit: the fresh coin is stored as it is, no re-send.
+      expect(context.currentQueryContext.effects.claimedShieldedReceives).toHaveLength(1);
     }
     expect(t.ledger.houseCoins.size()).toBe(2n);
+    // A deposit can't reuse a pool key (it would overwrite that coin's entry).
+    const poolKey = [...t.ledger.houseCoins][0]![0];
+    expect(
+      t.errorOf(house, (ctx) => r.houseDeposit(ctx, { nonce: poolKey, color: COLOR.bytes, value: 1n })),
+    ).toContain("already deposited");
     expect(t.errorOf(bob, (ctx) => r.houseDeposit(ctx, freshChip(COLOR.hex, 1n).arg))).toContain(
       "Only the house can deposit",
     );

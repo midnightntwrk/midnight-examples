@@ -29,6 +29,7 @@ import {
 } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/ledger';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
+import { freshCoin } from '@midnight-ntwrk/example-coins';
 import { resolveWallet, waitForNightThenDust } from '@midnight-ntwrk/example-fast-sync';
 import pino from 'pino';
 
@@ -159,7 +160,7 @@ describe(`Private Tip Jar Contract (${network})`, () => {
   // Same domain separator tip-token.compact mints with.
   const TOKEN_DOMAIN = pad32('private-tip-jar:demo-token:');
 
-  // Bob is minted one coin of MINTED and tips it as two coins.
+  // Bob is minted one coin of MINTED and tips all of it, in two tips.
   const MINTED = 100n;
   const FIRST_TIP = 40n;
   const SECOND_TIP = MINTED - FIRST_TIP;
@@ -167,7 +168,8 @@ describe(`Private Tip Jar Contract (${network})`, () => {
   // Things the design promises to keep off chain, recorded as the test runs.
   // The privacy test checks none of them appears in the public ledger.
   const bobIssuedNonces: Uint8Array[] = []; // nonces of coins the issuer (Alice) minted to Bob
-  const bobTippedNonces: Uint8Array[] = []; // nonces of the wallet coins Bob actually tipped
+  const bobWalletNonces: Uint8Array[] = []; // nonces of every coin seen in Bob's wallet
+  const tipNonces: Uint8Array[] = []; // the fresh nonces Bob tipped under (public by design)
 
   // Pot keys Alice has withdrawn, for the "withdraw twice" negative test.
   const withdrawnKeys: Uint8Array[] = [];
@@ -190,20 +192,23 @@ describe(`Private Tip Jar Contract (${network})`, () => {
       }));
   }
 
-  /** A coin of exactly `value` from `w`, as the `tip` circuit takes it. */
-  async function takeCoin(w: MidnightWalletProvider, value: bigint): Promise<ShieldedCoinArg> {
-    const coins = await tokenCoins(w);
-    const coin = coins.find((c) => c.value === value);
-    if (!coin) {
-      const seen = coins.map((c) => c.value).join(', ');
-      throw new Error(`No ${value}-token coin in wallet; saw values [${seen}]`);
-    }
-    return coin;
-  }
-
   async function tokenBalance(w: MidnightWalletProvider): Promise<bigint> {
     const state = await w.wallet.waitForSyncedState();
     return state.shielded.balances[tipColorHex] ?? 0n;
+  }
+
+  /**
+   * Wait until `w` holds `want` of the token. submitCallTx resolves on
+   * acceptance; the wallet's change shows up a few seconds later.
+   */
+  async function waitForTokenBalance(w: MidnightWalletProvider, want: bigint): Promise<void> {
+    const deadline = Date.now() + 300_000;
+    for (;;) {
+      const have = await tokenBalance(w);
+      if (have === want) return;
+      if (Date.now() > deadline) throw new Error(`token balance ${have}, expected ${want}`);
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+    }
   }
 
   async function bobTips(coin: ShieldedCoinArg): Promise<void> {
@@ -311,30 +316,27 @@ describe(`Private Tip Jar Contract (${network})`, () => {
     await bobJarProv.privateStateProvider.set(BOB_JAR_STATE_ID, createPrivateTipJarPrivateState(bobSk));
   });
 
-  it('Bob re-nonces his coin with a self-transfer, splitting it into two tips', async () => {
-    // Alice minted Bob's coin, so she knows its nonce, and the pot nonce of a
-    // tip follows from the tipped coin's nonce. A self-transfer gives Bob
-    // coins whose nonces only his wallet has seen.
-    await bobWallet.splitShieldedCoin(tipColorHex, FIRST_TIP);
-    await syncWallet(logger, bobWallet.wallet, syncTimeoutMs);
-
-    const coins = await tokenCoins(bobWallet);
-    expect(coins.map((c) => c.value).sort()).toEqual([FIRST_TIP, SECOND_TIP].sort());
-    const issued = new Set(bobIssuedNonces.map(hex));
-    for (const c of coins) expect(issued.has(hex(c.nonce))).toBe(false);
-  });
-
-  it('Bob tips twice; the pot holds two contract-owned coins', async () => {
-    const first = await takeCoin(bobWallet, FIRST_TIP);
-    bobTippedNonces.push(first.nonce);
+  it('Bob tips twice from his one coin; the pot holds exactly the coins he made', async () => {
+    // No split and no exact-value coin first: each tip is a NEW coin of the
+    // tip's value with a random nonce (freshCoin), not one of Bob's wallet
+    // coins. The wallet covers it from the 100-coin Alice minted, taking the
+    // change back under a nonce Alice has never seen.
+    const first = freshCoin(tipColorHex, FIRST_TIP);
+    tipNonces.push(first.nonce);
     await bobTips(first);
 
     let state = await queryLedger();
     expect(state.pot.size()).toEqual(1n);
 
-    await syncWallet(logger, bobWallet.wallet, syncTimeoutMs);
-    const second = await takeCoin(bobWallet, SECOND_TIP);
-    bobTippedNonces.push(second.nonce);
+    await waitForTokenBalance(bobWallet, MINTED - FIRST_TIP);
+    const change = await tokenCoins(bobWallet);
+    for (const c of change) bobWalletNonces.push(c.nonce);
+    // The issued coin is spent; what is left is change under a new nonce.
+    const issued = new Set(bobIssuedNonces.map(hex));
+    expect(change.some((c) => issued.has(hex(c.nonce)))).toBe(false);
+
+    const second = freshCoin(tipColorHex, SECOND_TIP);
+    tipNonces.push(second.nonce);
     await bobTips(second);
 
     state = await queryLedger();
@@ -343,16 +345,17 @@ describe(`Private Tip Jar Contract (${network})`, () => {
     // spend them later. What they don't carry is who paid them.
     const values = [...state.pot].map(([, coin]) => coin.value).sort();
     expect(values).toEqual([FIRST_TIP, SECOND_TIP].sort());
+    // Each pot entry is the tip coin itself, under the nonce Bob drew for it.
+    expect([...state.pot].map(([key]) => hex(key)).sort()).toEqual(tipNonces.map(hex).sort());
     for (const [key, coin] of state.pot) {
       expect(hex(coin.color)).toEqual(tipColorHex);
       expect(hex(key)).toEqual(hex(coin.nonce));
     }
 
-    await syncWallet(logger, bobWallet.wallet, syncTimeoutMs);
-    expect(await tokenBalance(bobWallet)).toEqual(0n);
+    await waitForTokenBalance(bobWallet, 0n);
   });
 
-  it('public state holds no tipper identity, tipped coin, or owner secret', async () => {
+  it('public state holds no tipper identity, tipper wallet coin, or owner secret', async () => {
     const state = await queryLedger();
     const pool = collectPublicBytes(state);
 
@@ -365,9 +368,10 @@ describe(`Private Tip Jar Contract (${network})`, () => {
       { label: "Alice's owner secret", bytes: aliceOwnerSk },
       { label: "Alice's wallet coin public key", bytes: encodeCoinPublicKey(aliceWallet.getCoinPublicKey()) },
       ...bobIssuedNonces.map((n) => ({ label: 'nonce of the coin Alice minted to Bob', bytes: n })),
-      ...bobTippedNonces.map((n) => ({ label: 'nonce of a coin Bob tipped', bytes: n })),
+      ...bobWalletNonces.map((n) => ({ label: "nonce of a coin in Bob's wallet", bytes: n })),
     ];
-    expect(bobTippedNonces).toHaveLength(2);
+    expect(bobIssuedNonces).toHaveLength(1);
+    expect(bobWalletNonces.length).toBeGreaterThan(0);
 
     for (const s of secrets) {
       const leak = findLeak(pool, s.bytes);
@@ -385,6 +389,14 @@ describe(`Private Tip Jar Contract (${network})`, () => {
   it('rejects a zero-value tip', async () => {
     const empty = { nonce: new Uint8Array(randomBytes(32)), color: tipColorBytes, value: 0n };
     await expect(bobTips(empty)).rejects.toThrow(/worth something/);
+  });
+
+  it('rejects a tip that reuses a pot key, so no pot entry can be overwritten', async () => {
+    // Same nonce as a coin already in the pot, different value: a different
+    // coin that Zswap would accept, so only the contract's guard stops it.
+    const [key] = [...(await queryLedger()).pot][0]!;
+    await expect(bobTips({ nonce: key, color: tipColorBytes, value: 1n })).rejects.toThrow(/already in the jar/);
+    expect((await queryLedger()).pot.size()).toEqual(2n);
   });
 
   it('rejects a withdrawal by anyone but the owner', async () => {

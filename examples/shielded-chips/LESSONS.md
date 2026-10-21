@@ -88,7 +88,8 @@ the standard prescribes for a recipient-private mint.
 
 `insertCoin` stores a full `QualifiedShieldedCoinInfo`, so
 `betCoins.insertCoin(pseudonym, coin, …)` publishes `{nonce, color, value,
-mt_index}` for a coin a player's wallet owned, keyed by their pseudonym. One line,
+mt_index}` for a coin a player's wallet owned, keyed by their pseudonym. (Why a
+wallet coin's nonce was there at all is §11: the client passed it.) One line,
 total break:
 
 ```
@@ -202,8 +203,9 @@ Verified by reading transcripts and state off a live chain, not from docs:
   one circuit does it. Cheaper in transactions *and* better for privacy. Verified
   to work on chain; the exact budget figure is the repo's claim, not something
   measured here.
-- **Client-side re-nonce before acting.** A wallet self-transfer replaces a coin
-  with one carrying wallet-chosen randomness. Verified that the new nonce is not
+- **Client-side re-nonce before acting.** *(Superseded, see §11: passing a fresh
+  coin does the same job without a transaction.)* A wallet self-transfer
+  replaces a coin with one carrying wallet-chosen randomness. Verified that the new nonce is not
   *any* derivation of the old one, so the derivation chain an issuer could follow
   stops dead:
 
@@ -246,7 +248,8 @@ Not everything got closed, and saying which is part of the deliverable:
   same commit-and-reprove technique applied twice more.
 - **The issuer can follow a coin it minted you** unless you re-nonce client-side
   first (§5). This one is irreducible in-contract — the issuer knows the coin — so
-  the mitigation has to live in the wallet.
+  the mitigation has to live in the wallet. *(Closed since, see §11: the client
+  never passes the minted coin's nonce at all.)*
 - **Privacy cost recovery something.** Because only a player can reopen their own
   escrow commitment, only they can move their escrowed coin: the house cannot
   sweep a loser's stake, so a loser must call `forfeit()`, which they have no
@@ -366,3 +369,48 @@ would hand over mint authority.
 - **Be specific about the adversary.** "Private" is not a property on its own.
   Public observer, token issuer, and counterparty have different views here, and
   the answers differ — most of §6 exists because those got separated.
+
+---
+
+## 11. Postscript (2026-10-17): the inbound leak was the client's
+
+Everything above treats the coin a player passes to `betColor` as *their* coin.
+It isn't. `receiveShielded(coin)` creates a Zswap **output** to the contract. The
+wallet then balances the transaction by token color and amount. Its coin
+selection spends whichever coins it likes and makes change under fresh nonces
+(`wallet-sdk-shielded` 3.0.2, `dist/v1/Transacting.js`,
+`#balanceGuaranteedSection`), and it never matches the output's nonce to one of
+its coins. The tests built the argument from `availableCoins`, so the contract's
+coin and the player's wallet coin shared a nonce. That shared nonce is the
+whole inbound leak in §2.2, and the reason the issuer could follow a minted
+coin (§7).
+
+Pass a fresh coin instead (`createShieldedCoinInfo(color, amount)`, a uniform
+random nonce) and the nonce sits in exactly one commitment, the contract's,
+which nobody else has seen. Checked on the local devnet: a player holding one
+100-chip coin bets a fresh coin of any value, the wallet spends the minted coin
+and keeps the change under a new nonce, and the minted nonce never reaches
+public state (privacy P8). The UI had been doing this all along, because the
+DApp Connector can't list a wallet's coins. Consequences:
+
+- **`houseDeposit` no longer re-sends to `kernel.self()`.** It stores the fresh
+  coin under its own nonce. That is one coin spend and one coin creation fewer,
+  and the re-send never protected anyone from whoever knew the old nonce anyway:
+  the new nonce is a public function of it.
+- **No client-side self-transfer before betting.** `splitShieldedCoin` is no
+  longer used by the tests.
+- **New guard.** A pool key is now a caller-chosen public nonce. Without
+  `assert(!houseCoins.member(nonce))`, a deposit that reuses an existing key with
+  a different value (a different coin, so Zswap accepts it) would overwrite the
+  entry and strand its coin.
+- **What doesn't change.** The escrow commitment is still needed: the payout is
+  derived from the escrow nonce, so publishing it, fresh or not, identifies the
+  winner (§3, outbound). `mergeCoin` order still matters. `forfeit` still spends
+  the escrow coin to the contract before pooling it, which keeps the escrow nonce
+  private and takes the pool coin's `mt_index` from the transaction rather than
+  from the player's witness. The escrow salt stays as a guard for a client that
+  reuses a nonce anyway, since the contract can't check that the nonce is fresh.
+
+The general lesson fits §10: the attack was right, the oracle was right, and the
+fix was aimed at the wrong component, because nobody checked which party chose
+the nonce.
