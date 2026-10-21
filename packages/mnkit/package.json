@@ -1,0 +1,36 @@
+{
+  "name": "mnkit",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Write your Midnight contract; mnkit writes everything around it: scaffold a project, then derive witness stubs, constructor args and test skeletons from the compiled contract.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/midnightntwrk/midnight-examples.git",
+    "directory": "packages/mnkit"
+  },
+  "homepage": "https://github.com/midnightntwrk/midnight-examples/tree/main/packages/mnkit#readme",
+  "bugs": "https://github.com/midnightntwrk/midnight-examples/issues",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "bin": "./bin/mnkit.mjs",
+  "exports": {
+    ".": "./src/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin",
+    "src",
+    "templates",
+    "toolchain.json"
+  ],
+  "scripts": {
+    "prepack": "node ../../scripts/pack-extras.mjs add LICENSE toolchain.json",
+    "postpack": "node ../../scripts/pack-extras.mjs remove LICENSE toolchain.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.0"
+  }
+}

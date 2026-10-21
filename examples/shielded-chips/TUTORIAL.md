@@ -1068,7 +1068,7 @@ So don't. The argument is a new coin, so make it up:
 
 ```ts
 // src/test/roulette.test.ts
-import { freshCoin } from '@midnight-ntwrk/example-coins';
+import { freshCoin } from '@midnight-ntwrk/mnkit-coins';
 const chip = freshCoin(chipColorHex, BET_SIZE); // uniform random nonce (the ledger's createShieldedCoinInfo)
 ```
 

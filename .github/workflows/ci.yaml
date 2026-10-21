@@ -175,7 +175,7 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          dirs=(examples/*/tutorials templates/example/tutorials)
+          dirs=(examples/*/tutorials packages/mnkit/templates/example/tutorials)
           status=0
           for dir in "${dirs[@]}"; do
             if [ ! -f "$dir/index.mdx" ]; then
@@ -225,12 +225,22 @@ jobs:
       - name: Install dependencies (whole workspace)
         run: yarn install --immutable
 
-      - name: Typecheck and test packages/sim and packages/coins
+      - name: Toolchain pins agree with toolchain.json
+        run: yarn toolchain:check
+
+      - name: Engine unit tests (scripts/lib)
+        run: yarn test:engine
+
+      - name: Compiled test fixtures match the pinned compiler
+        run: node scripts/test/fixtures/regen.mjs --check
+
+      - name: Typecheck and test the runtime packages (built by postinstall)
         run: |
-          yarn workspace @midnight-ntwrk/example-sim typecheck
-          yarn workspace @midnight-ntwrk/example-sim test:sim
-          yarn workspace @midnight-ntwrk/example-coins typecheck
-          yarn workspace @midnight-ntwrk/example-coins test:sim
+          yarn workspace @midnight-ntwrk/mnkit-wallet typecheck
+          yarn workspace @midnight-ntwrk/mnkit-sim typecheck
+          yarn workspace @midnight-ntwrk/mnkit-sim test:sim
+          yarn workspace @midnight-ntwrk/mnkit-coins typecheck
+          yarn workspace @midnight-ntwrk/mnkit-coins test:sim
 
       - name: Scaffold, compile:fast and derive a throwaway example
         run: |
@@ -246,7 +256,7 @@ jobs:
           yarn new:example ci-derive --derive
           grep -q 'CompiledTipTokenContract = CompiledContract.make' examples/ci-derive/contract/index.ts
           grep -q "it('deploys tip-token'" examples/ci-derive/src/test/ci-derive.test.ts
-          grep -q "from '@midnight-ntwrk/example-coins'" examples/ci-derive/src/test/ci-derive.sim.test.ts
+          grep -q "from '@midnight-ntwrk/mnkit-coins'" examples/ci-derive/src/test/ci-derive.sim.test.ts
           cp -r examples/ci-derive "$RUNNER_TEMP/first"
           yarn new:example ci-derive --derive
           diff -r --exclude=node_modules --exclude=managed "$RUNNER_TEMP/first" examples/ci-derive
@@ -265,3 +275,55 @@ jobs:
           # derive, typecheck, test:sim and the SPEC code checks. (Each example's
           # SPEC.md is also linted in its matrix job.)
           yarn pipeline private-tip-jar --until sim
+
+  # mnkit as a user gets it: pack mnkit and the runtime packages, scaffold each
+  # fixture with the packed CLI outside the workspace, derive (twice, no diff),
+  # typecheck, test:sim, then validate on a local network. Nothing comes from
+  # npm except third-party dependencies. See scripts/mnkit-e2e.sh.
+  mnkit-e2e:
+    name: mnkit e2e (${{ matrix.fixture }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [hello-world, private-tip-jar]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  #v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Compact Compiler
+        uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
+        with:
+          compact-version: '0.31.1'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  #v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack (Yarn 4)
+        run: corepack enable
+
+      - name: Install dependencies (whole workspace; builds the runtime packages)
+        run: yarn install --immutable
+
+      - name: Pack, scaffold, derive, test:sim and validate
+        run: bash scripts/mnkit-e2e.sh --devnet ${{ matrix.fixture }}
+        env:
+          MNKIT_E2E_DIR: ${{ runner.temp }}/mnkit-e2e
+
+      - name: Upload service logs on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  #v7.0.2
+        with:
+          name: mnkit-e2e-logs-${{ matrix.fixture }}
+          path: ${{ runner.temp }}/mnkit-e2e/${{ matrix.fixture }}/logs/
+          if-no-files-found: ignore
+          retention-days: 7

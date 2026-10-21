@@ -81,7 +81,7 @@ midnight-examples:
 - **`src/config.ts`** holds the endpoints for each network. `MIDNIGHT_NETWORK` picks one:
   `yarn test:local` sets it to `local`, and `yarn test:preview` and `yarn test:preprod` run the
   same suite against the public test networks.
-- **`resolveWallet(network)`**, from the shared `@midnight-ntwrk/example-fast-sync` package,
+- **`resolveWallet(network)`**, from the shared `@midnight-ntwrk/mnkit-wallet` package,
   returns the wallet secret. On `local` it is the devnet's pre-funded wallet, so there is nothing to
   set up. On a remote network it comes from a repo-root `.env.<network>` file.
 - **`src/wallet.ts`** builds, starts, and syncs the wallet. **`src/providers.ts`** bundles the

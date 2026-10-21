@@ -57,7 +57,7 @@ import {
   syncWallet,
   type WalletSecret,
 } from '../wallet.js';
-import { resolveWallet, waitForNightThenDust } from '@midnight-ntwrk/example-fast-sync';
+import { resolveWallet, waitForNightThenDust } from '@midnight-ntwrk/mnkit-wallet';
 import { buildProviders, type SilentAuctionProviders } from '../providers.js';
 import {
   CompiledSilentAuctionContract,

@@ -123,7 +123,7 @@ for a newcomer is the [Learning path](README.md#learning-path) in the root READM
   Don't read the whole repo: the harness files are identical in every example.
 
 - **Prefer the generator:** `yarn new:example <name> [--witnesses]` scaffolds a
-  new example from `templates/example/` (harness, config, compose, a `SPEC.md`
+  new example from `packages/mnkit/templates/example/` (harness, config, compose, a `SPEC.md`
   design card, docs stubs, an in-memory test and a devnet test skeleton) and
   registers it in the CI matrix + docs tables. Author writes `SPEC.md`, the
   `.compact`, the witnesses and the tests. After the first `yarn compile:fast`,
@@ -139,7 +139,7 @@ for a newcomer is the [Learning path](README.md#learning-path) in the root READM
   code exists; keep it in step with the code afterwards. Worked example:
   `examples/private-tip-jar/SPEC.md`.
 - **Two kinds of test.** `src/test/*.sim.test.ts` run the compiled contract in
-  memory with `@midnight-ntwrk/example-sim` (`packages/sim`): `Sim.deploy`,
+  memory with `@midnight-ntwrk/mnkit-sim` (`packages/sim`): `Sim.deploy`,
   `sim.call`, `sim.as`, `expectRejects` for every guard, and
   `assertNotInPublicState` with one entry per SPEC privacy invariant.
   `yarn test:sim` runs only these, and CI runs it before starting the network.
@@ -151,10 +151,10 @@ for a newcomer is the [Learning path](README.md#learning-path) in the root READM
   (+ `witnesses.ts` where needed); `src/` for the TypeScript test harness;
   `scripts/` for helpers; `compose.yml` for the local network.
 - Remote-network wiring is shared, not copied: depend on
-  `@midnight-ntwrk/example-fast-sync` and use its `resolveWallet(network, role)`
+  `@midnight-ntwrk/mnkit-wallet` and use its `resolveWallet(network, role)`
   and `waitForNightThenDust(...)` rather than writing a per-example seed resolver.
   `vitest.config.ts` loads `.env.<network>` from the REPO ROOT via `loadEnv`.
-- Shielded coins in tests are shared too: `@midnight-ntwrk/example-coins`
+- Shielded coins in tests are shared too: `@midnight-ntwrk/mnkit-coins`
   (`packages/coins`) has the token color, `freshCoin(color, value)` for a coin
   argument, balances, mint arguments and `simCoin` for sim tests. Don't copy
   the local helpers in `private-tip-jar`'s or `shielded-chips`' tests. A coin

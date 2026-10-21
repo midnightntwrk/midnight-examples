@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Lint an example's SPEC.md (scripts/lib/spec-lint.mjs):
+// Lint an example's SPEC.md (packages/mnkit/src/lib/spec-lint.mjs):
 //
 //   yarn spec:lint <name> [--design] [--json]
 //   yarn spec:lint --file <path> [--witnesses | --no-witnesses] [--json]
@@ -35,9 +35,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { listCompiled } from './lib/contract-info.mjs';
-import { lintCode, lintDesign } from './lib/spec-lint.mjs';
-import { fail } from './lib/template.mjs';
+import { listCompiled } from '../packages/mnkit/src/lib/contract-info.mjs';
+import { lintCode, lintDesign } from '../packages/mnkit/src/lib/spec-lint.mjs';
+import { exitOnError, fail } from '../packages/mnkit/src/lib/template.mjs';
+
+exitOnError();
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const EXAMPLES_DIR = path.join(REPO_ROOT, 'examples');

@@ -45,9 +45,12 @@ mn-examples/
 │   ├── private-tip-jar/  # anonymous shielded tips into a contract-held pot; only the owner can withdraw
 │   └── battleship/       # Compact contract as a state machine, RBAC, private state + browser UI (ui/)
 ├── packages/
-│   └── fast-sync/        # shared remote-network wallet harness (pre-seed, .env, funding gate)
+│   ├── mnkit/            # the scaffolder: engine, CLI and templates/example (copied by `yarn new:example`)
+│   ├── fast-sync/        # @midnight-ntwrk/mnkit-wallet: wallet provider, pre-seed fast sync, .env seeds, funding gate
+│   ├── sim/              # @midnight-ntwrk/mnkit-sim: in-memory contract harness for *.sim.test.ts
+│   └── coins/            # @midnight-ntwrk/mnkit-coins: shielded-coin helpers for tests
 ├── preseed/              # pre-seed reference bundles, per network
-├── templates/example/    # scaffold copied by `yarn new:example`
+├── toolchain.json        # the one toolchain pin (`yarn toolchain:check`)
 ├── templates/ui/         # browser UI scaffold rendered by `yarn new:ui`
 ├── tsconfig.base.json    # shared TypeScript compiler options
 ├── vitest.config.ts      # aggregate test projects (per-example configs still own env)
@@ -59,7 +62,10 @@ Each example is a Yarn workspace and remains independently runnable.
 ## Pinned toolchain (Phase 1 baseline)
 
 All Phase 1 examples are frozen on one generation. Do not bump these piecemeal;
-version changes happen in a coordinated pass.
+version changes happen in a coordinated pass. The pins live in
+[`toolchain.json`](toolchain.json): change them there first, then run
+`yarn toolchain:check`, which fails until this table, `ci.yaml`, `.nvmrc`, every
+`compose.yml`, `package.json` and contract pragma agree.
 
 | Component | Version |
 |---|---|
@@ -147,9 +153,10 @@ and asserts that he has no DUST of his own.
 ## Adding / working with examples
 
 - **Scaffold a new example with `yarn new:example <name> [--witnesses]`.** It
-  copies `templates/example/` into `examples/<name>`, wires the harness, and
-  registers the example in the CI matrix and the docs tables. You then only
-  write the `.compact` contract and the test bodies. See `templates/example/`.
+  copies `packages/mnkit/templates/example/` into `examples/<name>`, wires the
+  harness, and registers the example in the CI matrix and the docs tables. You
+  then only write the `.compact` contract and the test bodies. See
+  `packages/mnkit/templates/example/`.
 - **Add a browser UI with `yarn new:ui <name>`** once the contract compiles and
   its tests pass. It renders `templates/ui/` into `examples/<name>/ui`, deriving
   circuits, witnesses and ledger fields from the compiled contract, so the UI
@@ -161,6 +168,24 @@ and asserts that he has no DUST of his own.
   gitignored). Do not re-introduce a `.gitignore` rule that hides `*.compact`.
 - Each example carries an `AGENTS.md` describing what it teaches and how to run it.
 - See `AGENTS.md` at the repo root for agent-oriented conventions.
+
+## mnkit: the scaffolder, outside this repo
+
+[`packages/mnkit`](packages/mnkit/README.md) is the same engine packaged as an
+npm CLI (`npx mnkit init my-app`) that scaffolds a standalone project around a
+developer's own contract. `yarn new:example` is its monorepo mode; `mnkit init`
+renders the same template as a plain npm project. Its runtime libraries are
+`packages/fast-sync` (`@midnight-ntwrk/mnkit-wallet`), `packages/sim` and
+`packages/coins`, all versioned with mnkit.
+
+- `yarn test:engine`: the engine's unit tests, over committed compiler output
+  (`yarn fixtures:regen --check` keeps it current).
+- `scripts/mnkit-e2e.sh [--devnet]`: packs the four packages and runs the packed
+  CLI in a directory outside the repo, the way a user gets it (CI: `mnkit-e2e`).
+- `scripts/mnkit-rehearsal.sh`: publishes them to a throwaway local registry and
+  tests `npx mnkit@<version>` from it, before a real release.
+- Releases: `.github/workflows/release-mnkit.yml`, on a GitHub release tagged
+  `mnkit-v<version>`.
 
 ## License
 

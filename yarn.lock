@@ -919,7 +919,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-battleship@workspace:examples/battleship"
   dependencies:
-    "@midnight-ntwrk/example-fast-sync": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -929,6 +928,7 @@ __metadata:
     "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-types": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-utils": "npm:4.1.1"
+    "@midnight-ntwrk/mnkit-wallet": "workspace:^"
     "@midnight-ntwrk/testkit-js": "npm:4.1.1"
     "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
     "@types/node": "npm:^22.0.0"
@@ -991,8 +991,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-calculator@workspace:examples/calculator"
   dependencies:
-    "@midnight-ntwrk/example-fast-sync": "workspace:^"
-    "@midnight-ntwrk/example-sim": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -1002,6 +1000,8 @@ __metadata:
     "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-types": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-utils": "npm:4.1.1"
+    "@midnight-ntwrk/mnkit-sim": "workspace:^"
+    "@midnight-ntwrk/mnkit-wallet": "workspace:^"
     "@midnight-ntwrk/testkit-js": "npm:4.1.1"
     "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
     "@types/node": "npm:^22.0.0"
@@ -1013,17 +1013,6 @@ __metadata:
     vite-node: "npm:^6.0.0"
     vitest: "npm:^4.1.0"
     ws: "npm:^8.14.2"
-  languageName: unknown
-  linkType: soft
-
-"@midnight-ntwrk/example-coins@workspace:^, @midnight-ntwrk/example-coins@workspace:packages/coins":
-  version: 0.0.0-use.local
-  resolution: "@midnight-ntwrk/example-coins@workspace:packages/coins"
-  dependencies:
-    "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
-    "@types/node": "npm:^22.0.0"
-    typescript: "npm:^5.7.0"
-    vitest: "npm:^4.1.0"
   languageName: unknown
   linkType: soft
 
@@ -1031,7 +1020,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-election@workspace:examples/election"
   dependencies:
-    "@midnight-ntwrk/example-fast-sync": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -1041,6 +1029,7 @@ __metadata:
     "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-types": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-utils": "npm:4.1.1"
+    "@midnight-ntwrk/mnkit-wallet": "workspace:^"
     "@midnight-ntwrk/testkit-js": "npm:4.1.1"
     "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
     "@types/node": "npm:^22.0.0"
@@ -1052,27 +1041,6 @@ __metadata:
     vite-node: "npm:^6.0.0"
     vitest: "npm:^4.1.0"
     ws: "npm:^8.14.2"
-  languageName: unknown
-  linkType: soft
-
-"@midnight-ntwrk/example-fast-sync@workspace:^, @midnight-ntwrk/example-fast-sync@workspace:packages/fast-sync":
-  version: 0.0.0-use.local
-  resolution: "@midnight-ntwrk/example-fast-sync@workspace:packages/fast-sync"
-  dependencies:
-    "@midnight-ntwrk/midnight-js-network-id": "npm:4.1.1"
-    "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
-    "@midnight-ntwrk/testkit-js": "npm:4.1.1"
-    "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
-    "@midnight-ntwrk/wallet-sdk-abstractions": "npm:2.1.0"
-    "@polkadot/api": "npm:16.5.6"
-    "@polkadot/types": "npm:16.5.6"
-    "@polkadot/util": "npm:14.0.3"
-    "@types/node": "npm:^22.0.0"
-    pino: "npm:^9.0.0"
-    pino-pretty: "npm:^13.0.0"
-    rxjs: "npm:^7.8.2"
-    typescript: "npm:^5.7.0"
-    vite-node: "npm:^6.0.0"
   languageName: unknown
   linkType: soft
 
@@ -1124,7 +1092,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-hello-world@workspace:examples/hello-world"
   dependencies:
-    "@midnight-ntwrk/example-fast-sync": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -1134,6 +1101,7 @@ __metadata:
     "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-types": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-utils": "npm:4.1.1"
+    "@midnight-ntwrk/mnkit-wallet": "workspace:^"
     "@midnight-ntwrk/testkit-js": "npm:4.1.1"
     "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
     "@types/node": "npm:^22.0.0"
@@ -1153,7 +1121,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-private-bid@workspace:examples/private-bid"
   dependencies:
-    "@midnight-ntwrk/example-fast-sync": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -1163,6 +1130,7 @@ __metadata:
     "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-types": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-utils": "npm:4.1.1"
+    "@midnight-ntwrk/mnkit-wallet": "workspace:^"
     "@midnight-ntwrk/testkit-js": "npm:4.1.1"
     "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
     "@types/node": "npm:^22.0.0"
@@ -1225,7 +1193,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-private-party@workspace:examples/private-party"
   dependencies:
-    "@midnight-ntwrk/example-fast-sync": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -1235,6 +1202,7 @@ __metadata:
     "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-types": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-utils": "npm:4.1.1"
+    "@midnight-ntwrk/mnkit-wallet": "workspace:^"
     "@midnight-ntwrk/testkit-js": "npm:4.1.1"
     "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
     "@types/node": "npm:^22.0.0"
@@ -1253,9 +1221,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-private-tip-jar@workspace:examples/private-tip-jar"
   dependencies:
-    "@midnight-ntwrk/example-coins": "workspace:^"
-    "@midnight-ntwrk/example-fast-sync": "workspace:^"
-    "@midnight-ntwrk/example-sim": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -1265,6 +1230,9 @@ __metadata:
     "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-types": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-utils": "npm:4.1.1"
+    "@midnight-ntwrk/mnkit-coins": "workspace:^"
+    "@midnight-ntwrk/mnkit-sim": "workspace:^"
+    "@midnight-ntwrk/mnkit-wallet": "workspace:^"
     "@midnight-ntwrk/testkit-js": "npm:4.1.1"
     "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
     "@types/node": "npm:^22.0.0"
@@ -1283,7 +1251,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-secret-message@workspace:examples/secret-message"
   dependencies:
-    "@midnight-ntwrk/example-fast-sync": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -1293,6 +1260,7 @@ __metadata:
     "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-types": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-utils": "npm:4.1.1"
+    "@midnight-ntwrk/mnkit-wallet": "workspace:^"
     "@midnight-ntwrk/testkit-js": "npm:4.1.1"
     "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
     "@types/node": "npm:^22.0.0"
@@ -1355,8 +1323,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-shielded-chips@workspace:examples/shielded-chips"
   dependencies:
-    "@midnight-ntwrk/example-coins": "workspace:^"
-    "@midnight-ntwrk/example-fast-sync": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -1366,6 +1332,8 @@ __metadata:
     "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-types": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-utils": "npm:4.1.1"
+    "@midnight-ntwrk/mnkit-coins": "workspace:^"
+    "@midnight-ntwrk/mnkit-wallet": "workspace:^"
     "@midnight-ntwrk/testkit-js": "npm:4.1.1"
     "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
     "@types/node": "npm:^22.0.0"
@@ -1384,7 +1352,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-silent-auction@workspace:examples/silent-auction"
   dependencies:
-    "@midnight-ntwrk/example-fast-sync": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -1394,6 +1361,7 @@ __metadata:
     "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-types": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-utils": "npm:4.1.1"
+    "@midnight-ntwrk/mnkit-wallet": "workspace:^"
     "@midnight-ntwrk/testkit-js": "npm:4.1.1"
     "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
     "@types/node": "npm:^22.0.0"
@@ -1405,17 +1373,6 @@ __metadata:
     vite-node: "npm:^6.0.0"
     vitest: "npm:^4.1.0"
     ws: "npm:^8.14.2"
-  languageName: unknown
-  linkType: soft
-
-"@midnight-ntwrk/example-sim@workspace:^, @midnight-ntwrk/example-sim@workspace:packages/sim":
-  version: 0.0.0-use.local
-  resolution: "@midnight-ntwrk/example-sim@workspace:packages/sim"
-  dependencies:
-    "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
-    "@types/node": "npm:^22.0.0"
-    typescript: "npm:^5.7.0"
-    vitest: "npm:^4.1.0"
   languageName: unknown
   linkType: soft
 
@@ -1467,7 +1424,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-token-transfers@workspace:examples/token-transfers"
   dependencies:
-    "@midnight-ntwrk/example-fast-sync": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -1477,6 +1433,7 @@ __metadata:
     "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-types": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-utils": "npm:4.1.1"
+    "@midnight-ntwrk/mnkit-wallet": "workspace:^"
     "@midnight-ntwrk/testkit-js": "npm:4.1.1"
     "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
     "@types/node": "npm:^22.0.0"
@@ -1529,7 +1486,6 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@midnight-ntwrk/example-zk-loan@workspace:examples/zk-loan"
   dependencies:
-    "@midnight-ntwrk/example-fast-sync": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
@@ -1539,6 +1495,7 @@ __metadata:
     "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-types": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-utils": "npm:4.1.1"
+    "@midnight-ntwrk/mnkit-wallet": "workspace:^"
     "@midnight-ntwrk/testkit-js": "npm:4.1.1"
     "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
     "@types/node": "npm:^22.0.0"
@@ -1713,6 +1670,62 @@ __metadata:
   checksum: 10c0/da23caf62a14f77700283c5a4851dfdd6bcd696af8af2c1096d8ce7ad2b04244dfe3efb3df93163d1954e609b149359b7b15ffa775aece27096f21b9aafd52a3
   languageName: node
   linkType: hard
+
+"@midnight-ntwrk/mnkit-coins@workspace:^, @midnight-ntwrk/mnkit-coins@workspace:packages/coins":
+  version: 0.0.0-use.local
+  resolution: "@midnight-ntwrk/mnkit-coins@workspace:packages/coins"
+  dependencies:
+    "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
+    "@types/node": "npm:^22.0.0"
+    typescript: "npm:^5.7.0"
+    vitest: "npm:^4.1.0"
+  peerDependencies:
+    "@midnight-ntwrk/midnight-js-protocol": ~4.1.1
+  languageName: unknown
+  linkType: soft
+
+"@midnight-ntwrk/mnkit-sim@workspace:^, @midnight-ntwrk/mnkit-sim@workspace:packages/sim":
+  version: 0.0.0-use.local
+  resolution: "@midnight-ntwrk/mnkit-sim@workspace:packages/sim"
+  dependencies:
+    "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
+    "@types/node": "npm:^22.0.0"
+    typescript: "npm:^5.7.0"
+    vitest: "npm:^4.1.0"
+  peerDependencies:
+    "@midnight-ntwrk/midnight-js-protocol": ~4.1.1
+  languageName: unknown
+  linkType: soft
+
+"@midnight-ntwrk/mnkit-wallet@workspace:^, @midnight-ntwrk/mnkit-wallet@workspace:packages/fast-sync":
+  version: 0.0.0-use.local
+  resolution: "@midnight-ntwrk/mnkit-wallet@workspace:packages/fast-sync"
+  dependencies:
+    "@midnight-ntwrk/midnight-js-network-id": "npm:4.1.1"
+    "@midnight-ntwrk/midnight-js-protocol": "npm:4.1.1"
+    "@midnight-ntwrk/midnight-js-types": "npm:4.1.1"
+    "@midnight-ntwrk/midnight-js-utils": "npm:4.1.1"
+    "@midnight-ntwrk/testkit-js": "npm:4.1.1"
+    "@midnight-ntwrk/wallet-sdk": "npm:1.2.0"
+    "@midnight-ntwrk/wallet-sdk-abstractions": "npm:2.1.0"
+    "@polkadot/api": "npm:16.5.6"
+    "@polkadot/types": "npm:16.5.6"
+    "@polkadot/util": "npm:14.0.3"
+    "@types/node": "npm:^22.0.0"
+    pino: "npm:^9.0.0"
+    pino-pretty: "npm:^13.0.0"
+    rxjs: "npm:^7.8.2"
+    typescript: "npm:^5.7.0"
+    vite-node: "npm:^6.0.0"
+  peerDependencies:
+    "@midnight-ntwrk/midnight-js-network-id": ~4.1.1
+    "@midnight-ntwrk/midnight-js-protocol": ~4.1.1
+    "@midnight-ntwrk/midnight-js-types": ~4.1.1
+    "@midnight-ntwrk/midnight-js-utils": ~4.1.1
+    "@midnight-ntwrk/testkit-js": ~4.1.1
+    "@midnight-ntwrk/wallet-sdk": ~1.2.0
+  languageName: unknown
+  linkType: soft
 
 "@midnight-ntwrk/onchain-runtime-v3@npm:3.1.1":
   version: 3.1.1
@@ -7367,6 +7380,17 @@ __metadata:
   resolution: "mn-examples@workspace:."
   dependencies:
     bn.js: "npm:5.2.5"
+    vitest: "npm:^4.1.0"
+  languageName: unknown
+  linkType: soft
+
+"mnkit@workspace:packages/mnkit":
+  version: 0.0.0-use.local
+  resolution: "mnkit@workspace:packages/mnkit"
+  dependencies:
+    vitest: "npm:^4.1.0"
+  bin:
+    mnkit: ./bin/mnkit.mjs
   languageName: unknown
   linkType: soft
 

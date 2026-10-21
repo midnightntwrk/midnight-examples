@@ -49,7 +49,7 @@ edit examples/<name>/tutorials/ → PR merged to main → workflow opens a midni
 ## Writing a tutorial
 
 `yarn new:example` copies a starter `tutorials/index.mdx` from
-[`templates/example/tutorials/`](../templates/example/tutorials/index.mdx).
+[`packages/mnkit/templates/example/tutorials/`](../packages/mnkit/templates/example/tutorials/index.mdx).
 
 - **Prerequisites:** open by naming the previous learning-path step and linking
   its docs page.

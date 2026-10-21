@@ -10,7 +10,8 @@
 // in, and the alias table maps it onto one of the four, so a single set of
 // funded wallets in the repo-root .env.<network> serves all eight examples.
 
-import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import type { WalletSecret } from './types.js';
 import type { FastSyncOptions } from './fast-wallet.js';
 
@@ -32,8 +33,27 @@ const ALIASES: Record<string, CanonicalRole> = {
   BIDDER_TWO: 'CHARLIE',
 };
 
-/** The shipped reference bundles, at the repo root. */
-export const REFERENCE_ROOT = fileURLToPath(new URL('../../../preseed', import.meta.url));
+/**
+ * Where the pre-seed reference bundles are: $MIDNIGHT_PRESEED_DIR when set,
+ * else the nearest `preseed/` at or above the working directory (the
+ * monorepo's, for its examples), else null. A project without bundles
+ * syncs from genesis; a missing or foreign bundle is never used
+ * (reference-bundle.ts fails closed).
+ */
+export function findReferenceRoot(from: string = process.cwd()): string | null {
+  const env = process.env.MIDNIGHT_PRESEED_DIR;
+  if (env) return resolve(env);
+  for (let dir = resolve(from); ; dir = dirname(dir)) {
+    if (existsSync(join(dir, 'preseed'))) return join(dir, 'preseed');
+    if (dirname(dir) === dir) return null;
+  }
+}
+
+/**
+ * The reference root found at startup (findReferenceRoot), or `preseed/` in
+ * the working directory when there is none, which holds no bundle.
+ */
+export const REFERENCE_ROOT = findReferenceRoot() ?? join(process.cwd(), 'preseed');
 
 /** Genesis-funded seeds on the local `undeployed` devnet. */
 export const LOCAL_SEEDS: Record<CanonicalRole, string> = {
@@ -129,17 +149,18 @@ export function resolveWallet(net: string, role?: string): ResolvedWallet {
     const secret = readSecret(prefix);
     if (!secret) continue;
     const birthday = readBirthday(prefix);
+    const referenceRoot = findReferenceRoot();
     return {
       secret,
       role: canonical,
-      ...(birthday === undefined ? {} : { fastSync: { referenceRoot: REFERENCE_ROOT, birthday } }),
+      ...(birthday === undefined || referenceRoot === null ? {} : { fastSync: { referenceRoot, birthday } }),
     };
   }
 
   throw new Error(
     `No wallet for role '${canonical}' on network '${net}'. Set ` +
       `MIDNIGHT_${upper}_${canonical}_SEED (plus MIDNIGHT_${upper}_${canonical}_BIRTHDAY ` +
-      `to enable fast-sync) in the repo-root .env.${net}. ` +
-      `Run \`yarn wallets:new\` to generate and \`yarn preseed:cut\` first — see FAST-SYNC.md.`,
+      `to enable fast-sync) in .env.${net}: the project's, or the repo root's in midnight-examples, ` +
+      `where \`yarn preseed:cut\` then \`yarn wallets:new\` generate them — see its FAST-SYNC.md.`,
   );
 }

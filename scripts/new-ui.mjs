@@ -59,12 +59,13 @@ import {
   assertNodeVersion,
   assertNoLeftoverTokens,
   deriveNames,
+  exitOnError,
   fail,
   renderTree,
   substituteNames,
   writeFiles,
-} from './lib/template.mjs';
-import { gatePath, readJson, sourceHash } from './lib/gates.mjs';
+} from '../packages/mnkit/src/lib/template.mjs';
+import { gatePath, readJson, sourceHash } from '../packages/mnkit/src/lib/gates.mjs';
 import {
   ONE_TIME_ADVICE,
   SECRET_ADVICE,
@@ -77,8 +78,10 @@ import {
   readContractInfo,
   scanWitnessesTs,
   typeLabel,
-} from './lib/contract-info.mjs';
+} from '../packages/mnkit/src/lib/contract-info.mjs';
 import { readAll, renderBlock, skeleton, VERIFICATION_FILE, withBlock } from './lib/verification.mjs';
+
+exitOnError();
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
@@ -344,7 +347,7 @@ if (managed === null) {
   fail(`--contract ${managed}: not found (compiled: ${compiled.join(', ')})`);
 }
 
-// --- read the compiled contract (scripts/lib/contract-info.mjs) -------------
+// --- read the compiled contract (packages/mnkit/src/lib/contract-info.mjs) -------------
 const info = readContractInfo(exampleDir, managed);
 
 const circuits = info.circuits

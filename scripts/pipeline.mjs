@@ -69,7 +69,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { listCompiled } from './lib/contract-info.mjs';
+import { listCompiled } from '../packages/mnkit/src/lib/contract-info.mjs';
 import { fixPlanMarkdown, triage } from './lib/devnet-triage.mjs';
 import {
   compileIsStale,
@@ -79,10 +79,12 @@ import {
   sourceHash,
   walk,
   writeJson,
-} from './lib/gates.mjs';
-import { checkDocker, preflight } from './lib/preflight.mjs';
-import { lintCode, lintDesign } from './lib/spec-lint.mjs';
-import { NAME_RE, fail } from './lib/template.mjs';
+} from '../packages/mnkit/src/lib/gates.mjs';
+import { checkDocker, preflight } from '../packages/mnkit/src/lib/preflight.mjs';
+import { lintCode, lintDesign } from '../packages/mnkit/src/lib/spec-lint.mjs';
+import { NAME_RE, exitOnError, fail } from '../packages/mnkit/src/lib/template.mjs';
+
+exitOnError();
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const USAGE =
@@ -118,7 +120,7 @@ const SEEDS = gatePath(DIR, 'ui-seeds.json');
 // What to read when sent back to a step: the context budget in
 // docs/generation-flow.md, by step.
 const READ = {
-  1: ['templates/example/SPEC.md', 'examples/private-tip-jar/SPEC.md (a worked example)', 'docs/patterns.md (find the nearest example)'],
+  1: ['packages/mnkit/templates/example/SPEC.md', 'examples/private-tip-jar/SPEC.md (a worked example)', 'docs/patterns.md (find the nearest example)'],
   '3a': [
     'docs/compact-gotchas.md',
     'docs/patterns.md, then the 1–2 nearest examples’ contract/*.compact',

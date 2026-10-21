@@ -18,7 +18,7 @@
 - **A `receiveShielded` argument is a new coin, not a wallet coin.** It
   describes the output the transaction creates for the contract; the wallet
   pays for it from whichever coins it selects and makes change. So the tests
-  pass `freshCoin(color, amount)` from `@midnight-ntwrk/example-coins` (a
+  pass `freshCoin(color, amount)` from `@midnight-ntwrk/mnkit-coins` (a
   fresh random nonce) to `houseDeposit`, `betColor` and `burn`, and the UI
   does the same with `createShieldedCoinInfo` (`freshChip`). No wallet coin shares that
   nonce and the issuer never saw it, so `houseDeposit` stores the coin as it
@@ -78,7 +78,7 @@ yarn env:down
   from private state at claim/forfeit time. Its `mt_index` is recovered from the
   bet transaction's `zswapStartIndex` plus the escrow output's position in
   that transaction, found by commitment because the wallet's change output can
-  come first (`contractCoinMtIndex` from `@midnight-ntwrk/example-coins` in the
+  come first (`contractCoinMtIndex` from `@midnight-ntwrk/mnkit-coins` in the
   tests; `escrowMtIndex` in `ui/src/midnight/shielded-chips-api.ts`, a browser
   copy, since that package is Node-only), and written with `rememberEscrow`.
 - Pool keys in `houseCoins` are deposit nonces, chosen by the caller and

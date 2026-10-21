@@ -1,0 +1,156 @@
+// This file is part of mn-examples.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+// Licensed under the Apache License, Version 2.0 (the "License");
+// You may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// The devnet gate for one project: compile → env:up → wait:dust → test:local,
+// then env:down (`mnkit validate`; `yarn validate` in the monorepo's examples).
+// It returns the status of the first step that failed, so a red test run is
+// never reported as a pass.
+//
+//   keepNet     leave the network running afterwards. `env:up` is a no-op on a
+//               healthy network, so a fix loop of `validate --keep-net` skips
+//               the network restart; run env:down when done.
+//   reportPath  also write a JSON report: each step's status and time, the
+//               source hash at the start and the end (lib/gates.mjs), the
+//               failing tests from vitest's JSON reporter, and the tail of each
+//               failed step's output and of logs/compose.log. The monorepo's
+//               pipeline runner runs validate in the background with this and
+//               triages a failure from it. Output and exit status are
+//               otherwise unchanged.
+//
+// `compile` is skipped when every contract/managed/*/compiler/contract-info.json
+// is newer than every .compact under contract/, because a full compile
+// regenerates the proving keys and is the slowest step after the tests.
+
+import { spawn, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { compileIsStale, readJson, sourceHash, vitestFailures, writeJson } from '../lib/gates.mjs';
+
+/** Lines of output kept per step for the report. */
+const TAIL_LINES = 60;
+const tail = (text, n = TAIL_LINES) => text.split('\n').slice(-n).join('\n').trimEnd();
+
+/** The command line that runs package script `script` with `extra` arguments. */
+const scriptCommand = (pm, script, extra) =>
+  pm === 'npm' ? ['npm', ['run', script, ...(extra.length ? ['--', ...extra] : [])]] : [pm, [script, ...extra]];
+
+/**
+ * Run `<pm> <script> [...extra]`. Without a report the child inherits the
+ * terminal. With one, output is teed to ours and its tail kept for the report.
+ */
+function runScript({ dir, pm, reportPath }, script, extra = []) {
+  const [cmd, cmdArgs] = scriptCommand(pm, script, extra);
+  console.log(`\n▶ ${cmd} ${cmdArgs.join(' ')}`);
+  if (!reportPath) {
+    const r = spawnSync(cmd, cmdArgs, { stdio: 'inherit', cwd: dir });
+    return Promise.resolve({ status: r.status ?? 1, output: '' });
+  }
+  return new Promise((resolve) => {
+    const child = spawn(cmd, cmdArgs, { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    const keep = (chunk, sink) => {
+      sink.write(chunk);
+      output = tail(output + chunk.toString(), TAIL_LINES * 4);
+    };
+    child.stdout.on('data', (c) => keep(c, process.stdout));
+    child.stderr.on('data', (c) => keep(c, process.stderr));
+    child.on('error', (err) => resolve({ status: 1, output: String(err) }));
+    child.on('close', (code) => resolve({ status: code ?? 1, output }));
+  });
+}
+
+/**
+ * Runs the gate in project dir `dir` with package manager `pm` ('yarn' or
+ * 'npm') and returns the exit status of the first failed step, or 0.
+ */
+export async function validate({ dir, pm = 'npm', keepNet = false, reportPath = null }) {
+  const run = (script, extra) => runScript({ dir, pm, reportPath }, script, extra);
+  const vitestReport = reportPath ? path.join(path.dirname(reportPath), 'devnet-vitest.json') : null;
+  const extraArgs = {
+    // CLI reporters replace the config's ['default'], so name it again.
+    'test:local': vitestReport ? ['--reporter=default', '--reporter=json', `--outputFile.json=${vitestReport}`] : [],
+  };
+
+  const report = {
+    example: path.basename(dir),
+    startedAt: new Date().toISOString(),
+    sourceHashStart: sourceHash(dir),
+    keepNet,
+    steps: [],
+  };
+  if (vitestReport) fs.rmSync(vitestReport, { force: true });
+
+  const steps = [...(compileIsStale(dir) ? ['compile'] : []), 'env:up', 'wait:dust', 'test:local'];
+  if (!steps.includes('compile')) {
+    console.log('• compile skipped: contract/managed has proving keys and is newer than every .compact source');
+    report.steps.push({ step: 'compile', status: 'skipped', ms: 0 });
+  }
+
+  let failed = null;
+  let status = 0;
+  try {
+    for (const step of steps) {
+      const t0 = Date.now();
+      const r = await run(step, extraArgs[step]);
+      status = r.status;
+      const entry = { step, status: status === 0 ? 'pass' : 'fail', ms: Date.now() - t0 };
+      if (status !== 0) entry.outputTail = tail(r.output);
+      report.steps.push(entry);
+      if (status !== 0) {
+        failed = step;
+        break;
+      }
+    }
+  } finally {
+    if (failed && failed !== 'compile') {
+      // Same as CI: keep the service logs, which env:down deletes with the containers.
+      fs.mkdirSync(path.join(dir, 'logs'), { recursive: true });
+      const logs = spawnSync('docker', ['compose', 'logs', '--no-color', '--timestamps'], { cwd: dir });
+      fs.writeFileSync(path.join(dir, 'logs', 'compose.log'), logs.stdout ?? '');
+      report.composeLogTail = tail(logs.stdout?.toString() ?? '');
+    }
+    if (!keepNet && failed !== 'compile') await run('env:down');
+  }
+
+  if (reportPath) {
+    const tests = vitestReport ? readJson(vitestReport) : null;
+    Object.assign(report, {
+      finishedAt: new Date().toISOString(),
+      sourceHashEnd: sourceHash(dir),
+      passed: !failed,
+      failedStep: failed,
+      exitCode: status,
+      networkLeftUp: keepNet && failed !== 'compile',
+      tests: tests
+        ? {
+            total: tests.numTotalTests,
+            passed: tests.numPassedTests,
+            failed: tests.numFailedTests,
+            failures: vitestFailures(tests, dir),
+          }
+        : null,
+    });
+    writeJson(reportPath, report);
+  }
+
+  if (failed) {
+    const logNote = failed === 'compile' ? '' : ' Service logs: logs/compose.log.';
+    console.error(`\n✖ validate failed at \`${failed}\` (exit ${status}).${logNote}`);
+    return status;
+  }
+  const down = pm === 'npm' ? 'npm run env:down' : `${pm} env:down`;
+  console.log(`\n✔ validate passed${keepNet ? ` (network left running; \`${down}\` when done)` : ''}`);
+  return 0;
+}

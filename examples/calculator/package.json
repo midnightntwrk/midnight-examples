@@ -23,8 +23,6 @@
     "validate": "node ../../scripts/validate-example.mjs"
   },
   "dependencies": {
-    "@midnight-ntwrk/example-fast-sync": "workspace:^",
-    "@midnight-ntwrk/example-sim": "workspace:^",
     "@midnight-ntwrk/midnight-js-contracts": "4.1.1",
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "4.1.1",
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "4.1.1",
@@ -34,6 +32,8 @@
     "@midnight-ntwrk/midnight-js-protocol": "4.1.1",
     "@midnight-ntwrk/midnight-js-types": "4.1.1",
     "@midnight-ntwrk/midnight-js-utils": "4.1.1",
+    "@midnight-ntwrk/mnkit-sim": "workspace:^",
+    "@midnight-ntwrk/mnkit-wallet": "workspace:^",
     "@midnight-ntwrk/testkit-js": "4.1.1",
     "@midnight-ntwrk/wallet-sdk": "1.2.0",
     "pino": "^9.0.0",

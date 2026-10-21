@@ -21,7 +21,7 @@ import {
   REFERENCE_ROOT,
   type FastSyncOptions,
   type WalletSecret,
-} from '@midnight-ntwrk/example-fast-sync';
+} from '@midnight-ntwrk/mnkit-wallet';
 import { buildProviders, type HelloWorldProviders } from '../providers.js';
 
 // Where an auto-generated throwaway wallet is cached (gitignored). Only used

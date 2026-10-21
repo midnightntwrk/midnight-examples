@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Scaffolds a new example under examples/<name> from templates/example.
+// Scaffolds a new example under examples/<name> from packages/mnkit/templates/example.
 // Zero dependencies — Node built-ins only. Run with no AI assistance:
 //
 //   yarn new:example <name> [--witnesses] [--no-register]
@@ -27,27 +27,22 @@
 // @generated-stub regions from it: witness stubs, constructor arguments, an
 // it.todo per circuit, the ledger fields, and for each other contract under
 // contract/ (a test-only token) its exports, providers and a deploy test. See
-// scripts/lib/derive.mjs.
+// packages/mnkit/src/lib/derive.mjs.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { derive, sealRegions } from './lib/derive.mjs';
-import { preflight } from './lib/preflight.mjs';
-import { lintDesign } from './lib/spec-lint.mjs';
-import {
-  NAME_RE,
-  assertNoLeftoverTokens,
-  deriveNames,
-  fail,
-  renderTree,
-  substituteNames,
-  writeFiles,
-} from './lib/template.mjs';
+import { runDerive } from '../packages/mnkit/src/commands/derive.mjs';
+import { preflight } from '../packages/mnkit/src/lib/preflight.mjs';
+import { renderExample } from '../packages/mnkit/src/lib/scaffold.mjs';
+import { lintDesign } from '../packages/mnkit/src/lib/spec-lint.mjs';
+import { NAME_RE, exitOnError, fail, writeFiles } from '../packages/mnkit/src/lib/template.mjs';
+
+exitOnError();
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
-const TEMPLATE_DIR = path.join(REPO_ROOT, 'templates', 'example');
+const TEMPLATE_DIR = path.join(REPO_ROOT, 'packages', 'mnkit', 'templates', 'example');
 const EXAMPLES_DIR = path.join(REPO_ROOT, 'examples');
 
 function usage() {
@@ -106,43 +101,10 @@ const targetDir = path.join(EXAMPLES_DIR, name);
 if (args.includes('--derive')) {
   if (withWitnesses || noRegister || specFile) fail('--derive runs on an existing example; it takes no other options.');
   if (!fs.existsSync(targetDir)) fail(`examples/${name} does not exist. Scaffold it first: yarn new:example ${name}`);
-  let result;
-  try {
-    result = derive(targetDir, name, deriveNames(name));
-  } catch (err) {
-    fail(err instanceof Error ? err.message : String(err));
-  }
-  const list = (xs) => (xs.length ? xs.join(', ') : 'none');
-  console.log(`\n✔ Derived examples/${name} from contract/managed/${result.managed}`);
-  console.log(`    circuits: ${list(result.circuits)}${result.pureCircuits.length ? `; pure: ${list(result.pureCircuits)}` : ''}`);
-  console.log(`    witnesses: ${list(result.witnesses)}`);
-  console.log(`    constructor: ${list(result.ctorParams)}`);
-  if (result.secondaries.length) {
-    console.log(`    other contracts: ${result.secondaries.map((s) => `${s.name} (${s.status})`).join(', ')}`);
-  }
-  console.log('');
-  for (const r of result.report) {
-    if (r.note) {
-      console.log(`  ${r.rel}: ${r.note}`);
-      continue;
-    }
-    const parts = Object.entries(r.status).map(([id, st]) => `${id} ${st}`);
-    if (r.missing.length) parts.push(`no region for ${r.missing.join(', ')} (markers removed: yours now)`);
-    console.log(`  ${r.rel}: ${parts.join('; ') || 'no regions'}`);
-  }
-  if (result.secondaries.some((s) => s.status !== 'wired')) {
-    console.log('\n  A contract with witnesses of its own is not wired: contract/witnesses.ts belongs to');
-    console.log(`  ${name}.compact. Export it from contract/index.ts and deploy it in the test by hand.`);
-  }
-  const edited = result.report.flatMap((r) => Object.entries(r.status ?? {}).filter(([, st]) => st === 'edited'));
-  if (edited.length) {
-    console.log('\n  "edited" regions were changed by hand and left alone. To regenerate one, restore its');
-    console.log('  body to the generated text, or delete the body and set its sha= to e3b0c44298fc (empty).');
-  }
-  if (result.unstubbed.length) {
-    console.log(`\n  ⚠ contract/witnesses.ts has no implementation for: ${result.unstubbed.join(', ')}`);
-  }
-  console.log('\n  Next: yarn typecheck && yarn test:sim   (in examples/' + name + ')\n');
+  runDerive(targetDir, name, {
+    label: `examples/${name}`,
+    next: `yarn typecheck && yarn test:sim   (in examples/${name})`,
+  });
   process.exit(0);
 }
 
@@ -166,67 +128,8 @@ if (specFile) {
   if (problems.length > 0) fail(`--spec ${specFile} fails the design lint:\n  - ${problems.join('\n  - ')}`);
 }
 
-// --- name derivations -------------------------------------------------------
-const names = deriveNames(name);
-const { Name } = names;
-
-// --- token/marker substitution ----------------------------------------------
-const KNOWN_TOKENS = [
-  '__name__',
-  '__Name__',
-  '__Title__',
-  '__WITNESS_IMPORT__',
-  '__WITNESS_METHOD__',
-  '__PRIVATE_STATE_IMPORT__',
-  '__INITIAL_PRIVATE_STATE__',
-  '__SIM_WITNESS_IMPORT__',
-  '__SIM_WITNESSES__',
-];
-
-function substitute(content) {
-  // 1) Plain name tokens (case-sensitive, non-overlapping).
-  let out = substituteNames(content, names);
-
-  // 2) Witness markers. Values are pre-resolved so ordering is irrelevant.
-  if (withWitnesses) {
-    out = out
-      .replaceAll('__WITNESS_IMPORT__', "import { witnesses } from './witnesses.js';")
-      .replaceAll('__WITNESS_METHOD__', 'withWitnesses(witnesses)')
-      .replaceAll(
-        '__PRIVATE_STATE_IMPORT__',
-        `import { create${Name}PrivateState } from '../../contract/witnesses.js';`,
-      )
-      .replaceAll('__INITIAL_PRIVATE_STATE__', `create${Name}PrivateState()`)
-      .replaceAll(
-        '__SIM_WITNESS_IMPORT__',
-        `import { create${Name}PrivateState, witnesses } from '../../contract/witnesses.js';`,
-      )
-      .replaceAll('__SIM_WITNESSES__', 'witnesses');
-  } else {
-    // Drop the whole marker line for the import markers.
-    out = out
-      .replaceAll('__WITNESS_IMPORT__\n', '')
-      .replaceAll('__PRIVATE_STATE_IMPORT__\n', '')
-      .replaceAll('__SIM_WITNESS_IMPORT__\n', '')
-      .replaceAll('__SIM_WITNESSES__', '{}')
-      .replaceAll('__WITNESS_METHOD__', 'withVacantWitnesses')
-      .replaceAll('__INITIAL_PRIVATE_STATE__', '{}');
-  }
-  return out;
-}
-
 // --- render + write ----------------------------------------------------------
-const files = renderTree(TEMPLATE_DIR, {
-  name,
-  // Only copy the witnesses stub when --witnesses is set.
-  skip: (rel) => !withWitnesses && rel === path.join('contract', 'witnesses.ts'),
-  render: (raw, rel) => {
-    if (specContent !== null && rel === 'SPEC.md') return specContent;
-    const content = sealRegions(substitute(raw));
-    assertNoLeftoverTokens(rel, content, KNOWN_TOKENS);
-    return content;
-  },
-});
+const files = renderExample(TEMPLATE_DIR, { name, witnesses: withWitnesses, spec: specContent });
 const created = writeFiles(targetDir, files).map((p) => path.relative(REPO_ROOT, p));
 
 // --- registration (idempotent; a failure is fatal after the files are written) --

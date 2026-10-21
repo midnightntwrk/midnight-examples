@@ -13,13 +13,18 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "yarn build:packages",
+    "build:packages": "yarn workspaces foreach --all --include '@midnight-ntwrk/mnkit-*' --parallel run build",
     "new:example": "node scripts/new-example.mjs",
     "new:ui": "node scripts/new-ui.mjs",
     "spec:lint": "node scripts/spec-lint.mjs",
+    "toolchain:check": "node scripts/toolchain-check.mjs",
+    "test:engine": "yarn workspace mnkit test",
+    "fixtures:regen": "node packages/mnkit/test/fixtures/regen.mjs",
     "pipeline": "node scripts/pipeline.mjs",
-    "wallets:new": "yarn workspace @midnight-ntwrk/example-fast-sync run wallets:new",
-    "preseed:cut": "yarn workspace @midnight-ntwrk/example-fast-sync run preseed:cut",
-    "fund:wallet": "yarn workspace @midnight-ntwrk/example-fast-sync run fund:wallet",
+    "wallets:new": "yarn workspace @midnight-ntwrk/mnkit-wallet run wallets:new",
+    "preseed:cut": "yarn workspace @midnight-ntwrk/mnkit-wallet run preseed:cut",
+    "fund:wallet": "yarn workspace @midnight-ntwrk/mnkit-wallet run fund:wallet",
     "compile": "yarn workspaces foreach --all --parallel run compile",
     "compile:fast": "yarn workspaces foreach --all --parallel run compile:fast",
     "typecheck": "yarn workspaces foreach --all --parallel run typecheck",
@@ -30,7 +35,8 @@
     "test:preview": "yarn workspaces foreach --all --verbose run test:preview"
   },
   "devDependencies": {
-    "bn.js": "5.2.5"
+    "bn.js": "5.2.5",
+    "vitest": "^4.1.0"
   },
   "resolutions": {
     "@midnight-ntwrk/wallet-sdk": "1.2.0",
