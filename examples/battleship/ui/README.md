@@ -98,10 +98,27 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
   proof server you run yourself (`yarn proof:up` in `examples/hello-world`).
 - **Use your own wallet.** Never use the repo's fast-sync or seeded test wallets
   (`.env.<network>`, `yarn wallets:new`) on mainnet.
+- **Use a live indexer.** Midnight's hosted mainnet indexer was shut down on
+  2026-10-09. If your wallet still points at `indexer.mainnet.midnight.network`,
+  change it there or override it here (see [Indexer](#indexer)).
 - **One identity per browser profile.** Your secret key and ships live in
   this profile's passphrase-encrypted private state. Lose the passphrase or
   clear site data and you lose your seat. The contract refuses to let one key
   play itself, so player two needs a second browser profile.
+
+### Indexer
+
+The UI reads public data from the indexer configured in the connected wallet.
+If that indexer is wrong or has been shut down (deploys fail with
+`Failed to fetch`), override it without touching the wallet:
+
+```bash
+cp .env.example .env.local   # in this ui/ directory; .env.local is gitignored
+# uncomment and fill in VITE_INDEXER_URI and VITE_INDEXER_WS_URI, then restart `yarn dev`
+```
+
+Set both or neither, and use an indexer on the wallet's network. Blockfrost
+needs your project id in both URLs (`?project_id=<key>`).
 
 ## Scripts
 

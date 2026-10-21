@@ -25,6 +25,9 @@ dist/
 **/midnight-level-db/
 **/.env.preprod
 **/.env.preview
+# Vite env overrides (may hold an API key, e.g. a Blockfrost project id)
+**/.env.local
+**/.env.*.local
 **/.fast-sync-wallets/
 # Gate stamps, the background devnet lock and its reports (scripts/lib/gates.mjs)
 **/.gates/
