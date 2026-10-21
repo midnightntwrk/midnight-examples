@@ -27,7 +27,7 @@ import { doctor } from './commands/doctor.mjs';
 import { init, printNextSteps } from './commands/init.mjs';
 import { upgrade } from './commands/upgrade.mjs';
 import { validate } from './commands/validate.mjs';
-import { checkCompactVersion, checkDocker } from './lib/preflight.mjs';
+import { checkDocker } from './lib/preflight.mjs';
 import { fail } from './lib/template.mjs';
 import { loadToolchain, mnkitVersion } from './lib/toolchain.mjs';
 
@@ -37,7 +37,9 @@ Commands:
   init <dir>        scaffold a project around your contract
                     (--witnesses: the contract has witnesses; --name <name>: project name,
                     default the directory's; --dry-run: list the files; --skip-install)
-  compile           compile every contract under contract/ (--skip-zk: no proving keys)
+  compile           compile every contract under contract/ with the pinned compiler, installing
+                    it (and the Compact CLI) when missing (--skip-zk: no proving keys;
+                    --no-install, or MNKIT_NO_INSTALL=1: fail instead of installing)
   derive            fill the generated stubs from the compiled contract (safe to re-run)
   validate          compile, start a local network, wait for DUST, run the devnet tests
                     (--keep-net: leave the network up; --report <file>: write a JSON report)
@@ -66,6 +68,9 @@ export function projectName(dir) {
   }
   return path.basename(dir);
 }
+
+/** True when environment variable `name` is set to anything but '' or '0'. */
+const envFlag = (name) => !['', '0', undefined].includes(process.env[name]);
 
 /** `mnkit add <what>`: one entry per thing that can be added. */
 const ADD = {
@@ -108,8 +113,13 @@ const COMMANDS = {
     },
   },
   compile: {
-    options: { 'skip-zk': { type: 'boolean' } },
-    run: ({ values }) => compile(process.cwd(), { skipZk: values['skip-zk'], version: loadToolchain().compact.compiler }),
+    options: { 'skip-zk': { type: 'boolean' }, 'no-install': { type: 'boolean' } },
+    run: ({ values }) =>
+      compile(process.cwd(), {
+        skipZk: values['skip-zk'],
+        version: loadToolchain().compact.compiler,
+        install: !values['no-install'] && !envFlag('MNKIT_NO_INSTALL'),
+      }),
   },
   derive: {
     options: {},
@@ -123,8 +133,10 @@ const COMMANDS = {
     run: async ({ values }) => {
       const dir = process.cwd();
       if (!fs.existsSync(path.join(dir, 'compose.yml'))) fail('run this from a project directory (one with a compose.yml).');
-      const problems = [checkCompactVersion(loadToolchain().compact.compiler), checkDocker()].filter(Boolean);
-      if (problems.length) fail(`validate needs:\n  - ${problems.join('\n  - ')}`);
+      // No compiler check: the compile step installs it, and is skipped when
+      // the compiled contract is current.
+      const docker = checkDocker();
+      if (docker) fail(`validate needs Docker: ${docker}`);
       return validate({
         dir,
         pm: 'npm',

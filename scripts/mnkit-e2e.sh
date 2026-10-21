@@ -16,7 +16,7 @@
 
 # mnkit end to end, as a user gets it, before anything is on npm:
 #
-#   scripts/mnkit-e2e.sh [--devnet] [--from-registry <version>]
+#   scripts/mnkit-e2e.sh [--devnet] [--fresh-compact] [--from-registry <version>]
 #                        [--upgrade-from <git-ref|version>] [fixture ...]
 #
 # Packs mnkit and the three runtime packages with `npm pack`, then for each
@@ -42,6 +42,11 @@
 # A git ref is packed from a worktree of this repo at that ref; anything else
 # is a version from the registry (`npx mnkit@<version>`).
 #
+# --fresh-compact runs the first compile as on a machine without Compact:
+# HOME is a new directory and PATH has no `compact`, so `mnkit compile` has to
+# download the pinned Compact CLI and install the pinned compiler itself. The
+# later steps use the machine's own compact again.
+#
 # The work dir must be
 # outside the repo: Node resolves packages by walking up, so a project inside
 # the repo would pick up the monorepo's node_modules and hide missing deps.
@@ -52,14 +57,16 @@ set -euo pipefail
 
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 FIXTURES="$REPO/packages/mnkit/test/fixtures"
-USAGE="Usage: scripts/mnkit-e2e.sh [--devnet] [--from-registry <version>] [--upgrade-from <git-ref|version>] [fixture ...]"
+USAGE="Usage: scripts/mnkit-e2e.sh [--devnet] [--fresh-compact] [--from-registry <version>] [--upgrade-from <git-ref|version>] [fixture ...]"
 DEVNET=0
+FRESH_COMPACT=0
 FROM_REGISTRY=
 UPGRADE_FROM=
 SELECTED=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --devnet) DEVNET=1 ;;
+    --fresh-compact) FRESH_COMPACT=1 ;;
     --from-registry)
       [ $# -ge 2 ] || { echo "✖ --from-registry needs a version. $USAGE" >&2; exit 1; }
       FROM_REGISTRY=$2
@@ -136,6 +143,25 @@ if [ -n "$UPGRADE_FROM" ]; then
   fi
 fi
 
+# The first compile, on a machine without Compact (--fresh-compact) or as is.
+first_compile() {
+  if [ "$FRESH_COMPACT" != 1 ]; then npm run compile:fast; return; fi
+  local fresh_home="$WORK/fresh-home" path= d pin
+  pin=$(node -p "require('$REPO/toolchain.json').compact.compiler")
+  IFS=: read -ra dirs <<< "$PATH"
+  for d in "${dirs[@]}"; do [ -x "$d/compact" ] || path+="${path:+:}$d"; done
+  echo "▶ compile:fast without Compact (HOME=$fresh_home): mnkit installs the CLI and compiler $pin"
+  env -u COMPACT_DIRECTORY -u COMPACT_INSTALL_DIR -u XDG_BIN_HOME -u XDG_DATA_HOME \
+    HOME="$fresh_home" PATH="$path" npm run compile:fast
+  test -x "$fresh_home/.local/bin/compact" || { echo "✖ no compact CLI in $fresh_home/.local/bin" >&2; exit 1; }
+  test -d "$fresh_home/.compact/versions/$pin" || { echo "✖ compiler $pin not in $fresh_home/.compact" >&2; exit 1; }
+  # There was no default compiler, so the pin became it.
+  [ "$(HOME="$fresh_home" "$fresh_home/.local/bin/compact" compile --version)" = "$pin" ] \
+    || { echo "✖ compiler $pin is not the default in $fresh_home" >&2; exit 1; }
+}
+
+if [ "$FRESH_COMPACT" = 1 ]; then rm -rf "$WORK/fresh-home"; fi
+
 for fixture in "${SELECTED[@]}"; do
   src="$FIXTURES/$fixture"
   [ -d "$src/contract" ] || { echo "✖ no fixture $fixture under $FIXTURES" >&2; exit 1; }
@@ -149,7 +175,7 @@ for fixture in "${SELECTED[@]}"; do
   cd "$WORK/$fixture"
   test ! -e .npmrc || { echo "✖ init wrote an .npmrc" >&2; exit 1; }
   cp "$src"/contract/*.compact contract/
-  npm run compile:fast
+  first_compile
   npx mnkit derive
   rm -rf "$WORK/$fixture.first" && cp -r . "$WORK/$fixture.first"
   npx mnkit derive > /dev/null

@@ -18,6 +18,7 @@
 // nothing.
 
 import net from 'node:net';
+import { resolveCompact } from '../lib/compact-install.mjs';
 import { checkCompactVersion, checkDocker } from '../lib/preflight.mjs';
 import { loadToolchain } from '../lib/toolchain.mjs';
 
@@ -33,7 +34,8 @@ const portFree = (port) =>
 
 /**
  * Runs every check; returns [{ name, ok, detail, warn }]. A port in use is a
- * warning, not a failure: it may be this project's own network.
+ * warning, not a failure: it may be this project's own network. So is a
+ * missing Compact CLI or compiler: `mnkit compile` installs them.
  */
 export async function runChecks(tc = loadToolchain()) {
   const major = Number(process.versions.node.split('.')[0]);
@@ -44,8 +46,13 @@ export async function runChecks(tc = loadToolchain()) {
       detail: major >= Number(tc.node) ? `Node ${process.versions.node}` : `Node ${process.versions.node} is too old. Install Node ${tc.node}+.`,
     },
   ];
-  const compact = checkCompactVersion(tc.compact.compiler);
-  checks.push({ name: `Compact compiler ${tc.compact.compiler}`, ok: !compact, detail: compact ?? 'installed' });
+  const pin = tc.compact.compiler;
+  const missing = !resolveCompact()
+    ? `the \`compact\` CLI is not installed: \`npm run compile\` installs Compact CLI ${tc.compact.cli} and compiler ${pin}`
+    : checkCompactVersion(pin)
+      ? `not installed: \`npm run compile\` installs it, or run \`compact update ${pin} --no-set-default\``
+      : null;
+  checks.push({ name: `Compact compiler ${pin}`, ok: true, warn: Boolean(missing), detail: missing || 'installed' });
   const docker = checkDocker();
   checks.push({ name: 'Docker', ok: !docker, detail: docker ?? 'daemon reachable' });
   for (const [port, what] of Object.entries(DEVNET_PORTS)) {

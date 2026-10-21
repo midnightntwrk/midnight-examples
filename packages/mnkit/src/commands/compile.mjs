@@ -21,23 +21,28 @@
 // main one) needs no package.json edit: add contract/<token>.compact, compile,
 // and derive wires it into contract/index.ts and the devnet test.
 //
-// `version` selects the compiler with `compact compile +<version>`; without
-// it the default compiler runs (the monorepo's examples, whose CI sets the
-// default to the pin).
+// `version` selects the compiler with `compact compile +<version>`, and is
+// installed first when missing, with the Compact CLI if that is missing too
+// (lib/compact-install.mjs; `install: false` fails instead). Without it the
+// default compiler runs (the monorepo's examples, whose CI sets the default to
+// the pin).
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ensureCompiler } from '../lib/compact-install.mjs';
 import { contractSources } from '../lib/contract-info.mjs';
 import { fail } from '../lib/template.mjs';
+import { loadToolchain } from '../lib/toolchain.mjs';
 
-/** Returns the exit status of the first failed compile, or 0. */
-export function compile(dir, { skipZk = false, version = null } = {}) {
+/** Resolves to the exit status of the first failed compile, or 0. `installer` is for tests (ensureCompiler). */
+export async function compile(dir, { skipZk = false, version = null, install = true, installer } = {}) {
   if (!fs.existsSync(path.join(dir, 'contract'))) {
     fail('run this from a project directory (one with contract/), via `npm run compile` or `npm run compile:fast`.');
   }
   const contracts = contractSources(dir);
   if (contracts.length === 0) fail('no contract/*.compact to compile.');
+  if (version) await ensureCompiler(version, loadToolchain(), { install, installer });
 
   for (const { name } of contracts) {
     const cmd = [

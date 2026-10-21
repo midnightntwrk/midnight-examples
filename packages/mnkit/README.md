@@ -19,8 +19,11 @@ examples are built with this same engine.
 - Node.js 22 or later
 - Docker, for the local network
 - The [Compact CLI](https://docs.midnight.network/getting-started/installation)
-  (`compact`), with the compiler version mnkit pins installed. `npx mnkit
-  doctor` tells you which one and how to install it.
+  (`compact`) and the compiler version mnkit pins. You don't have to install
+  either: the first `npm run compile` installs what's missing (the CLI to
+  `~/.local/bin`, the compiler to `~/.compact`). It doesn't change your default
+  compiler; if you have none, the pinned one becomes it. `--no-install` or
+  `MNKIT_NO_INSTALL=1` turns that off.
 - Linux or macOS. On Windows, use WSL.
 
 ## Quickstart
@@ -123,7 +126,7 @@ so fixes reach your project with `npm update`.
 | Command | What it does |
 |---|---|
 | `mnkit init <dir>` | Scaffold a project. `--witnesses`, `--name <name>`, `--dry-run`, `--skip-install` |
-| `mnkit compile` | Compile every contract under `contract/` with the pinned compiler. `--skip-zk` skips the proving keys |
+| `mnkit compile` | Compile every contract under `contract/` with the pinned compiler, installing it (and the Compact CLI) if missing. `--skip-zk` skips the proving keys; `--no-install` fails instead of installing |
 | `mnkit derive` | Fill the `@generated-stub` regions from the compiled contract |
 | `mnkit validate` | The devnet gate: compile, network up, wait for DUST, `test:local`, network down. `--keep-net`, `--report <file>` |
 | `mnkit add ui` | A browser UI in `ui/` for the compiled contract. `--contract <dir>`, `--private-state memory\|persistent`, `--dry-run`, `--skip-gate`, `--skip-install` |

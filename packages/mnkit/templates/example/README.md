@@ -12,9 +12,10 @@ yarn install
 ```
 <!-- @endif -->
 <!-- @if standalone -->
-You need Node 22 or later, Docker, and the Compact CLI (`compact`), with
-compiler __TC_COMPILER__ installed: `compact update __TC_COMPILER__ --no-set-default`.
-`npx mnkit doctor` checks all of it. Then install dependencies:
+You need Node 22 or later and Docker. The first compile installs the Compact
+CLI and compiler __TC_COMPILER__ if they are missing; it changes your default
+compiler only if you have none. `npx mnkit doctor` checks all of it. Then
+install dependencies:
 
 ```bash
 npm install

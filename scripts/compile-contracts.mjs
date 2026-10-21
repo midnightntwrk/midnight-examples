@@ -31,4 +31,4 @@ exitOnError();
 const args = process.argv.slice(2);
 const unknown = args.filter((a) => a !== '--skip-zk');
 if (unknown.length) fail(`unknown argument(s): ${unknown.join(' ')}. Usage: compile-contracts.mjs [--skip-zk]`);
-process.exitCode = compile(process.cwd(), { skipZk: args.includes('--skip-zk') });
+process.exitCode = await compile(process.cwd(), { skipZk: args.includes('--skip-zk') });
