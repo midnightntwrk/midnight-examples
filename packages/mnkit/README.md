@@ -86,7 +86,7 @@ hand.
 ```bash
 npx mnkit deploy                        # local (env:up and wait:dust first)
 npx mnkit deploy --network preprod      # or preview: the wallet in .env.preprod
-npx mnkit deploy --contract my-token    # another contract, before one that needs its address
+npx mnkit deploy my-token               # another contract, before one that needs its address
 ```
 
 `deploy` runs the project's `scripts/deploy.ts` and records the address and tx
@@ -147,7 +147,7 @@ so fixes reach your project with `npm update`.
 | `mnkit compile` | Compile every contract under `contract/` with the pinned compiler, installing it (and the Compact CLI) if missing. `--skip-zk` skips the proving keys; `--no-install` fails instead of installing |
 | `mnkit derive` | Fill the `@generated-stub` regions from the compiled contract |
 | `mnkit validate` | The devnet gate: compile, network up, wait for DUST, `test:local`, network down. `--keep-net`, `--report <file>` |
-| `mnkit deploy` | Deploy a contract to local, preview or preprod without the UI or the tests, compiling first when needed. `--network <net>`, `--contract <name>`, `--no-install` |
+| `mnkit deploy` | Deploy a contract to local, preview or preprod without the UI or the tests, compiling first when needed. `[name]` (default: the project's contract), `--network <net>`, `--no-install` |
 | `mnkit add ui` | A browser UI in `ui/` for the compiled contract. `--contract <dir>`, `--private-state memory\|persistent`, `--dry-run`, `--skip-gate`, `--skip-install` |
 | `mnkit add contract <name>` | Another contract under `contract/`, wired in by the next `derive` |
 | `mnkit upgrade` | Move the project to this mnkit's templates and toolchain. `--check`, `--force`, `--skip-install` |

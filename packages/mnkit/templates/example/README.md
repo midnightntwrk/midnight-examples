@@ -84,7 +84,7 @@ gitignored. A new wallet syncs from genesis, which takes a while on preprod.
 ```bash
 npx mnkit deploy                        # the local network (env:up and wait:dust first)
 npx mnkit deploy --network preprod      # or preview
-npx mnkit deploy --contract <name>      # another contract under contract/
+npx mnkit deploy <name>                 # another contract under contract/
 ```
 
 `deploy` compiles first if the compiled contract is missing or out of date, then

@@ -393,7 +393,7 @@ export function derive(exampleDir, name, names, { coinsPackage = '@midnight-ntwr
     wired
       .map((s) =>
         [
-          `${indent}// contract/${s.name}.compact: \`mnkit deploy --contract ${s.name}\`, before a contract whose constructor needs it.`,
+          `${indent}// contract/${s.name}.compact: \`mnkit deploy ${s.name}\`, before a contract whose constructor needs it.`,
           `${indent}${quote(s.name)}: deployable<${s.Name}Contract>({`,
           `${indent}  compiledContract: Compiled${s.Name}Contract,`,
           `${indent}  zkConfigPath: ${s.camel}ZkConfigPath,`,

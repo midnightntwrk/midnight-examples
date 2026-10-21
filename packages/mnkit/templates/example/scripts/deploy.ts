@@ -20,7 +20,7 @@
 //   yarn deploy [contract]           # local; deploy:preview, deploy:preprod
 // @endif
 // @if standalone
-//   npx mnkit deploy [--network preprod] [--contract <name>]
+//   npx mnkit deploy [contract] [--network preprod]
 // @endif
 //
 // The contract defaults to __name__. Its constructor arguments and initial

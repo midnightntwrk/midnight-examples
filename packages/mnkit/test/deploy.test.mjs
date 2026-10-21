@@ -74,7 +74,7 @@ describe('mnkit deploy', () => {
     ]);
   });
 
-  it('passes --contract to the script and returns its exit status', async () => {
+  it('passes the contract name to the script and returns its exit status', async () => {
     const s = stubs({ deployStatus: 3 });
     expect(await deploy(project(), { contract: 'tip-token', ...s })).toBe(3);
     expect(s.calls.spawn[0]).toMatchObject({ args: ['scripts/deploy.ts', 'tip-token'], network: 'local' });
@@ -121,7 +121,10 @@ describe('mnkit deploy', () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining('has 1 TODO placeholder(s)'));
   });
 
-  it('takes the contract as --contract, not an argument', async () => {
-    await expect(main(['deploy', 'tip-token'])).rejects.toThrow('name the contract with --contract <name>');
+  it('takes the contract as its one argument', async () => {
+    // Outside a project, so one name gets as far as the project check.
+    await expect(main(['deploy', 'tip-token'])).rejects.toThrow('one with a mnkit.json');
+    await expect(main(['deploy', 'tip-token', 'private-tip-jar'])).rejects.toThrow('takes at most one contract');
+    await expect(main(['deploy', '--contract', 'tip-token'])).rejects.toThrow("Unknown option '--contract'");
   });
 });

@@ -44,10 +44,10 @@ Commands:
   derive            fill the generated stubs from the compiled contract (safe to re-run)
   validate          compile, start a local network, wait for DUST, run the devnet tests
                     (--keep-net: leave the network up; --report <file>: write a JSON report)
-  deploy            deploy the compiled contract to local, preview or preprod, compiling first
-                    when needed; writes deployments/<network>.json (--network <net>: default
-                    local; --contract <name>: another contract under contract/; arguments
-                    and private state come from contract/deploy-args.ts)
+  deploy [name]     deploy the compiled contract to local, preview or preprod, compiling first
+                    when needed; writes deployments/<network>.json (name: another contract
+                    under contract/, default the project's; --network <net>: default local;
+                    arguments and private state come from contract/deploy-args.ts)
   add contract <name>
                     add another contract under contract/ (compile and derive wire it in)
   add ui            add a browser UI in ui/ for the compiled contract (an npm workspace)
@@ -151,12 +151,12 @@ const COMMANDS = {
     },
   },
   deploy: {
-    options: { network: { type: 'string' }, contract: { type: 'string' }, 'no-install': { type: 'boolean' } },
+    options: { network: { type: 'string' }, 'no-install': { type: 'boolean' } },
     run: ({ values, positionals }) => {
-      if (positionals.length) fail('mnkit deploy takes no arguments: name the contract with --contract <name>.');
+      if (positionals.length > 1) fail('mnkit deploy takes at most one contract: mnkit deploy tip-token');
       return deploy(process.cwd(), {
         network: values.network ?? 'local',
-        contract: values.contract ?? null,
+        contract: positionals[0] ?? null,
         version: loadToolchain().compact.compiler,
         install: !values['no-install'] && !envFlag('MNKIT_NO_INSTALL'),
       });

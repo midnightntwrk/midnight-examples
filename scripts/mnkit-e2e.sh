@@ -174,8 +174,8 @@ deploy_all() {
   done
   contracts+=("$primary")
   for c in "${contracts[@]}"; do
-    echo "▶ mnkit deploy --contract $c"
-    npx mnkit deploy --contract "$c" || return
+    echo "▶ mnkit deploy $c"
+    npx mnkit deploy "$c" || return
   done
   node -e '
     const [file, ...names] = process.argv.slice(1);

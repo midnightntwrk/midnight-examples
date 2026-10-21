@@ -36,7 +36,7 @@ const TOKEN_DOMAIN = 'private-tip-jar:demo-token:';
 
 function tipTokenAddress(ctx: DeployContext): string {
   const token = ctx.deployments['tip-token'];
-  if (!token) throw new Error(`Deploy tip-token on ${ctx.network} first: mnkit deploy --contract tip-token`);
+  if (!token) throw new Error(`Deploy tip-token on ${ctx.network} first: mnkit deploy tip-token`);
   return token.address;
 }
 

@@ -19,7 +19,7 @@
 //
 // `ctx.deployments` holds the contracts already deployed on the network, so a
 // constructor that takes another contract's address (or its token color) can
-// read it there. Deploy that contract first: `mnkit deploy --contract <name>`.
+// read it there. Deploy that contract first: `mnkit deploy <name>`.
 
 import { deployable, type Deployable, type DeployContext } from '../src/deployments.js';
 import {

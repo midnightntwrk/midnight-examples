@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// `mnkit deploy [--network local|preview|preprod] [--contract <name>]`:
+// `mnkit deploy [name] [--network local|preview|preprod]`:
 // deploys one contract of the project in `dir` without the UI or the test
 // suite. The work happens in the project's scripts/deploy.ts, which runs on
 // the project's own SDK pins; this checks the project, compiles first when the
