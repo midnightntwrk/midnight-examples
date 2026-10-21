@@ -151,10 +151,11 @@ so fixes reach your project with `npm update`.
 | `mnkit add ui` | A browser UI in `ui/` for the compiled contract. `--contract <dir>`, `--private-state memory\|persistent`, `--dry-run`, `--skip-gate`, `--skip-install` |
 | `mnkit add contract <name>` | Another contract under `contract/`, wired in by the next `derive` |
 | `mnkit upgrade` | Move the project to this mnkit's templates and toolchain. `--check`, `--force`, `--skip-install` |
-| `mnkit doctor` | Check Node, Docker, the Compact compiler and the local network's ports |
+| `mnkit doctor` | Check Node, Docker, the Compact compiler and the local network's ports. `--network <net>` also checks local, preview or preprod: the node, the indexer and its lag, the proof server's version, and preprod's Blockfrost key |
 
-The project's `npm run compile`, `compile:fast`, `derive`, `validate` and
-`deploy` (`deploy:preview`, `deploy:preprod`) scripts call these.
+The project's `npm run compile`, `compile:fast`, `derive`, `validate`,
+`deploy` (`deploy:preview`, `deploy:preprod`) and `doctor:preview` /
+`doctor:preprod` scripts call these.
 
 ## How `derive` stays out of your way
 
@@ -178,6 +179,14 @@ The devnet suite runs against a remote network too. Start a local proof server
 `MIDNIGHT_PREPROD_SEED=<hex>` (preprod also needs `BLOCKFROST_PROJECT_ID`), and
 run `npm run test:preprod`. `.env.*` files are gitignored. A new wallet syncs
 from genesis, which takes a while on preprod.
+
+When a run hangs, `npm run doctor:preview` or `npm run doctor:preprod` tells
+you whether the network side is healthy: the node and indexer answer, the
+indexer is no more than 100 blocks behind, the proof server runs the pinned
+version, and (preprod) Blockfrost accepts the project ID. `mnkit deploy` runs
+the same checks before a preview or preprod deploy. For more,
+[midnight-cast](https://www.npmjs.com/package/midnight-cast) decodes errors
+and checks a wallet's DUST.
 
 ## Status
 

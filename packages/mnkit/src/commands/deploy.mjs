@@ -18,7 +18,9 @@
 // suite. The work happens in the project's scripts/deploy.ts, which runs on
 // the project's own SDK pins; this checks the project, compiles first when the
 // compiled contract is missing, stale or has no keys (a --skip-zk build has no
-// verifier keys to deploy), and runs the script with vite-node.
+// verifier keys to deploy), and runs the script with vite-node. On preview and
+// preprod it runs `mnkit doctor --network`'s checks first, so a network or
+// proof-server problem fails in seconds instead of as a wallet sync that hangs.
 //
 // What gets deployed (constructor arguments, initial private state) is in
 // contract/deploy-args.ts. The result is deployments/<network>.json.
@@ -29,6 +31,7 @@ import path from 'node:path';
 import { compileIsStale } from '../lib/gates.mjs';
 import { fail } from '../lib/template.mjs';
 import { compile } from './compile.mjs';
+import { MIDNIGHT_CAST_HINT, printChecks, runNetworkChecks } from './doctor.mjs';
 
 /** The networks deploy targets. Mainnet is refused until mnkit has a mainnet config. */
 export const DEPLOY_NETWORKS = ['local', 'preview', 'preprod'];
@@ -40,12 +43,21 @@ export function deployArgsTodos(dir) {
 }
 
 /**
- * Resolves to the exit status of the compile or the deploy script. `compiler`
- * and `spawn` are for tests (compile and spawnSync).
+ * Resolves to the exit status of the network checks, the compile or the deploy
+ * script. `compiler`, `networkChecks` and `spawn` are for tests (compile,
+ * runNetworkChecks and spawnSync).
  */
 export async function deploy(
   dir,
-  { network = 'local', contract = null, version = null, install = true, compiler = compile, spawn = spawnSync } = {},
+  {
+    network = 'local',
+    contract = null,
+    version = null,
+    install = true,
+    compiler = compile,
+    networkChecks = runNetworkChecks,
+    spawn = spawnSync,
+  } = {},
 ) {
   if (network === 'mainnet') {
     fail(`mnkit deploy doesn't deploy to mainnet: every deploy there spends real DUST. Networks: ${DEPLOY_NETWORKS.join(', ')}.`);
@@ -60,6 +72,16 @@ export async function deploy(
   }
   const viteNode = path.join(dir, 'node_modules', '.bin', 'vite-node');
   if (!fs.existsSync(viteNode)) fail('vite-node is not installed. Run `npm install` in the project first.');
+
+  if (network !== 'local') {
+    console.log(`• Checking ${network} first (\`npx mnkit doctor --network ${network}\`):`);
+    const checks = await networkChecks(network, { dir });
+    printChecks(checks);
+    if (checks.some((c) => !c.ok)) {
+      console.log(`\nFix these before deploying to ${network}.\n\n${MIDNIGHT_CAST_HINT(network)}`);
+      return 1;
+    }
+  }
 
   if (compileIsStale(dir)) {
     console.log('• The compiled contract is missing, older than its source or has no keys: compiling first.');

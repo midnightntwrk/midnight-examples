@@ -59,6 +59,8 @@ Commands:
                     (--check: report only, exit 1 if behind; --force: also replace edited
                     files; --skip-install)
   doctor            check Node, Docker, the Compact compiler and the local ports
+                    (--network <net>: also check local, preview or preprod: node, indexer
+                    and its lag, the proof server's version, preprod's Blockfrost key)
 
 Options:
   -h, --help        show this help
@@ -182,7 +184,13 @@ const COMMANDS = {
     run: ({ values }) =>
       upgrade(process.cwd(), { check: values.check, force: values.force, skipInstall: values['skip-install'] }),
   },
-  doctor: { options: {}, run: () => doctor() },
+  doctor: {
+    options: { network: { type: 'string' } },
+    run: ({ values, positionals }) => {
+      if (positionals.length) fail('mnkit doctor takes no arguments: mnkit doctor --network preview');
+      return doctor({ network: values.network ?? null });
+    },
+  },
 };
 
 /** Runs one command line; resolves to the exit code. */

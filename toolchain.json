@@ -1,5 +1,5 @@
 {
-  "$comment": "The one toolchain pin. Every other copy (README table, ci.yaml, compose.yml, package.json, .nvmrc, pragmas) must agree: `yarn toolchain:check`. Bump versions here first, in one coordinated pass.",
+  "$comment": "The one toolchain pin. Every other copy (README table, ci.yaml, compose.yml, package.json, .nvmrc, pragmas) must agree: `yarn toolchain:check`. Bump versions here first, in one coordinated pass. `networks` holds each network's public endpoints, which every src/config.ts must use and `mnkit doctor --network` probes; preprod is Blockfrost, whose project ID is added at runtime from BLOCKFROST_PROJECT_ID and never stored here.",
   "compact": {
     "compiler": "0.31.1",
     "language": "0.23",
@@ -20,6 +20,32 @@
     "midnightntwrk/proof-server": "8.1.3",
     "midnightntwrk/indexer-standalone": "4.3.5",
     "midnightntwrk/midnight-node": "1.0.400"
+  },
+  "networks": {
+    "local": {
+      "networkId": "undeployed",
+      "node": "http://127.0.0.1:9944",
+      "nodeWS": "ws://127.0.0.1:9944",
+      "indexer": "http://127.0.0.1:8088/api/v4/graphql",
+      "indexerWS": "ws://127.0.0.1:8088/api/v4/graphql/ws",
+      "faucet": ""
+    },
+    "preview": {
+      "networkId": "preview",
+      "node": "https://rpc.preview.midnight.network",
+      "nodeWS": "wss://rpc.preview.midnight.network",
+      "indexer": "https://indexer.preview.midnight.network/api/v4/graphql",
+      "indexerWS": "wss://indexer.preview.midnight.network/api/v4/graphql/ws",
+      "faucet": "https://midnight-tmnight-preview.nethermind.dev/"
+    },
+    "preprod": {
+      "networkId": "preprod",
+      "node": "https://rpc.midnight-preprod.blockfrost.io",
+      "nodeWS": "wss://rpc.midnight-preprod.blockfrost.io",
+      "indexer": "https://midnight-preprod.blockfrost.io/api/v0",
+      "indexerWS": "wss://midnight-preprod.blockfrost.io/api/v0/ws",
+      "faucet": "https://midnight-tmnight-preprod.nethermind.dev/"
+    }
   },
   "overrides": {
     "@midnight-ntwrk/wallet-sdk": "1.2.0",

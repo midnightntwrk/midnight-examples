@@ -193,6 +193,8 @@ export function standalonePackageJson(templatePkg, { name, specs, tc }) {
     deploy: 'mnkit deploy',
     'deploy:preview': 'mnkit deploy --network preview',
     'deploy:preprod': 'mnkit deploy --network preprod',
+    'doctor:preview': 'mnkit doctor --network preview',
+    'doctor:preprod': 'mnkit doctor --network preprod',
   };
   const dependencies = Object.fromEntries(
     Object.entries(p.dependencies).map(([pkg, spec]) => {

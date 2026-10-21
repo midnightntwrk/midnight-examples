@@ -133,6 +133,23 @@ for (const dir of projects) {
   }
 }
 
+{
+  // Every public endpoint in a network config must be one of toolchain.json's
+  // `networks`, so `mnkit doctor --network` probes what the code connects to.
+  const known = new Set(Object.values(tc.networks).flatMap((n) => Object.values(n)).filter(Boolean));
+  const configs = projects
+    .map((d) => path.join(d, 'src', 'config.ts'))
+    .filter((f) => fs.existsSync(f));
+  for (const f of configs) {
+    const src = read(f);
+    for (const m of src.matchAll(/(?:https?|wss?):\/\/[^'"`\s]+/g)) {
+      const url = m[0];
+      if (!/^[a-z]+:\/\/[^/?]*(midnight\.network|blockfrost\.io)\b/.test(url)) continue;
+      if (!known.has(url)) problems.push(`${rel(f)}:${lineOf(src, m.index)}: endpoint ${url} is not in toolchain.json networks`);
+    }
+  }
+}
+
 if (problems.length > 0) {
   console.error(`✖ toolchain:check found ${problems.length} disagreement(s) with toolchain.json:\n  - ${problems.join('\n  - ')}`);
   process.exit(1);

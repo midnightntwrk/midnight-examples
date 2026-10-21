@@ -47,14 +47,18 @@ function project({ compiled = true } = {}) {
   return dir;
 }
 
-/** Stand-ins for compile and spawnSync that record their calls. */
-function stubs({ compileStatus = 0, deployStatus = 0 } = {}) {
-  const calls = { compile: [], spawn: [] };
+/** Stand-ins for compile, the network checks and spawnSync that record their calls. */
+function stubs({ compileStatus = 0, deployStatus = 0, networkOk = true } = {}) {
+  const calls = { compile: [], network: [], spawn: [] };
   return {
     calls,
     compiler: async (dir, opts) => {
       calls.compile.push(opts);
       return compileStatus;
+    },
+    networkChecks: async (network) => {
+      calls.network.push(network);
+      return [{ name: 'node RPC', ok: networkOk, detail: networkOk ? 'node 1.0.400' : 'HTTP 502' }];
     },
     spawn: (cmd, args, opts) => {
       calls.spawn.push({ cmd, args, network: opts.env.MIDNIGHT_NETWORK, cwd: opts.cwd });
@@ -68,10 +72,26 @@ describe('mnkit deploy', () => {
     const dir = project();
     const s = stubs();
     expect(await deploy(dir, { network: 'preprod', ...s })).toBe(0);
+    expect(s.calls.network).toEqual(['preprod']);
     expect(s.calls.compile).toEqual([]);
     expect(s.calls.spawn).toEqual([
       { cmd: path.join(dir, 'node_modules', '.bin', 'vite-node'), args: ['scripts/deploy.ts'], network: 'preprod', cwd: dir },
     ]);
+  });
+
+  it('stops before compiling or deploying when a network check fails', async () => {
+    const s = stubs({ networkOk: false });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(await deploy(project({ compiled: false }), { network: 'preview', ...s })).toBe(1);
+    expect(s.calls.network).toEqual(['preview']);
+    expect(s.calls.compile).toEqual([]);
+    expect(s.calls.spawn).toEqual([]);
+  });
+
+  it('does not run the network checks for a local deploy', async () => {
+    const s = stubs();
+    expect(await deploy(project(), { ...s })).toBe(0);
+    expect(s.calls.network).toEqual([]);
   });
 
   it('passes the contract name to the script and returns its exit status', async () => {
