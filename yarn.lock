@@ -7232,7 +7232,7 @@ __metadata:
   dependencies:
     vitest: "npm:^5.0.4"
   bin:
-    mnkit: ./bin/mnkit.mjs
+    mnkit: bin/mnkit.mjs
   languageName: unknown
   linkType: soft
 
