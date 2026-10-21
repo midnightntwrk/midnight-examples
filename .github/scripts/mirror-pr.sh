@@ -46,6 +46,13 @@ title="#$n: $(field .title)"
 author=$(field .user.login)
 url=$(field .html_url)
 
+# Fork PRs stay out. In the mirror, pr/<N> is a same-repo branch, so any
+# workflow a fork adds would run there on push, with the mirror's secrets.
+if [[ $(field '.head.repo.full_name // ""') != "$src" ]]; then
+  echo "::notice::#$n is from a fork; not mirrored"
+  exit 0
+fi
+
 # The newest mirror PR for this branch, open ones first.
 mirror_pr() {
   mirror_gh pr list -R "$mirror" --head "$branch" --state "$1" \
@@ -72,8 +79,8 @@ if [[ "$state" == closed ]]; then
   exit 0
 fi
 
-# Open upstream: put pr/<N> at the PR head. refs/pull/<N>/head lives in the base
-# repo, so this works for fork PRs, and needs no token since the repo is public.
+# Open upstream: put pr/<N> at the PR head, fetched from refs/pull/<N>/head.
+# No token needed: the repo is public.
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 git init -q "$work"

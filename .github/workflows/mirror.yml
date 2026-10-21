@@ -6,9 +6,11 @@ name: Mirror to midnight-examples-mirror
 #   - any PR event     → .github/scripts/mirror-pr.sh reconciles that PR: branch
 #                        pr/<number> at its head, and a twin mirror PR with the
 #                        same base, title, body and draft state, closed when
-#                        this one closes. Fork and Dependabot PRs included.
-#   - workflow_dispatch → reconcile every open PR (backfill, or repair after a
-#                        failed run), then re-sync main.
+#                        this one closes. Dependabot PRs included; fork PRs are
+#                        skipped (in the mirror their workflows would run as
+#                        same-repo branches, with the mirror's secrets).
+#   - workflow_dispatch → re-sync main, then reconcile every open PR (backfill,
+#                        or repair after a failed run).
 # Nothing is ever pushed back. See the AGENTS.md golden rule on the mirror.
 #
 # Auth: an org-owned GitHub App installed on midnight-examples-mirror only,
@@ -17,14 +19,14 @@ name: Mirror to midnight-examples-mirror
 # touches .github/workflows/ is rejected without it. Its client ID and private
 # key are the MIRROR_APP_CLIENT_ID and MIRROR_APP_PRIVATE_KEY secrets, stored
 # both as Actions and as Dependabot secrets: runs triggered by Dependabot see
-# only the latter.
+# only the latter. Each job's token is scoped down to the permissions it uses.
 #
 # Why pull_request_target is safe here: it runs this file and the script from
 # main, with secrets, even for fork PRs. That's only dangerous if the PR's code
 # runs, and here it never does: the checkout is main, and the PR head is
 # fetched as git objects and pushed, never checked out or executed. PR titles
 # and bodies are read from the API inside the script, never interpolated into
-# a run: block.
+# a run: block. Fork PRs are skipped by the script before anything is pushed.
 #
 # The mirror receives this file too. The repository guard on every job keeps
 # it inert there.
@@ -34,7 +36,7 @@ permissions: {}
 on:
   push:
     branches: [main]
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] the PR's code never runs here, and fork PRs are skipped
     types: [opened, reopened, synchronize, edited, closed, ready_for_review, converted_to_draft]
   workflow_dispatch: {}
 
@@ -58,6 +60,8 @@ jobs:
           private-key: ${{ secrets.MIRROR_APP_PRIVATE_KEY }}
           owner: midnightntwrk
           repositories: midnight-examples-mirror
+          permission-contents: write
+          permission-workflows: write
 
       - name: Checkout main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -100,6 +104,9 @@ jobs:
           private-key: ${{ secrets.MIRROR_APP_PRIVATE_KEY }}
           owner: midnightntwrk
           repositories: midnight-examples-mirror
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
 
       # main, never the PR head (see the header).
       - name: Checkout the script from main
@@ -134,6 +141,9 @@ jobs:
           private-key: ${{ secrets.MIRROR_APP_PRIVATE_KEY }}
           owner: midnightntwrk
           repositories: midnight-examples-mirror
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
 
       - name: Checkout the script from main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -151,7 +161,9 @@ jobs:
         run: |
           set -uo pipefail
           failed=()
-          for n in $(gh pr list -R "$GITHUB_REPOSITORY" --state open --limit 500 --json number --jq '.[].number'); do
+          # Open here, plus anything still open in the mirror (closed here while a sync was failing).
+          mirrored=$(GH_TOKEN=$MIRROR_TOKEN gh pr list -R midnightntwrk/midnight-examples-mirror --state open --limit 500 --json headRefName --jq '.[].headRefName | select(startswith("pr/")) | ltrimstr("pr/")')
+          for n in $( { gh pr list -R "$GITHUB_REPOSITORY" --state open --limit 500 --json number --jq '.[].number'; echo "$mirrored"; } | sort -un); do
             echo "::group::PR #$n"
             bash .github/scripts/mirror-pr.sh "$n" || failed+=("$n")
             echo "::endgroup::"
