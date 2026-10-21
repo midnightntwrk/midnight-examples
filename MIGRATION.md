@@ -11,9 +11,17 @@ the source repositories.
 | `examples/hello-world` | `midnightntwrk/example-hello-world` | `8af06315ebed89aff41a8344695649718928b501` |
 | `examples/private-party` | `midnightntwrk/example-private-party` | `93711db25d0f8911d86845ff3ea9803a101e0366` |
 | `examples/battleship` | `midnightntwrk/example-battleship` | `3c2579334ee48c7997beb399c605b83eb650b7a9` |
+| `examples/zk-loan` | `midnightntwrk/example-zkloan` | `eff9030d509f98938914c1b2b721acb88fc1e42c` |
 
 > `private-party` was taken from the **canonical** `midnightntwrk/example-private-party`,
 > not the personal `nstanford5/example-private-party` fork.
+
+> `zk-loan` was ported, not copied: the contract, the attestation API, the simulator
+> tests and the UI were restructured into this repo's layout, and the CLI was not
+> ported (see [`examples/zk-loan/AGENTS.md`](examples/zk-loan/AGENTS.md)). The
+> commit is upstream `main` when the port landed (2026-09-24). Upstream's
+> `contract/`, attestation API and UI are unchanged from there through
+> `9e48112271825c5acc9ef39fc351f25299ee1b9c`.
 
 ## Tutorials
 
@@ -24,7 +32,7 @@ Each now lives in `examples/<name>/tutorials/` and syncs back to midnight-docs
 | Tutorial | Source | Source commit | Changes |
 |---|---|---|---|
 | `examples/battleship/tutorials/` | `midnightntwrk/midnight-docs` `docs/tutorials/bship/` (`index.mdx`, `smart-contract.mdx`, `test-suite.mdx`) | `6af8c96f29a363f005417357f6066e1baf6a56bc` | Rewritten as a tour of this repo's code, organized around defensive programming. The build-from-scratch steps and the standalone project setup were replaced by the monorepo commands and shared harness. Published path moves from `/tutorials/bship` to `/tutorials/battleship`. |
-| `examples/private-tip-jar/tutorials/` | New. `midnightntwrk/midnight-tip-jar` `TUTORIAL.md` was reference only | `0fcd18120a528d070f58dc33d96f21e57c339762` | Written new for this repo. The old tutorial builds a frontend tip jar, a different design; this one tours `examples/private-tip-jar` (the jar and its demo token, `SPEC.md`, the privacy test). Published at `/tutorials/private-tip-jar`. |
+| `examples/zk-loan/tutorials/` | `midnightntwrk/example-zkloan` `tutorials/` (`index.mdx`, `smart-contract.mdx`, `attestation-api.mdx`, `cli.mdx`) | `9e48112271825c5acc9ef39fc351f25299ee1b9c` | Rewritten as a tour of this repo's code, with titled excerpts of `contract/` and `attestation-api/`. The build-from-scratch npm setup, package.json/tsconfig and proof-server steps were replaced by the monorepo commands and shared harness. `cli.mdx` is replaced by `test-suite.mdx`, a tour of the on-chain suite, because the CLI was not ported. The published path stays `/tutorials/zk-loan`; `/tutorials/zk-loan/cli` is redirected on the docs side. |
 
 ## Changes applied during migration
 
