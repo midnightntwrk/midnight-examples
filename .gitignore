@@ -29,6 +29,10 @@ packages/*/LICENSE
 **/.env.preprod
 **/.env.preview
 **/.fast-sync-wallets/
+# Deploy state from scripts/deploy.ts: private state and signing keys, and the
+# local devnet's deploy records
+**/.mnkit/
+**/deployments/local.json
 # Gate stamps, the background devnet lock and its reports (scripts/lib/gates.mjs)
 **/.gates/
 # scratch dir used while re-cutting a pre-seed bundle; only present mid-cut

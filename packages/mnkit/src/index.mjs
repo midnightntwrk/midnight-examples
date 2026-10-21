@@ -17,6 +17,7 @@
 // scripts import the modules directly).
 
 export { compile } from './commands/compile.mjs';
+export { deploy } from './commands/deploy.mjs';
 export { runDerive } from './commands/derive.mjs';
 export { validate } from './commands/validate.mjs';
 export { derive, fillRegions, sealRegions, stubHash } from './lib/derive.mjs';

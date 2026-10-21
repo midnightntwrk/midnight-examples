@@ -28,7 +28,9 @@
 #   (the second run must change nothing) → copy the fixture's completed files
 #   (overlay/) in → typecheck → test:sim → compile (with proving keys) → add ui
 #   → the UI's typecheck, test:unit and build → with --devnet, validate
-#   (compile, local network, DUST, test:local)
+#   (compile, local network, DUST, test:local), then `mnkit deploy` of every
+#   contract (the others first, then the fixture's own) on the same network,
+#   checked in deployments/local.json
 #
 # MNKIT_LOCAL_PACKAGES points init at the tarballs. --from-registry <version>
 # skips the packing and runs `npx mnkit@<version>` from whatever registry npm
@@ -160,6 +162,30 @@ first_compile() {
     || { echo "✖ compiler $pin is not the default in $fresh_home" >&2; exit 1; }
 }
 
+# mnkit deploy of every contract of project $1 on the running local network:
+# the others first (a constructor may need their address), then $1's own.
+# Each must then have an address in deployments/local.json. Called after `||`,
+# where set -e is off, so each step returns its own failure.
+deploy_all() {
+  local primary=$1 c contracts=()
+  for c in contract/*.compact; do
+    c=$(basename "$c" .compact)
+    [ "$c" = "$primary" ] || [ ! -d "contract/managed/$c" ] || contracts+=("$c")
+  done
+  contracts+=("$primary")
+  for c in "${contracts[@]}"; do
+    echo "▶ mnkit deploy --contract $c"
+    npx mnkit deploy --contract "$c" || return
+  done
+  node -e '
+    const [file, ...names] = process.argv.slice(1);
+    const { contracts } = JSON.parse(require("fs").readFileSync(file, "utf8"));
+    const missing = names.filter((n) => !/^[0-9a-f]{64}$/.test(contracts[n]?.address ?? ""));
+    if (missing.length) { console.error(`✖ no address in ${file} for: ${missing.join(", ")}`); process.exit(1); }
+    console.log(`✔ deployed: ${names.map((n) => `${n} ${contracts[n].address}`).join(", ")}`);
+  ' deployments/local.json "${contracts[@]}" || return
+}
+
 if [ "$FRESH_COMPACT" = 1 ]; then rm -rf "$WORK/fresh-home"; fi
 
 for fixture in "${SELECTED[@]}"; do
@@ -197,7 +223,13 @@ for fixture in "${SELECTED[@]}"; do
   npm run typecheck --workspace ui
   npm run test:unit --workspace ui
   npm run build --workspace ui
-  if [ "$DEVNET" = 1 ]; then npm run validate; fi
+  if [ "$DEVNET" = 1 ]; then
+    npm run validate -- --keep-net
+    deployed=0
+    deploy_all "$fixture" || deployed=$?
+    npm run env:down
+    [ "$deployed" = 0 ] || exit "$deployed"
+  fi
   echo "✔ $fixture"
 done
 echo

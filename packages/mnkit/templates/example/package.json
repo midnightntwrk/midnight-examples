@@ -20,6 +20,9 @@
     "proof:up": "docker compose up -d --wait proof-server",
     "proof:down": "docker compose stop proof-server",
     "wait:dust": "vite-node scripts/wait-for-dust.ts",
+    "deploy": "vite-node scripts/deploy.ts",
+    "deploy:preview": "MIDNIGHT_NETWORK=preview yarn deploy",
+    "deploy:preprod": "MIDNIGHT_NETWORK=preprod yarn deploy",
     "validate": "node ../../scripts/validate-example.mjs"
   },
   "dependencies": {

@@ -213,6 +213,9 @@ export function derive(exampleDir, name, names, { coinsPackage = '@midnight-ntwr
           `${indent}],`,
         ].join('\n');
   const ctorArgs = argsFor(ctorParams);
+  // The same placeholders as array elements, for contract/deploy-args.ts.
+  const elementsFor = (params) => (indent) =>
+    params.map((p) => `${indent}${placeholder(p)}, // TODO ${p.name}: ${p.type ?? p.tsType}`).join('\n');
 
   // The other contracts this example compiles (a test-only token beside the
   // main one): every contract source except the primary. Each must have been
@@ -383,6 +386,24 @@ export function derive(exampleDir, name, names, { coinsPackage = '@midnight-ntwr
         ].join('\n');
       })
       .join('\n\n');
+  // contract/deploy-args.ts: one `deployables` entry per other contract.
+  const deployImports = (indent) =>
+    wired.flatMap((s) => [`Compiled${s.Name}Contract`, `type ${s.Name}Contract`, `${s.camel}ZkConfigPath`]).map((x) => `${indent}${x},`).join('\n');
+  const secondaryDeploys = (indent) =>
+    wired
+      .map((s) =>
+        [
+          `${indent}// contract/${s.name}.compact: \`mnkit deploy --contract ${s.name}\`, before a contract whose constructor needs it.`,
+          `${indent}${quote(s.name)}: deployable<${s.Name}Contract>({`,
+          `${indent}  compiledContract: Compiled${s.Name}Contract,`,
+          `${indent}  zkConfigPath: ${s.camel}ZkConfigPath,`,
+          ...(s.params.length
+            ? [`${indent}  args: (ctx: DeployContext) => [`, elementsFor(s.params)(`${indent}    `), `${indent}  ],`]
+            : []),
+          `${indent}}),`,
+        ].join('\n'),
+      )
+      .join('\n');
   const COIN_HELPERS = [
     'encryptionKeys',
     'freshCoin',
@@ -415,6 +436,15 @@ export function derive(exampleDir, name, names, { coinsPackage = '@midnight-ntwr
       },
     ],
     [
+      'contract/deploy-args.ts',
+      {
+        'deploy-imports': deployImports,
+        'private-state': privateStateLine('initialPrivateState'),
+        'constructor-args': elementsFor(ctorParams),
+        'secondary-deploys': secondaryDeploys,
+      },
+    ],
+    [
       `src/test/${name}.sim.test.ts`,
       {
         'private-state': privateStateLine('privateState'),
@@ -430,7 +460,8 @@ export function derive(exampleDir, name, names, { coinsPackage = '@midnight-ntwr
   for (const [rel, generators] of targets) {
     const file = path.join(exampleDir, rel);
     if (!fs.existsSync(file)) {
-      if (rel !== 'contract/witnesses.ts' && rel !== 'contract/index.ts') report.push({ rel, note: 'file not found; skipped' });
+      if (rel === 'contract/deploy-args.ts') report.push({ rel, note: 'file not found; skipped (deploy needs it: `mnkit upgrade` adds it)' });
+      else if (rel !== 'contract/witnesses.ts' && rel !== 'contract/index.ts') report.push({ rel, note: 'file not found; skipped' });
       continue;
     }
     const src = fs.readFileSync(file, 'utf8');

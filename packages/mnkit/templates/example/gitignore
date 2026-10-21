@@ -10,5 +10,10 @@ midnight-level-db/
 .env.preprod
 .env.preview
 .fast-sync-wallets/
+# Deploy state: the private state and signing keys `mnkit deploy` keeps (back
+# it up for a real network), and the local devnet's records, which a restart
+# empties. deployments/preview.json and preprod.json are committed.
+.mnkit/
+deployments/local.json
 # Gate stamps and reports
 .gates/

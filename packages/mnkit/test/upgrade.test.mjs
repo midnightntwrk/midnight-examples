@@ -177,6 +177,24 @@ describe('mnkit upgrade', () => {
     expect(manifestOf(dir).files['scripts/older.ts']).toBeUndefined();
   });
 
+  it('adds the deploy files to a project that predates them, and seeds deploy-args.ts once', () => {
+    const dir = currentProject();
+    for (const rel of ['scripts/deploy.ts', 'src/deployments.ts', 'contract/deploy-args.ts']) fs.rmSync(path.join(dir, ...rel.split('/')));
+    setManifest(dir, (m) => {
+      const { 'scripts/deploy.ts': _, 'src/deployments.ts': __, ...files } = m.files;
+      return { ...m, files };
+    });
+    const plan = planUpgrade(dir, { tc, version: VERSION });
+    expect(kinds(plan)).toEqual({ 'contract/deploy-args.ts': 'seed', 'scripts/deploy.ts': 'add', 'src/deployments.ts': 'add' });
+    applyUpgrade(dir, plan);
+    expect(read(dir, 'contract/deploy-args.ts')).toContain("'hello-world': deployable<Contract>({");
+    expect(manifestOf(dir).files['contract/deploy-args.ts']).toBeUndefined();
+
+    write(dir, 'contract/deploy-args.ts', '// mine now\n');
+    const again = planUpgrade(dir, { tc, version: VERSION });
+    expect(hasChanges(again)).toBe(false);
+  });
+
   it('upgrades the UI: restores its owned files and merges ui/package.json', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const dir = currentProject();

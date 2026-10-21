@@ -60,6 +60,17 @@ server (`yarn proof:up`), then from the repo root run `yarn preseed:cut` followe
 by `yarn wallets:new`, fund the printed addresses at the faucet, and run
 `yarn test:preprod`. The wallet seeds live in one repo-root `.env.<network>` that
 every example shares.
+
+## Deploy
+
+`yarn deploy` deploys the contract to the local network without the UI or the
+test suite; `yarn deploy:preview` and `yarn deploy:preprod` deploy to those
+networks. `yarn deploy <contract>` deploys another contract under `contract/`.
+The constructor arguments and initial private state come from
+`contract/deploy-args.ts`, and the address lands in `deployments/<network>.json`.
+Off local, set `MIDNIGHT_PRIVATE_STATE_PASSWORD` in the repo-root
+`.env.<network>`: it encrypts the private state and signing key kept in
+`.mnkit/private-state/<network>`.
 <!-- @endif -->
 <!-- @if standalone -->
 To run it against **preprod** or **preview** instead, start a local proof server
@@ -67,6 +78,32 @@ To run it against **preprod** or **preview** instead, start a local proof server
 `MIDNIGHT_PREPROD_SEED=<hex>` (or `MIDNIGHT_PREVIEW_SEED`; preprod also needs
 `BLOCKFROST_PROJECT_ID`), and run `npm run test:preprod`. The `.env.*` files are
 gitignored. A new wallet syncs from genesis, which takes a while on preprod.
+
+## Deploy without the UI
+
+```bash
+npx mnkit deploy                        # the local network (env:up and wait:dust first)
+npx mnkit deploy --network preprod      # or preview
+npx mnkit deploy --contract <name>      # another contract under contract/
+```
+
+`deploy` compiles first if the compiled contract is missing or out of date, then
+deploys with the constructor arguments and initial private state in
+`contract/deploy-args.ts`. That file is yours: `npx mnkit derive` fills its
+placeholders from the contract, and a constructor that needs another contract's
+address can read it from `ctx.deployments`. Deploy that contract first.
+
+The address and transaction go into `deployments/<network>.json`. Commit
+`preview.json` and `preprod.json`, so others (and the UI's Join) can find the
+contract; `local.json` is gitignored. A proof server must be running on every
+network (`npm run proof:up`).
+
+Off local, the deploy uses the wallet in `.env.<network>`, as `test:preprod`
+does, and needs `MIDNIGHT_PRIVATE_STATE_PASSWORD` there too: at least 16
+characters, with 3 of upper case, lower case, digits and symbols. It encrypts
+what `deploy` keeps in `.mnkit/private-state/<network>`: the contract's private
+state and its signing key, which you need to maintain the contract later. Back
+that directory up, and keep the password.
 
 ## Regenerate the stubs
 

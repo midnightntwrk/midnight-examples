@@ -41,6 +41,7 @@ export const KNOWN_TOKENS = [
   '__WITNESS_IMPORT__',
   '__WITNESS_METHOD__',
   '__PRIVATE_STATE_IMPORT__',
+  '__DEPLOY_PS_IMPORT__',
   '__INITIAL_PRIVATE_STATE__',
   '__SIM_WITNESS_IMPORT__',
   '__SIM_WITNESSES__',
@@ -85,6 +86,13 @@ export const isTemplateOwned = (rel) => {
   const posix = rel.split(path.sep).join('/');
   return !SEED_FILES.includes(posix) && !SEED_PREFIXES.some((p) => posix.startsWith(p));
 };
+
+/**
+ * Seed files the template gained after projects were first scaffolded from it.
+ * `upgrade` writes one into a project that doesn't have it; from then on it is
+ * the developer's, like any seed file.
+ */
+export const LATE_SEEDS = ['contract/deploy-args.ts'];
 
 /** The pins a standalone project uses, as mnkit.json records them: not the repo's comment or Yarn. */
 export const projectToolchain = (tc) => Object.fromEntries(Object.entries(tc).filter(([k]) => k !== '$comment' && k !== 'yarn'));
@@ -182,6 +190,9 @@ export function standalonePackageJson(templatePkg, { name, specs, tc }) {
     'test:preprod': `MIDNIGHT_NETWORK=preprod ${test}`,
     validate: 'mnkit validate',
     'fund:wallet': 'vite-node scripts/fund-wallet.ts',
+    deploy: 'mnkit deploy',
+    'deploy:preview': 'mnkit deploy --network preview',
+    'deploy:preprod': 'mnkit deploy --network preprod',
   };
   const dependencies = Object.fromEntries(
     Object.entries(p.dependencies).map(([pkg, spec]) => {
@@ -225,6 +236,7 @@ export function substituteExample(content, { names, witnesses }) {
         '__PRIVATE_STATE_IMPORT__',
         `import { create${Name}PrivateState } from '../../contract/witnesses.js';`,
       )
+      .replaceAll('__DEPLOY_PS_IMPORT__', `import { create${Name}PrivateState } from './witnesses.js';`)
       .replaceAll('__INITIAL_PRIVATE_STATE__', `create${Name}PrivateState()`)
       .replaceAll(
         '__SIM_WITNESS_IMPORT__',
@@ -236,6 +248,7 @@ export function substituteExample(content, { names, witnesses }) {
     out = out
       .replaceAll('__WITNESS_IMPORT__\n', '')
       .replaceAll('__PRIVATE_STATE_IMPORT__\n', '')
+      .replaceAll('__DEPLOY_PS_IMPORT__\n', '')
       .replaceAll('__SIM_WITNESS_IMPORT__\n', '')
       .replaceAll('__SIM_WITNESSES__', '{}')
       .replaceAll('__WITNESS_METHOD__', 'withVacantWitnesses')

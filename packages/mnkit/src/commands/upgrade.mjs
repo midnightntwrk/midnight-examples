@@ -39,7 +39,7 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { RUNTIME_PACKAGES, fileHash, isTemplateOwned, projectToolchain, renderExample } from '../lib/scaffold.mjs';
+import { LATE_SEEDS, RUNTIME_PACKAGES, fileHash, isTemplateOwned, projectToolchain, renderExample } from '../lib/scaffold.mjs';
 import { fail } from '../lib/template.mjs';
 import { PKG_ROOT, loadToolchain, mnkitVersion, pinFor } from '../lib/toolchain.mjs';
 import { UI_CONFIG, isUiOwned, planUi } from '../lib/ui.mjs';
@@ -172,6 +172,11 @@ export function planUpgrade(
     if (!fs.existsSync(onDisk)) continue;
     files.push({ rel, kind: fileHash(fs.readFileSync(onDisk, 'utf8')) === base ? 'remove' : 'orphan' });
   }
+  // A seed file the project predates is written once; then it is the developer's.
+  for (const rel of LATE_SEEDS) {
+    const seed = rendered.find((f) => posix(f.rel) === rel);
+    if (seed && !fs.existsSync(path.join(dir, ...rel.split('/')))) files.push({ rel, kind: 'seed', content: seed.content });
+  }
   files.sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
 
   const merged = packages.map(({ rel, rendered: next }) => ({
@@ -217,6 +222,7 @@ export function applyUpgrade(dir, plan) {
 const LABELS = {
   update: 'updated',
   add: 'added (new in the template)',
+  seed: 'added (new in the template, and yours from now on: `npx mnkit derive` fills it)',
   restore: 'restored (it was deleted)',
   force: 'replaced (--force; it had your edits)',
   conflict: 'you edited it and so did the template: the new version is in',
@@ -234,7 +240,7 @@ export function upgrade(dir, { check = false, force = false, skipInstall = false
     for (const t of plan.toolchain) console.log(`    ${t}`);
   }
   if (plan.files.length) {
-    console.log('\n  Template-owned files:');
+    console.log('\n  Files:');
     for (const f of plan.files) {
       console.log(`    ${f.rel}: ${LABELS[f.kind]}${f.kind === 'conflict' ? ` ${f.rel}.mnkit-new` : ''}`);
     }

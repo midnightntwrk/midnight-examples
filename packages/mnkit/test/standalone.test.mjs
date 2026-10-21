@@ -91,8 +91,10 @@ describe('renderExample in standalone mode', () => {
     expect(manifest.toolchain.$comment).toBeUndefined();
     const owned = Object.keys(files).filter(isTemplateOwned).sort();
     expect(Object.keys(manifest.files)).toEqual(owned);
-    expect(owned).toEqual(expect.arrayContaining(['compose.yml', 'src/providers.ts', 'tsconfig.json', '.gitignore']));
-    for (const seed of ['package.json', 'mnkit.json', 'README.md', 'contract/my-app.compact', 'src/test/my-app.test.ts']) {
+    expect(owned).toEqual(
+      expect.arrayContaining(['compose.yml', 'src/providers.ts', 'tsconfig.json', '.gitignore', 'scripts/deploy.ts', 'src/deployments.ts']),
+    );
+    for (const seed of ['package.json', 'mnkit.json', 'README.md', 'contract/my-app.compact', 'contract/deploy-args.ts', 'src/test/my-app.test.ts']) {
       expect(owned, seed).not.toContain(seed);
     }
     for (const [rel, hash] of Object.entries(manifest.files)) expect(fileHash(files[rel]), rel).toBe(hash);
@@ -106,6 +108,8 @@ describe('renderExample in standalone mode', () => {
       'compile:fast': 'mnkit compile --skip-zk',
       derive: 'mnkit derive',
       validate: 'mnkit validate',
+      deploy: 'mnkit deploy',
+      'deploy:preprod': 'mnkit deploy --network preprod',
     });
     expect(pkg.scripts['test:local']).toBe(`MIDNIGHT_NETWORK=local ${pkg.scripts.test}`);
     for (const p of RUNTIME_PACKAGES) expect(pkg.dependencies[p]).toBe('^0.1.0');

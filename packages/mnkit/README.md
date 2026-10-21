@@ -81,6 +81,22 @@ npm run compile:fast && npx mnkit derive
 suite (a deploy test each). One with witnesses it lists for you to wire by
 hand.
 
+### Deploy without the UI
+
+```bash
+npx mnkit deploy                        # local (env:up and wait:dust first)
+npx mnkit deploy --network preprod      # or preview: the wallet in .env.preprod
+npx mnkit deploy --contract my-token    # another contract, before one that needs its address
+```
+
+`deploy` runs the project's `scripts/deploy.ts` and records the address and tx
+in `deployments/<network>.json`. Commit the preview and preprod files; the local
+one is gitignored. The constructor arguments and initial private state come
+from `contract/deploy-args.ts`, which is yours and which `derive` fills with
+placeholders. The private state and the contract's signing key are kept,
+encrypted with `MIDNIGHT_PRIVATE_STATE_PASSWORD` (required off local), in
+`.mnkit/private-state/<network>`. Mainnet is not supported.
+
 ### Upgrade
 
 ```bash
@@ -111,6 +127,8 @@ change and exits 1 if the project is behind, for CI.
 | `src/test/<name>.sim.test.ts` | In-memory tests with `@midnight-ntwrk/mnkit-sim`: logic, guards, privacy invariants |
 | `src/test/<name>.test.ts` | The devnet suite: deploy and call on a real network |
 | `src/config.ts`, `src/providers.ts` | Network config (local, preview, preprod) and the midnight-js providers |
+| `contract/deploy-args.ts` | What `mnkit deploy` deploys: constructor arguments and initial private state, per contract |
+| `scripts/deploy.ts`, `src/deployments.ts` | The deploy `mnkit deploy` runs, and the `deployments/<network>.json` records it writes |
 | `compose.yml` | Node, indexer and proof server, at versions that work together |
 | `scripts/wait-for-dust.ts`, `scripts/fund-wallet.ts` | Wait for the test wallet's DUST; fund a browser wallet on the local network |
 | `SPEC.md`, `AGENTS.md` | A design card, and instructions for AI coding agents |
@@ -129,13 +147,14 @@ so fixes reach your project with `npm update`.
 | `mnkit compile` | Compile every contract under `contract/` with the pinned compiler, installing it (and the Compact CLI) if missing. `--skip-zk` skips the proving keys; `--no-install` fails instead of installing |
 | `mnkit derive` | Fill the `@generated-stub` regions from the compiled contract |
 | `mnkit validate` | The devnet gate: compile, network up, wait for DUST, `test:local`, network down. `--keep-net`, `--report <file>` |
+| `mnkit deploy` | Deploy a contract to local, preview or preprod without the UI or the tests, compiling first when needed. `--network <net>`, `--contract <name>`, `--no-install` |
 | `mnkit add ui` | A browser UI in `ui/` for the compiled contract. `--contract <dir>`, `--private-state memory\|persistent`, `--dry-run`, `--skip-gate`, `--skip-install` |
 | `mnkit add contract <name>` | Another contract under `contract/`, wired in by the next `derive` |
 | `mnkit upgrade` | Move the project to this mnkit's templates and toolchain. `--check`, `--force`, `--skip-install` |
 | `mnkit doctor` | Check Node, Docker, the Compact compiler and the local network's ports |
 
-The project's `npm run compile`, `compile:fast`, `derive` and `validate`
-scripts call these.
+The project's `npm run compile`, `compile:fast`, `derive`, `validate` and
+`deploy` (`deploy:preview`, `deploy:preprod`) scripts call these.
 
 ## How `derive` stays out of your way
 

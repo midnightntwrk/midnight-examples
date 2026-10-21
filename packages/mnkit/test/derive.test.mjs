@@ -81,6 +81,10 @@ describe('derive', () => {
     expect(region(sim, 'constructor-args')).toBe('');
     expect(region(sim, 'coin-imports')).toBe('');
     expect(region(read(dir, 'src/test/hello-world.test.ts'), 'ledger-fields')).toContain('//   message: Opaque<"string">');
+    const deployArgs = read(dir, 'contract/deploy-args.ts');
+    expect(region(deployArgs, 'constructor-args')).toBe('');
+    expect(region(deployArgs, 'private-state')).toBe('    initialPrivateState: {},');
+    expect(region(deployArgs, 'secondary-deploys')).toBe('');
   });
 
   it('fills constructor args from the Compact source types (private-party)', () => {
@@ -91,6 +95,13 @@ describe('derive', () => {
     expect(args).toContain('0n, // TODO partySize: Uint<16>');
     expect(args).toContain('0n, // TODO fee: Uint<16>');
     expect(args).toContain('new Uint8Array(32), // TODO _secret: Bytes<32>');
+    expect(region(read(dir, 'contract/deploy-args.ts'), 'constructor-args')).toBe(
+      [
+        '      0n, // TODO partySize: Uint<16>',
+        '      0n, // TODO fee: Uint<16>',
+        '      new Uint8Array(32), // TODO _secret: Bytes<32>',
+      ].join('\n'),
+    );
   });
 
   it('builds placeholders for struct arguments (silent-auction UserAddress)', () => {
@@ -126,6 +137,23 @@ describe('derive', () => {
     expect(region(sim, 'coin-imports')).toBe("import { simCoin } from '@midnight-ntwrk/mnkit-coins';");
     expect(region(sim, 'circuits')).toContain("it.todo('ownerKey(sk: Bytes<32>) (pure)');");
     expect(region(sim, 'privacy')).toContain("toEqual(['owner', 'pot', 'tipColor'])");
+
+    const deployArgs = read(dir, 'contract/deploy-args.ts');
+    expect(deployArgs).toContain("import { createPrivateTipJarPrivateState } from './witnesses.js';");
+    expect(region(deployArgs, 'deploy-imports')).toContain('type TipTokenContract,');
+    expect(region(deployArgs, 'private-state')).toBe('    initialPrivateState: createPrivateTipJarPrivateState(),');
+    expect(region(deployArgs, 'constructor-args')).toContain('// TODO acceptedColor: Bytes<32>');
+    const tipToken = region(deployArgs, 'secondary-deploys');
+    expect(tipToken).toContain("'tip-token': deployable<TipTokenContract>({");
+    expect(tipToken).toContain('zkConfigPath: tipTokenZkConfigPath,');
+    expect(tipToken).not.toContain('args:');
+  });
+
+  it('skips a missing contract/deploy-args.ts and says where to get it', () => {
+    const dir = scaffoldFixture('hello-world');
+    fs.rmSync(path.join(dir, 'contract', 'deploy-args.ts'));
+    const r = run(dir, 'hello-world');
+    expect(r.report).toContainEqual({ rel: 'contract/deploy-args.ts', note: expect.stringContaining('`mnkit upgrade` adds it') });
   });
 
   it('is idempotent: a second run changes nothing', () => {

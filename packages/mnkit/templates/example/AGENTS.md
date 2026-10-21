@@ -41,6 +41,11 @@ __RUN__ test:local
 __RUN__ env:down
 ```
 
+To deploy outside the tests (a contract the UI or a teammate joins), run
+`__RUN__ deploy` (local), `__RUN__ deploy:preview` or `__RUN__ deploy:preprod`. It
+deploys with `contract/deploy-args.ts` and records the address in
+`deployments/<network>.json`.
+
 ## Notes for agents
 
 <!-- @if monorepo -->
@@ -64,7 +69,8 @@ __RUN__ env:down
   refreshes the `@generated-stub`
 <!-- @endif -->
   regions nobody has edited (new circuits, constructor parameters, witnesses,
-  the initial private state in both tests) and leaves the rest alone.
+  the initial private state in both tests and in `contract/deploy-args.ts`)
+  and leaves the rest alone.
 - Shielded coins in tests come from `@midnight-ntwrk/mnkit-coins`. A
   `ShieldedCoinInfo` argument (a tip, a bet, a deposit: anything the circuit
   `receiveShielded`s) is a new coin the

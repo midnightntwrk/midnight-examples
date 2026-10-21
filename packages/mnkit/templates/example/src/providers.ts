@@ -30,19 +30,39 @@ export type __Name__Circuits = keyof ImpureCircuits<unknown>;
 
 export type __Name__Providers = MidnightProviders<any>;
 
+/**
+ * Where a provider set keeps private state and the contracts' signing keys.
+ * `dbName` is the LevelDB directory, `storeName` the store inside it, and
+ * `password` encrypts both (at least 16 characters, with 3 of: upper case,
+ * lower case, digits, symbols).
+ */
+export type PrivateStateStore = {
+  dbName: string;
+  storeName: string;
+  password: string;
+};
+
+/**
+ * The providers for one contract. Without `privateState` the store is a
+ * throwaway one for tests: a fresh name each call, under ./midnight-level-db.
+ * scripts/deploy.ts passes a persistent store instead.
+ */
 export function buildProviders(
   wallet: MidnightWalletProvider,
   zkConfigPath: string,
   config: NetworkConfig,
+  privateState?: PrivateStateStore,
 ): __Name__Providers {
   const zkConfigProvider = new NodeZkConfigProvider<__Name__Circuits>(zkConfigPath);
   return {
     privateStateProvider: levelPrivateStateProvider({
+      ...(privateState ? { midnightDbName: privateState.dbName } : {}),
       // The random suffix keeps each provider set's private-state store separate
       // when a test builds several sets (wallets, contracts) in the same millisecond.
-      privateStateStoreName: `__name__-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      privateStateStoreName:
+        privateState?.storeName ?? `__name__-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       // this password has requirements (capital/special chars >= 3)
-      privateStoragePasswordProvider: () => '__Name__-Test-Password',
+      privateStoragePasswordProvider: () => privateState?.password ?? '__Name__-Test-Password',
       accountId: wallet.getCoinPublicKey(),
     }),
     publicDataProvider: indexerPublicDataProvider(
