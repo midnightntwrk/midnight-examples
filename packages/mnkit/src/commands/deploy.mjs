@@ -31,7 +31,7 @@ import path from 'node:path';
 import { compileIsStale } from '../lib/gates.mjs';
 import { fail } from '../lib/template.mjs';
 import { compile } from './compile.mjs';
-import { MIDNIGHT_CAST_HINT, printChecks, runNetworkChecks } from './doctor.mjs';
+import { printChecks, runNetworkChecks } from './doctor.mjs';
 
 /** The networks deploy targets. Mainnet is refused until mnkit has a mainnet config. */
 export const DEPLOY_NETWORKS = ['local', 'preview', 'preprod'];
@@ -78,7 +78,7 @@ export async function deploy(
     const checks = await networkChecks(network, { dir });
     printChecks(checks);
     if (checks.some((c) => !c.ok)) {
-      console.log(`\nFix these before deploying to ${network}.\n\n${MIDNIGHT_CAST_HINT(network)}`);
+      console.log(`\nFix these before deploying to ${network}.`);
       return 1;
     }
   }

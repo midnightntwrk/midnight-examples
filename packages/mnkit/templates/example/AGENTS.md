@@ -52,13 +52,6 @@ When a preview or preprod run hangs or fails, run `npm run doctor:preview` or
 indexer's lag, the proof server's version and, on preprod, the Blockfrost key.
 
 <!-- @endif -->
-For deeper live-network diagnosis, use midnight-cast:
-`npx midnight-cast decode --raw "<error>"` explains an error,
-`npx midnight-cast preflight <network> --address <mn_addr…>` checks a wallet's
-NIGHT and DUST, and `npx midnight-cast tx <hash> --network <network>` and
-`npx midnight-cast contract <address> <network>` look up transactions and
-contracts.
-
 ## Notes for agents
 
 <!-- @if monorepo -->

@@ -184,9 +184,7 @@ When a run hangs, `npm run doctor:preview` or `npm run doctor:preprod` tells
 you whether the network side is healthy: the node and indexer answer, the
 indexer is no more than 100 blocks behind, the proof server runs the pinned
 version, and (preprod) Blockfrost accepts the project ID. `mnkit deploy` runs
-the same checks before a preview or preprod deploy. For more,
-[midnight-cast](https://www.npmjs.com/package/midnight-cast) decodes errors
-and checks a wallet's DUST.
+the same checks before a preview or preprod deploy.
 
 ## Status
 

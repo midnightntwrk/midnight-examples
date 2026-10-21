@@ -217,16 +217,6 @@ async function proofServerCheck(tc, env, fetch) {
   return { name, ok: true, warn: true, detail: `${url} runs ${found}, not the pinned ${pin}` };
 }
 
-/** Where to look next when a live network check fails: midnight-cast goes deeper. */
-export const MIDNIGHT_CAST_HINT = (network) =>
-  [
-    'For a deeper look at a live network, use midnight-cast:',
-    `  npx midnight-cast preflight ${network} --address <mn_addr…>   wallet and DUST readiness`,
-    `  npx midnight-cast decode --raw "<error>" --network ${network}   what an error means`,
-    `  npx midnight-cast tx <hash> --network ${network}, npx midnight-cast contract <address> ${network}`,
-    ...(network === 'preprod' ? ['  (midnight-cast reads the Blockfrost key from BLOCKFROST_PREPROD_PROJECT_ID)'] : []),
-  ].join('\n');
-
 /** Prints check rows with ✔, ! (a warning) or ✖. */
 export function printChecks(checks) {
   for (const c of checks) console.log(`${c.ok ? (c.warn ? '!' : '✔') : '✖'} ${c.name}: ${c.detail}`);
@@ -246,7 +236,6 @@ export async function doctor({ network = null } = {}) {
   const remote = network ? await runNetworkChecks(network) : [];
   printChecks([...local, ...remote]);
   const failed = [...local, ...remote].filter((c) => !c.ok);
-  if (network && network !== 'local' && remote.some((c) => !c.ok)) console.log(`\n${MIDNIGHT_CAST_HINT(network)}`);
   const before = network ? `compiling and testing on ${network}` : 'compiling and testing';
   console.log(failed.length ? `\n${failed.length} problem(s) to fix before ${before}.` : '\nReady.');
   return failed.length ? 1 : 0;
