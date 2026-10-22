@@ -24,7 +24,7 @@ import { cleanup, tmpDir } from './helpers.mjs';
 afterEach(cleanup);
 
 const TC = { ...loadToolchain(), images: { ...loadToolchain().images, 'midnightntwrk/proof-server': '8.1.3' } };
-const KEY = 'preprodSECRETkey123';
+const PROJECT_ID = 'preprod-test-project';
 
 /** A directory with a .git, so the .env.preprod search stops there. */
 function repo(envPreprod = null) {
@@ -123,28 +123,28 @@ describe('mnkit doctor --network', () => {
 
   it("reads the project ID from .env.preprod, sends it, and never prints it", async () => {
     const { fetch, urls } = fakeFetch({ status: { indexer: 403 } });
-    const dir = repo(`BLOCKFROST_PROJECT_ID=${KEY}\n`);
+    const dir = repo(`BLOCKFROST_PROJECT_ID=${PROJECT_ID}\n`);
     const checks = await runNetworkChecks('preprod', { tc: TC, dir, env: {}, fetch });
     const c = byName(checks);
     expect(c['Blockfrost project ID']).toMatchObject({ ok: true, detail: 'set, from .env.preprod' });
-    expect(urls).toContain(`${TC.networks.preprod.node}?project_id=${KEY}`);
+    expect(urls).toContain(`${TC.networks.preprod.node}?project_id=${PROJECT_ID}`);
     expect(c.indexer.ok).toBe(false);
     expect(c.indexer.detail).toMatch(/Blockfrost rejected the project ID \(403\): it is wrong, or for another network/);
-    expect(JSON.stringify(checks)).not.toContain(KEY);
+    expect(JSON.stringify(checks)).not.toContain(PROJECT_ID);
   });
 
   it('prefers BLOCKFROST_PROJECT_ID from the environment, and finds .env.preprod in a parent up to the repo root', () => {
-    const dir = repo(`BLOCKFROST_PROJECT_ID=${KEY}\n`);
+    const dir = repo(`BLOCKFROST_PROJECT_ID=${PROJECT_ID}\n`);
     const sub = path.join(dir, 'examples', 'app');
     fs.mkdirSync(sub, { recursive: true });
-    expect(blockfrostProjectId(sub, {})).toEqual({ id: KEY, from: path.join(dir, '.env.preprod') });
+    expect(blockfrostProjectId(sub, {})).toEqual({ id: PROJECT_ID, from: path.join(dir, '.env.preprod') });
     expect(blockfrostProjectId(sub, { BLOCKFROST_PROJECT_ID: ' envkey ' })).toEqual({ id: 'envkey', from: 'the environment' });
     expect(blockfrostProjectId(repo(), {})).toBeNull();
     expect(blockfrostProjectId(repo('OTHER=1\n'), {})).toBeNull();
   });
 
   it('redacts project IDs in URLs', () => {
-    expect(redact(`https://x.io/api?project_id=${KEY}&a=1 and wss://y.io?project_id=${KEY}`)).toBe(
+    expect(redact(`https://x.io/api?project_id=${PROJECT_ID}&a=1 and wss://y.io?project_id=${PROJECT_ID}`)).toBe(
       'https://x.io/api?project_id=<redacted>&a=1 and wss://y.io?project_id=<redacted>',
     );
   });
