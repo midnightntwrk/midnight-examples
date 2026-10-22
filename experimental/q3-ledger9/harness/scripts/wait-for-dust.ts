@@ -1,4 +1,4 @@
-// yarn wait:dust — blocks until the genesis wallet is synced and holds DUST,
+// npm run wait:dust — blocks until the genesis wallet is synced and holds DUST,
 // so the first e2e transaction does not race the fresh devnet.
 import { initNetwork, logger, startWallet } from '../src/index.js';
 

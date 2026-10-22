@@ -12,16 +12,16 @@ The tests target gaps, not duplicates. Vendor QA (compact-end-2-end) already pro
 features case by case. These tests aim at the gap rows (`01-G*`, `03-G*`) in the strategy
 doc, and each test name carries the gap ids and AC ids it covers.
 
-## Why a separate Yarn project
+## Why a separate npm project
 
 mn-examples is pinned to the **ledger 8** stack: compactc 0.31.1, Midnight.js 4.1.1, and
 wallet SDK 1.2.0. Those examples are also the pre-fork DApps the hard-fork rehearsal
 (SOW-Q3-08) needs. A version move in mn-examples has to be a coordinated, repo-wide pass
 (`AGENTS.md`).
 
-This directory is its own Yarn project instead: its own `package.json`, `yarn.lock` and
-`.yarnrc.yml`. It sits outside the root workspaces, so nothing here changes the root
-install. `yarn stack:check` fails if any pinned package resolves from the parent
+This directory is its own npm project instead: its own `package.json`, `package-lock.json` and
+`.npmrc`. It sits outside the root workspaces, so nothing here changes the root
+install. `npm run stack:check` fails if any pinned package resolves from the parent
 `node_modules`.
 
 ## Stack
@@ -45,26 +45,27 @@ mn-examples ports plus 10000, so a ledger 8 example network can run at the same 
 
 ```bash
 nvm use 22                                   # or newer; engines >=22.12
+npm install -g npm@11                        # npm 11.10+ (Node 22 bundles npm 10)
 compact update --no-set-default 0.35.0       # installs 0.35.0, keeps 0.31.1 the default
 cd experimental/q3-ledger9
-yarn install                                 # its own lockfile
-yarn stack:check                             # every pin resolved locally, compiler, image digests
+npm install                                  # its own lockfile
+npm run stack:check                          # every pin resolved locally, compiler, image digests
 ```
 
 ## Running
 
 ```bash
-yarn compile        # all contracts; the vector contracts always use --skip-zk
-                    # (Q3_SKIP_ZK=1 yarn compile skips keys everywhere: enough for test:sim)
-yarn test:sim       # L1: in memory, no network. Seconds.
+npm run compile     # all contracts; the vector contracts always use --skip-zk
+                    # (Q3_SKIP_ZK=1 npm run compile skips keys everywhere: enough for test:sim)
+npm run test:sim    # L1: in memory, no network. Seconds.
 
-yarn env:up && yarn wait:dust
-yarn test:local     # L2: deploy and call on the local network, real proofs. Minutes.
-yarn env:down
+npm run env:up && npm run wait:dust
+npm run test:local  # L2: deploy and call on the local network, real proofs. Minutes.
+npm run env:down
 
-yarn report         # runs sim + e2e; writes reports/sow-q3-0N-local-<date>.json and .md
-yarn report:md      # re-render the .md from existing JSON (preliminary notice included)
-yarn report sim     # L1 only
+npm run report      # runs sim + e2e; writes reports/sow-q3-0N-local-<date>.json and .md
+npm run report:md   # re-render the .md from existing JSON (preliminary notice included)
+npm run report sim  # L1 only
 ```
 
 Compiling `signature_auth` with keys takes about 1.5 minutes and writes about 720 MB of
@@ -97,7 +98,7 @@ Vendor QA runs only at L2, plus refusals before a circuit runs, so L1 is new cov
 | 01-G8 | `persistentHash<Bytes<N>>` equals node:crypto SHA-256 | L1 |
 | 01-G9 | `authorize_private`: key and signature come from witnesses, bound to a public commitment | L1, L2 |
 | 01-G10 | `authorize_once`: replay refused | L1, L2 |
-| 01-G11 | runs on onchain-runtime 4.0.0-rc.4 (`yarn stack:check`) | all |
+| 01-G11 | runs on onchain-runtime 4.0.0-rc.4 (`npm run stack:check`) | all |
 | 01-G6 | Solana vector: **not done** (optional; Ed25519 is the same algorithm) | — |
 
 **SOW-Q3-03** (`dynamic-calls/`)
@@ -138,7 +139,7 @@ not assume any of them in advance.
 | 8 | CoIP 4 (@ca9da303) lists 10 failure kinds; compact-runtime 0.20.0 has 11, including `PureInterfaceCircuit` | spec drift to raise |
 | 9 | The Midnight.js v5.0.0-rc.2 migration guide does not mention `contractModuleProvider` | doc gap to raise |
 | 10 | **The record's indexer image path names the wrong org.** It and compact-end-2-end's `infra/pins.ts` write `ghcr.io/midnight-ntwrk/indexer-standalone`. ghcr refuses that path (401 anonymous, 403 logged in with `read:packages`), and the GitHub packages API reports no such package under `midnight-ntwrk`. The image is **public** at `ghcr.io/midnightntwrk/indexer-standalone` (no hyphen), with the record's digest `sha256:5c717d83…2d64458`. Docker Hub stops at `4.4.0-rc.2` | doc error to raise; fixed in `compose.yml` |
-| 11 | Yarn 4.18's default 24-hour minimum package age quarantines release candidates on the day they ship. Fixed here by preapproving only the two first-party Midnight scopes in `.yarnrc.yml` | workaround |
+| 11 | Yarn 4.18's default 24-hour minimum package age quarantines release candidates on the day they ship. This workspace now uses npm, whose `min-release-age` (7 days in `.npmrc`) has no per-scope exemption: taking a younger RC needs `npm install --min-release-age=0` and a review of the `package-lock.json` diff | workaround |
 | 12 | `from` and `to` are reserved words in Compact and cannot be parameter names | minor |
 | 13 | A contract type may declare a `pure` circuit (`contract Peekable { pure circuit peek(): Uint<64>; }`) and compactc 0.35.0 compiles a call to it, proving keys included, but the runtime refuses every such call with `PureInterfaceCircuit` before resolving the module. The caller itself must be impure: a call from a circuit the compiler infers as pure is rejected with "cross-contract call from a pure circuit is not yet supported" | L1 (03-G12); spec gap to raise |
 | 14 | Malformed `circuitSignatures` from a module provider: an unknown tag and a `Struct` without `elements` are refused as **`UnreadableModule`**; a `Vector` of length 2^30 is a readable type (any safe integer length is), so it is refused as **`NonconformantImplementation`** against `Bytes<32>`. All three are refused in about 3 ms; none throws a raw `TypeError`/`RangeError`. A `transfer` signature present only on the prototype of `circuitSignatures` is `NonconformantImplementation` (own properties only) | L1 (03-G13) |
@@ -162,7 +163,7 @@ reports/               generated acceptance reports
 CI is out of scope for now. If it is added, it should be a separate job:
 - `setup-compact-action` with `compact-version: '0.35.0'`
 - `working-directory: experimental/q3-ledger9`
-- its own `yarn install --immutable`
-- `Q3_SKIP_ZK=1 yarn compile && yarn test:sim`
+- its own `npm ci`
+- `Q3_SKIP_ZK=1 npm run compile && npm run test:sim`
 
 That is L1 only: no keys, no network, under a minute. L2 needs about 720 MB of keys, so it suits a manual or nightly run.

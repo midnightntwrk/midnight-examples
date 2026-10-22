@@ -1,4 +1,4 @@
-// yarn report:md — renders each reports/sow-q3-0N-local-<date>.json as a
+// npm run report:md — renders each reports/sow-q3-0N-local-<date>.json as a
 // Markdown report next to it, for sharing outside the repo (e.g. the Q3 SOW
 // project). Numbers, test results and the stack come from the JSON; the
 // preliminary notice, gap definitions and findings are curated below.
@@ -102,7 +102,7 @@ const CURATED: Record<string, Curated> = {
 const COMMON_FINDINGS = [
   "The record gives the indexer images as `ghcr.io/midnight-ntwrk/…`. ghcr refuses that path (401 anonymous, 403 authenticated). The same images are public at `ghcr.io/midnightntwrk/…` (no hyphen), and their digests match the record.",
   'Indexer 4.4.0-rc.6 exits ("block number 1 not found") if started before the node produces block 1. The local compose file waits for block 1.',
-  "Yarn 4.18's default 24-hour minimum package age quarantines same-day release candidates. The test workspace exempts only the first-party Midnight scopes.",
+  "Yarn 4.18's default 24-hour minimum package age quarantines same-day release candidates. The test workspace now uses npm, whose minimum release age (7 days in `.npmrc`) has no per-scope exemption: a younger RC needs `npm install --min-release-age=0`.",
 ];
 
 const notice = (committed: boolean) => `> [!WARNING]
@@ -204,10 +204,10 @@ function render(r: Report): string {
   L.push('```bash');
   L.push('cd experimental/q3-ledger9');
   L.push('compact update --no-set-default 0.35.0');
-  L.push('yarn install && yarn stack:check && yarn compile');
-  L.push('yarn env:up && yarn wait:dust');
-  L.push('yarn report        # writes the JSON and this Markdown');
-  L.push('yarn env:down');
+  L.push('npm install && npm run stack:check && npm run compile');
+  L.push('npm run env:up && npm run wait:dust');
+  L.push('npm run report        # writes the JSON and this Markdown');
+  L.push('npm run env:down');
   L.push('```', '');
   L.push(`Machine-readable version: \`${r.deliverable.toLowerCase()}-local-${date}.json\` (same folder).`, '');
   return L.join('\n');

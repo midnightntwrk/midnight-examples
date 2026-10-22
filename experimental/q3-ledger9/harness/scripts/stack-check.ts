@@ -1,4 +1,4 @@
-// yarn stack:check — fails if any pinned package resolves to the wrong version
+// npm run stack:check — fails if any pinned package resolves to the wrong version
 // or from outside this workspace.
 import { compiler, imageDigests, packages } from '../src/stack.js';
 
