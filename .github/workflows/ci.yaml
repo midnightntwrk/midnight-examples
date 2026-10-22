@@ -49,26 +49,26 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Enable Corepack (Yarn 4)
+      - name: Use the pinned npm (min-release-age in .npmrc needs 11.10+)
         working-directory: .
-        run: corepack enable
+        run: npm install -g npm@11.21.0
 
       - name: Install dependencies (whole workspace)
         working-directory: .
-        run: yarn install --immutable
+        run: npm ci
 
       - name: Compile contract
-        run: yarn compile
+        run: npm run compile
 
       # Seconds, and its errors are clearer than the same mistake surfacing
       # inside a devnet test run.
       - name: Typecheck harness and tests
-        run: yarn typecheck
+        run: npm run typecheck
 
       # In-memory contract tests (src/**/*.sim.test.ts): no Docker, seconds.
       # Logic errors fail here before the network is started.
       - name: Run in-memory contract tests
-        run: yarn test:sim
+        run: npm run test:sim
 
       # SPEC.md against the compiled contract and the sim tests (examples with
       # a design card only).
@@ -76,13 +76,13 @@ jobs:
         run: if [ -f SPEC.md ]; then node ../../scripts/spec-lint.mjs ${{ matrix.example }}; fi
 
       - name: Start local Midnight network
-        run: yarn env:up
+        run: npm run env:up
 
       - name: Wait for DUST to accrue
-        run: yarn wait:dust
+        run: npm run wait:dust
 
       - name: Run tests against local network
-        run: yarn test:local
+        run: npm run test:local
 
       # Must run before env:down, which removes the containers and their logs.
       - name: Collect service logs on failure
@@ -91,7 +91,7 @@ jobs:
 
       - name: Stop local Midnight network
         if: always()
-        run: yarn env:down
+        run: npm run env:down
 
       - name: Upload service logs on failure
         if: failure()
@@ -102,9 +102,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # Every UI scaffolded by `yarn new:ui` (marked by its ui/new-ui.json, the same
-  # marker `yarn new:ui --check-all` uses):
-  # its template-owned files must match templates/ui, and it must typecheck,
+  # Every UI scaffolded by `npm run new:ui` (marked by its ui/new-ui.json, the same
+  # marker `npm run new:ui -- --check-all` uses):
+  # its template-owned files must match packages/mnkit/templates/ui, and it must typecheck,
   # pass its unit tests and build (Vite/Rollup bundling problems only show up
   # there). No local network needed. The wallet flow needs a
   # human (Lace approvals), so there is no E2E step.
@@ -132,11 +132,11 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Enable Corepack (Yarn 4)
-        run: corepack enable
+      - name: Use the pinned npm (min-release-age in .npmrc needs 11.10+)
+        run: npm install -g npm@11.21.0
 
       - name: Install dependencies (whole workspace)
-        run: yarn install --immutable
+        run: npm ci
 
       - name: Check, typecheck, unit-test, and build each generated UI
         run: |
@@ -147,11 +147,11 @@ jobs:
             name=$(basename "$(dirname "$(dirname "$f")")")
             found=1
             echo "::group::$name/ui"
-            yarn workspace "@midnight-ntwrk/example-$name" run compile
-            yarn new:ui "$name" --check
-            yarn workspace "@midnight-ntwrk/example-$name-ui" typecheck
-            yarn workspace "@midnight-ntwrk/example-$name-ui" test:unit
-            yarn workspace "@midnight-ntwrk/example-$name-ui" build
+            npm run compile -w "@midnight-ntwrk/example-$name"
+            npm run new:ui -- "$name" --check
+            npm run typecheck -w "@midnight-ntwrk/example-$name-ui"
+            npm run test:unit -w "@midnight-ntwrk/example-$name-ui"
+            npm run build -w "@midnight-ntwrk/example-$name-ui"
             echo "::endgroup::"
           done
           [ "$found" = 1 ] || { echo "no generated UIs found"; exit 1; }
@@ -175,7 +175,7 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          dirs=(examples/*/tutorials templates/example/tutorials)
+          dirs=(examples/*/tutorials packages/mnkit/templates/example/tutorials)
           status=0
           for dir in "${dirs[@]}"; do
             if [ ! -f "$dir/index.mdx" ]; then
@@ -219,44 +219,54 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Enable Corepack (Yarn 4)
-        run: corepack enable
+      - name: Use the pinned npm (min-release-age in .npmrc needs 11.10+)
+        run: npm install -g npm@11.21.0
 
       - name: Install dependencies (whole workspace)
-        run: yarn install --immutable
+        run: npm ci
 
-      - name: Typecheck and test packages/sim and packages/coins
+      - name: Toolchain pins agree with toolchain.json
+        run: npm run toolchain:check
+
+      - name: Engine unit tests (scripts/lib)
+        run: npm run test:engine
+
+      - name: Compiled test fixtures match the pinned compiler
+        run: npm run fixtures:regen -- --check
+
+      - name: Typecheck and test the runtime packages (built by postinstall)
         run: |
-          yarn workspace @midnight-ntwrk/example-sim typecheck
-          yarn workspace @midnight-ntwrk/example-sim test:sim
-          yarn workspace @midnight-ntwrk/example-coins typecheck
-          yarn workspace @midnight-ntwrk/example-coins test:sim
+          npm run typecheck -w @midnight-ntwrk/mnkit-wallet
+          npm run typecheck -w @midnight-ntwrk/mnkit-sim
+          npm run test:sim -w @midnight-ntwrk/mnkit-sim
+          npm run typecheck -w @midnight-ntwrk/mnkit-coins
+          npm run test:sim -w @midnight-ntwrk/mnkit-coins
 
       - name: Scaffold, compile:fast and derive a throwaway example
         run: |
           set -euo pipefail
-          yarn new:example ci-derive --witnesses --no-register
+          npm run new:example -- ci-derive --witnesses --no-register
           # A contract with a constructor argument, a witness, a pure circuit, a Map
           # and a shielded-coin argument, plus a second, witness-less contract that
           # mints: compile:fast compiles both, and --derive wires the second one.
           cp examples/private-tip-jar/contract/private-tip-jar.compact examples/ci-derive/contract/ci-derive.compact
           cp examples/private-tip-jar/contract/tip-token.compact examples/ci-derive/contract/tip-token.compact
-          yarn install --no-immutable
-          yarn workspace @midnight-ntwrk/example-ci-derive compile:fast
-          yarn new:example ci-derive --derive
+          npm install
+          npm run compile:fast -w @midnight-ntwrk/example-ci-derive
+          npm run new:example -- ci-derive --derive
           grep -q 'CompiledTipTokenContract = CompiledContract.make' examples/ci-derive/contract/index.ts
           grep -q "it('deploys tip-token'" examples/ci-derive/src/test/ci-derive.test.ts
-          grep -q "from '@midnight-ntwrk/example-coins'" examples/ci-derive/src/test/ci-derive.sim.test.ts
+          grep -q "from '@midnight-ntwrk/mnkit-coins'" examples/ci-derive/src/test/ci-derive.sim.test.ts
           cp -r examples/ci-derive "$RUNNER_TEMP/first"
-          yarn new:example ci-derive --derive
+          npm run new:example -- ci-derive --derive
           diff -r --exclude=node_modules --exclude=managed "$RUNNER_TEMP/first" examples/ci-derive
-          yarn workspace @midnight-ntwrk/example-ci-derive typecheck
+          npm run typecheck -w @midnight-ntwrk/example-ci-derive
 
       - name: Pipeline runner and SPEC lint
         run: |
           set -euo pipefail
           # The runner stops at step 1 on a scaffold whose SPEC.md is still the template.
-          step=$(yarn pipeline ci-derive --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).next.step))' || true)
+          step=$(npm run -s pipeline -- ci-derive --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).next.step))' || true)
           test "$step" = "1"
           # new:ui refuses an example that hasn't passed the in-memory gate.
           if node scripts/new-ui.mjs ci-derive > "$RUNNER_TEMP/new-ui.log" 2>&1; then exit 1; fi
@@ -264,4 +274,73 @@ jobs:
           # The in-memory gate end to end on a real example: spec lint, compile:fast,
           # derive, typecheck, test:sim and the SPEC code checks. (Each example's
           # SPEC.md is also linted in its matrix job.)
-          yarn pipeline private-tip-jar --until sim
+          npm run pipeline -- private-tip-jar --until sim
+
+  # mnkit as a user gets it: pack mnkit and the runtime packages, scaffold each
+  # fixture with the packed CLI outside the workspace, derive (twice, no diff),
+  # typecheck, test:sim, then validate on a local network. Nothing comes from
+  # npm except third-party dependencies. See scripts/mnkit-e2e.sh.
+  mnkit-e2e:
+    name: mnkit e2e (${{ matrix.fixture }}${{ matrix.upgrade && ', upgrade' || '' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [hello-world, private-tip-jar]
+        upgrade: [false]
+        # hello-world also compiles once on a machine without Compact, so
+        # `mnkit compile` installs the CLI and compiler (--fresh-compact).
+        # The upgrade test: scaffold with the previous mnkit, then `mnkit
+        # upgrade` to this one (scripts/mnkit-e2e.sh --upgrade-from).
+        include:
+          - fixture: private-tip-jar
+            upgrade: true
+    env:
+      # The mnkit to upgrade from: 0.1.0, a commit on this branch that was
+      # never published. Once 0.2.0 is on npm, make it that version, and from
+      # then on the previous release. Then delete the Yarn install branch in
+      # scripts/mnkit-e2e.sh.
+      MNKIT_UPGRADE_FROM: 7ff0a29
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  #v7.0.1
+        with:
+          persist-credentials: false
+          # The upgrade test packs the old mnkit from a worktree at that commit.
+          fetch-depth: ${{ matrix.upgrade && '0' || '1' }}
+
+      - name: Setup Compact Compiler
+        uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
+        with:
+          compact-version: '0.31.1'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  #v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install dependencies (whole workspace; builds the runtime packages)
+        # npm 11 for the repo (its lockfile and .npmrc need 11.10+), through npx: Node's own npm
+        # stays on PATH, and mnkit-e2e.sh runs the scaffolded projects with it, as users do.
+        run: npx --yes npm@11.21.0 ci
+
+      - name: Pack, scaffold, derive, test:sim, add ui and validate
+        run: bash scripts/mnkit-e2e.sh --devnet ${FRESH:+--fresh-compact} ${UPGRADE:+--upgrade-from "$MNKIT_UPGRADE_FROM"} ${{ matrix.fixture }}
+        env:
+          MNKIT_E2E_DIR: ${{ runner.temp }}/mnkit-e2e
+          UPGRADE: ${{ matrix.upgrade && 'true' || '' }}
+          FRESH: ${{ matrix.fixture == 'hello-world' && !matrix.upgrade && 'true' || '' }}
+
+      - name: Upload service logs on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  #v7.0.2
+        with:
+          name: mnkit-e2e-logs-${{ matrix.fixture }}${{ matrix.upgrade && '-upgrade' || '' }}
+          path: ${{ runner.temp }}/mnkit-e2e/${{ matrix.fixture }}/logs/
+          if-no-files-found: ignore
+          retention-days: 7

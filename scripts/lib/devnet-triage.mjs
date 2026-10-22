@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Turn a failed background devnet run (the `yarn validate --report` JSON) into
+// Turn a failed background devnet run (the `npm run validate -- --report` JSON) into
 // a fix plan. Deterministic: it classifies by the failed step and the error
 // text, it doesn't reason. Zero dependencies — Node built-ins only.
 //
@@ -32,7 +32,7 @@ const TEST_CLASSES = [
     kind: 'infra',
     route: '4',
     cause: 'a test or hook timed out: usually indexer or wallet sync timing on a busy machine',
-    actions: ['rerun once: `yarn pipeline __name__ --retry-devnet`', 'if it times out again, treat it as a test-setup problem (3c): a wait that never resolves'],
+    actions: ['rerun once: `npm run pipeline -- __name__ --retry-devnet`', 'if it times out again, treat it as a test-setup problem (3c): a wait that never resolves'],
     uiAffected: false,
   },
   {
@@ -69,7 +69,7 @@ const TEST_CLASSES = [
     cause: 'wallet, fee or coin handling: DUST balancing, coin selection or a coin the wallet has not synced yet; the sim has none of these',
     actions: [
       'fix the devnet test setup (3c): fund and sync the wallet that pays, wait for a received coin before spending it, use one coin per transaction',
-      'shielded flows: use @midnight-ntwrk/example-coins (packages/coins/src/index.ts): freshCoin(color, value) for a coin argument (never a wallet coin), waitForShieldedBalance before the next call that pays from a coin just received, encryptionKeys(recipient) when minting to another wallet',
+      'shielded flows: use @midnight-ntwrk/mnkit-coins (packages/coins/src/index.ts): freshCoin(color, value) for a coin argument (never a wallet coin), waitForShieldedBalance before the next call that pays from a coin just received, encryptionKeys(recipient) when minting to another wallet',
     ],
     uiAffected: false,
   },
@@ -132,7 +132,7 @@ export function triage(report, name) {
       kind: 'infra',
       route: '4',
       cause: 'validate stopped without finishing its report (killed, or crashed)',
-      actions: sub(['read logs/devnet.log', 'rerun: `yarn pipeline __name__ --retry-devnet`']),
+      actions: sub(['read logs/devnet.log', 'rerun: `npm run pipeline -- __name__ --retry-devnet`']),
       uiAffected: false,
     };
   }
@@ -150,7 +150,7 @@ export function triage(report, name) {
     const tail = report.steps?.find((s) => s.step === step)?.outputTail ?? '';
     const port = /Bind for [\d.]+:(\d+) failed: port is already allocated/.exec(tail)?.[1];
     const held = port
-      ? [`port ${port} is already in use: \`docker ps --filter publish=${port}\` shows which example's devnet holds it; run \`yarn env:down\` there`]
+      ? [`port ${port} is already in use: \`docker ps --filter publish=${port}\` shows which example's devnet holds it; run \`npm run env:down\` there`]
       : [];
     return {
       ...base,
@@ -159,9 +159,9 @@ export function triage(report, name) {
       cause: 'the devnet did not start: Docker is down, an image pull failed, or another example holds ports 6300/8088/9944',
       actions: sub([
         ...held,
-        "`docker ps`: if another example's devnet is up, run `yarn env:down` in that example",
+        "`docker ps`: if another example's devnet is up, run `npm run env:down` in that example",
         'check that Docker is running and can pull images',
-        'rerun: `yarn pipeline __name__ --retry-devnet`. No code change is needed',
+        'rerun: `npm run pipeline -- __name__ --retry-devnet`. No code change is needed',
       ]),
       uiAffected: false,
     };
@@ -173,7 +173,7 @@ export function triage(report, name) {
       route: '4',
       cause: 'the genesis wallet had no spendable DUST in time',
       actions: sub([
-        'rerun: `yarn pipeline __name__ --retry-devnet` (the network is still up, so this is quick)',
+        'rerun: `npm run pipeline -- __name__ --retry-devnet` (the network is still up, so this is quick)',
         'if it times out again, raise WAIT_FOR_DUST_TIMEOUT_MS and check logs/compose.log for node or indexer errors',
       ]),
       uiAffected: false,

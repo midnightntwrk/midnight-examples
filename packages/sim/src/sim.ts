@@ -2,7 +2,7 @@
 //
 // Runs the compiler's JS output (contract/managed/<c>/contract/index.js) with
 // compact-runtime, so it needs no proof server, node or indexer. Proving keys
-// aren't used either: `yarn compile:fast` (--skip-zk) output is enough.
+// aren't used either: `npm run compile:fast` (--skip-zk) output is enough.
 //
 // Each call() is its own transaction: a fresh circuit context built from the
 // current public state, the current private state and the caller's coin

@@ -11,13 +11,13 @@ accept or decline `Proposed` offers.
 
 ## Prerequisites
 
-- The contract compiled: `yarn compile` in `examples/zk-loan`. The UI serves
+- The contract compiled: `npm run compile` in `examples/zk-loan`. The UI serves
   prover keys and zkir straight from `contract/managed/zk-loan` (Vite
   `publicDir`), so there is no copy step and no stale keys.
 - The Midnight Lace extension, on the same network as `VITE_NETWORK_ID`
   (default **preprod**) and funded with tDUST. The wallet supplies the indexer
   and proof-server URLs, and balances/submits every transaction.
-- The attestation API running: `yarn attestation:start` in `examples/zk-loan`
+- The attestation API running: `npm run attestation:start` in `examples/zk-loan`
   (defaults to `http://localhost:4000`). Register its key on-chain as admin
   (`registerProvider`) before requesting a loan. The UI does not do that; use
   the key it prints at startup.
@@ -26,10 +26,10 @@ accept or decline `Proposed` offers.
 
 ```bash
 # from the repo root
-yarn install
+npm install
 # from examples/zk-loan/ui
-yarn dev          # http://localhost:5173
-yarn build        # typecheck + production bundle in dist/
+npm run dev    # http://localhost:5173
+npm run build  # typecheck + production bundle in dist/
 ```
 
 Settings are optional environment variables read at build/dev time. This repo
@@ -42,7 +42,7 @@ does not commit `.env.<network>` files, so set them in the shell:
 | `VITE_LOGGING_LEVEL` | `info` |
 
 ```bash
-VITE_NETWORK_ID=preview yarn dev
+VITE_NETWORK_ID=preview npm run dev
 ```
 
 ## Notes
@@ -63,7 +63,7 @@ VITE_NETWORK_ID=preview yarn dev
 ## TODO: move to Vite 8
 
 This UI keeps upstream's Vite 6 toolchain, which has a repo-wide side effect.
-Yarn hoists Vite 6 to the repo root, so every example's `vitest.config.ts`
+npm hoists Vite 6 to the repo root, so every example's `vitest.config.ts`
 imports Vite **6.4.3** for `loadEnv`, where it used to get 8.2.2. vitest still
 runs on its own nested Vite 8, and the configs load fine, but it is a quiet
 change for every example.
@@ -88,7 +88,7 @@ repo-wide version pass, not as a one-off:
       under Vite 8's Rolldown bundler; try `build.target: 'esnext'` instead.
       That also removes the need for the root `@swc/core` resolution.
 - [ ] Check whether `@originjs/vite-plugin-commonjs` is still needed.
-- [ ] Confirm the root-hoisted `vite` is back on 8.x, rerun `yarn build` here,
+- [ ] Confirm the root-hoisted `vite` is back on 8.x, rerun `npm run build` here,
       and do a Lace smoke test.
 - [ ] Remove the Vite 6 notes from the root `AGENTS.md` and
       `examples/zk-loan/AGENTS.md`.

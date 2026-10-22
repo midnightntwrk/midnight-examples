@@ -3,9 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "description": "Official Midnight example DApps and smart contracts, verified to compile and run against a pinned toolchain.",
-  "packageManager": "yarn@4.18.0",
   "engines": {
     "node": ">=22.0.0"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": ">=11.10.0",
+      "onFail": "warn"
+    }
   },
   "workspaces": [
     "examples/*",
@@ -13,31 +19,40 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "npm run build:packages",
+    "build:packages": "node scripts/each-workspace.mjs build --include \"@midnight-ntwrk/mnkit-*\"",
     "new:example": "node scripts/new-example.mjs",
     "new:ui": "node scripts/new-ui.mjs",
     "spec:lint": "node scripts/spec-lint.mjs",
+    "toolchain:check": "node scripts/toolchain-check.mjs",
+    "test:engine": "npm test -w mnkit --",
+    "fixtures:regen": "node packages/mnkit/test/fixtures/regen.mjs",
     "pipeline": "node scripts/pipeline.mjs",
-    "wallets:new": "yarn workspace @midnight-ntwrk/example-fast-sync run wallets:new",
-    "preseed:cut": "yarn workspace @midnight-ntwrk/example-fast-sync run preseed:cut",
-    "fund:wallet": "yarn workspace @midnight-ntwrk/example-fast-sync run fund:wallet",
-    "compile": "yarn workspaces foreach --all --parallel run compile",
-    "compile:fast": "yarn workspaces foreach --all --parallel run compile:fast",
-    "typecheck": "yarn workspaces foreach --all --parallel run typecheck",
-    "test": "yarn workspaces foreach --all --verbose run test",
-    "test:sim": "yarn workspaces foreach --all --verbose run test:sim",
-    "test:local": "yarn workspaces foreach --all --verbose run test:local",
-    "test:preprod": "yarn workspaces foreach --all --verbose run test:preprod",
-    "test:preview": "yarn workspaces foreach --all --verbose run test:preview"
+    "wallets:new": "npm run wallets:new -w @midnight-ntwrk/mnkit-wallet --",
+    "preseed:cut": "npm run preseed:cut -w @midnight-ntwrk/mnkit-wallet --",
+    "fund:wallet": "npm run fund:wallet -w @midnight-ntwrk/mnkit-wallet --",
+    "compile": "node scripts/each-workspace.mjs compile",
+    "compile:fast": "node scripts/each-workspace.mjs compile:fast",
+    "typecheck": "node scripts/each-workspace.mjs typecheck",
+    "test": "npm run test --workspaces --if-present",
+    "test:sim": "npm run test:sim --workspaces --if-present",
+    "test:local": "npm run test:local --workspaces --if-present",
+    "test:preprod": "npm run test:preprod --workspaces --if-present",
+    "test:preview": "npm run test:preview --workspaces --if-present"
   },
   "devDependencies": {
-    "bn.js": "5.2.5"
+    "bn.js": "5.2.5",
+    "vite": "6.4.4",
+    "vitest": "^5.0.4"
   },
-  "resolutions": {
+  "overrides": {
     "@midnight-ntwrk/wallet-sdk": "1.2.0",
     "@midnight-ntwrk/ledger-v8": "8.1.2",
     "@midnight-ntwrk/onchain-runtime-v3": "3.1.1",
     "@midnight-ntwrk/zkir-v2": "2.1.1",
-    "vite-plugin-top-level-await/@swc/core": "1.15.47",
-    "vite-plugin-top-level-await/uuid": "11.1.1"
+    "vite-plugin-top-level-await": {
+      "@swc/core": "1.15.47",
+      "uuid": "11.1.1"
+    }
   }
 }

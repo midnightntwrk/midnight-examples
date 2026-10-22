@@ -12,9 +12,9 @@
     "typecheck": "tsc --noEmit -p .",
     "test": "NODE_OPTIONS='--experimental-vm-modules' vitest run --exclude 'src/**/*.sim.test.ts'",
     "test:sim": "vitest run --passWithNoTests .sim.test.ts",
-    "test:local": "MIDNIGHT_NETWORK=local yarn test",
-    "test:preview": "MIDNIGHT_NETWORK=preview yarn test",
-    "test:preprod": "MIDNIGHT_NETWORK=preprod yarn test",
+    "test:local": "MIDNIGHT_NETWORK=local npm test --",
+    "test:preview": "MIDNIGHT_NETWORK=preview npm test --",
+    "test:preprod": "MIDNIGHT_NETWORK=preprod npm test --",
     "env:up": "docker compose up -d --wait",
     "env:down": "docker compose down",
     "proof:up": "docker compose up -d --wait proof-server",
@@ -23,9 +23,6 @@
     "validate": "node ../../scripts/validate-example.mjs"
   },
   "dependencies": {
-    "@midnight-ntwrk/example-coins": "workspace:^",
-    "@midnight-ntwrk/example-fast-sync": "workspace:^",
-    "@midnight-ntwrk/example-sim": "workspace:^",
     "@midnight-ntwrk/midnight-js-contracts": "4.1.1",
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "4.1.1",
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "4.1.1",
@@ -35,6 +32,9 @@
     "@midnight-ntwrk/midnight-js-protocol": "4.1.1",
     "@midnight-ntwrk/midnight-js-types": "4.1.1",
     "@midnight-ntwrk/midnight-js-utils": "4.1.1",
+    "@midnight-ntwrk/mnkit-coins": "*",
+    "@midnight-ntwrk/mnkit-sim": "*",
+    "@midnight-ntwrk/mnkit-wallet": "*",
     "@midnight-ntwrk/testkit-js": "4.1.1",
     "@midnight-ntwrk/wallet-sdk": "1.2.0",
     "pino": "^9.0.0",
@@ -46,7 +46,8 @@
     "@types/node": "^22.0.0",
     "@types/ws": "^8.5.9",
     "typescript": "^5.7.0",
+    "vite": "6.4.4",
     "vite-node": "^6.0.0",
-    "vitest": "^4.1.0"
+    "vitest": "^5.0.4"
   }
 }

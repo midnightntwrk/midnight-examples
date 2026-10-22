@@ -4,7 +4,7 @@ Browser frontend for `examples/token-transfers`: connect a Midnight wallet,
 deploy or join the contract, and move unshielded and shielded tokens between
 the contract and your wallet.
 
-Scaffolded by `yarn new:ui token-transfers` from `templates/ui/`. See
+Scaffolded by `npm run new:ui token-transfers` from `packages/mnkit/templates/ui/`. See
 `AGENTS.md` next to this file for which files are template-owned and
 which are yours, and for the verification checklist.
 
@@ -44,19 +44,19 @@ secrets.
 
 Amounts of NIGHT are in STAR (1 NIGHT = 1,000,000 STAR). `receiveNightTokens`
 pays NIGHT from your wallet, so it needs NIGHT as well as DUST. On the local
-devnet, `yarn fund:wallet <mn_dust_…> <mn_addr_…>` arranges both.
+devnet, `npm run fund:wallet <mn_dust_…> <mn_addr_…>` arranges both.
 
 ## TODO: end-to-end verification with a wallet
 
 Not yet run. Everything below needs a human to approve wallet prompts. What *has* been
-verified is in `templates/ui/VERIFIED.md`, generated from this UI's
+verified is in `packages/mnkit/templates/ui/VERIFIED.md`, generated from this UI's
 `verification.json`. When you run these, tick them off. Once all pass, set
 `walletDeploy` and `walletCalls` to `verified` in `verification.json` (with the
-date and what ran), run `yarn new:ui token-transfers --sync`, and delete this section.
+date and what ran), run `npm run new:ui -- token-transfers --sync`, and delete this section.
 
-Setup: `yarn env:up && yarn wait:dust` in `examples/token-transfers`, `yarn
-workspace @midnight-ntwrk/example-token-transfers-ui dev`, and a browser wallet on
-`undeployed` funded with `yarn fund:wallet <mn_dust_…> <mn_addr_…>`.
+Setup: `npm run env:up && npm run wait:dust` in `examples/token-transfers`, `npm run
+dev -w @midnight-ntwrk/example-token-transfers-ui`, and a browser wallet on
+`undeployed` funded with `npm run fund:wallet <mn_dust_…> <mn_addr_…>`.
 
 - [ ] **Deploy (wallet proving):** the "Your wallet" card appears, with NIGHT
       and no custom token.
@@ -85,13 +85,13 @@ workspace @midnight-ntwrk/example-token-transfers-ui dev`, and a browser wallet 
 ## Run
 
 ```bash
-yarn workspace @midnight-ntwrk/example-token-transfers run compile   # contract first
-cd examples/token-transfers && yarn env:up && yarn wait:dust            # local devnet
-yarn workspace @midnight-ntwrk/example-token-transfers-ui dev           # http://localhost:5173
+npm run compile -w @midnight-ntwrk/example-token-transfers          # contract first
+cd examples/token-transfers && npm run env:up && npm run wait:dust  # local devnet
+npm run dev -w @midnight-ntwrk/example-token-transfers-ui           # http://localhost:5173
 ```
 
 On the local devnet, give your browser wallet DUST (and NIGHT) with
-`yarn fund:wallet <mn_dust_…> [mn_addr_…]`, run from anywhere in the repo. The
+`npm run fund:wallet <mn_dust_…> [mn_addr_…]`, run from anywhere in the repo. The
 page prints the exact command when the connected wallet has no DUST.
 
 ### Mainnet
@@ -104,9 +104,9 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
 - **Everything is public and permanent.** The contract and its public ledger
   stay on mainnet.
 - **Prove with the wallet** if it supports `getProvingProvider`, or with a
-  proof server you run yourself (`yarn proof:up` in `examples/hello-world`).
+  proof server you run yourself (`npm run proof:up` in `examples/hello-world`).
 - **Use your own wallet.** Never use the repo's fast-sync or seeded test wallets
-  (`.env.<network>`, `yarn wallets:new`) on mainnet.
+  (`.env.<network>`, `npm run wallets:new`) on mainnet.
 - **Two circuits move real NIGHT.** `receiveNightTokens` pays NIGHT from your
   wallet into the contract, and `sendNightTokensToUser` pays it out to any
   address. Anyone can call it: the contract has no access control, so NIGHT

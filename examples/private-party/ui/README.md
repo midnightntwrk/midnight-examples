@@ -3,7 +3,7 @@
 Browser frontend for `examples/private-party`: connect a Midnight wallet,
 deploy or join the contract, watch its public ledger, and call its circuits.
 
-Scaffolded by `yarn new:ui private-party` from `templates/ui/`. See
+Scaffolded by `npm run new:ui private-party` from `packages/mnkit/templates/ui/`. See
 `AGENTS.md` next to this file for which files are template-owned and
 which are yours, and for the verification checklist.
 
@@ -27,21 +27,21 @@ locks that person out of this party. The chain only holds
 
 `checkIn` pays `entryFee` (in STAR: 1 NIGHT = 1,000,000 STAR) in unshielded
 NIGHT, so a guest's wallet needs NIGHT as well as DUST. On the local devnet,
-`yarn fund:wallet <mn_dust_…> <mn_addr_…>` arranges both: the page's "no DUST"
+`npm run fund:wallet <mn_dust_…> <mn_addr_…>` arranges both: the page's "no DUST"
 hint prints the command with your addresses.
 
 ## TODO: end-to-end verification with a wallet
 
 Not yet run. Everything below needs a human to approve wallet prompts. What *has* been
-verified is in `templates/ui/VERIFIED.md`, generated from this UI's
+verified is in `packages/mnkit/templates/ui/VERIFIED.md`, generated from this UI's
 `verification.json`. When you run these, tick them off. Once all pass, set
 `walletDeploy` and `walletCalls` to `verified` in `verification.json` (with the
-date and what ran), run `yarn new:ui private-party --sync`, and delete this section.
+date and what ran), run `npm run new:ui -- private-party --sync`, and delete this section.
 
-Setup: `yarn env:up && yarn wait:dust` in `examples/private-party`, `yarn
-workspace @midnight-ntwrk/example-private-party-ui dev`, and two Chrome
+Setup: `npm run env:up && npm run wait:dust` in `examples/private-party`, `npm run
+dev -w @midnight-ntwrk/example-private-party-ui`, and two Chrome
 profiles: O (organizer) and G (guest), each with its own browser wallet on
-`undeployed`. Fund both, NIGHT included, with `yarn fund:wallet <mn_dust_…>
+`undeployed`. Fund both, NIGHT included, with `npm run fund:wallet <mn_dust_…>
 <mn_addr_…>`; the page's "no DUST" hint prints the command.
 
 - [ ] **Unlock:** O connects and sets a passphrase; the panel appears.
@@ -61,19 +61,19 @@ profiles: O (organizer) and G (guest), each with its own browser wallet on
 - [ ] **Wrong passphrase:** reload O with a different passphrase; it is
       refused, and the correct one restores the organizer role.
 - [ ] **Local proving:** repeat one call with the proving toggle set to the
-      local proof server (`yarn proof:up`).
+      local proof server (`npm run proof:up`).
 - [ ] **Preprod:** repeat deploy → RSVP → check-in → claim on preprod.
 
 ## Run
 
 ```bash
-yarn workspace @midnight-ntwrk/example-private-party run compile   # contract first
-cd examples/private-party && yarn env:up && yarn wait:dust            # local devnet
-yarn workspace @midnight-ntwrk/example-private-party-ui dev           # http://localhost:5173
+npm run compile -w @midnight-ntwrk/example-private-party          # contract first
+cd examples/private-party && npm run env:up && npm run wait:dust  # local devnet
+npm run dev -w @midnight-ntwrk/example-private-party-ui           # http://localhost:5173
 ```
 
 On the local devnet, give your browser wallet DUST (and NIGHT) with
-`yarn fund:wallet <mn_dust_…> [mn_addr_…]`, run from anywhere in the repo. The
+`npm run fund:wallet <mn_dust_…> [mn_addr_…]`, run from anywhere in the repo. The
 page prints the exact command when the connected wallet has no DUST.
 
 ### Mainnet
@@ -86,9 +86,9 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
 - **Everything is public and permanent.** The contract and its public ledger
   stay on mainnet.
 - **Prove with the wallet** if it supports `getProvingProvider`, or with a
-  proof server you run yourself (`yarn proof:up` in `examples/hello-world`).
+  proof server you run yourself (`npm run proof:up` in `examples/hello-world`).
 - **Use your own wallet.** Never use the repo's fast-sync or seeded test wallets
-  (`.env.<network>`, `yarn wallets:new`) on mainnet.
+  (`.env.<network>`, `npm run wallets:new`) on mainnet.
 - **`checkIn` pays real NIGHT** (the entry fee, in STAR) into the contract,
   and only the organizer's `claimFees` gets it out. The organizer's secret lives
   in this browser profile's passphrase-encrypted private state: lose the

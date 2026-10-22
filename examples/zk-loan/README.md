@@ -30,7 +30,7 @@ For a guided walkthrough of the contract, the attestation API and the on-chain t
 Install dependencies (from the repo root — one lockfile for the whole workspace):
 
 ```bash
-yarn install
+npm install
 ```
 
 ## Compile the contract
@@ -38,7 +38,7 @@ yarn install
 The contract is `contract/zk-loan.compact`; it imports the Schnorr verifier module in `contract/schnorr.compact`.
 
 ```bash
-yarn compile
+npm run compile
 ```
 
 ## Run the unit tests (no network)
@@ -54,8 +54,8 @@ profile, bound to a hash of their derived identity. The on-chain tests start
 it in-process; to run it on its own:
 
 ```bash
-yarn attestation:start            # PORT=4000, PROVIDER_ID=1, ephemeral key
-PROVIDER_SECRET_KEY=<hex> yarn attestation:start   # stable key across restarts
+npm run attestation:start                            # PORT=4000, PROVIDER_ID=1, ephemeral key
+PROVIDER_SECRET_KEY=<hex> npm run attestation:start  # stable key across restarts
 ```
 
 | Endpoint | Purpose |
@@ -72,8 +72,8 @@ would source them from its own records and authenticate the caller.
 A browser front end (React + Lace wallet) lives in [`ui/`](ui/README.md):
 
 ```bash
-yarn attestation:start      # in one terminal, from examples/zk-loan
-cd ui && yarn dev           # in another
+npm run attestation:start  # in one terminal, from examples/zk-loan
+cd ui && npm run dev       # in another
 ```
 
 It targets preprod by default and needs Lace with tDUST. See `ui/README.md`.
@@ -83,27 +83,27 @@ It targets preprod by default and needs Lace with tDUST. See `ui/README.md`.
 Ensure the Docker engine is running, then:
 
 ```bash
-yarn env:up
+npm run env:up
 ```
 
 ## Run the test suite
 
 ```bash
-yarn wait:dust     # wait until the dev wallet has spendable DUST for fees
-yarn test:local
+npm run wait:dust     # wait until the dev wallet has spendable DUST for fees
+npm run test:local
 ```
 
 Tear the network down when finished:
 
 ```bash
-yarn env:down
+npm run env:down
 ```
 
 This example is set up for a local devnet running via Docker.
 
 To run it against **preprod** or **preview** instead, see
 [FAST-SYNC.md](../../FAST-SYNC.md) at the repo root. In short: start a local proof
-server (`yarn proof:up`), then from the repo root run `yarn preseed:cut` followed
-by `yarn wallets:new`, fund the printed addresses at the faucet, and run
-`yarn test:preprod`. The wallet seeds live in one repo-root `.env.<network>` that
+server (`npm run proof:up`), then from the repo root run `npm run preseed:cut` followed
+by `npm run wallets:new`, fund the printed addresses at the faucet, and run
+`npm run test:preprod`. The wallet seeds live in one repo-root `.env.<network>` that
 every example shares.

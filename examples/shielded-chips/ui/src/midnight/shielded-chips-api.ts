@@ -25,7 +25,7 @@
 // CompiledContract and its own providers bundle from
 // `useMidnightProviders().providersFor(CHIPS_ZK_ASSETS_PATH)`.
 //
-// Seed file: generated once by `yarn new:ui` from contract-info.json, then
+// Seed file: generated once by `npm run new:ui` from contract-info.json, then
 // yours to edit. The drift check ignores it.
 import {
   deployContract,
@@ -413,7 +413,7 @@ export async function placeBet(
 /**
  * The Zswap Merkle-tree index of the coin a bet escrowed.
  *
- * The Node tests use the same logic from `@midnight-ntwrk/example-coins`
+ * The Node tests use the same logic from `@midnight-ntwrk/mnkit-coins`
  * (`contractCoinMtIndex`). This copy stays because that package is Node-only
  * (it imports `node:crypto`), and the UI's package.json is template-owned.
  *

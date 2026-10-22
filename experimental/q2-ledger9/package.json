@@ -8,13 +8,20 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": ">=11.10.0",
+      "onFail": "warn"
+    }
+  },
   "scripts": {
     "compile": "node scripts/compile.mts",
     "test": "NODE_OPTIONS='--experimental-vm-modules' vitest run",
-    "test:local": "MIDNIGHT_NETWORK=local yarn test",
-    "test:preview": "MIDNIGHT_NETWORK=preview yarn test",
-    "test:preprod": "MIDNIGHT_NETWORK=preprod yarn test",
-    "test:stagenet": "MIDNIGHT_NETWORK=stagenet yarn test",
+    "test:local": "MIDNIGHT_NETWORK=local npm test --",
+    "test:preview": "MIDNIGHT_NETWORK=preview npm test --",
+    "test:preprod": "MIDNIGHT_NETWORK=preprod npm test --",
+    "test:stagenet": "MIDNIGHT_NETWORK=stagenet npm test --",
     "proof:up": "docker compose up -d --wait proof-server",
     "proof:down": "docker compose stop proof-server",
     "env:up": "docker compose up -d --wait",
@@ -50,6 +57,5 @@
     "@types/ws": "^8.5.9",
     "typescript": "^5.7.0",
     "vitest": "^4.1.11"
-  },
-  "packageManager": "yarn@4.18.0"
+  }
 }

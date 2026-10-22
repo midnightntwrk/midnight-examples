@@ -1,0 +1,141 @@
+// Private tip jar: anyone can drop a shielded coin into the jar without
+// saying who they are, and only the jar's owner can take coins out.
+//
+// Flow:
+// - The owner deploys the jar with the token color it accepts. The
+//   constructor stores only a hash of the owner's secret key (`owner`), never
+//   the key and never the owner's wallet.
+// - A tipper calls `tip(coin)`. `coin` is not a coin from the tipper's wallet:
+//   it describes a NEW coin that this transaction creates for the contract.
+//   The tipper's client makes it up with a fresh random nonce
+//   (`createShieldedCoinInfo(color, amount)`), and the wallet pays for it from
+//   whichever of its coins it selects, taking change back under fresh nonces.
+//   The contract stores that coin in the public `pot`. `tip` uses no witness
+//   and records no identity at all: the contract never learns who tipped, so
+//   it cannot leak it.
+// - The owner calls `withdraw(tipKey)` once per pot entry. The circuit proves
+//   knowledge of the secret behind `owner` and pays that coin to the
+//   caller's own shielded wallet.
+//
+// Privacy model (see AGENTS.md for the full list of accepted leaks):
+// - PRIVATE: who tipped. A coin nonce in public state is only a linkability
+//   oracle if some other commitment shares it: anyone can hash
+//   (nonce, color, value, guessed owner) and look the result up. The pot
+//   nonce was drawn fresh for this one contract-owned coin, so no wallet coin
+//   carries it, and nobody but the tipper's client ever saw it before it
+//   landed. The wallet coins that paid for the tip are spent through Zswap,
+//   which reveals nullifiers, not the coins or their owner.
+// - PRIVATE: the owner's secret key. Only its domain-separated hash is stored.
+// - PUBLIC: the value of each tip (each `pot` entry holds a full coin, value
+//   included, because the contract needs the whole coin to spend it later),
+//   the accepted token color, the number of tips, when each `tip` and
+//   `withdraw` happened (circuit names are public), and which pot coin each
+//   withdrawal took. So an observer sees "someone tipped 40" but not who.
+// - CLIENT'S JOB: the nonce must be fresh. A client that passes the nonce of
+//   a coin it already holds puts that nonce in two commitments, the wallet's
+//   and the contract's, and publishing it here then identifies the wallet to
+//   anyone who can guess its key (the coin's issuer, for one). The contract
+//   cannot tell a fresh nonce from a reused one.
+// - RESIDUAL: a withdrawal's payout nonce is derived from a pot nonce that is
+//   public, so an observer who guesses the owner's wallet key can confirm it
+//   received the payout. The owner is a public role here; this design does
+//   not try to hide where the owner's money goes.
+
+pragma language_version 0.23;
+import CompactStandardLibrary;
+
+// Hash of the owner's secret key, written once at deployment. `sealed` means
+// no circuit can ever change it, so ownership cannot be transferred or hijacked.
+export sealed ledger owner: Bytes<32>;
+
+// The only token color the jar accepts, fixed at deployment. Tips of any
+// other color are refused, so every pot entry is the same currency.
+export sealed ledger tipColor: Bytes<32>;
+
+// The coins the jar currently holds, keyed by each coin's own nonce.
+// Every coin here is contract-owned and was created by its `tip` transaction
+// under a fresh nonce, so publishing it links nothing back to a tipper's
+// wallet. The coin value IS public: that is the price of letting the contract
+// spend these coins without anyone having to hand it a secret later.
+export ledger pot: Map<Bytes<32>, QualifiedShieldedCoinInfo>;
+
+// The owner's secret key, read from the owner's private state. Only the
+// constructor and `withdraw` call it. Tippers never call it, so a tipper's
+// private state does not need a real key.
+witness ownerSecretKey(): Bytes<32>;
+
+// `acceptedColor` is a constructor argument, not a witness: it is meant to be
+// public. The owner key comes from the witness so the raw secret never
+// appears in the deploy transaction.
+constructor(acceptedColor: Bytes<32>) {
+    owner = disclose(ownerKey(ownerSecretKey()));
+    tipColor = disclose(acceptedColor);
+}
+
+// Domain-separated owner key. The "private-tip-jar:owner:" prefix means the
+// same secret, reused in another dapp with a different prefix, yields an
+// unrelated key there. It is a `pure` circuit so the tests (and a UI) can
+// compute the expected `owner` value off chain from the secret alone.
+// Use a fresh secret per jar: with a shared secret, two jars would show the
+// same `owner` value and so be linkable to one owner.
+export pure circuit ownerKey(sk: Bytes<32>): Bytes<32> {
+    return persistentHash<Vector<2, Bytes<32>>>([pad(32, "private-tip-jar:owner:"), sk]);
+}
+
+// Anyone can tip. `coin` is the coin this transaction creates for the jar,
+// and its value is the tip: the wallet covers it from any of its coins of the
+// right color and makes change, so no exact-value coin is needed first.
+//
+// There is deliberately no caller check and no witness call here. Asking for
+// an identity would only create something that could leak.
+export circuit tip(coin: ShieldedCoinInfo): [] {
+    // The guards run before any coin moves. A failing assert is rejected
+    // while the transaction is being built, so a bad tip costs nothing.
+    assert(coin.color == tipColor, "Tips must be paid in the jar's token");
+    assert(coin.value > 0, "A tip must be worth something");
+    // Pot keys are public and the tipper picks the nonce, so without this a
+    // tip that reused a pot key with a different value (a different coin, so
+    // Zswap would accept it) would overwrite that entry and strand its coin
+    // in the contract for good.
+    assert(!pot.member(disclose(coin.nonce)), "A tip with that nonce is already in the jar");
+
+    // `disclose` here acknowledges that the coin flows into a public effect
+    // (the Zswap output to this contract, which carries only its commitment)
+    // and, below, into the ledger. Both are fine: the nonce is fresh.
+    receiveShielded(disclose(coin));
+
+    // insertCoin records the coin as a QualifiedShieldedCoinInfo, filling in
+    // the commitment-tree index the ledger assigns when this transaction
+    // lands, so `withdraw` can spend it later with sendShielded.
+    pot.insertCoin(
+        disclose(coin.nonce),
+        disclose(coin),
+        right<ZswapCoinPublicKey, ContractAddress>(kernel.self())
+    );
+}
+
+// The owner takes one coin out of the jar and into their own shielded wallet.
+// One coin per call keeps the circuit small; call it once per pot entry.
+export circuit withdraw(tipKey: Bytes<32>): [] {
+    // Ownership is proven by knowing the secret behind `owner`. The secret is
+    // only used inside the proof; the comparison result is all that matters.
+    assert(ownerKey(ownerSecretKey()) == owner, "Only the owner can withdraw");
+
+    // The key is public anyway (it is a pot key), so disclosing it is free.
+    const key = disclose(tipKey);
+    assert(pot.member(key), "No such tip in the jar");
+
+    // `pot` holds the coin with the mt_index the ledger assigned when the tip
+    // landed (insertCoin records it), so it can be spent with sendShielded.
+    const coin = pot.lookup(key);
+
+    // Pay the full coin to the caller's shielded wallet. `ownPublicKey()` is
+    // the key of whoever submits the transaction, which the owner check above
+    // has already restricted to the owner.
+    sendShielded(
+        coin,
+        left<ZswapCoinPublicKey, ContractAddress>(ownPublicKey()),
+        coin.value
+    );
+    pot.remove(key);
+}

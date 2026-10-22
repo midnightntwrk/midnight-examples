@@ -1,10 +1,10 @@
 // In-memory tests for the calculator contract: the compiled circuits run with
-// compact-runtime, with no network and no proofs. `yarn compile:fast` then
-// `yarn test:sim` runs them in seconds; the devnet suite in calculator.test.ts
+// compact-runtime, with no network and no proofs. `npm run compile:fast` then
+// `npm run test:sim` runs them in seconds; the devnet suite in calculator.test.ts
 // covers the same circuits end to end.
 
 import { describe, expect, it } from 'vitest';
-import { Sim, expectRejects } from '@midnight-ntwrk/example-sim';
+import { Sim, expectRejects } from '@midnight-ntwrk/mnkit-sim';
 import { Contract, ledger } from '../../contract/managed/calculator/contract/index.js';
 import { createCalculatorPrivateState, witnesses } from '../../contract/witnesses.js';
 

@@ -14,12 +14,12 @@ file is the browser counterpart of a piece of the Node test harness in
 | `providers.ts` | `providers.ts`, `wallet.ts` | Wallet = the browser wallet via the DApp Connector; keys fetched over HTTP; wallet or local proving; in-memory private state |
 | `hello-world-api.ts` | `test/hw.test.ts` | `deployContract` / `findDeployedContract` / `callTx.storeMessage`, plus a live `message$` stream |
 
-It is the reference output of `yarn new:ui` (Vite, React 19, Tailwind v4,
+It is the reference output of `npm run new:ui` (Vite, React 19, Tailwind v4,
 shadcn), pinned to this repo's toolchain: `midnight-js-*` 4.1.1,
 `dapp-connector-api` 4.0.1, and Vite 6.4.3, which matches the hoisted root Vite
 (see the root `AGENTS.md`). Everything except `hello-world-api.ts`,
 `components/hello-world-panel.tsx`, `__tests__/message.test.ts` and this README
-is rendered from `templates/ui/`. Edit those files there, not here. CI fails
+is rendered from `packages/mnkit/templates/ui/`. Edit those files there, not here. CI fails
 if the two drift apart (see `AGENTS.md`).
 
 ## Prerequisites
@@ -29,20 +29,20 @@ if the two drift apart (see `AGENTS.md`).
 - DUST in that wallet on the network you'll use, to pay fees.
 - The compiled contract. From the repo root:
   ```bash
-  yarn workspace @midnight-ntwrk/example-hello-world run compile
+  npm run compile -w @midnight-ntwrk/example-hello-world
   ```
 
 ## Run
 
 ```bash
 cd examples/hello-world/ui
-yarn dev          # runs copy:zk, then Vite on http://localhost:5173
+npm run dev          # runs copy:zk, then Vite on http://localhost:5173
 ```
 
 `copy:zk` copies `../contract/managed/hello-world/{keys,zkir}` into
 `public/managed/hello-world/` (gitignored). `FetchZkConfigProvider` fetches
-the prover key, verifier key and ZKIR from there. Yarn 4 doesn't run `pre*`
-scripts, so `dev` and `build` call `copy:zk` explicitly.
+the prover key, verifier key and ZKIR from there. There's no `pre*`
+hook: `dev` and `build` call `copy:zk` explicitly.
 
 Then, in the page:
 
@@ -58,7 +58,7 @@ Then, in the page:
 
 ```bash
 cd examples/hello-world
-yarn env:up      # node :9944, indexer :8088, proof server :6300 (network id `undeployed`)
+npm run env:up      # node :9944, indexer :8088, proof server :6300 (network id `undeployed`)
 ```
 
 Point the wallet at the local network (node `http://127.0.0.1:9944`, indexer
@@ -72,7 +72,7 @@ receiver. `fund:wallet` uses that:
 
 ```bash
 # from anywhere in the repo (packages/fast-sync/scripts/fund-wallet.ts)
-yarn fund:wallet <your mn_dust_undeployed1… address> [mn_addr_undeployed1… for some NIGHT too]
+npm run fund:wallet <your mn_dust_undeployed1… address> [mn_addr_undeployed1… for some NIGHT too]
 ```
 
 It sends NIGHT from the genesis wallet to a throwaway sponsor wallet, and the
@@ -98,7 +98,7 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
 - **Prove with the wallet** (the default), or with a proof server you run
   yourself. Never use a hosted proof server you don't control.
 - **Use your own browser wallet.** Never use the repo's fast-sync or seeded test
-  wallets (`.env.<network>`, `yarn wallets:new`) on mainnet.
+  wallets (`.env.<network>`, `npm run wallets:new`) on mainnet.
 - **Versions must match.** This UI is built against the repo's pinned
   toolchain (see the version matrix in the root `README.md`). If mainnet runs a
   different ledger or protocol version, transactions fail at proving or
@@ -116,7 +116,7 @@ the providers and re-joins the contract.
   and key material to the wallet (`ConnectedAPI.getProvingProvider`), and the
   wallet generates the proof. There's nothing extra to run.
 - **Local proof server**: `httpClientProofProvider` against a proof server you
-  run yourself (`yarn proof:up` in `examples/hello-world`, default
+  run yourself (`npm run proof:up` in `examples/hello-world`, default
   `http://127.0.0.1:6300`). This is the same setup as the Node test harness.
 
 Don't point either mode at a proof server you don't control: the proof server
@@ -126,13 +126,13 @@ sees your circuit inputs.
 
 | Script | What it does |
 |---|---|
-| `yarn dev` | `copy:zk` + Vite dev server |
-| `yarn build` | `copy:zk` + `tsc -b` + production build into `dist/` |
-| `yarn typecheck` | `tsc -b` against the real SDK types |
-| `yarn test:unit` | vitest (jsdom). Mocked wallet and proof providers; one test runs the real compiled circuit in memory to check `message$` decoding |
+| `npm run dev` | `copy:zk` + Vite dev server |
+| `npm run build` | `copy:zk` + `tsc -b` + production build into `dist/` |
+| `npm run typecheck` | `tsc -b` against the real SDK types |
+| `npm run test:unit` | vitest (jsdom). Mocked wallet and proof providers; one test runs the real compiled circuit in memory to check `message$` decoding |
 
 The UI deliberately has no `compile`, `test` or `test:local` script. Root
-`yarn compile` / `yarn test*` run on every workspace (`foreach --all`), and
+`npm run compile` / `npm test*` run on every workspace (`foreach --all`), and
 the UI must not join CI's local-network runs.
 
 ## Gotchas found while wiring this up
