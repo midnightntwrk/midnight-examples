@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// `mnkit derive` (`yarn new:example <name> --derive` in the monorepo): fills
+// `mnkit derive` (`npm run new:example -- <name> --derive` in the monorepo): fills
 // the generated-stub regions of a scaffolded project from its compiled
 // contract (run the compile:fast script first). A region looks like
 //

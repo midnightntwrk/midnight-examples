@@ -14,11 +14,11 @@
 // limitations under the License.
 
 // In-memory tests: the compiled contract runs with compact-runtime, with no
-// network and no proofs. `__RUN__ compile:fast && __RUN__ test:sim` runs them in
+// network and no proofs. `npm run compile:fast && npm run test:sim` runs them in
 // seconds; put contract logic, every guard and the privacy invariants here,
 // and keep the devnet suite (__name__.test.ts) for the end-to-end flow.
 // @if monorepo
-// `yarn new:example __name__ --derive` (repo root) fills the @generated-stub
+// `npm run new:example -- __name__ --derive` (repo root) fills the @generated-stub
 // @endif
 // @if standalone
 // `npx mnkit derive` fills the @generated-stub

@@ -1,5 +1,5 @@
 // The two private-state stores a generated UI can use. contract.ts's
-// PRIVATE_STATE_STORAGE (set by `__NEW_UI__ --private-state`) picks one:
+// PRIVATE_STATE_STORAGE (set by `__NEW_UI__`'s --private-state flag) picks one:
 //
 //   "memory"      inMemoryPrivateStateProvider: plain Maps, lost on reload.
 //                 Fine when private state is re-derivable or throwaway.
@@ -88,7 +88,7 @@ export async function persistentPrivateStateProvider<PSI extends string, PS>(opt
  * This implements the complete 13-method PrivateStateProvider<PSI, PS>
  * contract. The export/import methods are not meaningful for an ephemeral
  * in-memory store, so they reject. Use persistentPrivateStateProvider
- * (`__NEW_UI__ --private-state persistent`) for cross-session private state.
+ * (`__NEW_UI__` with --private-state persistent) for cross-session private state.
  */
 export function inMemoryPrivateStateProvider<
   PSI extends string,

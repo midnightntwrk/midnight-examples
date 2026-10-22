@@ -139,7 +139,7 @@ describe(`Zk Loan Contract (${network})`, () => {
 
     providers = buildProviders(wallet, zkConfigPath, config);
 
-    // Fresh ephemeral provider key per run, like `yarn attestation:start`
+    // Fresh ephemeral provider key per run, like `npm run attestation:start`
     // without PROVIDER_SECRET_KEY.
     attestationServer = createServer(generateKeyPair().sk, Number(PROVIDER_ID));
     await new Promise<void>((resolve) => attestationServer.listen(0, '127.0.0.1', resolve));

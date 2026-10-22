@@ -5,7 +5,7 @@ Each fixture is a contract copied from an example, with what the tests need:
 - `contract/*.compact` (and `witnesses.ts` when the example has one): the sources.
 - `compiled/<contract>/`: the two compiler outputs the generators read,
   `contract-info.json` and `index.d.ts`. Regenerate them with
-  `yarn fixtures:regen`; `yarn fixtures:regen --check` fails when the pinned
+  `npm run fixtures:regen`; `npm run fixtures:regen -- --check` fails when the pinned
   compiler would emit something different.
 - `overlay/` (end-to-end fixtures only): the completed files copied over a
   derived project, so `scripts/mnkit-e2e.sh` can run its tests. For

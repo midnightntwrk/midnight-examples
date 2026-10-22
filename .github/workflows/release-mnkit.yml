@@ -54,11 +54,10 @@ jobs:
           # No dependency cache in a publishing workflow (cache poisoning).
           package-manager-cache: false
 
-      - name: Enable Corepack (Yarn 4)
-        run: corepack enable
-
       - name: Install dependencies (builds the runtime packages)
-        run: yarn install --immutable
+        # npm 11 for the repo (its lockfile and .npmrc need 11.10+), through npx: Node's own npm
+        # stays on PATH, and mnkit-e2e.sh runs the scaffolded projects with it, as users do.
+        run: npx --yes npm@11.21.0 ci
 
       - name: Check the tag matches every package version
         id: version
@@ -78,9 +77,9 @@ jobs:
 
       - name: Pins, engine tests and compiled fixtures
         run: |
-          yarn toolchain:check
-          yarn test:engine
-          yarn fixtures:regen --check
+          npm run toolchain:check
+          npm run test:engine
+          npm run fixtures:regen -- --check
 
       - name: Tarball end to end (in-memory gate)
         run: bash scripts/mnkit-e2e.sh

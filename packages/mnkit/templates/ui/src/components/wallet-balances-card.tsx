@@ -14,7 +14,7 @@
 //
 // @if monorepo
 // Template-owned: edit packages/mnkit/templates/ui/src/components/wallet-balances-card.tsx,
-// then `yarn new:ui --sync-all`.
+// then `npm run new:ui -- --sync-all`.
 // @endif
 // @if standalone
 // Template-owned: `mnkit upgrade` replaces this file unless you have edited it.

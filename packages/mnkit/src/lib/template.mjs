@@ -51,7 +51,7 @@ export function exitOnError() {
 
 /**
  * Return a problem string unless the running Node satisfies the root
- * package.json `engines.node` (a `>=MAJOR…` range), else null. Yarn 4 doesn't
+ * package.json `engines.node` (a `>=MAJOR…` range), else null. npm doesn't
  * enforce `engines`, and a shell that defaults to an older Node produces UIs
  * whose dev server then crashes.
  */

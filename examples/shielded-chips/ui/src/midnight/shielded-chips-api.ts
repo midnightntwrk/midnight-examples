@@ -25,7 +25,7 @@
 // CompiledContract and its own providers bundle from
 // `useMidnightProviders().providersFor(CHIPS_ZK_ASSETS_PATH)`.
 //
-// Seed file: generated once by `yarn new:ui` from contract-info.json, then
+// Seed file: generated once by `npm run new:ui` from contract-info.json, then
 // yours to edit. The drift check ignores it.
 import {
   deployContract,

@@ -91,7 +91,7 @@ describe('planUi in standalone mode', () => {
     expect(tsconfig(files['tsconfig.app.json']).extends).toBe('../../../tsconfig.base.json');
     expect(files['.gitignore']).toBeUndefined();
     expect(files['VERIFIED.md']).toBeUndefined();
-    expect(files['src/components/deployment-card.tsx']).toContain('yarn fund:wallet {dustAddress}');
+    expect(files['src/components/deployment-card.tsx']).toContain('npm run fund:wallet {dustAddress}');
   });
 });
 

@@ -16,15 +16,15 @@
 
 // Phase 2 of scaffolding: adds a browser UI (examples/<name>/ui) to an example
 // whose contract already compiles and whose tests pass (phase 1 is
-// `yarn new:example`). Zero dependencies — Node built-ins only.
+// `npm run new:example`). Zero dependencies — Node built-ins only.
 //
-//   yarn new:ui <name> [--contract <managed-dir>] [--private-state memory|persistent]
+//   npm run new:ui -- <name> [--contract <managed-dir>] [--private-state memory|persistent]
 //                                                   scaffold examples/<name>/ui
-//   yarn new:ui <name> --dry-run [flags]            print what create would generate, write nothing
-//   yarn new:ui <name> --check                      diff template-owned files (CI)
-//   yarn new:ui <name> --sync                       rewrite template-owned files
-//   yarn new:ui --check-all                         --check every generated UI, and the lockfile
-//   yarn new:ui --sync-all                          --sync every generated UI, then yarn install
+//   npm run new:ui -- <name> --dry-run [flags]            print what create would generate, write nothing
+//   npm run new:ui -- <name> --check                      diff template-owned files (CI)
+//   npm run new:ui -- <name> --sync                       rewrite template-owned files
+//   npm run new:ui -- --check-all                         --check every generated UI, and the lockfile
+//   npm run new:ui -- --sync-all                          --sync every generated UI, then npm install
 //                                                   if a package.json changed
 //
 // The create-time choices (--contract, --private-state) are recorded in
@@ -64,10 +64,10 @@ assertNodeVersion(REPO_ROOT);
 function usage() {
   console.log(
     [
-      'Usage: yarn new:ui <name> [--contract <managed-dir>] [--private-state memory|persistent]',
-      '       yarn new:ui <name> --dry-run [--contract ...] [--private-state ...]',
-      '       yarn new:ui <name> --check | --sync',
-      '       yarn new:ui --check-all | --sync-all',
+      'Usage: npm run new:ui -- <name> [--contract <managed-dir>] [--private-state memory|persistent]',
+      '       npm run new:ui -- <name> --dry-run [--contract ...] [--private-state ...]',
+      '       npm run new:ui -- <name> --check | --sync',
+      '       npm run new:ui -- --check-all | --sync-all',
       '',
       '  <name>           existing example under examples/ (compile it first)',
       '  --contract       which contract/managed/<dir> to use when there are several',
@@ -78,16 +78,16 @@ function usage() {
       '                   in contract/witnesses.ts takes arguments (per-user secrets),',
       '                   with or without witnesses; else memory',
       '  --skip-gate   create even though the in-memory gate has no stamp for the',
-      '                current sources (.gates/sim.json, written by yarn pipeline)',
+      '                current sources (.gates/sim.json, written by npm run pipeline)',
       '  --dry-run     print the create summary (forms, TODOs, storage, warnings) and',
       '                write nothing; works even when ui/ already exists',
       '  --check       compare template-owned files in examples/<name>/ui with the',
       '                template; exit 1 on any difference (seed files are ignored)',
       '  --sync        rewrite template-owned files in examples/<name>/ui (seeds untouched)',
       '  --check-all   --check every generated UI (examples/*/ui/new-ui.json), then',
-      '                `yarn install --immutable` to catch a stale yarn.lock',
-      '  --sync-all    --sync every generated UI; runs `yarn install` when a UI\'s',
-      '                package.json changed (commit the yarn.lock it writes)',
+      '                `npm ci --dry-run` to catch a stale package-lock.json',
+      '  --sync-all    --sync every generated UI; runs `npm install` when a UI\'s',
+      '                package.json changed (commit the package-lock.json it writes)',
     ].join('\n'),
   );
 }
@@ -108,7 +108,7 @@ function generatedUis() {
  * process, so the single-UI flow below stays as it is. Returns the exit code.
  *
  * A template change is only done once *every* UI is synced, including one
- * created earlier in the same change, and yarn.lock matches the synced
+ * created earlier in the same change, and package-lock.json matches the synced
  * package.json files. Both were easy to miss by hand.
  */
 function runAll(each) {
@@ -121,16 +121,16 @@ function runAll(each) {
     (n) => spawnSync(process.execPath, [script, n, `--${each}`], { stdio: 'inherit' }).status !== 0,
   );
   // No `shell:` option (opengrep flags any non-false value). Windows can only
-  // run yarn.cmd through cmd.exe, so call it explicitly; the args are literals.
-  const yarn = (args) => {
+  // run npm.cmd through cmd.exe, so call it explicitly; the args are literals.
+  const npm = (args) => {
     const [cmd, argv] =
-      process.platform === 'win32' ? ['cmd.exe', ['/d', '/s', '/c', 'yarn', ...args]] : ['yarn', args];
+      process.platform === 'win32' ? ['cmd.exe', ['/d', '/s', '/c', 'npm', ...args]] : ['npm', args];
     return spawnSync(cmd, argv, { cwd: REPO_ROOT, stdio: 'inherit' }).status === 0;
   };
   if (each === 'check') {
-    console.log('\n  yarn install --immutable (does yarn.lock match every package.json?)');
-    const lockOk = yarn(['install', '--immutable', '--mode=skip-build']);
-    if (!lockOk) console.error('✖ yarn.lock is stale: run `yarn install` and commit it.');
+    console.log('\n  npm ci --dry-run (does package-lock.json match every package.json?)');
+    const lockOk = npm(['ci', '--dry-run', '--ignore-scripts']);
+    if (!lockOk) console.error('✖ package-lock.json is stale: run `npm install` and commit it.');
     if (failed.length) console.error(`✖ drifted: ${failed.join(', ')}`);
     return failed.length || !lockOk ? 1 : 0;
   }
@@ -140,9 +140,9 @@ function runAll(each) {
   }
   const changed = names.filter((n) => pkgJson(n) !== before[n]);
   if (changed.length) {
-    console.log(`\n  package.json changed in ${changed.join(', ')}: running yarn install`);
-    if (!yarn(['install'])) return 1;
-    console.log('  Commit the updated yarn.lock; CI installs with --immutable.');
+    console.log(`\n  package.json changed in ${changed.join(', ')}: running npm install`);
+    if (!npm(['install'])) return 1;
+    console.log('  Commit the updated package-lock.json; CI installs with npm ci.');
   }
   console.log(`\n✔ Synced ${names.length} generated UI(s): ${names.join(', ')}. Review with \`git diff\`.`);
   return 0;
@@ -195,7 +195,7 @@ const exampleDir = path.join(EXAMPLES_DIR, name);
 const uiDir = path.join(exampleDir, 'ui');
 const pkg = `@midnight-ntwrk/example-${name}`;
 if (!fs.existsSync(path.join(exampleDir, 'package.json'))) {
-  fail(`examples/${name} does not exist. Scaffold it first:  yarn new:example ${name}`);
+  fail(`examples/${name} does not exist. Scaffold it first:  npm run new:example ${name}`);
 }
 if (mode === 'create' && !dryRun && fs.existsSync(uiDir)) {
   fail(`examples/${name}/ui already exists. Use --check or --sync to compare/update template-owned files.`);
@@ -210,7 +210,7 @@ if (mode === 'create' && !dryRun) {
     fail(
       `examples/${name} has not passed the in-memory gate on its current sources ` +
         `(${stamp ? 'the contract, witnesses or tests changed since it passed' : 'no .gates/sim.json'}). ` +
-        `Run \`yarn pipeline ${name}\` (it creates the UI once the gate passes), or pass --skip-gate ` +
+        `Run \`npm run pipeline ${name}\` (it creates the UI once the gate passes), or pass --skip-gate ` +
         '(an older example without a SPEC.md, after its own typecheck and test:sim).',
     );
   }
@@ -259,7 +259,7 @@ const MANIFEST = '.template-files';
 const posix = (p) => p.split(path.sep).join('/');
 const templateOwned = files.filter((f) => !SEED_FILES.has(f.templateRel)).map((f) => posix(f.rel)).sort();
 const manifestContent =
-  '# Template-owned files, written by `yarn new:ui`. Do not edit; --sync rewrites it.\n' +
+  '# Template-owned files, written by `npm run new:ui`. Do not edit; --sync rewrites it.\n' +
   templateOwned.map((f) => `${f}\n`).join('');
 function readManifest() {
   const p = path.join(uiDir, MANIFEST);
@@ -303,13 +303,13 @@ if (mode === 'check') {
   }
   console.error(
     '\n  Template-owned files must stay identical across examples. Either move the change into\n' +
-      `  packages/mnkit/templates/ui/ (then \`yarn new:ui ${name} --sync\` here and in any other UI), or, if it is\n` +
+      `  packages/mnkit/templates/ui/ (then \`npm run new:ui -- ${name} --sync\` here and in any other UI), or, if it is\n` +
       '  example-specific, move it into a seed file (the api, panel, or circuits test).',
   );
   if (problems.length) {
     console.error(
       `  A missing/out-of-date ${MANIFEST} or ${CONFIG}, a stale file, or a stale VERIFIED.md table is fixed by\n` +
-        `  \`yarn new:ui ${name} --sync\`. A malformed ${VERIFICATION_FILE} has to be fixed by hand.`,
+        `  \`npm run new:ui -- ${name} --sync\`. A malformed ${VERIFICATION_FILE} has to be fixed by hand.`,
     );
   }
   process.exit(1);
@@ -380,8 +380,8 @@ if (dryRun) {
   process.exit(0);
 }
 console.log('\n  Next steps:');
-console.log('    1. yarn install   (the new workspace changes yarn.lock; commit it — CI uses --immutable)');
-console.log(`    2. yarn workspace ${pkg}-ui typecheck && yarn workspace ${pkg}-ui test:unit && yarn workspace ${pkg}-ui build`);
+console.log('    1. npm install   (the new workspace changes package-lock.json; commit it — CI uses npm ci)');
+console.log(`    2. npm run typecheck -w ${pkg}-ui && npm run test:unit -w ${pkg}-ui && npm run build -w ${pkg}-ui`);
 console.log('    3. Build the use case into the seed files above');
 console.log(`    4. Work through the verification checklist in examples/${name}/ui/AGENTS.md`);
 console.log('');

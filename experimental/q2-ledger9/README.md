@@ -6,13 +6,13 @@ A stagenet testing harness for the `compact-end-2-end` dapps, modeled after
 `example-usdcx`. One package: a shared `src/` harness (network config, wallet,
 DUST bootstrap, providers, contract loader) plus one vitest suite per dapp under
 `src/test/`. Contracts live under `contracts/<dapp>/`, compiled into
-`contracts/<dapp>/managed/` by `yarn compile`.
+`contracts/<dapp>/managed/` by `npm run compile`.
 
 ## Layout
 
 ```
 contracts/<dapp>/*.compact      # sources (per-dapp; DEX/FungibleToken names repeat)
-contracts/<dapp>/managed/       # compactc output (gitignored, rebuilt by yarn compile)
+contracts/<dapp>/managed/       # compactc output (gitignored, rebuilt by npm run compile)
 src/config.ts                   # LOCAL / PREVIEW / PREPROD / STAGENET endpoints
 src/wallet.ts src/dust.ts src/providers.ts   # wallet lifecycle + DUST + SDK providers
 src/secret.ts src/harness.ts    # per-role secret resolution + funded/address-only helpers
@@ -21,7 +21,7 @@ src/witnesses/usdcx.ts          # the only witnessed dapp's witness wiring
 src/test/<dapp>.test.ts         # one end-to-end suite per dapp
 ```
 
-## Why a separate Yarn project
+## Why a separate npm project
 
 This is a **frozen snapshot** of the Q2 stagenet run, ported from the standalone
 `stagenet-q2` repo. mn-examples is pinned to the ledger 8 stack, and a version move
@@ -38,26 +38,26 @@ an early ledger 9 stack instead:
 | Proof server image | `midnightntwrk/proof-server:9.0.0-rc.6` |
 | Target node | stagenet, midnight-node 2.0.x (specVersion 2_000_000) |
 
-So it is its own Yarn project, like `../q3-ledger9`: its own `package.json`,
-`yarn.lock` and `.yarnrc.yml`, outside the root workspaces. Nothing here changes the
+So it is its own npm project, like `../q3-ledger9`: its own `package.json`,
+`package-lock.json` and `.npmrc`, outside the root workspaces. Nothing here changes the
 root install, and it is not in the CI matrix.
 
 ## Setup
 
 ```sh
 nvm use 22                                   # Node >= 22
-corepack enable                              # Yarn 4 via packageManager
+npm install -g npm@11                        # npm 11.10+ (Node 22 bundles npm 10)
 cd experimental/q2-ledger9
-yarn install                                 # its own lockfile
+npm install                                  # its own lockfile
 cp .env.stagenet.example .env.stagenet       # fill in funded seeds (gitignored)
 ```
 
 Download compactc 0.33.0-rc.2 for your platform from the
 [`compactc-v0.33.0-rc.2` release](https://github.com/LFDT-Minokawa/compact/releases/tag/compactc-v0.33.0-rc.2)
-and unzip it. `yarn compile` requires `COMPACTC` to point at it:
+and unzip it. `npm run compile` requires `COMPACTC` to point at it:
 
 ```sh
-COMPACTC=/path/to/compactc-0.33.0-rc.2/compactc yarn compile   # gaps are expected
+COMPACTC=/path/to/compactc-0.33.0-rc.2/compactc npm run compile  # gaps are expected
 ```
 
 Expected result: **compiled 11, failed 4**. The failures are the four gap contracts in
@@ -66,9 +66,9 @@ the table below. `caller/Proxy` compiles; only `caller/Caller` fails.
 ## Run
 
 ```sh
-yarn proof:up          # local proof server on :6300 (proof:down to stop)
-yarn test:stagenet     # remote node+indexer (shielded.tools), local proof server
-yarn test:local        # against a local devnet on :9944 / :8088
+npm run proof:up        # local proof server on :6300 (proof:down to stop)
+npm run test:stagenet   # remote node+indexer (shielded.tools), local proof server
+npm run test:local      # against a local devnet on :9944 / :8088
 ```
 
 The proof server and the local endpoints use the same ports as the mn-examples local

@@ -17,7 +17,7 @@
 // coins themselves are unaffected.
 //
 // Template-owned: edit packages/mnkit/templates/ui/src/lib/coin-book.ts, then
-// `yarn new:ui --sync-all`.
+// `npm run new:ui -- --sync-all`.
 import { useSyncExternalStore } from "react";
 import { formatScalar } from "@/lib/ledger-format";
 

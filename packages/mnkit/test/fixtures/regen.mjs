@@ -16,8 +16,8 @@
 
 // Regenerates the compiler output the engine unit tests read:
 //
-//   yarn fixtures:regen           rewrite compiled/
-//   yarn fixtures:regen --check   fail if compiled/ is stale
+//   npm run fixtures:regen           rewrite compiled/
+//   npm run fixtures:regen -- --check   fail if compiled/ is stale
 //
 // Each fixture is <fixture>/contract/*.compact, copied from an example. Only
 // the two files the generators read are kept, under <fixture>/compiled/<c>/
@@ -82,7 +82,7 @@ try {
 if (stale.length > 0) {
   console.error(
     `✖ ${stale.length} fixture file(s) differ from what the pinned compiler emits:\n  - ${stale.join('\n  - ')}\n` +
-      'Run yarn fixtures:regen and review the diff: the generators may need updating.',
+      'Run `npm run fixtures:regen` and review the diff: the generators may need updating.',
   );
   process.exit(1);
 }

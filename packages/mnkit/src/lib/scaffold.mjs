@@ -16,15 +16,15 @@
 // Renders templates/example for one project name, in memory, in one of two
 // modes:
 //
-//   monorepo    an example inside midnight-examples (new-example.mjs): yarn
-//               workspace deps, the repo's scripts, the repo-root .env
+//   monorepo    an example inside midnight-examples (new-example.mjs): the
+//               runtime packages as workspaces, the repo's scripts, the
+//               repo-root .env
 //   standalone  a plain npm project (mnkit init): the runtime packages from
 //               npm, `mnkit` scripts, an inlined tsconfig, its own .env
 //
 // The template holds both. Text files mark mode-only lines with whole-line
 // `@if monorepo` / `@if standalone` … `@endif` markers in any comment syntax
-// (selectBlocks); __RUN__ is the package-script runner. Files only one mode
-// gets are listed in MODE_FILES, and the standalone package.json is rewritten
+// (selectBlocks). Files only one mode gets are listed in MODE_FILES, and the standalone package.json is rewritten
 // from the template's (standalonePackageJson).
 // Zero dependencies — Node built-ins only.
 
@@ -45,7 +45,6 @@ export const KNOWN_TOKENS = [
   '__INITIAL_PRIVATE_STATE__',
   '__SIM_WITNESS_IMPORT__',
   '__SIM_WITNESSES__',
-  '__RUN__',
   '__TC_LANGUAGE__',
   '__TC_COMPILER__',
   '__TC_MIDNIGHT_JS__',
@@ -64,7 +63,7 @@ export const RUNTIME_PACKAGES = ['@midnight-ntwrk/mnkit-coins', '@midnight-ntwrk
  * template ships `gitignore`).
  */
 const MODE_FILES = {
-  // The repo has one root `yarn fund:wallet` for every example.
+  // The repo has one root `npm run fund:wallet` for every example.
   monorepo: { skip: ['gitignore', 'tsconfig.standalone.json', path.join('scripts', 'fund-wallet.ts')] },
   standalone: {
     skip: ['.envrc', 'tsconfig.json', `tutorials${path.sep}`],
@@ -94,8 +93,8 @@ export const isTemplateOwned = (rel) => {
  */
 export const LATE_SEEDS = ['contract/deploy-args.ts'];
 
-/** The pins a standalone project uses, as mnkit.json records them: not the repo's comment or Yarn. */
-export const projectToolchain = (tc) => Object.fromEntries(Object.entries(tc).filter(([k]) => k !== '$comment' && k !== 'yarn'));
+/** The pins a standalone project uses, as mnkit.json records them: not the repo's comment or CI npm. */
+export const projectToolchain = (tc) => Object.fromEntries(Object.entries(tc).filter(([k]) => k !== '$comment' && k !== 'npmCli'));
 
 /** sha256 of a file's content, as mnkit.json records it. */
 export const fileHash = (content) => createHash('sha256').update(content).digest('hex');
@@ -146,9 +145,8 @@ export function selectBlocks(content, mode, rel = 'template') {
   return out.join('\n');
 }
 
-/** The tokens filled from toolchain.json and the mode. */
-const toolchainTokens = (mode, tc) => ({
-  __RUN__: mode === 'standalone' ? 'npm run' : 'yarn',
+/** The tokens filled from toolchain.json. */
+const toolchainTokens = (tc) => ({
   __TC_LANGUAGE__: tc.compact.language,
   __TC_COMPILER__: tc.compact.compiler,
   __TC_MIDNIGHT_JS__: tc.npm['midnight-js'],
@@ -157,9 +155,9 @@ const toolchainTokens = (mode, tc) => ({
 });
 
 /**
- * toolchain.json's overrides (Yarn `resolutions` syntax) as npm `overrides`: a
- * `parent/child` key, which pins `child` only where `parent` depends on it,
- * becomes `{ parent: { child } }`.
+ * toolchain.json's overrides as npm `overrides` (the root package.json's and a
+ * standalone project's): a `parent/child` key, which pins `child` only where
+ * `parent` depends on it, becomes `{ parent: { child } }`.
  */
 export function npmOverrides(overrides) {
   const out = {};
@@ -198,8 +196,8 @@ export function standalonePackageJson(templatePkg, { name, specs, tc }) {
   };
   const dependencies = Object.fromEntries(
     Object.entries(p.dependencies).map(([pkg, spec]) => {
-      if (!spec.startsWith('workspace:')) return [pkg, spec];
-      if (!specs[pkg]) fail(`template package.json: no version for workspace dependency ${pkg}`);
+      if (!RUNTIME_PACKAGES.includes(pkg)) return [pkg, spec];
+      if (!specs[pkg]) fail(`template package.json: no version for runtime package ${pkg}`);
       return [pkg, specs[pkg]];
     }),
   );
@@ -275,7 +273,7 @@ export function renderExample(
   if (!MODES.includes(mode)) fail(`unknown mode '${mode}'`);
   const names = deriveNames(name);
   const { skip = [], rename = {} } = MODE_FILES[mode];
-  const tokens = toolchainTokens(mode, tc);
+  const tokens = toolchainTokens(tc);
   const files = renderTree(templateDir, {
     name,
     skip: (rel) =>

@@ -19,13 +19,13 @@ import { artifactExists, type Witnesses } from '../contracts.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const USDCX = path.resolve(HERE, '..', '..', 'contracts', 'usdcx');
-// Built by `yarn compile` from contracts/usdcx/bridged-usdc-mint.compact with
+// Built by `npm run compile` from contracts/usdcx/bridged-usdc-mint.compact with
 // --feature-zkir-v3 (the secp256k1 surface lives in the compiler's zkir-v3
 // library). It verifies ECDSA against supplied pubkeys — no recover-path
 // primitives — so it compiles from source on rc.2.
 export const BRIDGED_USDC_MINT_DIR = path.join(USDCX, 'managed', 'BridgedUsdcMint');
 
-/** True once `yarn compile` has emitted the BridgedUsdcMint bindings. */
+/** True once `npm run compile` has emitted the BridgedUsdcMint bindings. */
 export function bridgedUsdcMintArtifactExists(): boolean {
   return artifactExists(BRIDGED_USDC_MINT_DIR);
 }

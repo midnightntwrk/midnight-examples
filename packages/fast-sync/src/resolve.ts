@@ -129,7 +129,7 @@ function readBirthday(prefix: string): number | undefined {
  * whole safety story: `isSeedable()` refuses to seed a wallet that could have
  * been active before the reference was cut, and a seed with no recorded
  * birthday is exactly such a wallet. Never hand-write a _BIRTHDAY line — only
- * `yarn wallets:new`, which reads the chain tip at the moment it mints the
+ * `npm run wallets:new`, which reads the chain tip at the moment it mints the
  * seed, is entitled to.
  */
 export function resolveWallet(net: string, role?: string): ResolvedWallet {
@@ -161,6 +161,6 @@ export function resolveWallet(net: string, role?: string): ResolvedWallet {
     `No wallet for role '${canonical}' on network '${net}'. Set ` +
       `MIDNIGHT_${upper}_${canonical}_SEED (plus MIDNIGHT_${upper}_${canonical}_BIRTHDAY ` +
       `to enable fast-sync) in .env.${net}: the project's, or the repo root's in midnight-examples, ` +
-      `where \`yarn preseed:cut\` then \`yarn wallets:new\` generate them — see its FAST-SYNC.md.`,
+      `where \`npm run preseed:cut\` then \`npm run wallets:new\` generate them — see its FAST-SYNC.md.`,
   );
 }

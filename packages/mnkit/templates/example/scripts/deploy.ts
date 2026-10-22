@@ -17,7 +17,7 @@
 // preprod), without the UI or the test suite:
 //
 // @if monorepo
-//   yarn deploy [contract]           # local; deploy:preview, deploy:preprod
+//   npm run deploy [contract]           # local; deploy:preview, deploy:preprod
 // @endif
 // @if standalone
 //   npx mnkit deploy [contract] [--network preprod]
@@ -32,7 +32,7 @@
 // Off local the wallet is the Alice wallet from .env.<network>
 // (MIDNIGHT_<NETWORK>_SEED, as the devnet tests use), and the store's password
 // is MIDNIGHT_PRIVATE_STATE_PASSWORD. A proof server must be running
-// (`__RUN__ proof:up`), on every network.
+// (`npm run proof:up`), on every network.
 
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -120,10 +120,10 @@ const { getConfig } = await import('../src/config.js');
 const config = getConfig();
 
 if (!(await answers(config.proofServer))) {
-  fail(`No proof server at ${config.proofServer}. Start one with \`__RUN__ proof:up\` (or set MIDNIGHT_PROOF_SERVER).`);
+  fail(`No proof server at ${config.proofServer}. Start one with \`npm run proof:up\` (or set MIDNIGHT_PROOF_SERVER).`);
 }
 if (!isRemote && !((await answers(config.node)) && (await answers(config.indexer)))) {
-  fail('The local network is not running. Start it with `__RUN__ env:up && __RUN__ wait:dust`.');
+  fail('The local network is not running. Start it with `npm run env:up && npm run wait:dust`.');
 }
 
 setNetworkId(config.networkId);

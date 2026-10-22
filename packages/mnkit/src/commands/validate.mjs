@@ -14,7 +14,7 @@
 // limitations under the License.
 
 // The devnet gate for one project: compile → env:up → wait:dust → test:local,
-// then env:down (`mnkit validate`; `yarn validate` in the monorepo's examples).
+// then env:down (`mnkit validate`; `npm run validate` in the monorepo's examples).
 // It returns the status of the first step that failed, so a red test run is
 // never reported as a pass.
 //
@@ -42,16 +42,12 @@ import { compileIsStale, readJson, sourceHash, vitestFailures, writeJson } from 
 const TAIL_LINES = 60;
 const tail = (text, n = TAIL_LINES) => text.split('\n').slice(-n).join('\n').trimEnd();
 
-/** The command line that runs package script `script` with `extra` arguments. */
-const scriptCommand = (pm, script, extra) =>
-  pm === 'npm' ? ['npm', ['run', script, ...(extra.length ? ['--', ...extra] : [])]] : [pm, [script, ...extra]];
-
 /**
- * Run `<pm> <script> [...extra]`. Without a report the child inherits the
+ * Run `npm run <script> [-- ...extra]`. Without a report the child inherits the
  * terminal. With one, output is teed to ours and its tail kept for the report.
  */
-function runScript({ dir, pm, reportPath }, script, extra = []) {
-  const [cmd, cmdArgs] = scriptCommand(pm, script, extra);
+function runScript({ dir, reportPath }, script, extra = []) {
+  const [cmd, cmdArgs] = ['npm', ['run', script, ...(extra.length ? ['--', ...extra] : [])]];
   console.log(`\n▶ ${cmd} ${cmdArgs.join(' ')}`);
   if (!reportPath) {
     const r = spawnSync(cmd, cmdArgs, { stdio: 'inherit', cwd: dir });
@@ -72,11 +68,11 @@ function runScript({ dir, pm, reportPath }, script, extra = []) {
 }
 
 /**
- * Runs the gate in project dir `dir` with package manager `pm` ('yarn' or
- * 'npm') and returns the exit status of the first failed step, or 0.
+ * Runs the gate in project dir `dir` and returns the exit status of the first
+ * failed step, or 0.
  */
-export async function validate({ dir, pm = 'npm', keepNet = false, reportPath = null }) {
-  const run = (script, extra) => runScript({ dir, pm, reportPath }, script, extra);
+export async function validate({ dir, keepNet = false, reportPath = null }) {
+  const run = (script, extra) => runScript({ dir, reportPath }, script, extra);
   const vitestReport = reportPath ? path.join(path.dirname(reportPath), 'devnet-vitest.json') : null;
   const extraArgs = {
     // CLI reporters replace the config's ['default'], so name it again.
@@ -150,7 +146,6 @@ export async function validate({ dir, pm = 'npm', keepNet = false, reportPath = 
     console.error(`\n✖ validate failed at \`${failed}\` (exit ${status}).${logNote}`);
     return status;
   }
-  const down = pm === 'npm' ? 'npm run env:down' : `${pm} env:down`;
-  console.log(`\n✔ validate passed${keepNet ? ` (network left running; \`${down}\` when done)` : ''}`);
+  console.log(`\n✔ validate passed${keepNet ? ' (network left running; `npm run env:down` when done)' : ''}`);
   return 0;
 }

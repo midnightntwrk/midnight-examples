@@ -3,9 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "description": "Foundation acceptance tests for the Q3 2026 ledger 9 deliverables (SOW-Q3-01, SOW-Q3-03). Isolated from the ledger 8 mn-examples workspace on purpose.",
-  "packageManager": "yarn@4.18.0",
   "engines": {
     "node": ">=22.12.0"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": ">=11.10.0",
+      "onFail": "warn"
+    }
   },
   "workspaces": [
     "harness",
@@ -15,15 +21,15 @@
   "scripts": {
     "env:up": "docker compose up -d --wait",
     "env:down": "docker compose down -v",
-    "wait:dust": "yarn workspace @q3/harness run wait:dust",
-    "stack:check": "yarn workspace @q3/harness run stack:check",
-    "compile": "yarn workspaces foreach --all --topological run compile",
-    "test:sim": "yarn workspaces foreach --all run test:sim",
-    "test:local": "yarn workspaces foreach --all run test:local",
-    "report": "yarn workspace @q3/harness run report",
-    "report:md": "yarn workspace @q3/harness run report:md"
+    "wait:dust": "npm run wait:dust -w @q3/harness --",
+    "stack:check": "npm run stack:check -w @q3/harness --",
+    "compile": "npm run compile --workspaces --if-present",
+    "test:sim": "npm run test:sim --workspaces --if-present",
+    "test:local": "npm run test:local --workspaces --if-present",
+    "report": "npm run report -w @q3/harness --",
+    "report:md": "npm run report:md -w @q3/harness --"
   },
-  "resolutions": {
+  "overrides": {
     "@midnightntwrk/ledger-v9": "1.0.0-rc.5",
     "@midnightntwrk/onchain-runtime-v4": "4.0.0-rc.4",
     "@midnight-ntwrk/platform-js": "3.0.0"

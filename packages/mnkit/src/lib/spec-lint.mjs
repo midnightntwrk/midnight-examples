@@ -232,7 +232,7 @@ export function privacyKeys(testSrc) {
 
 /**
  * The card against the compiled code of examples/<name>. Run after
- * `yarn compile:fast` and the sim tests are written.
+ * `npm run compile:fast` and the sim tests are written.
  */
 export function lintCode(exampleDir) {
   const problems = [];
@@ -241,7 +241,7 @@ export function lintCode(exampleDir) {
   const sections = parseSpec(fs.readFileSync(specPath, 'utf8'));
   const testOnly = new Set(testOnlyContracts(sections));
   const compiled = listCompiled(exampleDir);
-  if (compiled.length === 0) return ['no compiled contract under contract/managed/: run yarn compile:fast first'];
+  if (compiled.length === 0) return ['no compiled contract under contract/managed/: run `npm run compile:fast` first'];
   for (const c of testOnly) if (!compiled.includes(c)) problems.push(`"## ${TEST_ONLY_SECTION}" lists \`${c}\`, which isn't compiled`);
   const contracts = compiled.filter((c) => !testOnly.has(c));
   const infos = contracts.map((c) => readContractInfo(exampleDir, c));

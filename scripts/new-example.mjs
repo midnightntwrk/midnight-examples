@@ -17,13 +17,13 @@
 // Scaffolds a new example under examples/<name> from packages/mnkit/templates/example.
 // Zero dependencies — Node built-ins only. Run with no AI assistance:
 //
-//   yarn new:example <name> [--witnesses] [--no-register]
-//   yarn new:example <name> --derive
+//   npm run new:example -- <name> [--witnesses] [--no-register]
+//   npm run new:example -- <name> --derive
 //
 // After scaffolding, the author writes SPEC.md, then contract/<name>.compact,
 // and fills in the test bodies. Everything else (harness, config, docker, docs
 // stubs, and test skeletons up to the first deployContract call) is generated.
-// Once the contract compiles (`yarn compile:fast`), --derive fills the
+// Once the contract compiles (`npm run compile:fast`), --derive fills the
 // @generated-stub regions from it: witness stubs, constructor arguments, an
 // it.todo per circuit, the ledger fields, and for each other contract under
 // contract/ (a test-only token) its exports, providers and a deploy test. See
@@ -48,13 +48,13 @@ const EXAMPLES_DIR = path.join(REPO_ROOT, 'examples');
 function usage() {
   console.log(
     [
-      'Usage: yarn new:example <name> [--witnesses] [--no-register] [--spec <file>]',
-      '       yarn new:example <name> --derive',
+      'Usage: npm run new:example -- <name> [--witnesses] [--no-register] [--spec <file>]',
+      '       npm run new:example -- <name> --derive',
       '',
       '  <name>          kebab-case example name (e.g. voting, hello-world)',
       '  --witnesses     generate a witnesses.ts stub and wire withWitnesses()',
       '  --no-register   do not edit ci.yaml / README.md / AGENTS.md',
-      '  --spec <file>   the reviewed design card (step 1): lint it (yarn spec:lint',
+      '  --spec <file>   the reviewed design card (step 1): lint it (npm run spec:lint',
       '                  --file), check --witnesses against its Witnesses section,',
       '                  and use it as the new example\'s SPEC.md',
       '  --derive        on an existing, compiled example: fill the @generated-stub',
@@ -100,16 +100,16 @@ const targetDir = path.join(EXAMPLES_DIR, name);
 // --- --derive: fill the stubs of an existing example, then stop ---------------
 if (args.includes('--derive')) {
   if (withWitnesses || noRegister || specFile) fail('--derive runs on an existing example; it takes no other options.');
-  if (!fs.existsSync(targetDir)) fail(`examples/${name} does not exist. Scaffold it first: yarn new:example ${name}`);
+  if (!fs.existsSync(targetDir)) fail(`examples/${name} does not exist. Scaffold it first: npm run new:example ${name}`);
   runDerive(targetDir, name, {
     label: `examples/${name}`,
-    next: `yarn typecheck && yarn test:sim   (in examples/${name})`,
+    next: `npm run typecheck && npm run test:sim   (in examples/${name})`,
   });
   process.exit(0);
 }
 
 // The next step is `compile`, so check the compiler now rather than after the
-// contract is written. Docker is checked later, by `yarn validate`.
+// contract is written. Docker is checked later, by `npm run validate`.
 preflight(REPO_ROOT, { compact: true });
 
 if (fs.existsSync(targetDir)) {
@@ -200,16 +200,16 @@ console.log('\n  Next steps (docs/generation-flow.md):');
 console.log(
   specContent !== null
     ? `    1. SPEC.md is your reviewed design card (${specFile}); keep it in step with the code`
-    : `    1. Fill in examples/${name}/SPEC.md and get the design reviewed (yarn spec:lint ${name} --design)`,
+    : `    1. Fill in examples/${name}/SPEC.md and get the design reviewed (npm run spec:lint -- ${name} --design)`,
 );
-console.log('    2. yarn install, then drive the rest from the repo root:');
-console.log(`         yarn pipeline ${name} [--json]`);
+console.log('    2. npm install, then drive the rest from the repo root:');
+console.log(`         npm run pipeline -- ${name} [--json]`);
 console.log('       It runs the scripts and gates (compile:fast, --derive, typecheck, test:sim, the SPEC');
 console.log('       checks, compile, the UI, the devnet in the background) and stops with what to do next:');
 console.log(`       the contract (contract/${name}.compact), ${withWitnesses ? 'the witnesses, ' : ''}the sim test and the devnet test,`);
 console.log('       then the UI seed files. Run it again after each change.');
-console.log('    By hand instead: yarn compile:fast, yarn new:example ' + name + ' --derive, yarn typecheck,');
-console.log('       yarn test:sim, yarn spec:lint ' + name + ', then yarn validate (in examples/' + name + ').');
+console.log(`    By hand instead: npm run compile:fast, npm run new:example -- ${name} --derive, npm run typecheck,`);
+console.log('       npm run test:sim, npm run spec:lint ' + name + ', then npm run validate (in examples/' + name + ').');
 console.log('');
 
 const failedRegistration = registration.filter((r) => !r.ok);

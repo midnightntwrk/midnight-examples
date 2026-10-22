@@ -125,7 +125,7 @@ describe('renderExample in standalone mode', () => {
     expect(files['.gitignore']).toBeUndefined();
     expect(files['mnkit.json']).toBeUndefined();
     expect(JSON.parse(files['tsconfig.json']).extends).toBe('../../tsconfig.base.json');
-    expect(JSON.parse(files['package.json']).dependencies['@midnight-ntwrk/mnkit-sim']).toBe('workspace:^');
+    expect(JSON.parse(files['package.json']).dependencies['@midnight-ntwrk/mnkit-sim']).toBe('*');
   });
 });
 

@@ -61,7 +61,7 @@ export type ContractProviders<C extends string> = MidnightProviders<
  *  - "wallet": the connected wallet proves (ConnectedAPI.getProvingProvider).
  *    There's nothing else to run, and witness data never leaves the wallet.
  * @if monorepo
- *  - "local": a proof server you run yourself (`yarn proof:up` in
+ *  - "local": a proof server you run yourself (`npm run proof:up` in
  *    examples/__name__), same as the Node test harness.
  * @endif
  * @if standalone

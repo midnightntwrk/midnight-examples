@@ -42,7 +42,7 @@ export const mnkitVersion = () => JSON.parse(fs.readFileSync(path.join(PKG_ROOT,
  * The version spec toolchain `tc` pins `pkg` to in a package.json, or null if
  * it doesn't pin it. Exact: every midnight-js-* package, testkit-js,
  * wallet-sdk, dapp-connector-api and vite (vitest's peer, and the UIs'
- * bundler: one Vite for the whole project, so npm and Yarn hoist the same
+ * bundler: one Vite for the whole project, so npm hoists the same
  * one). vitest is a caret range on the pinned floor. In peerDependencies
  * (`peer`), an exact pin becomes a tilde range, so a project can pick up
  * patch releases without a peer conflict.

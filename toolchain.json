@@ -1,5 +1,5 @@
 {
-  "$comment": "The one toolchain pin. Every other copy (README table, ci.yaml, compose.yml, package.json, .nvmrc, pragmas) must agree: `yarn toolchain:check`. Bump versions here first, in one coordinated pass. `networks` holds each network's public endpoints, which every src/config.ts must use and `mnkit doctor --network` probes; preprod is Blockfrost, whose project ID is added at runtime from BLOCKFROST_PROJECT_ID and never stored here.",
+  "$comment": "The one toolchain pin. Every other copy (README table, ci.yaml, compose.yml, package.json, .nvmrc, pragmas) must agree: `npm run toolchain:check`. Bump versions here first, in one coordinated pass. `networks` holds each network's public endpoints, which every src/config.ts must use and `mnkit doctor --network` probes; preprod is Blockfrost, whose project ID is added at runtime from BLOCKFROST_PROJECT_ID and never stored here.",
   "compact": {
     "compiler": "0.31.1",
     "language": "0.23",
@@ -7,7 +7,7 @@
     "installerSha256": "5ad9c8f53dd09c39ebd4290dc47d1742d36b01ad65859eed41e7658ac65bdff8"
   },
   "node": "22",
-  "yarn": "4.18.0",
+  "npmCli": "11.21.0",
   "npm": {
     "midnight-js": "4.1.1",
     "testkit-js": "4.1.1",

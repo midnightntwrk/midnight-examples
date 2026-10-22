@@ -1,4 +1,4 @@
-// Shielded-chips roulette, built on the seed `yarn new:ui` generated for the
+// Shielded-chips roulette, built on the seed `npm run new:ui` generated for the
 // roulette contract. It plays the round the Node test plays
 // (src/test/roulette.test.ts), with the house in one browser profile and each
 // player in their own:
@@ -15,7 +15,7 @@
 // pure helpers in @/midnight/shielded-chips-api, which the circuits test
 // checks against the real contracts.
 //
-// Seed file: generated once by `yarn new:ui`, then yours to edit. The drift
+// Seed file: generated once by `npm run new:ui`, then yours to edit. The drift
 // check ignores it.
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Copy, Loader2 } from "lucide-react";

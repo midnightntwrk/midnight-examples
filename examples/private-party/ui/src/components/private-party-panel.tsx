@@ -1,4 +1,4 @@
-// The private party, built on the seed `yarn new:ui` generated: step 1 is the
+// The private party, built on the seed `npm run new:ui` generated: step 1 is the
 // template's <DeploymentCard> (deploy takes a party size and an entry fee),
 // then the party itself. Everything the panel decides (organizer or guest, on
 // the list or not, which buttons are live and why) comes from partyView /
@@ -10,7 +10,7 @@
 // the wallet's own unshielded address. Nothing here asks the user to paste a
 // secret or an address.
 //
-// Seed file: generated once by `yarn new:ui`, then yours to edit. The drift
+// Seed file: generated once by `npm run new:ui`, then yours to edit. The drift
 // check ignores it.
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";

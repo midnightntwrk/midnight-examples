@@ -160,7 +160,7 @@ describe(`__Title__ Contract (${network})`, () => {
   });
 
   // @if monorepo
-  // One it.todo per circuit, written by `yarn new:example __name__ --derive`.
+  // One it.todo per circuit, written by `npm run new:example -- __name__ --derive`.
   // @endif
   // @if standalone
   // One it.todo per circuit, written by `npx mnkit derive`.

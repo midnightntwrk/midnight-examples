@@ -12,7 +12,7 @@
 // the Node harness encodes the wallet SDK's hex key with `encodeCoinPublicKey`.
 //
 // Template-owned: edit packages/mnkit/templates/ui/src/lib/addresses.ts, then
-// `yarn new:ui --sync-all`.
+// `npm run new:ui -- --sync-all`.
 import type { ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
 import {
   MidnightBech32m,

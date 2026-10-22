@@ -8,7 +8,7 @@
 //
 // @if monorepo
 // Template-owned: edit packages/mnkit/templates/ui/src/lib/tokens.ts, then
-// `yarn new:ui --sync-all`.
+// `npm run new:ui -- --sync-all`.
 // @endif
 // @if standalone
 // Template-owned: `mnkit upgrade` replaces this file unless you have edited it.
