@@ -301,7 +301,8 @@ jobs:
     env:
       # The mnkit to upgrade from: 0.1.0, a commit on this branch that was
       # never published. Once 0.2.0 is on npm, make it that version, and from
-      # then on the previous release.
+      # then on the previous release. Then delete the Yarn install branch in
+      # scripts/mnkit-e2e.sh.
       MNKIT_UPGRADE_FROM: 7ff0a29
     steps:
       - name: Checkout code

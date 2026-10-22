@@ -132,7 +132,8 @@ if [ -n "$UPGRADE_FROM" ]; then
     git -C "$REPO" worktree remove --force "$OLD_SRC" 2> /dev/null || rm -rf "$OLD_SRC"
     git -C "$REPO" worktree add --detach "$OLD_SRC" "$UPGRADE_FROM" > /dev/null
     trap 'git -C "$REPO" worktree remove --force "$OLD_SRC" 2> /dev/null || true' EXIT
-    # Commits before the move to npm install with Yarn.
+    # Commits before the move to npm install with Yarn. Delete this branch once
+    # MNKIT_UPGRADE_FROM in ci.yaml is a published (npm-era) version.
     if [ -f "$OLD_SRC/package-lock.json" ]; then
       (cd "$OLD_SRC" && npx --yes "npm@$(node -p "require('$REPO/toolchain.json').npmCli")" ci > /dev/null)
     else

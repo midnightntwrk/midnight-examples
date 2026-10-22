@@ -1,8 +1,6 @@
 # Dependencies
 node_modules/
 
-.pnp.*
-
 # Build / TypeScript output
 dist/
 # Copies prepack puts in a package (scripts/pack-extras.mjs)
