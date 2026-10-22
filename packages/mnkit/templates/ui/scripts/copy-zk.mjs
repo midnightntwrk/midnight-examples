@@ -41,14 +41,16 @@ const range = JSON.parse(readFileSync(path.resolve(here, "../../package.json"), 
 // @endif
 const min = Number(/^>=\s*(\d+)/.exec(range ?? "")?.[1]);
 if (min && Number(process.versions.node.split(".")[0]) < min) {
+  // @if monorepo
   console.error(
-    // @if monorepo
     `[copy:zk] Node ${process.versions.node} is too old: this repo needs Node ${range} (see .nvmrc). Try \`nvm use\`.`,
-    // @endif
-    // @if standalone
-    `[copy:zk] Node ${process.versions.node} is too old: this project needs Node ${range}.`,
-    // @endif
   );
+  // @endif
+  // @if standalone
+  console.error(
+    `[copy:zk] Node ${process.versions.node} is too old: this project needs Node ${range}.`,
+  );
+  // @endif
   process.exit(1);
 }
 const managed = path.resolve(here, "../../contract/managed");
@@ -56,15 +58,18 @@ const primary = path.join(managed, "__MANAGED__");
 
 for (const dir of ["keys", "zkir"]) {
   if (!existsSync(path.join(primary, dir))) {
+    // @if monorepo
     console.error(
       `[copy:zk] ${path.join(primary, dir)} not found.\n` +
-        // @if monorepo
         "Compile the contract first:  npm run compile -w @midnight-ntwrk/example-__name__",
-        // @endif
-        // @if standalone
-        "Compile the contract first:  npm run compile",
-        // @endif
     );
+    // @endif
+    // @if standalone
+    console.error(
+      `[copy:zk] ${path.join(primary, dir)} not found.\n` +
+        "Compile the contract first:  npm run compile",
+    );
+    // @endif
     process.exit(1);
   }
 }

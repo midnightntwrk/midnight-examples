@@ -134,8 +134,9 @@ jobs:
           exit 1
 
       - name: npx mnkit init, derive, test:sim and validate from npm
-        run: bash scripts/mnkit-e2e.sh --from-registry "${{ needs.publish.outputs.version }}" --devnet hello-world
+        run: bash scripts/mnkit-e2e.sh --from-registry "$VERSION" --devnet hello-world
         env:
+          VERSION: ${{ needs.publish.outputs.version }}
           MNKIT_E2E_DIR: ${{ runner.temp }}/mnkit-smoke
 
       - name: Upload service logs on failure
