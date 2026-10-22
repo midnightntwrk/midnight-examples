@@ -153,9 +153,9 @@ treated as an authenticated caller — see
 ## Running it
 
 ```bash
-yarn env:up          # local devnet: node, indexer, proof server
-yarn wait:dust       # block until the sponsor actually has spendable DUST
-yarn test:sponsorship
+npm run env:up     # local devnet: node, indexer, proof server
+npm run wait:dust  # block until the sponsor actually has spendable DUST
+npm run test:sponsorship
 ```
 
 The suite proves the premise before it demonstrates the fix — it asserts that Dave holds
@@ -181,7 +181,7 @@ One transaction, two payers.
 To run the sponsor as a real HTTP service instead:
 
 ```bash
-yarn sponsor:serve   # GET /health, POST /sponsor { "tx": "<hex>" }
+npm run sponsor:serve   # GET /health, POST /sponsor { "tx": "<hex>" }
 ```
 
 ## Adapting it to your DApp
@@ -199,7 +199,7 @@ yarn sponsor:serve   # GET /health, POST /sponsor { "tx": "<hex>" }
 ## Troubleshooting
 
 **`could not balance dust` on the sponsor side.** The sponsor's DUST does not cover fee plus
-overhead. Check `yarn wait:dust` succeeded, and remember DUST accrues over time rather than
+overhead. Check `npm run wait:dust` succeeded, and remember DUST accrues over time rather than
 appearing at once. `src/wallet.ts` sets `additionalFeeOverhead: 1_000n`, which adds headroom
 on top of the SDK default of `0n`.
 

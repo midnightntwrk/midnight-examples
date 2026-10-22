@@ -20,7 +20,7 @@
 //     isSeedable() refuses to seed a wallet whose birthday predates the
 //     reference, because doing so would start it past its own funding
 //     transaction and hide those funds. So a re-cut means re-running
-//     `yarn wallets:new` and re-funding at the faucet. Cut first, mint second.
+//     `npm run wallets:new` and re-funding at the faucet. Cut first, mint second.
 
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -257,7 +257,7 @@ try {
       `(${(total / 1e6).toFixed(1)} MB gzipped) to ${live}`,
   );
   logger.info(
-    'Next: `yarn wallets:new` to mint wallets against this reference, then fund them. ' +
+    'Next: `npm run wallets:new` to mint wallets against this reference, then fund them. ' +
       'Any wallet minted BEFORE this cut can no longer fast-sync — see FAST-SYNC.md.',
   );
 } finally {

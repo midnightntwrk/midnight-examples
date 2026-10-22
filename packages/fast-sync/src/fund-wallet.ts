@@ -14,7 +14,7 @@
 // limitations under the License.
 
 // fundWallet: fund a browser wallet (e.g. Lace) on the LOCAL devnet. Behind
-// the repo's `yarn fund:wallet` (scripts/fund-wallet.ts) and a standalone
+// the repo's `npm run fund:wallet` (scripts/fund-wallet.ts) and a standalone
 // project's `npm run fund:wallet`; a generated UI's "no DUST" hint prints the
 // command with the wallet's addresses.
 //

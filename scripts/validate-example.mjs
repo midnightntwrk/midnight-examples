@@ -18,7 +18,7 @@
 // then env:down. Every example's `validate` script runs this from its own
 // directory:
 //
-//   yarn validate [--keep-net] [--report <file>]
+//   npm run validate -- [--keep-net] [--report <file>]
 //
 // A thin wrapper over mnkit's validate command
 // (packages/mnkit/src/commands/validate.mjs), which documents the flags. It
@@ -35,7 +35,7 @@ exitOnError();
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const EXAMPLE_DIR = process.cwd();
-const USAGE = 'Usage: yarn validate [--keep-net] [--report <file>]';
+const USAGE = 'Usage: npm run validate -- [--keep-net] [--report <file>]';
 
 const args = process.argv.slice(2);
 let keepNet = false;
@@ -47,8 +47,8 @@ for (let i = 0; i < args.length; i++) {
 }
 
 if (!fs.existsSync(path.join(EXAMPLE_DIR, 'compose.yml'))) {
-  fail('run this from an example directory (one with a compose.yml), via `yarn validate`.');
+  fail('run this from an example directory (one with a compose.yml), via `npm run validate`.');
 }
 preflight(REPO_ROOT, { compact: true, docker: true });
 
-process.exitCode = await validate({ dir: EXAMPLE_DIR, pm: 'yarn', keepNet, reportPath });
+process.exitCode = await validate({ dir: EXAMPLE_DIR, keepNet, reportPath });

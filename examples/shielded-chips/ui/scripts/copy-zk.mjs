@@ -8,12 +8,12 @@
 //   <base>/keys/<circuit>.prover, <base>/keys/<circuit>.verifier, <base>/zkir/<circuit>.bzkir
 // We serve them from /managed/<contract>/ (see src/midnight/providers.ts).
 //
-// `yarn dev` and `yarn build` run it first (Yarn 4 does not run pre* scripts).
-// The source is the gitignored output of `yarn compile` in examples/shielded-chips,
+// `npm run dev` and `npm run build` run it first.
+// The source is the gitignored output of `npm run compile` in examples/shielded-chips,
 // and the destination (public/managed/) is gitignored too.
 //
 // It also refuses to run on a Node older than the repo root's engines.node:
-// Yarn 4 doesn't enforce `engines`, and a shell defaulting to Node 20 crashed
+// npm doesn't enforce `engines`, and a shell defaulting to Node 20 crashed
 // the dev server in hello-world/ui with an unrelated-looking error. This is
 // the first thing `dev` and `build` run, so it fails early and clearly.
 import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
@@ -37,7 +37,7 @@ for (const dir of ["keys", "zkir"]) {
   if (!existsSync(path.join(primary, dir))) {
     console.error(
       `[copy:zk] ${path.join(primary, dir)} not found.\n` +
-        "Compile the contract first:  yarn workspace @midnight-ntwrk/example-shielded-chips run compile",
+        "Compile the contract first:  npm run compile -w @midnight-ntwrk/example-shielded-chips",
     );
     process.exit(1);
   }

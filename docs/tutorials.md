@@ -48,14 +48,14 @@ edit examples/<name>/tutorials/ → PR merged to main → workflow opens a midni
 
 ## Writing a tutorial
 
-`yarn new:example` copies a starter `tutorials/index.mdx` from
+`npm run new:example` copies a starter `tutorials/index.mdx` from
 [`packages/mnkit/templates/example/tutorials/`](../packages/mnkit/templates/example/tutorials/index.mdx).
 
 - **Prerequisites:** open by naming the previous learning-path step and linking
   its docs page.
-- **Commands:** use this repo's commands: `yarn install && yarn compile` at the
-  root, then `cd examples/<name>`, `yarn env:up`, `yarn wait:dust`,
-  `yarn test:local`. Never `git clone` a standalone `example-*` repo. CI fails
+- **Commands:** use this repo's commands: `npm install && npm run compile` at the
+  root, then `cd examples/<name>`, `npm run env:up`, `npm run wait:dust`,
+  `npm run test:local`. Never `git clone` a standalone `example-*` repo. CI fails
   if a tutorial does.
 - **Links:** the pages render on the docs site, so:
   - link other docs pages site-absolute (`/tutorials/<name>/…`,

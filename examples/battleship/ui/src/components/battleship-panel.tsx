@@ -1,11 +1,11 @@
-// The battleship game, built on the seed `yarn new:ui` generated: step 1 is
+// The battleship game, built on the seed `npm run new:ui` generated: step 1 is
 // the template's <DeploymentCard> (deploy takes a ship placement), then the
 // game itself. Everything the panel decides (whose seat, whose turn, which
 // cells are valid) comes from roleOf / nextAction / placementError /
 // shotError in @/midnight/battleship-api, which the circuits test checks
 // against the real contract.
 //
-// Seed file: generated once by `yarn new:ui`, then yours to edit. The drift
+// Seed file: generated once by `npm run new:ui`, then yours to edit. The drift
 // check ignores it.
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";

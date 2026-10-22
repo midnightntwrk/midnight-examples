@@ -122,7 +122,7 @@ export function DeploymentCard<T, I = void>({
 
 /**
  * Shown while the wallet has 0 DUST. On the local devnet, point
- * `yarn fund:wallet` at this wallet's DUST address: a sponsor wallet registers
+ * `npm run fund:wallet` at this wallet's DUST address: a sponsor wallet registers
  * NIGHT with this address as the DUST receiver, so no wallet UI step is needed.
  * The unshielded address is passed too, so the wallet also gets NIGHT to spend
  * (a contract may charge it, e.g. private-party's checkIn). The script is a
@@ -156,7 +156,7 @@ function NoDustWarning({ cap, networkId }: { cap: bigint; networkId: string | nu
             wallet{nightAddress && " and 1,000 NIGHT sent to it"}:
           </p>
           <code className="break-all rounded bg-muted px-2 py-1 text-xs">
-            yarn fund:wallet {dustAddress}
+            npm run fund:wallet {dustAddress}
             {nightAddress && ` ${nightAddress}`}
           </code>
         </>

@@ -3,7 +3,7 @@
 Browser frontend for `examples/calculator`: connect a Midnight wallet,
 deploy or join the contract, watch its public ledger, and call its circuits.
 
-Scaffolded by `yarn new:ui calculator` from `packages/mnkit/templates/ui/`. See
+Scaffolded by `npm run new:ui calculator` from `packages/mnkit/templates/ui/`. See
 `AGENTS.md` next to this file for which files are template-owned and
 which are yours, and for the verification checklist.
 
@@ -26,13 +26,13 @@ On top of the scaffold it adds:
 ## Run
 
 ```bash
-yarn workspace @midnight-ntwrk/example-calculator run compile   # contract first
-cd examples/calculator && yarn env:up && yarn wait:dust            # local devnet
-yarn workspace @midnight-ntwrk/example-calculator-ui dev           # http://localhost:5173
+npm run compile -w @midnight-ntwrk/example-calculator          # contract first
+cd examples/calculator && npm run env:up && npm run wait:dust  # local devnet
+npm run dev -w @midnight-ntwrk/example-calculator-ui           # http://localhost:5173
 ```
 
 On the local devnet, give your browser wallet DUST (and NIGHT) with
-`yarn fund:wallet <mn_dust_…> [mn_addr_…]`, run from anywhere in the repo. The
+`npm run fund:wallet <mn_dust_…> [mn_addr_…]`, run from anywhere in the repo. The
 page prints the exact command when the connected wallet has no DUST.
 
 ### Mainnet
@@ -45,9 +45,9 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
 - **Everything is public and permanent.** The contract and its public ledger
   stay on mainnet.
 - **Prove with the wallet** if it supports `getProvingProvider`, or with a
-  proof server you run yourself (`yarn proof:up` in `examples/hello-world`).
+  proof server you run yourself (`npm run proof:up` in `examples/hello-world`).
 - **Use your own wallet.** Never use the repo's fast-sync or seeded test wallets
-  (`.env.<network>`, `yarn wallets:new`) on mainnet.
+  (`.env.<network>`, `npm run wallets:new`) on mainnet.
 
 ## Scripts
 

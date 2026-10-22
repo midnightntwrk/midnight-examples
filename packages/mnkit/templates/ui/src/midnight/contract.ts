@@ -4,7 +4,7 @@
 // @if monorepo
 // contract/managed/__MANAGED__/compiler/contract-info.json. This file is
 // template-owned: change packages/mnkit/templates/ui/src/midnight/contract.ts, not this copy
-// (`yarn new:ui --check <name>` fails CI when they diverge).
+// (`npm run new:ui -- --check <name>` fails CI when they diverge).
 // @endif
 // @if standalone
 // contract/managed/__MANAGED__/compiler/contract-info.json. This file is
@@ -16,7 +16,7 @@
 // compiler's generated JS (contract/managed/__MANAGED__/contract/index.js) is
 // @if monorepo
 // plain ESM with no Node dependencies, so we import it directly. Run
-// `yarn compile` in examples/__name__ first; the managed/ output is
+// `npm run compile` in examples/__name__ first; the managed/ output is
 // gitignored.
 // @endif
 // @if standalone
@@ -45,7 +45,7 @@ __PRIVATE_STATE_BLOCK__
 export const PRIVATE_STATE_ID = "__camelName__PrivateState";
 
 /**
- * Where private state is kept (`__NEW_UI__ --private-state`, recorded in
+ * Where private state is kept (`__NEW_UI__`'s --private-state flag, recorded in
  * ui/new-ui.json): __PRIVATE_STATE_STORAGE_DOC__
  */
 export const PRIVATE_STATE_STORAGE: PrivateStateStorage = "__PRIVATE_STATE_STORAGE__";

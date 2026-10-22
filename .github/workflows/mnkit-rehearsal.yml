@@ -41,11 +41,10 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Enable Corepack (Yarn 4)
-        run: corepack enable
-
       - name: Install dependencies (builds the runtime packages)
-        run: yarn install --immutable
+        # npm 11 for the repo (its lockfile and .npmrc need 11.10+), through npx: Node's own npm
+        # stays on PATH, and mnkit-e2e.sh runs the scaffolded projects with it, as users do.
+        run: npx --yes npm@11.21.0 ci
 
       - name: Publish to a local registry, then init and test from it
         run: bash scripts/mnkit-rehearsal.sh ${DEVNET:+--devnet}

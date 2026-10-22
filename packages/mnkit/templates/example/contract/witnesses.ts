@@ -27,7 +27,7 @@ export const create__Name__PrivateState = (): __Name__PrivateState => ({});
 
 // TODO: implement each witness declared in __name__.compact. After the first
 // @if monorepo
-// `yarn compile:fast`, `yarn new:example __name__ --derive` (repo root) writes
+// `npm run compile:fast`, `npm run new:example -- __name__ --derive` (repo root) writes
 // @endif
 // @if standalone
 // `npm run compile:fast`, `npx mnkit derive` writes

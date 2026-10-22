@@ -14,17 +14,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// `yarn toolchain:check`: fails when any copy of a pin disagrees with
-// toolchain.json. The copies: the README table, every workflow's compact-version,
-// .nvmrc, the root package.json (engines, packageManager, resolutions), every
+// `npm run toolchain:check`: fails when any copy of a pin disagrees with
+// toolchain.json. The copies: the README table, every workflow's compact-version
+// and npm, .nvmrc, the root package.json (engines, devEngines, overrides), every
 // compose.yml image, the pinned deps and engines of every example, UI,
 // template and package, and every contract's pragma. experimental/ is left
-// out on purpose: it tracks release candidates.
+// out on purpose: it tracks release candidates. It also fails when
+// package-lock.json nests a package inside a workspace (see below).
 // Zero dependencies — Node built-ins only.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { npmOverrides } from '../packages/mnkit/src/lib/scaffold.mjs';
 import { pinFor } from '../packages/mnkit/src/lib/toolchain.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -36,6 +38,10 @@ const expect = (where, what, found, want) => {
   if (found !== want) problems.push(`${where}: ${what} is ${found ?? '(missing)'}, toolchain.json says ${want}`);
 };
 const lineOf = (src, index) => src.slice(0, index).split('\n').length;
+
+// The oldest npm with min-release-age (.npmrc): the root package.json's
+// devEngines asks for it. CI runs toolchain.json's npmCli.
+const NPM_FLOOR = '11.10.0';
 
 // Project dirs: the template, examples, their UIs and the shared packages.
 const dirsUnder = (d) =>
@@ -63,14 +69,14 @@ const projects = [
     ['testkit-js', /^\| `@midnight-ntwrk\/testkit-js` \| `([^`]+)` \|/m, tc.npm['testkit-js']],
     ['wallet SDK', /^\| wallet SDK \| `([^`]+)` \|/m, tc.npm['wallet-sdk']],
     ['Node.js', /^\| Node\.js \| `([^`]+)` /m, tc.node],
-    ['Yarn', /^\| Yarn \| `([^`]+)` /m, tc.yarn],
+    ['npm', /^\| npm \| `([^`]+)` /m, tc.npmCli],
     ['Vitest', /^\| Vitest \| `([^`]+)` \|/m, tc.npm.vitest],
     ['Vite', /^\| Vite \| `([^`]+)` \|/m, tc.npm.vite],
   ];
   for (const [label, re, want] of rows) expect('README.md toolchain table', label, re.exec(src)?.[1], want);
 }
 
-// --- workflows: every compact-version (ci.yaml must have one) ----------------
+// --- workflows: every compact-version (ci.yaml must have one) and npm --------
 {
   const dir = path.join(REPO_ROOT, '.github', 'workflows');
   for (const name of fs.readdirSync(dir).filter((n) => /\.ya?ml$/.test(n))) {
@@ -79,6 +85,7 @@ const projects = [
     const hits = [...src.matchAll(/compact-version:\s*'?([0-9][0-9.]*)'?/g)];
     if (hits.length === 0 && name === 'ci.yaml') problems.push(`${rel(f)}: no compact-version found`);
     for (const m of hits) expect(`${rel(f)}:${lineOf(src, m.index)}`, 'compact-version', m[1], tc.compact.compiler);
+    for (const m of src.matchAll(/\bnpm@([0-9][^\s'"]*)/g)) expect(`${rel(f)}:${lineOf(src, m.index)}`, 'npm', m[1], tc.npmCli);
   }
 }
 
@@ -87,9 +94,24 @@ expect('.nvmrc', 'Node', read(path.join(REPO_ROOT, '.nvmrc')).trim(), tc.node);
 {
   const root = JSON.parse(read(path.join(REPO_ROOT, 'package.json')));
   expect('package.json', 'engines.node', root.engines?.node, `>=${tc.node}.0.0`);
-  expect('package.json', 'packageManager', root.packageManager, `yarn@${tc.yarn}`);
-  for (const [pkg, want] of Object.entries(tc.overrides)) {
-    expect('package.json', `resolutions["${pkg}"]`, root.resolutions?.[pkg], want);
+  const pm = root.devEngines?.packageManager;
+  expect('package.json', 'devEngines.packageManager', pm && `${pm.name}@${pm.version}`, `npm@>=${NPM_FLOOR}`);
+  for (const [pkg, want] of Object.entries(npmOverrides(tc.overrides))) {
+    expect('package.json', `overrides["${pkg}"]`, JSON.stringify(root.overrides?.[pkg]), JSON.stringify(want));
+  }
+}
+
+// --- package-lock.json: nothing nested under a UI ----------------------------
+// npm never installs a package under a workspace that sits inside another
+// workspace's folder (examples/<name>/ui), so a UI that needs a different
+// version than the hoisted one silently gets the hoisted one
+// (https://github.com/npm/cli/issues/4774). Align the version range instead.
+{
+  const lock = JSON.parse(read(path.join(REPO_ROOT, 'package-lock.json')));
+  for (const key of Object.keys(lock.packages)) {
+    if (/^examples\/[^/]+\/ui\/node_modules\//.test(key)) {
+      problems.push(`package-lock.json: ${key} would never be installed (npm/cli#4774); align the UI's version range with the hoisted one`);
+    }
   }
 }
 

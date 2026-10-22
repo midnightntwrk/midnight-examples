@@ -9,7 +9,7 @@ with the house in one browser profile and each player in their own.
 | House | deploy the chips token → deploy a table (winning number committed) → mint chips to players → deposit match coins → reveal → sweep the pool. Also burn chips and mint/burn the token's treasury. |
 | Player | share your shielded address → bet RED or BLACK → claim 2x, or forfeit a losing bet |
 
-Scaffolded by `yarn new:ui shielded-chips --contract roulette` from
+Scaffolded by `npm run new:ui -- shielded-chips --contract roulette` from
 `packages/mnkit/templates/ui/`. See `AGENTS.md` next to this file for which files are
 template-owned and which are yours, and for the verification checklist.
 
@@ -55,13 +55,13 @@ in `verification.json`.
 ## Run
 
 ```bash
-yarn workspace @midnight-ntwrk/example-shielded-chips run compile   # contracts first
-cd examples/shielded-chips && yarn env:up && yarn wait:dust            # local devnet
-yarn workspace @midnight-ntwrk/example-shielded-chips-ui dev           # http://localhost:5173
+npm run compile -w @midnight-ntwrk/example-shielded-chips          # contracts first
+cd examples/shielded-chips && npm run env:up && npm run wait:dust  # local devnet
+npm run dev -w @midnight-ntwrk/example-shielded-chips-ui           # http://localhost:5173
 ```
 
 On the local devnet, give each browser wallet DUST (and NIGHT) with
-`yarn fund:wallet <mn_dust_…> [mn_addr_…]`, run from anywhere in the repo. The
+`npm run fund:wallet <mn_dust_…> [mn_addr_…]`, run from anywhere in the repo. The
 page prints the exact command when the connected wallet has no DUST.
 
 ### Playing a round
@@ -97,12 +97,12 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
 - **Everything public is permanent.** Both contracts and their ledgers stay on
   mainnet: bet colors and values, the pool, the commitments. Coins, keys, and
   which wallet placed which bet stay private.
-- **Prove with a proof server you run yourself** (`yarn proof:up` in
+- **Prove with a proof server you run yourself** (`npm run proof:up` in
   `examples/shielded-chips`, proof server 8.1.0), or with the wallet if it
   supports `getProvingProvider`. Never a hosted one: it sees your keys and
   coins. The burn circuits' prover keys are about 20 MB each.
 - **Use your own wallets.** Never use the repo's fast-sync or seeded test
-  wallets (`.env.<network>`, `yarn wallets:new`) on mainnet.
+  wallets (`.env.<network>`, `npm run wallets:new`) on mainnet.
 - **One round per table.** Betting never reopens; deploy a new table for
   another round (the chips token can be reused).
 

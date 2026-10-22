@@ -15,7 +15,7 @@
 
 // Fund a browser wallet (e.g. Lace) on the LOCAL devnet, for any example's ui/.
 //
-//   yarn fund:wallet <mn_dust_undeployed1...> [mn_addr_undeployed1...]
+//   npm run fund:wallet <mn_dust_undeployed1...> [mn_addr_undeployed1...]
 //
 // Runs from anywhere in the repo (root script). A generated UI's
 // "no DUST" hint prints the exact command with this wallet's addresses. The
@@ -32,7 +32,7 @@ const args = process.argv.slice(2);
 const dust = args.find((a) => a.startsWith('mn_dust_'));
 const addr = args.find((a) => a.startsWith('mn_addr_'));
 if (!dust) {
-  logger.error('usage: yarn fund:wallet <mn_dust_undeployed1...> [mn_addr_undeployed1...]');
+  logger.error('usage: npm run fund:wallet <mn_dust_undeployed1...> [mn_addr_undeployed1...]');
   logger.error('A generated ui/ page prints this command, with your addresses, in its "no DUST" hint.');
   process.exit(1);
 }

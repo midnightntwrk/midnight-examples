@@ -17,8 +17,8 @@
 // Compiles every contract of one example. An example's `compile` and
 // `compile:fast` scripts run this from its own directory:
 //
-//   yarn compile        → node ../../scripts/compile-contracts.mjs
-//   yarn compile:fast   → node ../../scripts/compile-contracts.mjs --skip-zk
+//   npm run compile        → node ../../scripts/compile-contracts.mjs
+//   npm run compile:fast   → node ../../scripts/compile-contracts.mjs --skip-zk
 //
 // A thin wrapper over mnkit's compile command (packages/mnkit/src/commands/compile.mjs).
 // It runs the default compiler, which CI sets to the pin.

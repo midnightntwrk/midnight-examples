@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { checkNode, fail } from './template.mjs';
 
-/** The pinned compiler version: `compact.compiler` in toolchain.json (`yarn toolchain:check` keeps ci.yaml in step). */
+/** The pinned compiler version: `compact.compiler` in toolchain.json (`npm run toolchain:check` keeps ci.yaml in step). */
 export function pinnedCompactVersion(repoRoot) {
   const file = path.join(repoRoot, 'toolchain.json');
   if (!fs.existsSync(file)) return null;

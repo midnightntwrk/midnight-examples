@@ -4,7 +4,7 @@
 //
 // Moved here from examples/hello-world/src/wallet.ts (they were
 // MidnightWalletProvider methods), so every generated UI shares one
-// `yarn fund:wallet` instead of each example copying it.
+// `npm run fund:wallet` instead of each example copying it.
 
 import { nativeToken } from '@midnight-ntwrk/midnight-js-protocol/ledger';
 import type { DustAddress, UnshieldedAddress } from '@midnight-ntwrk/wallet-sdk';

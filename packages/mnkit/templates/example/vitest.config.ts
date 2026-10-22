@@ -8,7 +8,7 @@ const isRemote = network !== 'local';
 // @if monorepo
 // Remote runs read their wallet seeds from a single repo-root .env.<network>,
 // so one set of funded wallets serves every example. Shell env still wins over
-// file values. Generate the file with `yarn wallets:new` from the repo root.
+// file values. Generate the file with `npm run wallets:new` from the repo root.
 const envDir = fileURLToPath(new URL('../../', import.meta.url));
 // @endif
 // @if standalone

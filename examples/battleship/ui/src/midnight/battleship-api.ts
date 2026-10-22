@@ -9,7 +9,7 @@
 // (placementError, shotError). __tests__/battleship-circuits.test.ts runs them
 // against the real compiled circuits so they can't drift from the contract.
 //
-// Seed file: generated once by `yarn new:ui` from contract-info.json, then
+// Seed file: generated once by `npm run new:ui` from contract-info.json, then
 // yours to edit. The drift check ignores it.
 import {
   deployContract,

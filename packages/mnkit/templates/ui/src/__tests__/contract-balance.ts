@@ -10,7 +10,7 @@
 //
 // @if monorepo
 // Template-owned: edit packages/mnkit/templates/ui/src/__tests__/contract-balance.ts, then
-// `yarn new:ui --sync-all`. A module, not a test: vitest only runs *.test.ts.
+// `npm run new:ui -- --sync-all`. A module, not a test: vitest only runs *.test.ts.
 // @endif
 // @if standalone
 // Template-owned: `mnkit upgrade` replaces this file unless you have edited it.

@@ -54,7 +54,7 @@ here means no --witnesses. -->
 <!-- "Never on chain: …", one line per secret, ending with → `key`: the key (or
 key prefix) of its entry in the assertNotInPublicState call in
 <!-- @if monorepo -->
-src/test/__name__.sim.test.ts. `yarn spec:lint __name__` checks both ends.
+src/test/__name__.sim.test.ts. `npm run spec:lint __name__` checks both ends.
 <!-- @endif -->
 <!-- @if standalone -->
 src/test/__name__.sim.test.ts. Keep both ends in step.
@@ -81,7 +81,7 @@ counts, timing, circuit names, links through fees or reused keys. -->
 <!-- Optional. Contracts that exist only so the tests can run (a demo token
 faucet for the devnet test), named in backticks, e.g. `demo-token`. The lint
 leaves their circuits and fields out of the checks above. Add the contract as
-contract/<name>.compact: `__RUN__ compile` picks it up and `--derive` wires it
+contract/<name>.compact: `npm run compile` picks it up and `--derive` wires it
 into contract/index.ts and the devnet test. Write "None." or delete this
 section if there are none. -->
 

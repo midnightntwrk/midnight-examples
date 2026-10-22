@@ -8,7 +8,7 @@
 Install dependencies (from the repo root — one lockfile for the whole workspace):
 
 ```bash
-yarn install
+npm install
 ```
 <!-- @endif -->
 <!-- @if standalone -->
@@ -27,7 +27,7 @@ npm install
 Write your contract in `contract/__name__.compact`, then:
 
 ```bash
-__RUN__ compile
+npm run compile
 ```
 
 ## Start the local Midnight network
@@ -35,20 +35,20 @@ __RUN__ compile
 Ensure the Docker engine is running, then:
 
 ```bash
-__RUN__ env:up
+npm run env:up
 ```
 
 ## Run the test suite
 
 ```bash
-__RUN__ wait:dust     # wait until the dev wallet has spendable DUST for fees
-__RUN__ test:local
+npm run wait:dust     # wait until the dev wallet has spendable DUST for fees
+npm run test:local
 ```
 
 Tear the network down when finished:
 
 ```bash
-__RUN__ env:down
+npm run env:down
 ```
 
 This example is set up for a local devnet running via Docker.
@@ -56,16 +56,16 @@ This example is set up for a local devnet running via Docker.
 <!-- @if monorepo -->
 To run it against **preprod** or **preview** instead, see
 [FAST-SYNC.md](../../FAST-SYNC.md) at the repo root. In short: start a local proof
-server (`yarn proof:up`), then from the repo root run `yarn preseed:cut` followed
-by `yarn wallets:new`, fund the printed addresses at the faucet, and run
-`yarn test:preprod`. The wallet seeds live in one repo-root `.env.<network>` that
+server (`npm run proof:up`), then from the repo root run `npm run preseed:cut` followed
+by `npm run wallets:new`, fund the printed addresses at the faucet, and run
+`npm run test:preprod`. The wallet seeds live in one repo-root `.env.<network>` that
 every example shares.
 
 ## Deploy
 
-`yarn deploy` deploys the contract to the local network without the UI or the
-test suite; `yarn deploy:preview` and `yarn deploy:preprod` deploy to those
-networks. `yarn deploy <contract>` deploys another contract under `contract/`.
+`npm run deploy` deploys the contract to the local network without the UI or the
+test suite; `npm run deploy:preview` and `npm run deploy:preprod` deploy to those
+networks. `npm run deploy <contract>` deploys another contract under `contract/`.
 The constructor arguments and initial private state come from
 `contract/deploy-args.ts`, and the address lands in `deployments/<network>.json`.
 Off local, set `MIDNIGHT_PRIVATE_STATE_PASSWORD` in the repo-root

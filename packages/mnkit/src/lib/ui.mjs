@@ -15,7 +15,7 @@
 
 // Renders packages/mnkit/templates/ui, a browser UI for a project's compiled contract, in
 // memory, in one of two modes (see scaffold.mjs): an example's ui/ in the
-// monorepo (scripts/new-ui.mjs, `yarn new:ui`), or a standalone project's
+// monorepo (scripts/new-ui.mjs, `npm run new:ui`), or a standalone project's
 // ui/ (`mnkit add ui`). Zero dependencies — Node built-ins only.
 //
 // Everything is derived from the compiled contract, never from memory:
@@ -115,7 +115,6 @@ export const UI_KNOWN_TOKENS = [
   '__DEPLOYMENT_OPS__',
   '__TEST_BODY__',
   '__NETWORK_IDS__',
-  '__RUN__',
   '__NEW_UI__',
   '__PROJECT__',
 ];
@@ -134,14 +133,12 @@ export const BASE_NETWORKS = ['undeployed', 'preview', 'preprod'];
 export const OPT_IN_NETWORKS = ['mainnet'];
 
 /**
- * The UI's package.json in a standalone project: named <project>-ui, with
- * npm in place of Yarn in its scripts. The project's root package.json lists
- * ui/ as an npm workspace.
+ * The UI's package.json in a standalone project: named <project>-ui. The
+ * project's root package.json lists ui/ as an npm workspace.
  */
 export function standaloneUiPackageJson(raw, name) {
   const p = JSON.parse(raw);
   p.name = `${name}-ui`;
-  p.scripts = Object.fromEntries(Object.entries(p.scripts).map(([k, v]) => [k, v.replaceAll('yarn ', 'npm run ')]));
   return `${JSON.stringify(p, null, 2)}\n`;
 }
 
@@ -169,7 +166,7 @@ export function planUi(
     networks: extraNetworks = [],
     skipSeeds = false,
     where = mode === 'monorepo' ? `examples/${name}` : 'this project',
-    compileHint = mode === 'monorepo' ? `yarn workspace @midnight-ntwrk/example-${name} run compile` : 'npm run compile',
+    compileHint = mode === 'monorepo' ? `npm run compile -w @midnight-ntwrk/example-${name}` : 'npm run compile',
     templateDir = UI_TEMPLATE_DIR,
   },
 ) {
@@ -188,9 +185,8 @@ export function planUi(
   const at = (rel) => (mode === 'monorepo' ? `examples/${name}/${rel}` : rel);
   /** The project directory as generated files name it (`__name__` is filled in later). */
   const projectRef = mode === 'monorepo' ? 'examples/__name__/' : '';
-  const run = mode === 'standalone' ? 'npm run' : 'yarn';
   /** The generator command, and the project directory, as generated text names them. */
-  const newUi = mode === 'standalone' ? 'mnkit add ui' : 'yarn new:ui';
+  const newUi = mode === 'standalone' ? 'mnkit add ui' : 'npm run new:ui';
   const project = mode === 'standalone' ? '..' : 'examples/__name__';
 
   const compiled = listCompiled(dir);
@@ -640,7 +636,7 @@ export function planUi(
       : out.replaceAll('__WITNESS_IMPORT__\n', '');
     // Blocks first (they contain name tokens), then names.
     for (const [token, value] of Object.entries(blocks)) out = out.replaceAll(token, value);
-    out = out.replaceAll('__camelName__', camelName).replaceAll('__MANAGED__', managed).replaceAll('__RUN__', run);
+    out = out.replaceAll('__camelName__', camelName).replaceAll('__MANAGED__', managed);
     out = out.replaceAll('__NEW_UI__', newUi).replaceAll('__PROJECT__', project);
     out = substituteNames(out, names);
     assertNoLeftoverTokens(rel, out, UI_KNOWN_TOKENS);

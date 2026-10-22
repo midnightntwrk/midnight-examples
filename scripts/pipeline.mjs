@@ -16,9 +16,9 @@
 
 // The generation pipeline runner (docs/generation-flow.md):
 //
-//   yarn pipeline <name> [--json] [--until sim] [--no-ui] [--retry-devnet]
-//   yarn pipeline <name> --wait-devnet [--json]
-//   yarn pipeline <name> --cancel-devnet
+//   npm run pipeline -- <name> [--json] [--until sim] [--no-ui] [--retry-devnet]
+//   npm run pipeline -- <name> --wait-devnet [--json]
+//   npm run pipeline -- <name> --cancel-devnet
 //
 // It never writes contract, test or UI code and never calls a model. Each run
 // works out from the files on disk how far examples/<name> has got, runs the
@@ -31,7 +31,7 @@
 //   1 spec lint (design) → 3a contract written? → compile:fast → 3b --derive
 //   → in-memory gate: typecheck, test:sim, spec lint (code) → .gates/sim.json
 //   → full compile (proving keys, for the devnet and the UI's copy:zk)
-//   → 5 new:ui + yarn install, if there's no ui/ yet
+//   → 5 new:ui + npm install, if there's no ui/ yet
 //   → 4 devnet, started in the BACKGROUND: validate --keep-net --report
 //   → 6 UI gates: typecheck, test:unit, build, new:ui --check
 //   → docs: no TODO left in README.md / AGENTS.md
@@ -48,7 +48,7 @@
 // A change to the contract-level sources (contract/, src/, package.json; ui/
 // doesn't count) makes the run stale: the next pipeline run cancels it and,
 // once the in-memory gate passes again, starts a fresh one. new:ui and
-// `yarn install` run before the devnet starts, so the install never rewrites
+// `npm install` run before the devnet starts, so the install never rewrites
 // node_modules under a running test.
 //
 //   --json          print one JSON object: { example, steps, devnet, pending, next };
@@ -60,7 +60,7 @@
 //   --wait-devnet   block until the background run finishes, then report it.
 //                   Run it in the background to be told when the devnet is done
 //   --cancel-devnet stop the background run and remove its lock (the network
-//                   stays up; `yarn env:down` in the example takes it down)
+//                   stays up; `npm run env:down` in the example takes it down)
 //
 // Every gate it runs is appended to examples/<name>/logs/pipeline.jsonl.
 
@@ -88,7 +88,7 @@ exitOnError();
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const USAGE =
-  'Usage: yarn pipeline <name> [--json] [--until sim] [--no-ui] [--retry-devnet] | <name> --wait-devnet | <name> --cancel-devnet';
+  'Usage: npm run pipeline -- <name> [--json] [--until sim] [--no-ui] [--retry-devnet] | <name> --wait-devnet | <name> --cancel-devnet';
 
 // --- args ----------------------------------------------------------------------
 const opts = { json: false, until: null, ui: true, retry: false, wait: false, cancel: false, name: null };
@@ -263,7 +263,7 @@ function cancelDevnet(reason) {
   const lock = readJson(LOCK);
   if (lock && alive(lock.pid)) {
     try {
-      process.kill(-lock.pid, 'SIGTERM'); // the whole process group: yarn, vitest, docker compose
+      process.kill(-lock.pid, 'SIGTERM'); // the whole process group: npm, vitest, docker compose
     } catch {
       process.kill(lock.pid, 'SIGTERM');
     }
@@ -304,7 +304,7 @@ function devnetFailureNext(d) {
     uiAffected: plan.uiAffected,
     failures: plan.failures,
     fixPlan: rel(fixPath),
-    run: plan.kind === 'infra' ? [`yarn pipeline ${name} --retry-devnet`] : [],
+    run: plan.kind === 'infra' ? [`npm run pipeline -- ${name} --retry-devnet`] : [],
     edit:
       plan.route === '3a'
         ? [`examples/${name}/contract/${name}.compact`]
@@ -325,28 +325,28 @@ if (!fs.existsSync(path.join(DIR, 'package.json'))) {
     kind: 'reason',
     step: '1',
     reason: `examples/${name} does not exist: write the design card (SPEC.md) and have it reviewed, then scaffold from it`,
-    run: [`yarn spec:lint --file <card.md> [--witnesses]`, `yarn new:example ${name} --spec <card.md> [--witnesses]`],
+    run: [`npm run spec:lint -- --file <card.md> [--witnesses]`, `npm run new:example -- ${name} --spec <card.md> [--witnesses]`],
     read: READ[1],
   });
 }
 
 if (opts.cancel) {
   cancelDevnet('--cancel-devnet');
-  console.log(`✔ background devnet for ${name} cancelled (the network is still up: \`yarn env:down\` in examples/${name})`);
+  console.log(`✔ background devnet for ${name} cancelled (the network is still up: \`npm run env:down\` in examples/${name})`);
   process.exit(0);
 }
 
 if (opts.wait) {
   let d = devnetStatus();
-  if (d.status === 'none') fail(`no background devnet run for ${name}. Start one with \`yarn pipeline ${name}\`.`);
+  if (d.status === 'none') fail(`no background devnet run for ${name}. Start one with \`npm run pipeline ${name}\`.`);
   while (d.status === 'running') {
     await new Promise((r) => setTimeout(r, 5000));
     d = devnetStatus();
   }
   d.stale = d.sourceHash !== sourceHash(DIR);
   state.devnet = d;
-  if (d.status === 'passed' && !d.stale) state.next = { kind: 'pass', reason: `the devnet passed on the current sources. Run \`yarn pipeline ${name}\` to finish` };
-  else if (d.stale) state.next = { kind: 'reason', reason: `the run finished on older sources; run \`yarn pipeline ${name}\` to start a fresh one` };
+  if (d.status === 'passed' && !d.stale) state.next = { kind: 'pass', reason: `the devnet passed on the current sources. Run \`npm run pipeline ${name}\` to finish` };
+  else if (d.stale) state.next = { kind: 'reason', reason: `the run finished on older sources; run \`npm run pipeline ${name}\` to start a fresh one` };
   else state.next = devnetFailureNext(d);
   finish();
 }
@@ -398,7 +398,7 @@ if (compiledOutOfDate && devnetStatus().status === 'running') {
   // touched, not changed. Compiling would delete the keys under the run.
   step('compile:fast', 'skipped', { note: 'the background devnet run holds the lock; the sources are unchanged' });
 } else if (compiledOutOfDate) {
-  const r = run('compile:fast', 'yarn', ['compile:fast']);
+  const r = run('compile:fast', 'npm', ['run', 'compile:fast']);
   step('compile:fast', r.ok ? 'pass' : 'fail', { ms: r.ms });
   if (!r.ok) stop({ kind: 'reason', step: '3a', reason: 'the contract does not compile', output: trimOutput(r.output), edit: sources.map(rel), read: READ.gate });
 } else step('compile:fast', 'skipped', { note: 'compiled output is newer than every .compact' });
@@ -425,7 +425,7 @@ if (simStamp?.sourceHash === hash) {
 } else {
   fs.rmSync(SIM_STAMP, { force: true });
   const edit3c = [`examples/${name}/contract/witnesses.ts`, `examples/${name}/src/test/${name}.sim.test.ts`, `examples/${name}/src/test/${name}.test.ts`];
-  let r = run('typecheck', 'yarn', ['typecheck']);
+  let r = run('typecheck', 'npm', ['run', 'typecheck']);
   step('typecheck', r.ok ? 'pass' : 'fail', { ms: r.ms });
   if (!r.ok) {
     stop({
@@ -439,7 +439,7 @@ if (simStamp?.sourceHash === hash) {
   }
   const simReport = gatePath(DIR, 'sim-vitest.json');
   fs.rmSync(simReport, { force: true });
-  r = run('test:sim', 'yarn', ['test:sim', '--reporter=default', '--reporter=json', `--outputFile.json=${simReport}`]);
+  r = run('test:sim', 'npm', ['run', 'test:sim', '--', '--reporter=default', '--reporter=json', `--outputFile.json=${simReport}`]);
   const sim = readJson(simReport);
   const simTests = sim?.numTotalTests ?? 0;
   const simOk = r.ok && simTests > 0;
@@ -484,12 +484,12 @@ if (opts.until === 'sim') {
 let devnet = devnetStatus();
 if (devnet.status === 'running') step('compile', 'skipped', { note: 'the background devnet run already compiled these sources' });
 else if (compileIsStale(DIR)) {
-  const r = run('compile', 'yarn', ['compile']);
+  const r = run('compile', 'npm', ['run', 'compile']);
   step('compile', r.ok ? 'pass' : 'fail', { ms: r.ms });
   if (!r.ok) stop({ kind: 'reason', step: '3a', reason: 'the full compile (with proving keys) failed', output: trimOutput(r.output), read: READ.gate });
 } else step('compile', 'skipped', { note: 'proving keys are newer than every .compact' });
 
-// 5 · the UI scaffold, before the devnet starts (yarn install rewrites node_modules)
+// 5 · the UI scaffold, before the devnet starts (npm install rewrites node_modules)
 const seedHash = (p) => (fs.existsSync(p) ? crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex') : null);
 const seedFiles = [
   'README.md',
@@ -505,9 +505,9 @@ if (opts.ui && !fs.existsSync(UI_DIR)) {
   step('new:ui', r.ok ? 'pass' : 'fail', { ms: r.ms });
   if (!r.ok) stop({ kind: 'reason', step: '5', reason: 'new:ui refused; its message says what it needs', output: trimOutput(r.output) });
   writeJson(SEEDS, Object.fromEntries(seedFiles.map((p) => [rel(p), seedHash(p)])));
-  r = run('install', 'yarn', ['install'], REPO_ROOT);
-  step('install', r.ok ? 'pass' : 'fail', { ms: r.ms, note: 'the new UI workspace changes yarn.lock: commit it' });
-  if (!r.ok) stop({ kind: 'infra', step: '5', reason: '`yarn install` failed after adding the UI workspace', output: trimOutput(r.output) });
+  r = run('install', 'npm', ['install'], REPO_ROOT);
+  step('install', r.ok ? 'pass' : 'fail', { ms: r.ms, note: 'the new UI workspace changes package-lock.json: commit it' });
+  if (!r.ok) stop({ kind: 'infra', step: '5', reason: '`npm install` failed after adding the UI workspace', output: trimOutput(r.output) });
 } else if (!opts.ui) step('new:ui', 'skipped', { note: '--no-ui' });
 else step('new:ui', 'skipped', { note: 'ui/ exists' });
 
@@ -521,7 +521,7 @@ if (devnet.status === 'running') {
   const docker = checkDocker();
   if (docker) {
     step('devnet', 'fail', { note: docker });
-    stop({ kind: 'infra', step: '4', reason: `the devnet can't start: ${docker}`, run: [`yarn pipeline ${name}`] });
+    stop({ kind: 'infra', step: '4', reason: `the devnet can't start: ${docker}`, run: [`npm run pipeline ${name}`] });
   }
   devnet = startDevnet(hash);
   step('devnet', 'running', { note: `started in the background, pid ${devnet.pid}; log: ${rel(path.join(DIR, 'logs', 'devnet.log'))}` });
@@ -555,9 +555,9 @@ if (opts.ui && fs.existsSync(UI_DIR)) {
     });
   } else {
     const gates = [
-      ['ui:typecheck', 'yarn', ['workspace', UI_PKG, 'typecheck']],
-      ['ui:test:unit', 'yarn', ['workspace', UI_PKG, 'test:unit']],
-      ['ui:build', 'yarn', ['workspace', UI_PKG, 'build']],
+      ['ui:typecheck', 'npm', ['run', 'typecheck', '-w', UI_PKG]],
+      ['ui:test:unit', 'npm', ['run', 'test:unit', '-w', UI_PKG]],
+      ['ui:build', 'npm', ['run', 'build', '-w', UI_PKG]],
       ['ui:check', 'node', [path.join(REPO_ROOT, 'scripts', 'new-ui.mjs'), name, '--check']],
     ];
     for (const [id, cmd, args] of gates) {
@@ -609,7 +609,7 @@ if (devnet.status === 'running') {
     kind: 'wait',
     step: '4',
     reason: 'the devnet is still running in the background; carry on, or wait for it',
-    run: [`yarn pipeline ${name} --wait-devnet`],
+    run: [`npm run pipeline -- ${name} --wait-devnet`],
   });
 }
 candidates.sort((a, b) => a.rank - b.rank);
@@ -625,6 +625,6 @@ stop({
     devnet.report?.networkLeftUp ? '. The devnet is still up' : ''
   }`,
   run: opts.ui
-    ? [`yarn workspace ${UI_PKG} dev`, 'yarn fund:wallet <mn_dust_…> [mn_addr_…]   # DUST (and NIGHT) for a browser wallet', `(cd examples/${name} && yarn env:down)   # when finished`]
-    : [`(cd examples/${name} && yarn env:down)   # when finished`],
+    ? [`npm run dev -w ${UI_PKG}`, 'npm run fund:wallet <mn_dust_…> [mn_addr_…]   # DUST (and NIGHT) for a browser wallet', `(cd examples/${name} && npm run env:down)   # when finished`]
+    : [`(cd examples/${name} && npm run env:down)   # when finished`],
 });

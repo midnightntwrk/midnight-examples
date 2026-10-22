@@ -95,8 +95,8 @@ trust recalled APIs over it.
 - **`submitTransaction` resolves when the transaction is accepted, not when
   it's included.** Wait for the balance or state before the next step.
   ([LESSONS §5](../examples/shielded-chips/LESSONS.md#5-patterns-that-worked))
-- **A synced wallet isn't necessarily funded.** Tests need `yarn wait:dust`
-  first (`yarn validate` runs it).
+- **A synced wallet isn't necessarily funded.** Tests need `npm run wait:dust`
+  first (`npm run validate` runs it).
 - **Tests that share a wallet can't run in parallel.** Set
   `fileParallelism: false` when there's more than one test file.
   ([shielded-chips `vitest.config.ts`](../examples/shielded-chips/vitest.config.ts), [root AGENTS.md](../AGENTS.md#golden-rules))

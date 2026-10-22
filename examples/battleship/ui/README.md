@@ -3,7 +3,7 @@
 Browser frontend for `examples/battleship`: connect a Midnight wallet,
 deploy or join the contract, watch its public ledger, and call its circuits.
 
-Scaffolded by `yarn new:ui battleship` from `packages/mnkit/templates/ui/`. See
+Scaffolded by `npm run new:ui battleship` from `packages/mnkit/templates/ui/`. See
 `AGENTS.md` next to this file for which files are template-owned and
 which are yours, and for the verification checklist.
 
@@ -38,12 +38,12 @@ Not yet run. Everything below needs a human to approve wallet prompts. What *has
 verified is in `packages/mnkit/templates/ui/VERIFIED.md`, generated from this UI's
 `verification.json`. When you run these, tick them off. Once all pass, set
 `walletDeploy` and `walletCalls` to `verified` in `verification.json` (with the
-date and what ran), run `yarn new:ui battleship --sync`, and delete this section.
+date and what ran), run `npm run new:ui -- battleship --sync`, and delete this section.
 
-Setup: `yarn env:up && yarn wait:dust` here, `yarn workspace
-@midnight-ntwrk/example-battleship-ui dev`, and two Chrome profiles (A and B),
+Setup: `npm run env:up && npm run wait:dust` here, `npm run dev -w
+@midnight-ntwrk/example-battleship-ui`, and two Chrome profiles (A and B),
 each with its own browser wallet on `undeployed`. Fund both with
-`yarn fund:wallet <mn_dust_…> [mn_addr_…]` (a root script).
+`npm run fund:wallet <mn_dust_…> [mn_addr_…]` (a root script).
 
 - [ ] **Unlock:** A connects and sets a passphrase; the panel appears. A
       weak passphrase is refused with the policy reason.
@@ -67,7 +67,7 @@ each with its own browser wallet on `undeployed`. Fund both with
 - [ ] **Win:** play to two hits; both profiles show the game-over banner
       with the right winner, and further moves are not offered.
 - [ ] **Local proving:** repeat one shoot/check round with the proving
-      toggle set to the local proof server (`yarn proof:up`).
+      toggle set to the local proof server (`npm run proof:up`).
 - [ ] **Failed re-join:** stop the indexer (`docker compose stop indexer`),
       reload, confirm the address is kept with Retry/Forget, restart the
       indexer, Retry works.
@@ -76,13 +76,13 @@ each with its own browser wallet on `undeployed`. Fund both with
 ## Run
 
 ```bash
-yarn workspace @midnight-ntwrk/example-battleship run compile   # contract first
-cd examples/battleship && yarn env:up && yarn wait:dust            # local devnet
-yarn workspace @midnight-ntwrk/example-battleship-ui dev           # http://localhost:5173
+npm run compile -w @midnight-ntwrk/example-battleship          # contract first
+cd examples/battleship && npm run env:up && npm run wait:dust  # local devnet
+npm run dev -w @midnight-ntwrk/example-battleship-ui           # http://localhost:5173
 ```
 
 On the local devnet, give **each** browser wallet DUST with
-`yarn fund:wallet <mn_dust_…> [mn_addr_…]`, from anywhere in the repo. The UI shows the
+`npm run fund:wallet <mn_dust_…> [mn_addr_…]`, from anywhere in the repo. The UI shows the
 exact command when the connected wallet has none.
 
 ### Mainnet
@@ -95,9 +95,9 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
 - **Everything is public and permanent.** The contract and its public ledger
   stay on mainnet.
 - **Prove with the wallet** if it supports `getProvingProvider`, or with a
-  proof server you run yourself (`yarn proof:up` in `examples/hello-world`).
+  proof server you run yourself (`npm run proof:up` in `examples/hello-world`).
 - **Use your own wallet.** Never use the repo's fast-sync or seeded test wallets
-  (`.env.<network>`, `yarn wallets:new`) on mainnet.
+  (`.env.<network>`, `npm run wallets:new`) on mainnet.
 - **One identity per browser profile.** Your secret key and ships live in
   this profile's passphrase-encrypted private state. Lose the passphrase or
   clear site data and you lose your seat. The contract refuses to let one key

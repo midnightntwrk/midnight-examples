@@ -12,7 +12,7 @@
 //
 // @if monorepo
 // Template-owned: edit packages/mnkit/templates/ui/src/components/circuit-form.tsx, then
-// `yarn new:ui <name> --sync`.
+// `npm run new:ui -- <name> --sync`.
 // @endif
 // @if standalone
 // Template-owned: `mnkit upgrade` replaces this file unless you have edited it.
