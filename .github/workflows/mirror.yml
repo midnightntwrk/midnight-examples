@@ -1,0 +1,188 @@
+name: Mirror to midnight-examples-mirror
+
+# Keeps the private midnightntwrk/midnight-examples-mirror (internal review and
+# scanning) in step with this repo, one way:
+#   - push to main     → the mirror's main is force-set to this main.
+#   - any PR event     → .github/scripts/mirror-pr.sh reconciles that PR: branch
+#                        pr/<number> at its head, and a twin mirror PR with the
+#                        same base, title, body and draft state, closed when
+#                        this one closes. Dependabot PRs included; fork PRs are
+#                        skipped (in the mirror their workflows would run as
+#                        same-repo branches, with the mirror's secrets).
+#   - workflow_dispatch → re-sync main, then reconcile every open PR (backfill,
+#                        or repair after a failed run).
+# Nothing is ever pushed back. See the AGENTS.md golden rule on the mirror.
+#
+# Auth: an org-owned GitHub App installed on midnight-examples-mirror only,
+# with repository permissions Contents, Pull requests and Workflows (read &
+# write) and Metadata (read). Workflows is needed because a pushed commit that
+# touches .github/workflows/ is rejected without it. Its client ID and private
+# key are the MIRROR_APP_CLIENT_ID and MIRROR_APP_PRIVATE_KEY secrets, stored
+# both as Actions and as Dependabot secrets: runs triggered by Dependabot see
+# only the latter. Each job's token is scoped down to the permissions it uses.
+#
+# Why pull_request_target is safe here: it runs this file and the script from
+# main, with secrets, even for fork PRs. That's only dangerous if the PR's code
+# runs, and here it never does: the checkout is main, and the PR head is
+# fetched as git objects and pushed, never checked out or executed. PR titles
+# and bodies are read from the API inside the script, never interpolated into
+# a run: block. Fork PRs are skipped by the script before anything is pushed.
+#
+# The mirror receives this file too. The repository guard on every job keeps
+# it inert there.
+
+permissions: {}
+
+on:
+  push:
+    branches: [main]
+  pull_request_target: # zizmor: ignore[dangerous-triggers] the PR's code never runs here, and fork PRs are skipped
+    types: [opened, reopened, synchronize, edited, closed, ready_for_review, converted_to_draft]
+  workflow_dispatch: {}
+
+jobs:
+  mirror-main:
+    name: Force mirror main to this main
+    if: github.repository == 'midnightntwrk/midnight-examples' && github.event_name != 'pull_request_target'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Only the newest main matters; a superseded push can be dropped.
+    concurrency:
+      group: mirror-main
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    steps:
+      - name: Mint mirror token
+        id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.MIRROR_APP_CLIENT_ID }}
+          private-key: ${{ secrets.MIRROR_APP_PRIVATE_KEY }}
+          owner: midnightntwrk
+          repositories: midnight-examples-mirror
+          permission-contents: write
+          permission-workflows: write
+
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      # --force on purpose: the mirror is never committed to, so this main is
+      # always right. Normally a fast-forward; the first run replaces the
+      # mirror's template commit.
+      - name: Push main to the mirror
+        env:
+          MIRROR_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          set -euo pipefail
+          auth=$(printf 'x-access-token:%s' "$MIRROR_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" \
+            push --force https://github.com/midnightntwrk/midnight-examples-mirror.git HEAD:refs/heads/main
+          echo "Mirror main is now $(git rev-parse HEAD)"
+
+  mirror-pr:
+    name: Reconcile this PR in the mirror
+    # The fork guard is here as well as in the script so a fork PR never even
+    # mints a write-scoped token. The script's check still covers backfill.
+    if: >-
+      github.repository == 'midnightntwrk/midnight-examples'
+      && github.event_name == 'pull_request_target'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Queue, don't cancel, per PR: a `closed` must never be dropped. The script
+    # reads current state, so a queued run that finds nothing new is harmless.
+    concurrency:
+      group: mirror-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Mint mirror token
+        id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.MIRROR_APP_CLIENT_ID }}
+          private-key: ${{ secrets.MIRROR_APP_PRIVATE_KEY }}
+          owner: midnightntwrk
+          repositories: midnight-examples-mirror
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      # main, never the PR head (see the header).
+      - name: Checkout the script from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      - name: Reconcile the mirror PR
+        env:
+          SRC_TOKEN: ${{ github.token }}
+          MIRROR_TOKEN: ${{ steps.token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash .github/scripts/mirror-pr.sh "$PR_NUMBER"
+
+  backfill:
+    name: Reconcile main and every open PR
+    if: github.repository == 'midnightntwrk/midnight-examples' && github.event_name == 'workflow_dispatch'
+    # After main, so each mirror PR diffs against an up-to-date base.
+    needs: mirror-main
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Queue backfills rather than running them against each other. This does
+    # not serialise against mirror-pr, which uses a per-PR group; the script's
+    # creation path tolerates that race.
+    concurrency:
+      group: mirror-backfill
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Mint mirror token
+        id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.MIRROR_APP_CLIENT_ID }}
+          private-key: ${{ secrets.MIRROR_APP_PRIVATE_KEY }}
+          owner: midnightntwrk
+          repositories: midnight-examples-mirror
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      - name: Checkout the script from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+
+      # One failed PR doesn't stop the rest; the job still fails at the end.
+      - name: Reconcile every open PR
+        env:
+          SRC_TOKEN: ${{ github.token }}
+          MIRROR_TOKEN: ${{ steps.token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          failed=()
+          # Open here, plus anything still open in the mirror (closed here while a sync was failing).
+          mirrored=$(GH_TOKEN=$MIRROR_TOKEN gh pr list -R midnightntwrk/midnight-examples-mirror --state open --limit 500 --json headRefName --jq '.[].headRefName | select(startswith("pr/")) | ltrimstr("pr/")')
+          for n in $( { gh pr list -R "$GITHUB_REPOSITORY" --state open --limit 500 --json number --jq '.[].number'; echo "$mirrored"; } | sort -un); do
+            echo "::group::PR #$n"
+            bash .github/scripts/mirror-pr.sh "$n" || failed+=("$n")
+            echo "::endgroup::"
+          done
+          if [ "${#failed[@]}" -ne 0 ]; then
+            echo "::error::Failed to mirror PRs: ${failed[*]}"
+            exit 1
+          fi
