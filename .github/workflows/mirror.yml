@@ -42,8 +42,9 @@ on:
 
 jobs:
   mirror-main:
+    name: Force mirror main to this main
     if: github.repository == 'midnightntwrk/midnight-examples' && github.event_name != 'pull_request_target'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     # Only the newest main matters; a superseded push can be dropped.
     concurrency:
@@ -84,8 +85,14 @@ jobs:
           echo "Mirror main is now $(git rev-parse HEAD)"
 
   mirror-pr:
-    if: github.repository == 'midnightntwrk/midnight-examples' && github.event_name == 'pull_request_target'
-    runs-on: ubuntu-latest
+    name: Reconcile this PR in the mirror
+    # The fork guard is here as well as in the script so a fork PR never even
+    # mints a write-scoped token. The script's check still covers backfill.
+    if: >-
+      github.repository == 'midnightntwrk/midnight-examples'
+      && github.event_name == 'pull_request_target'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     # Queue, don't cancel, per PR: a `closed` must never be dropped. The script
     # reads current state, so a queued run that finds nothing new is harmless.
@@ -124,10 +131,11 @@ jobs:
         run: bash .github/scripts/mirror-pr.sh "$PR_NUMBER"
 
   backfill:
+    name: Reconcile main and every open PR
     if: github.repository == 'midnightntwrk/midnight-examples' && github.event_name == 'workflow_dispatch'
     # After main, so each mirror PR diffs against an up-to-date base.
     needs: mirror-main
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
