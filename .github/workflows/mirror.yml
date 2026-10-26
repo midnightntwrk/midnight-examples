@@ -137,6 +137,12 @@ jobs:
     needs: mirror-main
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    # Queue backfills rather than running them against each other. This does
+    # not serialise against mirror-pr, which uses a per-PR group; the script's
+    # creation path tolerates that race.
+    concurrency:
+      group: mirror-backfill
+      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: read

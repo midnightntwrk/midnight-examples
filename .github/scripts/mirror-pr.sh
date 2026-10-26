@@ -120,9 +120,20 @@ fi
 if [[ -z "$existing" ]]; then
   flags=()
   [[ "$draft" == true ]] && flags+=(--draft)
-  mirror_gh pr create -R "$mirror" --head "$branch" --base "$base" \
-    --title "$title" --body "$body" "${flags[@]}"
-  exit 0
+  # A backfill can run alongside the pull_request_target run for the same PR
+  # (different concurrency groups), so the mirror PR may appear between the
+  # check above and here; GitHub then answers 422. Re-read and fall through to
+  # the edit path instead of failing the run.
+  if mirror_gh pr create -R "$mirror" --head "$branch" --base "$base" \
+      --title "$title" --body "$body" "${flags[@]}"; then
+    exit 0
+  fi
+  existing=$(mirror_pr open)
+  if [[ -z "$existing" ]]; then
+    echo "::error::could not create or find a mirror PR for $branch"
+    exit 1
+  fi
+  echo "::notice::mirror PR for $branch was created concurrently; updating it"
 fi
 
 m=$(jq -r .number <<<"$existing")
