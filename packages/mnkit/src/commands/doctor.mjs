@@ -23,7 +23,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { resolveCompact } from '../lib/compact-install.mjs';
 import { loadNetworkEnv } from '../lib/env.mjs';
-import { checkCompactVersion, checkDocker } from '../lib/preflight.mjs';
+import { checkCompactCli, checkCompactVersion, checkDocker } from '../lib/preflight.mjs';
 import { fail } from '../lib/template.mjs';
 import { loadToolchain } from '../lib/toolchain.mjs';
 
@@ -52,7 +52,12 @@ export async function runChecks(tc = loadToolchain()) {
     },
   ];
   const pin = tc.compact.compiler;
-  const missing = !resolveCompact()
+  const hasCli = resolveCompact();
+  if (hasCli) {
+    const old = checkCompactCli(tc.compact.cli);
+    checks.push({ name: `Compact CLI ${tc.compact.cli} or later`, ok: true, warn: Boolean(old), detail: old ?? 'installed' });
+  }
+  const missing = !hasCli
     ? `the \`compact\` CLI is not installed: \`npm run compile\` installs Compact CLI ${tc.compact.cli} and compiler ${pin}`
     : checkCompactVersion(pin)
       ? `not installed: \`npm run compile\` installs it, or run \`compact update ${pin} --no-set-default\``

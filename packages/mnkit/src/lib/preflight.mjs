@@ -38,6 +38,29 @@ export function checkCompact(repoRoot) {
   return checkCompactVersion(pinnedCompactVersion(repoRoot), { asDefault: true });
 }
 
+/** True when dotted version `a` is older than `b` (numeric parts; missing parts count as 0). */
+export function versionBefore(a, b) {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) < (pb[i] ?? 0);
+  }
+  return false;
+}
+
+/**
+ * A warning when the `compact` CLI on PATH is older than `pin` (toolchain.json
+ * `compact.cli`), else null: the CLI it was tested with. Only a warning, since
+ * an older CLI usually still installs and runs the pinned compiler. Null when
+ * there is no CLI, or its version can't be read.
+ */
+export function checkCompactCli(pin) {
+  const r = spawnSync('compact', ['--version'], { encoding: 'utf8' });
+  const found = r.error || r.status !== 0 ? null : /(\d+\.\d+\.\d+)/.exec(r.stdout)?.[1];
+  if (!found || !versionBefore(found, pin)) return null;
+  return `Compact CLI ${found} is older than the ${pin} mnkit pins. Run \`compact self update\`.`;
+}
+
 /**
  * A problem string unless compiler `pin` is usable, else null. asDefault: it
  * must be the default compiler (the repo's scripts run plain `compact

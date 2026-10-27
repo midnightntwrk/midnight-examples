@@ -21,6 +21,11 @@
 // (toolchain.json `compact.cli`). The script is downloaded, checked against
 // `compact.installerSha256` and only then run; it checks the archive it
 // fetches against hashes of its own, so pinning the script pins the binaries.
+// It skips that check when there is no `sha256sum` (stock macOS has only
+// `shasum`), so mnkit then puts a `sha256sum` that runs `shasum -a 256` first
+// on the installer's PATH, and refuses to run it with neither. It runs with
+// COMPACT_NO_MODIFY_PATH=1, so it leaves shell profiles alone; mnkit prints
+// the PATH line to add instead.
 // The compiler comes from `compact update <pin> --no-set-default`, which
 // leaves the developer's default compiler alone; on a machine with no default
 // compiler yet, plain `compact update <pin>` makes the pin the default.
@@ -30,7 +35,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { checkCompactVersion } from './preflight.mjs';
+import { checkCompactCli, checkCompactVersion } from './preflight.mjs';
 import { fail } from './template.mjs';
 
 export const COMPACT_DOCS = 'https://docs.midnight.network/getting-started/installation';
@@ -61,8 +66,39 @@ export function resolveCompact() {
   return true;
 }
 
-/** Downloads, verifies and runs the pinned Compact CLI installer. `url` and `sha256` are for tests. */
-export async function installCompactCli(tc, { url = installerUrl(tc.compact.cli), sha256 = tc.compact.installerSha256 } = {}) {
+/** Whether `cmd` is on PATH, as the installer's `check_cmd` sees it. */
+const onPath = (cmd) => spawnSync('sh', ['-c', 'command -v "$1"', 'sh', cmd], { stdio: 'ignore' }).status === 0;
+
+/**
+ * The installer's environment: no shell profile edits, and a `sha256sum` it
+ * can verify its archive with. Without one it prints "skipping sha256 checksum
+ * verification" and installs anyway, so a `shasum`-only machine gets a shim in
+ * `tmp` (same `-b` flag, same "<hash> *<file>" output), and a machine with
+ * neither fails here. `has` is for tests.
+ */
+export function installerEnv(tmp, { has = onPath } = {}) {
+  const env = { ...process.env, COMPACT_NO_MODIFY_PATH: '1' };
+  if (has('sha256sum')) return env;
+  if (!has('shasum')) {
+    fail(
+      'the Compact CLI installer verifies what it downloads with `sha256sum` or `shasum`, and neither is on PATH. ' +
+        `Install one (coreutils or perl), or install the CLI yourself: ${COMPACT_DOCS}`,
+    );
+  }
+  const bin = path.join(tmp, 'bin');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, 'sha256sum'), '#!/bin/sh\nexec shasum -a 256 "$@"\n', { mode: 0o755 });
+  return { ...env, PATH: `${bin}${path.delimiter}${env.PATH ?? ''}` };
+}
+
+/**
+ * Downloads, verifies and runs the pinned Compact CLI installer. `url`,
+ * `sha256` and `has` (installerEnv) are for tests.
+ */
+export async function installCompactCli(
+  tc,
+  { url = installerUrl(tc.compact.cli), sha256 = tc.compact.installerSha256, has } = {},
+) {
   if (process.platform === 'win32') fail(`the Compact CLI doesn't run on Windows. Use WSL: ${COMPACT_DOCS}`);
   console.log(`• Installing the Compact CLI ${tc.compact.cli} from ${url}`);
   let body;
@@ -79,11 +115,12 @@ export async function installCompactCli(tc, { url = installerUrl(tc.compact.cli)
       `the Compact CLI installer has sha256 ${got}, but mnkit pins ${sha256}. Not running it. Install the CLI yourself: ${COMPACT_DOCS}`,
     );
   }
+  const shellPath = process.env.PATH ?? '';
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mnkit-compact-'));
   try {
     const file = path.join(tmp, 'compact-installer.sh');
     fs.writeFileSync(file, body);
-    const r = spawnSync('sh', [file, '--quiet'], { stdio: 'inherit' });
+    const r = spawnSync('sh', [file, '--quiet'], { stdio: 'inherit', env: installerEnv(tmp, { has }) });
     if (r.error) fail(`could not run the Compact CLI installer: ${r.error.message}`);
     if (r.status !== 0) fail(`the Compact CLI installer failed (exit ${r.status}). Install the CLI yourself: ${COMPACT_DOCS}`);
   } finally {
@@ -92,7 +129,15 @@ export async function installCompactCli(tc, { url = installerUrl(tc.compact.cli)
   if (!resolveCompact()) {
     fail(`the Compact CLI installer finished, but no \`compact\` is in ${compactInstallDirs().join(', ')}.`);
   }
-  console.log(`✔ Compact CLI ${tc.compact.cli} installed. Open a new shell to have \`compact\` on your PATH.`);
+  const dir = compactInstallDirs().find((d) => fs.existsSync(path.join(d, 'compact')));
+  if (dir && !shellPath.split(path.delimiter).includes(dir)) {
+    console.log(
+      `✔ Compact CLI ${tc.compact.cli} installed in ${dir}. mnkit finds it there; to run \`compact\` yourself, ` +
+        `add this to your shell profile (~/.bashrc, ~/.zshrc, …):\n    export PATH="${dir}:$PATH"`,
+    );
+  } else {
+    console.log(`✔ Compact CLI ${tc.compact.cli} installed.`);
+  }
 }
 
 /**
@@ -106,6 +151,9 @@ export async function ensureCompiler(pin, tc, { install = true, installer } = {}
   if (!resolveCompact()) {
     if (!install) fail(`the \`compact\` CLI is not on PATH. Install it (${COMPACT_DOCS}), ${offer}.`);
     await installCompactCli(tc, installer);
+  } else {
+    const old = checkCompactCli(tc.compact.cli);
+    if (old) console.log(`⚠ ${old}`);
   }
   if (!checkCompactVersion(pin)) return;
   if (!install) fail(`Compact compiler ${pin} is not installed. Run \`compact update ${pin} --no-set-default\`, ${offer}.`);

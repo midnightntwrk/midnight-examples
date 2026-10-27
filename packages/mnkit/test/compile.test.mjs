@@ -24,13 +24,15 @@ import fs from 'node:fs';
 import http from 'node:http';
 import { once } from 'node:events';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { compile } from '../src/commands/compile.mjs';
 import { runChecks } from '../src/commands/doctor.mjs';
+import { versionBefore } from '../src/lib/preflight.mjs';
 import { loadToolchain } from '../src/lib/toolchain.mjs';
 import { PKG_ROOT, cleanup, tmpDir } from './helpers.mjs';
 
 const PIN = loadToolchain().compact.compiler;
+const CLI_PIN = loadToolchain().compact.cli;
 const BIN = path.join(PKG_ROOT, 'bin', 'mnkit.mjs');
 
 // `compile +<v> …` fails until `update <v> …` has run, and `compile
@@ -39,7 +41,7 @@ const BIN = path.join(PKG_ROOT, 'bin', 'mnkit.mjs');
 const FAKE_COMPACT = `#!/bin/sh
 echo "$*" >> "$FAKE_COMPACT_LOG"
 case "$1" in
-  --version) echo 'compact 0.5.3' ;;
+  --version) echo "compact \${FAKE_COMPACT_CLI_VERSION:-${CLI_PIN}}" ;;
   update)
     touch "$FAKE_COMPACT_STATE/$2"
     [ "$3" = --no-set-default ] || echo "$2" > "$FAKE_COMPACT_STATE/default" ;;
@@ -59,13 +61,18 @@ esac
 `;
 
 // Installs the fake compact where the real installer would: $XDG_BIN_HOME.
+// Records what the real one depends on: COMPACT_NO_MODIFY_PATH, and the
+// sha256sum it would verify its archive with (and that sum of itself).
 const FAKE_INSTALLER = `#!/bin/sh
 echo "$*" > "$FAKE_COMPACT_STATE/installer-args"
+echo "$COMPACT_NO_MODIFY_PATH" > "$FAKE_COMPACT_STATE/no-modify-path"
+command -v sha256sum > "$FAKE_COMPACT_STATE/sha256sum-path"
+sha256sum -b "$0" | awk '{printf $1}' > "$FAKE_COMPACT_STATE/sha256"
 mkdir -p "$XDG_BIN_HOME" && cp "$FAKE_COMPACT_SRC" "$XDG_BIN_HOME/compact" && chmod +x "$XDG_BIN_HOME/compact"
 `;
 
 const ENV_KEYS = ['PATH', 'HOME', 'XDG_BIN_HOME', 'XDG_DATA_HOME', 'COMPACT_INSTALL_DIR', 'MNKIT_NO_INSTALL'];
-const ENV_KEYS_FAKE = ['FAKE_COMPACT_LOG', 'FAKE_COMPACT_STATE', 'FAKE_COMPACT_SRC'];
+const ENV_KEYS_FAKE = ['FAKE_COMPACT_LOG', 'FAKE_COMPACT_STATE', 'FAKE_COMPACT_SRC', 'FAKE_COMPACT_CLI_VERSION'];
 let saved;
 beforeEach(() => {
   saved = Object.fromEntries([...ENV_KEYS, ...ENV_KEYS_FAKE].map((k) => [k, process.env[k]]));
@@ -99,7 +106,7 @@ function machine({ cli = true, compiler = false, default: dflt = cli ? '0.30.0' 
   fs.mkdirSync(path.join(project, 'contract'), { recursive: true });
   fs.writeFileSync(path.join(project, 'contract', 'demo.compact'), 'export circuit f(): [] {}\n');
 
-  for (const k of ['XDG_DATA_HOME', 'COMPACT_INSTALL_DIR', 'MNKIT_NO_INSTALL']) delete process.env[k];
+  for (const k of ['XDG_DATA_HOME', 'COMPACT_INSTALL_DIR', 'MNKIT_NO_INSTALL', 'FAKE_COMPACT_CLI_VERSION']) delete process.env[k];
   Object.assign(process.env, {
     PATH: [dirs.bin, '/usr/bin', '/bin'].join(path.delimiter),
     HOME: dirs.home,
@@ -186,11 +193,64 @@ describe('mnkit compile installs the pinned toolchain', () => {
       server.close();
     }
     expect(fs.readFileSync(path.join(m.dirs.state, 'installer-args'), 'utf8').trim()).toBe('--quiet');
+    // Shell profiles are left alone, and the archive check has its sha256sum.
+    expect(fs.readFileSync(path.join(m.dirs.state, 'no-modify-path'), 'utf8').trim()).toBe('1');
+    expect(fs.readFileSync(path.join(m.dirs.state, 'sha256'), 'utf8')).toBe(sha256(FAKE_INSTALLER));
     // The install dir isn't on the shell's PATH yet, so mnkit put it on its own.
     expect(process.env.PATH.split(path.delimiter)[0]).toBe(m.dirs['xdg-bin']);
     // A fresh CLI has no default compiler, so the pin becomes it.
     expect(m.updates()).toEqual([`update ${PIN}`]);
     expect(m.compiled()).toBe(true);
+  });
+
+  it('says which PATH line to add, since the installer no longer edits shell profiles', async () => {
+    const m = machine({ cli: false });
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const server = await serve(FAKE_INSTALLER);
+    try {
+      await compile(m.project, { version: PIN, installer: { url: server.url, sha256: sha256(FAKE_INSTALLER) } });
+      expect(log).toHaveBeenCalledWith(expect.stringContaining(`export PATH="${m.dirs['xdg-bin']}:$PATH"`));
+    } finally {
+      server.close();
+      log.mockRestore();
+    }
+  });
+
+  it("gives the installer a sha256sum that runs shasum when there is none, so it still checks its archive", async () => {
+    const m = machine({ cli: false });
+    const server = await serve(FAKE_INSTALLER);
+    try {
+      const has = (cmd) => cmd !== 'sha256sum';
+      expect(await compile(m.project, { version: PIN, installer: { url: server.url, sha256: sha256(FAKE_INSTALLER), has } })).toBe(0);
+    } finally {
+      server.close();
+    }
+    expect(fs.readFileSync(path.join(m.dirs.state, 'sha256sum-path'), 'utf8')).toMatch(/mnkit-compact-[^/]+\/bin\/sha256sum\n$/);
+    expect(fs.readFileSync(path.join(m.dirs.state, 'sha256'), 'utf8')).toBe(sha256(FAKE_INSTALLER));
+  });
+
+  it('refuses to run the installer with neither sha256sum nor shasum', async () => {
+    const m = machine({ cli: false });
+    const server = await serve(FAKE_INSTALLER);
+    try {
+      const installer = { url: server.url, sha256: sha256(FAKE_INSTALLER), has: () => false };
+      await expect(compile(m.project, { version: PIN, installer })).rejects.toThrow(/neither is on PATH/);
+    } finally {
+      server.close();
+    }
+    expect(fs.existsSync(path.join(m.dirs.state, 'installer-args'))).toBe(false);
+  });
+
+  it('warns, and still compiles, when the Compact CLI is older than the pin', async () => {
+    const m = machine({ compiler: true });
+    process.env.FAKE_COMPACT_CLI_VERSION = '0.0.1';
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      expect(await compile(m.project, { version: PIN })).toBe(0);
+      expect(log).toHaveBeenCalledWith(`⚠ Compact CLI 0.0.1 is older than the ${CLI_PIN} mnkit pins. Run \`compact self update\`.`);
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it('refuses to run an installer whose sha256 does not match the pin', async () => {
@@ -227,6 +287,23 @@ describe('mnkit doctor', () => {
     const check = (await runChecks()).find((c) => c.name === `Compact compiler ${PIN}`);
     expect(check).toMatchObject({ ok: true, warn: true });
     expect(check.detail).toContain('`npm run compile` installs it');
+  });
+
+  it('warns, without failing, when the Compact CLI is older than the pin', async () => {
+    machine({ compiler: true });
+    process.env.FAKE_COMPACT_CLI_VERSION = '0.0.1';
+    const check = (await runChecks()).find((c) => c.name === `Compact CLI ${CLI_PIN} or later`);
+    expect(check).toMatchObject({ ok: true, warn: true });
+    expect(check.detail).toContain('Run `compact self update`');
+    delete process.env.FAKE_COMPACT_CLI_VERSION;
+    expect((await runChecks()).find((c) => c.name === `Compact CLI ${CLI_PIN} or later`)).toMatchObject({ warn: false });
+  });
+
+  it('compares versions part by part', () => {
+    expect(versionBefore('0.5.1', '0.5.3')).toBe(true);
+    expect(versionBefore('0.5.10', '0.5.3')).toBe(false);
+    expect(versionBefore('0.5.3', '0.5.3')).toBe(false);
+    expect(versionBefore('0.4', '0.4.1')).toBe(true);
   });
 
   it('warns, without failing, when the Compact CLI is missing', async () => {
