@@ -71,8 +71,9 @@ export interface FundWalletOptions {
 
 /**
  * Make DUST accrue to the `dust` address on the local devnet (and send `addr`
- * NIGHT). Safe to rerun: a wallet that already has a sponsor is left as is.
- * `envConfig` must be the local devnet's.
+ * NIGHT). Safe to rerun: a sponsor that already holds NIGHT isn't funded
+ * again, and a rerun registers any of its NIGHT a stopped run left
+ * unregistered. `envConfig` must be the local devnet's.
  */
 export async function fundWallet(
   logger: Logger,
@@ -92,6 +93,9 @@ export async function fundWallet(
     return typeof p?.isStrictlyComplete === 'function' && p.isStrictlyComplete();
   };
 
+  // Every wallet started, stopped in reverse order when this returns or throws.
+  const opened: AssembledWallet[] = [];
+
   /**
    * Build, start and fully sync a wallet from a hex seed. "Fully" means all three
    * sub-wallets report isStrictlyComplete(), as the examples' syncWallet waits
@@ -99,6 +103,9 @@ export async function fundWallet(
    */
   async function openWallet(label: string, seed: string): Promise<AssembledWallet> {
     const w = await assembleWallet(logger, envConfig, { kind: 'seed', value: seed });
+    // Tracked before the sync wait, so the finally below stops a wallet that
+    // never syncs; a running wallet keeps the process alive.
+    opened.push(w);
     await w.facade.start(w.zswapSecretKeys, w.dustSecretKey);
     await Rx.firstValueFrom(
       w.facade.state().pipe(
@@ -119,21 +126,16 @@ export async function fundWallet(
     return w;
   }
 
-  const opened: AssembledWallet[] = [];
   try {
     const alice = await openWallet('Genesis', ALICE_SEED);
-    opened.push(alice);
     const sponsor = await openWallet('Sponsor', sponsorSeed(dustArg));
-    opened.push(sponsor);
     await waitForDust(logger, alice.facade, 1, SYNC_TIMEOUT_MS, envConfig.indexer);
 
     const nightCoins = (s: { unshielded: { availableCoins: readonly { utxo: { type: string } }[] } }) =>
       s.unshielded.availableCoins.filter((c) => c.utxo.type === nativeToken().raw).length;
-    const sponsored = nightCoins(await sponsor.facade.waitForSyncedState()) > 0;
-    if (sponsored) {
-      // A rerun for the same wallet: its sponsor's NIGHT is already registered
-      // to it, so DUST is already accruing. Nothing to do for DUST.
-      logger.info(`This wallet already has a sponsor; DUST keeps accruing to ${dustArg}.`);
+    if (nightCoins(await sponsor.facade.waitForSyncedState()) > 0) {
+      // A rerun for the same wallet: its sponsor already holds NIGHT.
+      logger.info('This wallet already has a sponsor.');
     } else {
       // 1. Fund the sponsor with NIGHT, and wait until it sees the new UTXO.
       const sponsorAddress = await sponsor.facade.unshielded.getAddress();
@@ -149,12 +151,15 @@ export async function fundWallet(
           }),
         ),
       );
-
-      // 2. Register the sponsor's NIGHT, pointing its DUST at the browser wallet.
-      logger.info(`Registering the sponsor's NIGHT for DUST generation -> ${dustArg}`);
-      const regTx = await registerNightForDust(sponsor, dustReceiver);
-      logger.info(regTx ? `  tx: ${regTx}` : '  nothing new to register');
     }
+
+    // 2. Register the sponsor's NIGHT, pointing its DUST at the browser wallet.
+    // Every run, not only the one that funded it: a run stopped between the
+    // transfer and the registration (Ctrl-C, or a timeout) leaves NIGHT that
+    // generates nothing for the browser wallet until a rerun registers it.
+    logger.info(`Registering the sponsor's NIGHT for DUST generation -> ${dustArg}`);
+    const regTx = await registerNightForDust(sponsor, dustReceiver);
+    logger.info(regTx ? `  tx: ${regTx}` : '  already registered; DUST keeps accruing');
 
     if (nightRecipient) {
       await alice.facade.waitForSyncedState();

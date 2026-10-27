@@ -38,14 +38,24 @@ export async function transferNight(
  * transferred, but a NIGHT holder can point its generation at any DUST
  * address, so a browser wallet gets DUST without signing anything. Returns the
  * tx id, or null if there was nothing to register.
+ *
+ * A first registration pays its own fee from the DUST its NIGHT has generated
+ * so far, and the facade refuses it until that covers the fee ("Insufficient
+ * generated dust"). So this waits, up to `timeoutMs`, for that much first.
  */
-export async function registerNightForDust(w: AssembledWallet, dustReceiver: DustAddress): Promise<string | null> {
+export async function registerNightForDust(
+  w: AssembledWallet,
+  dustReceiver: DustAddress,
+  timeoutMs = 300_000,
+): Promise<string | null> {
   const state = await w.facade.waitForSyncedState();
   const night = nativeToken().raw;
   const unregistered = state.unshielded.availableCoins.filter(
     (coin) => coin.utxo.type === night && coin.meta.registeredForDustGeneration === false,
   );
   if (unregistered.length === 0) return null;
+  const { fee } = await w.facade.estimateRegistration(unregistered);
+  await w.facade.waitForGeneratedDust(unregistered, fee, { timeoutMs });
   const recipe = await w.facade.registerNightUtxosForDustGeneration(
     unregistered,
     w.keystore.getPublicKey(),
