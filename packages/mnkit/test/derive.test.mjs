@@ -112,6 +112,40 @@ describe('derive', () => {
     );
   });
 
+  it('gives a struct parameter one argument, though index.d.ts writes it inline (struct-params)', () => {
+    const dir = scaffoldFixture('struct-params');
+    expect(run(dir, 'struct-params').ctorParams).toEqual(['cfg', 'w', 'coin', 'owner']);
+    const want = [
+      'undefined as never, // TODO cfg: Limits',
+      'undefined as never, // TODO w: Window',
+      '{ nonce: new Uint8Array(32), color: new Uint8Array(32), value: 0n }, // TODO coin: ShieldedCoinInfo',
+      'new Uint8Array(32), // TODO owner: Bytes<32>',
+    ];
+    for (const [rel, prefix] of [
+      ['src/test/struct-params.sim.test.ts', 'args: ['],
+      ['src/test/struct-params.test.ts', 'args: ['],
+      ['contract/deploy-args.ts', null],
+    ]) {
+      const lines = region(read(dir, rel), 'constructor-args')
+        .split('\n')
+        .map((l) => l.trim());
+      expect(lines).toEqual(prefix ? [prefix, ...want, '],'] : want);
+    }
+  });
+
+  it('gives each private-state factory parameter one placeholder, struct types too', () => {
+    const dir = scaffoldFixture('struct-params', { witnesses: true });
+    const file = path.join(dir, 'contract', 'witnesses.ts');
+    const src = read(dir, 'contract/witnesses.ts');
+    const factory = 'export const createStructParamsPrivateState = ()';
+    expect(src).toContain(factory);
+    fs.writeFileSync(file, src.replace(factory, `${factory.slice(0, -1)}cfg: { a: bigint, b: bigint }, s: Uint8Array)`));
+    run(dir, 'struct-params');
+    expect(region(read(dir, 'contract/deploy-args.ts'), 'private-state')).toBe(
+      '    initialPrivateState: createStructParamsPrivateState(undefined as never /* TODO cfg */, new Uint8Array(32) /* TODO s */),',
+    );
+  });
+
   it('wires witnesses, a second contract and the coin helpers (private-tip-jar)', () => {
     const dir = scaffoldFixture('private-tip-jar', { witnesses: true });
     const r = run(dir, 'private-tip-jar');

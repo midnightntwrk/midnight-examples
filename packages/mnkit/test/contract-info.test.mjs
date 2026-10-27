@@ -26,6 +26,8 @@ import {
   readConstructor,
   readContractInfo,
   scanWitnessesTs,
+  splitTopLevel,
+  tsParams,
 } from '../src/lib/contract-info.mjs';
 import { cleanup, fixtureDir, tmpDir } from './helpers.mjs';
 
@@ -77,6 +79,15 @@ describe('readConstructor', () => {
     });
   });
 
+  it('keeps struct parameters, which index.d.ts writes inline, whole', () => {
+    expect(tsParams(readConstructor(fixtureDir('struct-params'), 'struct-params').params)).toEqual([
+      { name: 'cfg_0', tsType: 'Limits' },
+      { name: 'w_0', tsType: '{ start: bigint, end: bigint }' },
+      { name: 'coin_0', tsType: '{ nonce: Uint8Array, color: Uint8Array, value: bigint }' },
+      { name: 'owner_0', tsType: 'Uint8Array' },
+    ]);
+  });
+
   it('returns null when the declaration is not where it expects', () => {
     const dir = fixtureDir('hello-world');
     const dts = path.join(dir, 'contract', 'managed', 'hello-world', 'contract', 'index.d.ts');
@@ -100,16 +111,40 @@ describe('compactConstructorParams', () => {
       ['private-party', 'private-party'],
       ['silent-auction', 'silent-auction'],
       ['private-tip-jar', 'private-tip-jar'],
+      ['struct-params', 'struct-params'],
     ]) {
       const dir = fixtureDir(fixture);
       const fromSource = compactConstructorParams(fs.readFileSync(path.join(dir, 'contract', `${c}.compact`), 'utf8'));
-      expect(fromSource.length).toBe(readConstructor(dir, c).params.split(',').length);
+      expect(fromSource.length).toBe(tsParams(readConstructor(dir, c).params).length);
     }
   });
 
   it('is empty without a constructor', () => {
     expect(compactConstructorParams('export circuit f(): [] {}')).toEqual([]);
     expect(compactConstructorParams('constructor() {}')).toEqual([]);
+  });
+});
+
+describe('splitTopLevel / tsParams', () => {
+  it('splits only on commas outside brackets and braces', () => {
+    expect(splitTopLevel('a_0: { x: bigint, y: { p: bigint, q: Uint8Array } }, b_0: Map<string, bigint>, c_0: [bigint, bigint]')).toEqual([
+      'a_0: { x: bigint, y: { p: bigint, q: Uint8Array } }',
+      'b_0: Map<string, bigint>',
+      'c_0: [bigint, bigint]',
+    ]);
+  });
+
+  it('is not unbalanced by an arrow', () => {
+    expect(splitTopLevel('f: (x: bigint) => bigint, g: bigint')).toEqual(['f: (x: bigint) => bigint', 'g: bigint']);
+  });
+
+  it('splits each parameter at its first colon', () => {
+    expect(tsParams('cfg: { a: bigint, b: bigint }, s?: Uint8Array, bare')).toEqual([
+      { name: 'cfg', tsType: '{ a: bigint, b: bigint }' },
+      { name: 's?', tsType: 'Uint8Array' },
+      { name: 'bare', tsType: '' },
+    ]);
+    expect(tsParams('')).toEqual([]);
   });
 });
 
@@ -124,6 +159,7 @@ describe('placeholderForCompactType', () => {
     ['Vector<2, Boolean>', '[false, false]'],
     ['Vector<8, Field>', 'Array.from({ length: 8 }, () => 0n)'],
     ['UserAddress', '{ bytes: new Uint8Array(32) }'],
+    ['ShieldedCoinInfo', '{ nonce: new Uint8Array(32), color: new Uint8Array(32), value: 0n }'],
     ['MyStruct', 'undefined as never'],
   ])('%s → %s', (type, want) => {
     expect(placeholderForCompactType(type)).toBe(want);

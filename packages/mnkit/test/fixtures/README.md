@@ -1,6 +1,7 @@
 # Engine test fixtures
 
-Each fixture is a contract copied from an example, with what the tests need:
+Each fixture is a contract copied from an example (except `struct-params`,
+written for the tests), with what the tests need:
 
 - `contract/*.compact` (and `witnesses.ts` when the example has one): the sources.
 - `compiled/<contract>/`: the two compiler outputs the generators read,
@@ -20,3 +21,4 @@ Each fixture is a contract copied from an example, with what the tests need:
 | `private-party` | yes | no | constructor arguments, including a secret |
 | `silent-auction` | yes | no | a struct (`UserAddress`) constructor argument, witnesses |
 | `private-tip-jar` | yes | yes | witnesses, a pure circuit, a `Map`, a shielded-coin argument, a second contract that mints |
+| `struct-params` | yes | no | struct constructor arguments that `index.d.ts` writes inline (an unexported struct, a `ShieldedCoinInfo`); not an example |

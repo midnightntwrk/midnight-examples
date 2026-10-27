@@ -222,14 +222,20 @@ export function compactConstructorParams(compactSrc) {
   });
 }
 
-/** Splits on commas that aren't inside <...>, [...] or (...). */
-function splitTopLevel(s) {
+/**
+ * Splits on commas that aren't inside <...>, [...], (...) or {...}: index.d.ts
+ * writes a struct parameter inline, `w_0: { start: bigint, end: bigint }`.
+ * The `>` of `=>` doesn't close anything.
+ */
+export function splitTopLevel(s) {
   const out = [];
   let depth = 0;
   let cur = '';
+  let prev = '';
   for (const ch of s) {
-    if ('<[('.includes(ch)) depth++;
-    if ('>])'.includes(ch)) depth--;
+    if ('<[({'.includes(ch)) depth++;
+    if ('])}'.includes(ch) || (ch === '>' && prev !== '=')) depth--;
+    prev = ch;
     if (ch === ',' && depth === 0) {
       if (cur.trim()) out.push(cur.trim());
       cur = '';
@@ -237,6 +243,18 @@ function splitTopLevel(s) {
   }
   if (cur.trim()) out.push(cur.trim());
   return out;
+}
+
+/**
+ * A TypeScript parameter list, "a_0: bigint, w_0: { start: bigint, end: bigint }",
+ * as [{ name, tsType }], split at each parameter's first colon. `name` keeps
+ * any suffix (the compiler's `_0`, an optional `?`).
+ */
+export function tsParams(list) {
+  return splitTopLevel(list ?? '').map((p) => {
+    const i = p.indexOf(':');
+    return i === -1 ? { name: p, tsType: '' } : { name: p.slice(0, i).trim(), tsType: p.slice(i + 1).trim() };
+  });
 }
 
 /**
@@ -259,5 +277,6 @@ export function placeholderForCompactType(type) {
     return n <= 4 ? `[${Array(n).fill(el).join(', ')}]` : `Array.from({ length: ${n} }, () => ${el})`;
   }
   if (/^(ZswapCoinPublicKey|UserAddress|ContractAddress)$/.test(t)) return '{ bytes: new Uint8Array(32) }';
+  if (t === 'ShieldedCoinInfo') return '{ nonce: new Uint8Array(32), color: new Uint8Array(32), value: 0n }';
   return 'undefined as never';
 }

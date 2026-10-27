@@ -39,6 +39,7 @@ import {
   readConstructor,
   readContractInfo,
   scanWitnessesTs,
+  tsParams,
 } from './contract-info.mjs';
 
 const BEGIN_RE = /^(\s*)\/\/ @generated-stub begin ([\w-]+) sha=([0-9a-f]*)$/;
@@ -181,14 +182,11 @@ export function derive(exampleDir, name, names, { coinsPackage = '@midnight-ntwr
   // against the arity the compiler declared.
   const paramsOf = (m, c) => {
     const sourcePath = path.join(exampleDir, 'contract', `${m}.compact`);
-    const dtsParams = c.params ? c.params.split(',').map((p) => p.trim()) : [];
+    const dtsParams = tsParams(c.params);
     const fromSource = fs.existsSync(sourcePath) ? compactConstructorParams(fs.readFileSync(sourcePath, 'utf8')) : [];
     if (fromSource.length === dtsParams.length) return fromSource;
     // Fall back to index.d.ts: names without the `_0` suffix, TS types only.
-    return dtsParams.map((p) => {
-      const [n, t] = p.split(':').map((s) => s.trim());
-      return { name: n.replace(/_\d+$/, ''), type: null, tsType: t };
-    });
+    return dtsParams.map((p) => ({ name: p.name.replace(/_\d+$/, ''), type: null, tsType: p.tsType }));
   };
   const ctorParams = paramsOf(managed, ctor);
   const placeholder = (p) =>
@@ -261,17 +259,9 @@ export function derive(exampleDir, name, names, { coinsPackage = '@midnight-ntwr
     ({ bigint: '0n', boolean: 'false', string: "''", Uint8Array: 'new Uint8Array(32)' })[t.trim()] ?? 'undefined as never';
   const initialPrivateState = !witnessesTs?.factory
     ? '{}'
-    : `${witnessesTs.factory}(${
-        witnessesTs.factoryParams
-          ? witnessesTs.factoryParams
-              .split(',')
-              .map((p) => {
-                const [n, t = ''] = p.split(':');
-                return `${tsPlaceholder(t)} /* TODO ${n.trim()} */`;
-              })
-              .join(', ')
-          : ''
-      })`;
+    : `${witnessesTs.factory}(${tsParams(witnessesTs.factoryParams)
+        .map((p) => `${tsPlaceholder(p.tsType)} /* TODO ${p.name} */`)
+        .join(', ')})`;
   const privateStateLine = (key) => (indent) => `${indent}${key}: ${initialPrivateState},`;
 
   const psType = witnessesTs?.privateStateType ?? `${names.Name}PrivateState`;
