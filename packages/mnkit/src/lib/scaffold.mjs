@@ -111,6 +111,19 @@ export const ownedFileHashes = (files) =>
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
   );
 
+/** The package.json fields `mnkit upgrade` merges three-way. */
+export const PACKAGE_BASE_FIELDS = ['dependencies', 'devDependencies', 'scripts', 'overrides', 'engines'];
+
+/**
+ * A rendered package.json's PACKAGE_BASE_FIELDS, as mnkit.json records them
+ * under `packageBase`: the base `upgrade` compares the developer's
+ * package.json and the new render against.
+ */
+export const packageBaseOf = (content) => {
+  const pkg = JSON.parse(content);
+  return Object.fromEntries(PACKAGE_BASE_FIELDS.filter((k) => pkg[k] !== undefined).map((k) => [k, pkg[k]]));
+};
+
 // A marker is a line of its own: the marker inside //, #, <!-- --> or {/* */},
 // or after the * of a block-comment line.
 // Other `@if <cond>` blocks (the UI template's `@if ledger`) pass through
@@ -297,6 +310,7 @@ export function renderExample(
       mnkit: mnkitVersion,
       toolchain: projectToolchain(tc),
       files: ownedFileHashes(files),
+      packageBase: { 'package.json': packageBaseOf(files.find((f) => f.rel === 'package.json').content) },
     };
     files.push({ templateRel: null, rel: 'mnkit.json', content: `${JSON.stringify(manifest, null, 2)}\n` });
   }

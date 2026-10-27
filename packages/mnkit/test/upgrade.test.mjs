@@ -116,7 +116,8 @@ describe('mnkit upgrade', () => {
         'overrides: vite-plugin-top-level-await → {"@swc/core":"1.15.47","uuid":"11.1.1"}',
       ]),
     );
-    expect(root.notes).toEqual([expect.stringMatching(/^scripts\.test differs/)]);
+    // Only you changed scripts.test: kept, with nothing to note.
+    expect(root.notes).toEqual([]);
 
     vi.spyOn(console, 'log').mockImplementation(() => {});
     expect(upgrade(dir, { tc, version: VERSION, skipInstall: true })).toBe(0);
@@ -312,5 +313,58 @@ describe('mergePackageJson', () => {
     const cur = JSON.stringify({ dependencies: { pino: '^10.0.0' } });
     const next = JSON.stringify({ dependencies: { pino: '^9.0.0' } });
     expect(mergePackageJson(cur, next, tc).changes).toEqual([]);
+    expect(mergePackageJson(cur, next, tc, { dependencies: { pino: '^9.0.0' } })).toMatchObject({ changes: [], notes: [] });
+  });
+
+  const merge = (cur, next, base) => {
+    const r = mergePackageJson(JSON.stringify(cur), JSON.stringify(next), tc, base);
+    return { ...r, pkg: JSON.parse(r.content) };
+  };
+
+  it('takes a template change to an unpinned dependency you left alone, and notes one you changed', () => {
+    const base = { devDependencies: { '@vitejs/plugin-react': '^5.0.0', vite: tc.npm.vite } };
+    const next = { devDependencies: { '@vitejs/plugin-react': '^6.0.0', vite: tc.npm.vite } };
+    const taken = merge(base, next, base);
+    expect(taken.changes).toEqual(['devDependencies: @vitejs/plugin-react ^5.0.0 → ^6.0.0']);
+    // No base (an older mnkit's project): not taken, but never silently.
+    expect(merge(base, next, undefined)).toMatchObject({
+      changes: [],
+      notes: ['devDependencies.@vitejs/plugin-react is ^5.0.0; the template now has ^6.0.0: left as is'],
+    });
+    const mine = { devDependencies: { '@vitejs/plugin-react': '^5.1.0', vite: tc.npm.vite } };
+    expect(merge(mine, next, base)).toMatchObject({ changes: [], notes: [expect.stringContaining('plugin-react is ^5.1.0')] });
+  });
+
+  it('bumps a pinned package you added, and one you moved to devDependencies, where it is', () => {
+    const pin = tc.npm['midnight-js'];
+    const cur = {
+      dependencies: { '@midnight-ntwrk/midnight-js-fetch-zk-config-provider': '4.0.0' },
+      devDependencies: { '@midnight-ntwrk/midnight-js-types': '4.0.0' },
+    };
+    const next = { dependencies: { '@midnight-ntwrk/midnight-js-types': pin } };
+    const r = merge(cur, next, next);
+    expect(r.pkg.dependencies).toEqual({ '@midnight-ntwrk/midnight-js-fetch-zk-config-provider': pin });
+    expect(r.pkg.devDependencies).toEqual({ '@midnight-ntwrk/midnight-js-types': pin });
+  });
+
+  it('leaves out a dependency you removed', () => {
+    const base = { dependencies: { pino: '^9.0.0' } };
+    expect(merge({}, base, base)).toMatchObject({ changes: [], notes: [] });
+    expect(merge({}, { dependencies: { pino: '^9.1.0' } }, base).notes).toEqual([expect.stringMatching(/^pino: you removed it/)]);
+  });
+
+  it('takes a template change to a script you left alone', () => {
+    const r = merge({ scripts: { test: 'vitest run' } }, { scripts: { test: 'vitest run --silent' } }, { scripts: { test: 'vitest run' } });
+    expect(r.pkg.scripts.test).toBe('vitest run --silent');
+  });
+
+  it('merges overrides and engines key by key, and removes an override the toolchain dropped', () => {
+    const base = { overrides: { a: { b: '1.0.0' }, gone: '1.0.0', edited: '1.0.0' }, engines: { node: '>=22' } };
+    const cur = { overrides: { a: { b: '1.0.0', mine: '2.0.0' }, gone: '1.0.0', edited: '1.5.0' }, engines: { node: '>=22', npm: '>=11' } };
+    const next = { overrides: { a: { b: '1.1.0' } }, engines: { node: '>=22.12' } };
+    const r = merge(cur, next, base);
+    expect(r.pkg.overrides).toEqual({ a: { b: '1.1.0', mine: '2.0.0' }, edited: '1.5.0' });
+    expect(r.pkg.engines).toEqual({ node: '>=22.12', npm: '>=11' });
+    expect(r.changes).toEqual(expect.arrayContaining(['overrides: removed gone']));
   });
 });

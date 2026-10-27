@@ -116,8 +116,10 @@ tell what you changed:
 - a file you deleted stays deleted (`--force` restores it)
 
 `package.json` (and `ui/package.json`) are merged: the pinned packages move to
-the new versions, new dependencies and scripts are added, and your own
-dependencies and scripts stay. `npx mnkit upgrade --check` reports what would
+the new versions wherever you list them, new dependencies and scripts are
+added, a dependency or script you left as the template had it follows the
+template, overrides and engines are merged key by key, and your own changes
+stay (with a note when the template changed the same entry). `npx mnkit upgrade --check` reports what would
 change and exits 1 if the project is behind, for CI. Every mnkit command exits
 2 on an error, so 1 always means "behind".
 

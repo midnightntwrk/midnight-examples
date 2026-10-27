@@ -34,17 +34,28 @@
 //                               since (--force restores it)
 //   gone from the template      deleted if unedited, else left and reported
 //
-// The package.json files (the project's and ui/'s) are merged instead: the
+// The package.json files (the project's and ui/'s) are merged instead, three
+// ways against what the last render had (mnkit.json's packageBase): the
 // toolchain pins (pinFor), the runtime packages and mnkit are moved to this
-// mnkit's, new dependencies and scripts are added, overrides and engines
-// follow the toolchain, and your own dependencies and scripts stay. Seed files
+// mnkit's wherever they are listed, a dependency or script you left as the
+// template had it follows the template, new ones are added, overrides and
+// engines follow the toolchain key by key, and your own changes stay (with a
+// note where the template changed the same entry). Seed files
 // (the contracts, tests, README, SPEC and the UI's seeds) are never touched.
 // Then mnkit.json records the new hashes and toolchain, and npm install runs.
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { LATE_SEEDS, RUNTIME_PACKAGES, fileHash, isTemplateOwned, projectToolchain, renderExample } from '../lib/scaffold.mjs';
+import {
+  LATE_SEEDS,
+  RUNTIME_PACKAGES,
+  fileHash,
+  isTemplateOwned,
+  packageBaseOf,
+  projectToolchain,
+  renderExample,
+} from '../lib/scaffold.mjs';
 import { NAME_RE, fail } from '../lib/template.mjs';
 import { PKG_ROOT, loadToolchain, mnkitVersion, pinFor } from '../lib/toolchain.mjs';
 import { UI_CONFIG, isUiOwned, planUi } from '../lib/ui.mjs';
@@ -82,47 +93,110 @@ export function projectPath(dir, rel) {
 
 /** The packages mnkit versions in lockstep with itself. */
 const LOCKSTEP = [...RUNTIME_PACKAGES, 'mnkit'];
+const DEP_FIELDS = ['dependencies', 'devDependencies'];
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 /**
- * `current` package.json text merged with the freshly rendered one. Returns
- * { content, changes, notes }: what changed, and what was left as is.
+ * `cur` merged with `next` key by key, recursively: the template's keys win,
+ * your extra keys stay, and a key the template dropped goes only if it is
+ * still as `base` had it. (overrides and engines follow the toolchain.)
  */
-export function mergePackageJson(current, rendered, tc) {
+function mergeObject(cur, next, base) {
+  if (!isObject(cur) || !isObject(next)) return next;
+  const out = { ...cur };
+  for (const [k, v] of Object.entries(next)) out[k] = mergeObject(cur[k], v, isObject(base) ? base[k] : undefined);
+  if (isObject(base)) for (const k of Object.keys(base)) if (!(k in next) && same(cur[k], base[k])) delete out[k];
+  return out;
+}
+
+/**
+ * `current` package.json text merged with the freshly rendered one, against
+ * `base` (mnkit.json's packageBase for it: what the last render had; absent
+ * for a project from an older mnkit). Returns { content, changes, notes }:
+ * what changed, and what was left as is.
+ *
+ *   pinned (pinFor) and lockstep packages   moved to the template's version,
+ *                                           wherever you list them, even ones
+ *                                           the template doesn't
+ *   other dependencies and scripts          the template's change is taken if
+ *                                           yours is as the base had it; else
+ *                                           yours stays, with a note
+ *   overrides, engines                      merged key by key (mergeObject)
+ */
+export function mergePackageJson(current, rendered, tc, base) {
   const cur = JSON.parse(current);
   const next = JSON.parse(rendered);
   const out = structuredClone(cur);
   const changes = [];
   const notes = [];
-  for (const field of ['dependencies', 'devDependencies']) {
+  const fieldOf = (pkg, o) => DEP_FIELDS.find((f) => o?.[f]?.[pkg] !== undefined);
+  const baseSpec = (pkg) => base?.[fieldOf(pkg, base)]?.[pkg];
+  for (const field of DEP_FIELDS) {
     for (const [pkg, spec] of Object.entries(next[field] ?? {})) {
-      const have = cur[field]?.[pkg];
-      if (have === spec) continue;
-      if (have === undefined) {
-        out[field] = sortKeys({ ...out[field], [pkg]: spec });
-        changes.push(`${field}: added ${pkg} ${spec}`);
-      } else if (pinFor(tc, pkg) || LOCKSTEP.includes(pkg)) {
-        out[field][pkg] = spec;
-        changes.push(`${field}: ${pkg} ${have} → ${spec}`);
+      const where = fieldOf(pkg, cur);
+      const was = baseSpec(pkg);
+      if (where === undefined) {
+        if (was === undefined) {
+          out[field] = sortKeys({ ...out[field], [pkg]: spec });
+          changes.push(`${field}: added ${pkg} ${spec}`);
+        } else if (was !== spec) {
+          notes.push(`${pkg}: you removed it, and the template now has ${spec}; left out`);
+        }
+        continue;
       }
+      const have = cur[where][pkg];
+      if (have === spec) continue;
+      if (pinFor(tc, pkg) || LOCKSTEP.includes(pkg) || (was !== undefined && have === was)) {
+        out[where][pkg] = spec;
+        changes.push(`${where}: ${pkg} ${have} → ${spec}`);
+      } else if (was !== spec) {
+        notes.push(`${where}.${pkg} is ${have}; the template now has ${spec}: left as is`);
+      }
+    }
+  }
+  // Pinned packages you added yourself move with the others.
+  for (const field of DEP_FIELDS) {
+    for (const [pkg, have] of Object.entries(cur[field] ?? {})) {
+      const pin = pinFor(tc, pkg);
+      if (fieldOf(pkg, next) !== undefined || !pin || have === pin) continue;
+      out[field][pkg] = pin;
+      changes.push(`${field}: ${pkg} ${have} → ${pin}`);
     }
   }
   for (const [name, command] of Object.entries(next.scripts ?? {})) {
     const have = cur.scripts?.[name];
+    const was = base?.scripts?.[name];
+    if (have === command) continue;
     if (have === undefined) {
-      out.scripts = { ...out.scripts, [name]: command };
-      changes.push(`scripts: added ${name}`);
-    } else if (have !== command) {
+      if (was === undefined) {
+        out.scripts = { ...out.scripts, [name]: command };
+        changes.push(`scripts: added ${name}`);
+      }
+    } else if (was !== undefined && have === was) {
+      out.scripts[name] = command;
+      changes.push(`scripts: ${name} → ${command}`);
+    } else if (was !== command) {
       notes.push(`scripts.${name} differs from the template's (${command}); left as is`);
     }
   }
-  if (next.engines && JSON.stringify(cur.engines) !== JSON.stringify(next.engines)) {
-    out.engines = next.engines;
-    changes.push(`engines: ${JSON.stringify(cur.engines ?? {})} → ${JSON.stringify(next.engines)}`);
+  if (next.engines) {
+    const engines = mergeObject(cur.engines ?? {}, next.engines, base?.engines);
+    if (!same(engines, cur.engines)) {
+      out.engines = engines;
+      changes.push(`engines: ${JSON.stringify(cur.engines ?? {})} → ${JSON.stringify(engines)}`);
+    }
   }
   for (const [pkg, spec] of Object.entries(next.overrides ?? {})) {
-    if (JSON.stringify(cur.overrides?.[pkg]) === JSON.stringify(spec)) continue;
-    out.overrides = { ...out.overrides, [pkg]: spec };
-    changes.push(`overrides: ${pkg} → ${JSON.stringify(spec)}`);
+    const merged = mergeObject(cur.overrides?.[pkg], spec, base?.overrides?.[pkg]);
+    if (same(cur.overrides?.[pkg], merged)) continue;
+    out.overrides = { ...out.overrides, [pkg]: merged };
+    changes.push(`overrides: ${pkg} → ${JSON.stringify(merged)}`);
+  }
+  for (const [pkg, spec] of Object.entries(base?.overrides ?? {})) {
+    if (pkg in (next.overrides ?? {}) || !same(cur.overrides?.[pkg], spec)) continue;
+    delete out.overrides[pkg];
+    changes.push(`overrides: removed ${pkg}`);
   }
   return { content: changes.length ? `${JSON.stringify(out, null, 2)}\n` : current, changes, notes };
 }
@@ -246,7 +320,7 @@ export function planUpgrade(
 
   const merged = packages.map(({ rel, rendered: next }) => ({
     rel,
-    ...mergePackageJson(fs.readFileSync(path.join(dir, ...rel.split('/')), 'utf8'), next, tc),
+    ...mergePackageJson(fs.readFileSync(path.join(dir, ...rel.split('/')), 'utf8'), next, tc, manifest.packageBase?.[rel]),
   }));
 
   const { conflicts: _, ...rest } = manifest;
@@ -256,6 +330,7 @@ export function planUpgrade(
     toolchain: projectToolchain(tc),
     files: sortKeys(Object.fromEntries(Object.entries(owned).map(([rel, content]) => [rel, nextBases[rel] ?? fileHash(content)]))),
     ...(Object.keys(nextConflicts).length ? { conflicts: sortKeys(nextConflicts) } : {}),
+    packageBase: Object.fromEntries(packages.map(({ rel, rendered: next }) => [rel, packageBaseOf(next)])),
   };
   return {
     from: manifest.mnkit,

@@ -27,7 +27,7 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileHash } from '../lib/scaffold.mjs';
+import { fileHash, packageBaseOf } from '../lib/scaffold.mjs';
 import { fail, writeFiles } from '../lib/template.mjs';
 import { UI_CONFIG, isUiOwned, planUi, uiDetails, uiWarnings } from '../lib/ui.mjs';
 
@@ -87,6 +87,10 @@ export function addUi(
     writeJson(manifestPath, {
       ...manifest,
       files: Object.fromEntries(Object.entries(files).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
+      packageBase: {
+        ...manifest.packageBase,
+        'ui/package.json': packageBaseOf(plan.files.find((f) => f.rel === 'package.json').content),
+      },
     });
 
     console.log(`\n  ${plan.files.length} files created. Seed files (yours to edit):`);
