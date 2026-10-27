@@ -299,11 +299,11 @@ jobs:
           - fixture: private-tip-jar
             upgrade: true
     env:
-      # The mnkit to upgrade from: 0.1.0, a commit on this branch that was
-      # never published. Once 0.2.0 is on npm, make it that version, and from
-      # then on the previous release. Then delete the Yarn install branch in
-      # scripts/mnkit-e2e.sh.
-      MNKIT_UPGRADE_FROM: 7ff0a29
+      # The mnkit to upgrade from: 0.1.0, never published. The tag marks commit
+      # 7ff0a29, so it stays reachable however PR 62 merges. Once 0.2.0 is on
+      # npm, make it that version, and from then on the previous release. Then
+      # delete the Yarn install branch in scripts/mnkit-e2e.sh.
+      MNKIT_UPGRADE_FROM: mnkit-upgrade-base-0.1.0
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  #v7.0.1

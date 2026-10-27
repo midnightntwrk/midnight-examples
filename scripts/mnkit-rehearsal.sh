@@ -24,11 +24,15 @@
 # and the `^<version>` ranges it writes resolve exactly as they will on npm.
 # Every other package is proxied from registry.npmjs.org.
 #
-# Nothing is written to npm config: the registry, the npm cache and the
-# publish token (a dummy, Verdaccio accepts anonymous publishes here) are set
-# for this script's commands only, and the npm cache is a fresh one in the
-# work dir, so no rehearsal tarball lands in your own cache. Verdaccio is
-# stopped on exit. MNKIT_E2E_DIR picks the work dir (default: a temp dir).
+# Your npm config is neither read nor written: npm uses user and global
+# config files in the work dir, which set the registry, the @midnight-ntwrk
+# scope registry and the publish token (a dummy, Verdaccio accepts anonymous
+# publishes here). npm takes a scoped package's registry from a scope line
+# before --registry, so a `@midnight-ntwrk:registry` line in ~/.npmrc would
+# otherwise send the publishes to the real npm. The npm cache is a fresh one
+# in the work dir too, so no rehearsal tarball lands in your own cache.
+# Verdaccio is stopped on exit. MNKIT_E2E_DIR picks the work dir (default: a
+# temp dir).
 
 set -euo pipefail
 
@@ -63,10 +67,18 @@ packages:
 log: { type: stdout, format: pretty, level: warn }
 EOF
 
+cat > "$WORK/npmrc" <<EOF
+registry=$REGISTRY
+@midnight-ntwrk:registry=$REGISTRY
+//localhost:$PORT/:_authToken=rehearsal
+EOF
+: > "$WORK/npmrc-global"
+export NPM_CONFIG_USERCONFIG="$WORK/npmrc" NPM_CONFIG_GLOBALCONFIG="$WORK/npmrc-global"
 export npm_config_cache="$WORK/npm-cache"
 echo "▶ verdaccio@$VERDACCIO_VERSION on $REGISTRY (storage in $WORK/verdaccio)"
 # In its own process group, so stopping it also stops the server npx starts.
-setsid npx --yes "verdaccio@$VERDACCIO_VERSION" --config "$WORK/verdaccio/config.yaml" --listen "$PORT" \
+# Verdaccio itself comes from npm: the rehearsal registry isn't up yet.
+setsid npx --yes --registry https://registry.npmjs.org/ "verdaccio@$VERDACCIO_VERSION" --config "$WORK/verdaccio/config.yaml" --listen "$PORT" \
   > "$WORK/verdaccio/verdaccio.log" 2>&1 &
 VERDACCIO_PID=$!
 trap 'kill -- "-$VERDACCIO_PID" 2>/dev/null || true' EXIT
@@ -80,10 +92,10 @@ curl -sf "${REGISTRY}-/ping" > /dev/null || { echo "✖ verdaccio did not start"
 # Runtime packages first, as the release workflow does.
 for p in sim coins fast-sync mnkit; do
   echo "▶ npm publish packages/$p → $REGISTRY"
-  (cd "$REPO/packages/$p" && npm publish --registry "$REGISTRY" "--//localhost:$PORT/:_authToken=rehearsal" --access public)
+  (cd "$REPO/packages/$p" && npm publish --access public)
 done
 
-npm_config_registry="$REGISTRY" MNKIT_E2E_DIR="$WORK" bash "$REPO/scripts/mnkit-e2e.sh" --from-registry "$VERSION" "$@"
+MNKIT_E2E_DIR="$WORK" bash "$REPO/scripts/mnkit-e2e.sh" --from-registry "$VERSION" "$@"
 
 # What each project got from where: our packages from the rehearsal registry,
 # the rest from npm through it.
