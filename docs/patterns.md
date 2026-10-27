@@ -44,14 +44,17 @@ Entries name a symbol rather than a line number, so search the file for it.
 | Nested `Map`s; batched migration | zk-loan | `zk-loan.compact` → `loans`, `changePin` |
 | Admin key, blacklist, admin rotation | zk-loan | `blacklistUser`, `rotateAdmin` |
 | In-circuit Schnorr signature check (Jubjub) | zk-loan | `schnorr.compact` → `schnorrVerify`, `schnorrChallenge` |
-| `pure circuit` reused off chain | zk-loan | `deriveUserPublicKey`, `schnorrChallenge` |
+| `pure circuit` reused off chain | zk-loan, lottery | `deriveUserPublicKey`, `schnorrChallenge`; `organizerKey`, `playerKey` |
+| A draw nobody can steer: committed seed + per-ticket entropy, seed never published | lottery | `lottery.compact` → `constructor`, `buyTicket`, `draw` |
+| `x mod n` in a circuit (witness divides, circuit checks `q*n + r == x` and `r < n`) | lottery, calculator | `lottery.compact` → `draw`; `calculator.compact` → `divide` |
+| A key the constructor stores can't use `kernel.self()` | lottery, secret-message | `lottery.compact` → `organizerKey` |
 
 ## Tokens
 
 | You need | Example | File → symbol |
 |---|---|---|
 | Mint an unshielded token, then send or receive it | token-transfers | `mintAndReceive`, `sendToUser`, `receiveTokens` |
-| Receive and send NIGHT | token-transfers, private-party | `receiveNightTokens`, `sendNightTokensToUser`; `checkIn`, `claimFees` |
+| Receive and send NIGHT | token-transfers, private-party, lottery | `receiveNightTokens`, `sendNightTokensToUser`; `checkIn`, `claimFees`; `buyTicket`, `claimPrize` |
 | Check the contract's own balance | private-party | `claimFees` (`unshieldedBalanceGte`) |
 | An unshielded NFT plus a NIGHT deposit and settlement | silent-auction | `receiveTokens`, `claimWin` |
 | Shielded mint, send and receive | token-transfers | `mintShieldedToSelf`, `mintAndSendShielded`, `sendShieldedToUser` |

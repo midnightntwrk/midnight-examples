@@ -1,0 +1,19 @@
+{
+  "steps": {
+    "browser": {
+      "status": "not-run"
+    },
+    "walletDeploy": {
+      "status": "not-run"
+    },
+    "walletCalls": {
+      "status": "not-run"
+    },
+    "preprod": {
+      "status": "not-run"
+    },
+    "mainnet": {
+      "status": "not-run"
+    }
+  }
+}

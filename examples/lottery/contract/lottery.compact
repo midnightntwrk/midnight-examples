@@ -1,0 +1,207 @@
+// This file is part of example-lottery.
+// Copyright (C) Midnight Foundation
+// SPDX-License-Identifier: Apache-2.0
+// Licensed under the Apache License, Version 2.0 (the "License");
+// You may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// A NIGHT lottery with a draw nobody can predict or steer, except a cheating
+// organizer (see SPEC.md → Out of scope).
+//
+// Midnight has no on-chain randomness, so the draw combines two sources:
+//   1. a secret seed the organizer commits to in the constructor, before any
+//      ticket is sold. Fixing it up front stops the organizer choosing a seed
+//      after seeing the tickets.
+//   2. a fresh nonce from every ticket, folded into a public running hash
+//      (`entropy`). Players don't know the seed, so no nonce they pick can aim
+//      the draw at a ticket.
+// `draw` proves, in zero knowledge, that the winner was computed from the
+// committed seed. The seed itself never reaches the chain.
+//
+// What an observer of the chain learns, step by step:
+//   deploy      -> the organizer key (a hash), the seed commitment, the price
+//                  and the cap.
+//   buyTicket   -> a ticket number, the buyer's player key (a hash), the new
+//                  entropy hash and the pot. The NIGHT payment shows the
+//                  paying wallet. Not the nonce, not the secret key.
+//   closeSales  -> that sales closed.
+//   draw        -> the winning ticket and its holder key. Not the seed.
+//   claimPrize  -> the address the winner chose to be paid at.
+
+pragma language_version 0.23;
+
+import CompactStandardLibrary;
+
+// OPEN: tickets on sale. CLOSED: sales over, waiting for the draw.
+// DRAWN: the winner is known, the pot is unclaimed. PAID: the pot was paid out.
+export enum LotteryState {
+  OPEN,
+  CLOSED,
+  DRAWN,
+  PAID
+}
+
+// --- Public state -----------------------------------------------------------
+// Every `ledger` field is on chain and readable by anyone. `sealed` fields are
+// set once, in the constructor, so the rules can't change after deployment.
+
+export sealed ledger organizer: Bytes<32>;
+export sealed ledger seedCommitment: Bytes<32>;
+export sealed ledger ticketPrice: Uint<64>;
+export sealed ledger maxTickets: Uint<16>;
+
+export ledger state: LotteryState;
+// ticket number -> holder's player key. Ticket numbers run 0 .. ticketCount-1.
+export ledger tickets: Map<Uint<16>, Bytes<32>>;
+export ledger ticketCount: Counter;
+// NIGHT held for the winner. Tracked here rather than read back from the
+// contract's balance so the UI and the claim agree on one number.
+export ledger pot: Uint<128>;
+export ledger entropy: Bytes<32>;
+export ledger winningTicket: Uint<16>;
+export ledger winner: Bytes<32>;
+
+// --- Private input ------------------------------------------------------------
+// Witnesses run on the caller's device (contract/witnesses.ts). Their results
+// are private inside the circuit, and the compiler refuses to let them, or
+// anything derived from them, reach the ledger without disclose().
+
+// The caller's secret. Hashed with a different purpose for each role, so one
+// secret gives an organizer key and an unrelated player key.
+witness secretKey(): Bytes<32>;
+// The organizer's draw seed: a different secret from `secretKey`, so revealing
+// either one never gives away the other.
+witness seed(): Bytes<32>;
+// Division done off chain: [quotient, remainder] of `value / divisor`. The
+// circuit checks the answer (`draw`), so a lying witness can't pick the winner.
+witness divMod(value: Uint<64>, divisor: Uint<64>): [Uint<64>, Uint<64>];
+
+constructor(price: Uint<64>, max: Uint<16>) {
+  assert(price > 0, "Ticket price must be positive");
+  assert(max >= 2, "A lottery needs at least two tickets");
+
+  organizer = disclose(organizerKey(secretKey()));
+  // A plain hash, not a salted commitment: the seed is 32 random bytes, so
+  // nobody can find it by hashing guesses (docs/compact-gotchas.md → salt only
+  // guessable values). Publishing the hash is safe; the seed stays private.
+  seedCommitment = disclose(commitSeed(seed()));
+  ticketPrice = disclose(price);
+  maxTickets = disclose(max);
+  // The running hash starts from a fixed tag. It needn't be unique per
+  // deployment: the seed already is.
+  entropy = pad(32, "lottery:entropy:");
+  state = LotteryState.OPEN;
+}
+
+// The organizer key: a hash of the secret, NOT bound to the contract address
+// like the player key. `kernel.self()` returns a different value inside the
+// constructor than in later calls (secret-message.compact has the same note),
+// so a key the constructor stores could never be matched again. The organizer
+// is public anyway, and createLotteryPrivateState makes a fresh secret per
+// lottery, so nothing links two lotteries through this key.
+//
+// `export pure`: also callable off chain (`pureCircuits.organizerKey`), so a
+// client can tell whether its secret is the organizer's without a transaction.
+export pure circuit organizerKey(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "lottery:organizer:"), sk]);
+}
+
+// The player key: bound to (purpose, this contract, secret), the private-bid
+// pattern. The contract address makes the same secret give an unrelated key
+// in every deployment, so a player can't be linked across lotteries by it.
+// Pure, with the address as an argument, so a client can find its own tickets
+// (`pureCircuits.playerKey`); circuits pass `kernel.self().bytes`, which is
+// the real address because no player key is computed in the constructor.
+export pure circuit playerKey(lottery: Bytes<32>, sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>([pad(32, "lottery:player:"), lottery, sk]);
+}
+
+circuit commitSeed(s: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "lottery:seed:"), s]);
+}
+
+// The caller's player key: what a ticket is recorded under.
+circuit callerKey(): Bytes<32> {
+  return disclose(playerKey(kernel.self().bytes, secretKey()));
+}
+
+// True when the caller's secret is the organizer's.
+circuit isOrganizer(): Boolean {
+  return disclose(organizerKey(secretKey()) == organizer);
+}
+
+// `nonce` is a circuit argument, so it isn't published: only the new entropy
+// hash is. The client draws it at random for every ticket.
+export circuit buyTicket(nonce: Bytes<32>): [] {
+  assert(state == LotteryState.OPEN, "Ticket sales are closed");
+  // Only catches an organizer buying with their own secret. One playing under
+  // a second secret can't be detected (SPEC.md → Out of scope).
+  assert(!isOrganizer(), "The organizer cannot buy tickets");
+  assert(ticketCount.read() < maxTickets, "All tickets are sold");
+
+  // The caller's wallet pays the ticket price in NIGHT to the contract.
+  receiveUnshielded(nativeToken(), ticketPrice as Uint<128>);
+
+  const player = callerKey();
+  // ticketCount < maxTickets, a Uint<16>, so the cast can't fail.
+  tickets.insert(ticketCount.read() as Uint<16>, player);
+  entropy = persistentHash<Vector<3, Bytes<32>>>([entropy, player, disclose(nonce)]);
+  ticketCount.increment(1);
+  pot = (pot + ticketPrice) as Uint<128>;
+}
+
+export circuit closeSales(): [] {
+  assert(isOrganizer(), "Only the organizer can close sales");
+  assert(state == LotteryState.OPEN, "Ticket sales are closed");
+  // A draw over zero tickets would divide by zero.
+  assert(ticketCount.read() > 0, "No tickets were sold");
+  state = LotteryState.CLOSED;
+}
+
+export circuit draw(): [] {
+  assert(isOrganizer(), "Only the organizer can draw");
+  assert(state == LotteryState.CLOSED, "Sales must be closed before the draw");
+
+  const s = seed();
+  // Opening the commitment: the seed must be the one fixed at deployment.
+  // Only the comparison's result is disclosed, never the seed.
+  assert(disclose(commitSeed(s) == seedCommitment), "Seed does not match the commitment");
+
+  // Mix the seed with every ticket's entropy, then read the first 8 bytes of
+  // the digest as a number. A Bytes<8> always fits in a Uint<64>, so this
+  // cast never fails, which isn't true of the whole 32-byte digest.
+  const digest = persistentHash<Vector<3, Bytes<32>>>([pad(32, "lottery:draw:"), s, entropy]);
+  const h = (slice<8>(digest, 0) as Field) as Uint<64>;
+
+  // winningTicket = h mod ticketCount. Compact has no `%`, so the witness
+  // divides and the circuit checks the result (the calculator pattern).
+  // Both checks are needed: without `r < count`, a witness could return any
+  // r with a matching q and choose the winner.
+  const count = ticketCount.read();
+  const [q, r] = divMod(h, count);
+  assert(disclose(r < count && q * count + r == h), "Incorrect division");
+
+  // Publishing r reveals a few bits about a hash of the seed, not the seed.
+  winningTicket = disclose(r) as Uint<16>;
+  winner = tickets.lookup(winningTicket);
+  state = LotteryState.DRAWN;
+}
+
+// The winner names the address to be paid at, which needn't be the wallet
+// that bought the ticket.
+export circuit claimPrize(to: UserAddress): [] {
+  assert(state == LotteryState.DRAWN, "The draw has not happened");
+  assert(callerKey() == winner, "Only the winner can claim");
+
+  sendUnshielded(nativeToken(), pot, right<ContractAddress, UserAddress>(disclose(to)));
+  pot = 0;
+  state = LotteryState.PAID;
+}
