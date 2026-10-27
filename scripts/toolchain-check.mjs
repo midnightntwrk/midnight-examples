@@ -18,8 +18,9 @@
 // toolchain.json. The copies: the README table, every workflow's compact-version
 // and npm, .nvmrc, the root package.json (engines, devEngines, overrides), every
 // compose.yml image, the pinned deps and engines of every example, UI,
-// template and package, and every contract's pragma. experimental/ is left
-// out on purpose: it tracks release candidates. It also fails when
+// template and package, the runtime packages' README overrides, and every
+// contract's pragma. experimental/ is left out on purpose: it tracks release
+// candidates. It also fails when
 // package-lock.json nests a package inside a workspace (see below).
 // Zero dependencies — Node built-ins only.
 
@@ -98,6 +99,35 @@ expect('.nvmrc', 'Node', read(path.join(REPO_ROOT, '.nvmrc')).trim(), tc.node);
   expect('package.json', 'devEngines.packageManager', pm && `${pm.name}@${pm.version}`, `npm@>=${NPM_FLOOR}`);
   for (const [pkg, want] of Object.entries(npmOverrides(tc.overrides))) {
     expect('package.json', `overrides["${pkg}"]`, JSON.stringify(root.overrides?.[pkg]), JSON.stringify(want));
+  }
+}
+
+// --- runtime package READMEs: "Install outside mnkit" ------------------------
+// Each README gives the overrides (and the install line its peers) a project
+// outside mnkit needs; they must be toolchain.json's.
+for (const name of ['fast-sync', 'sim', 'coins']) {
+  const f = path.join(REPO_ROOT, 'packages', name, 'README.md');
+  const src = read(f);
+  const m = /```json\n("overrides": \{[\s\S]*?\n\})\n```/.exec(src);
+  if (!m) {
+    problems.push(`${rel(f)}: no \`"overrides": { … }\` json block`);
+    continue;
+  }
+  const where = `${rel(f)}:${lineOf(src, m.index)}`;
+  let overrides;
+  try {
+    overrides = JSON.parse(`{${m[1]}}`).overrides;
+  } catch (err) {
+    problems.push(`${where}: overrides block is not valid JSON (${err.message})`);
+    continue;
+  }
+  for (const [pkg, version] of Object.entries(overrides)) {
+    if (!(pkg in tc.overrides)) problems.push(`${where}: overrides["${pkg}"] is not in toolchain.json overrides`);
+    else expect(where, `overrides["${pkg}"]`, version, tc.overrides[pkg]);
+  }
+  for (const hit of src.matchAll(/(@midnight-ntwrk\/[a-z0-9-]+)@([0-9][^\s`]*)/g)) {
+    const want = pinFor(tc, hit[1]);
+    if (want) expect(`${rel(f)}:${lineOf(src, hit.index)}`, hit[1], hit[2], want);
   }
 }
 

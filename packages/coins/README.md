@@ -16,4 +16,21 @@ when a circuit takes a coin.
   another wallet needs.
 - `contractCoinMtIndex`: a contract-held coin's tree index, from the indexer.
 
+## Install outside mnkit
+
+An mnkit project already has these. Anywhere else, add the peer and these
+`overrides` to your `package.json`:
+
+```json
+"overrides": {
+  "@midnight-ntwrk/ledger-v8": "8.1.2",
+  "@midnight-ntwrk/onchain-runtime-v3": "3.1.1"
+}
+```
+
+midnight-js-protocol 4.1.1 pins `ledger-v8` 8.1.0 and `onchain-runtime-v3`
+3.0.0 exactly. Without the overrides you get those versions, which mnkit
+doesn't test, and ledger-v8 8.1.0 lacks the 8.1.2 deserialization security
+fix.
+
 Apache-2.0. Source: [midnight-examples/packages/coins](https://github.com/midnightntwrk/midnight-examples/tree/main/packages/coins).

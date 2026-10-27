@@ -18,4 +18,32 @@ Test wallets for Midnight projects. Part of
   `MIDNIGHT_PRESEED_DIR` at a bundle directory to use it. For development
   wallets only.
 
+## Install outside mnkit
+
+An mnkit project already has these. Anywhere else, install the peers at
+exactly these versions and add the `overrides` to your `package.json`:
+
+```sh
+npm install --save-exact @midnight-ntwrk/mnkit-wallet \
+  @midnight-ntwrk/midnight-js-network-id@4.1.1 @midnight-ntwrk/midnight-js-protocol@4.1.1 \
+  @midnight-ntwrk/midnight-js-types@4.1.1 @midnight-ntwrk/midnight-js-utils@4.1.1 \
+  @midnight-ntwrk/testkit-js@4.1.1 @midnight-ntwrk/wallet-sdk@1.2.0
+```
+
+```json
+"overrides": {
+  "@midnight-ntwrk/wallet-sdk": "1.2.0",
+  "@midnight-ntwrk/ledger-v8": "8.1.2",
+  "@midnight-ntwrk/onchain-runtime-v3": "3.1.1",
+  "@midnight-ntwrk/zkir-v2": "2.1.1"
+}
+```
+
+midnight-js 4.1.1 pins `ledger-v8` 8.1.0 and `onchain-runtime-v3` 3.0.0
+exactly, and testkit-js 4.1.1 pins `wallet-sdk` 1.1.0 and `zkir-v2` 2.1.0.
+Without the overrides you get those versions, which mnkit doesn't test, and
+ledger-v8 8.1.0 lacks the 8.1.2 deserialization security fix. npm rejects an
+override that differs from a direct dependency's range (`EOVERRIDE`), so
+depend on `wallet-sdk` at exactly `1.2.0`.
+
 Apache-2.0. Source: [midnight-examples/packages/fast-sync](https://github.com/midnightntwrk/midnight-examples/tree/main/packages/fast-sync).
