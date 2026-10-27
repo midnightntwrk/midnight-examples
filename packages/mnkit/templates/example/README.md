@@ -70,14 +70,21 @@ The constructor arguments and initial private state come from
 `contract/deploy-args.ts`, and the address lands in `deployments/<network>.json`.
 Off local, set `MIDNIGHT_PRIVATE_STATE_PASSWORD` in the repo-root
 `.env.<network>`: it encrypts the private state and signing key kept in
-`.mnkit/private-state/<network>`.
+`.mnkit/private-state/<network>`. It needs at least 16 characters, with 3 of
+upper case, lower case, digits and symbols, no character more than 3 times in
+a row, and no runs like `1234` or `abcd`; `deploy` checks it before it spends
+anything.
 <!-- @endif -->
 <!-- @if standalone -->
 To run it against **preprod** or **preview** instead, start a local proof server
 (`npm run proof:up`), put a funded wallet's seed in `.env.<network>` as
 `MIDNIGHT_PREPROD_SEED=<hex>` (or `MIDNIGHT_PREVIEW_SEED`; preprod also needs
-`BLOCKFROST_PROJECT_ID`), and run `npm run test:preprod`. The `.env.*` files are
-gitignored. A new wallet syncs from genesis, which takes a while on preprod.
+`BLOCKFROST_PROJECT_ID`), and run `npm run test:preprod`. The tests and `deploy`
+read the same files: `.env`, `.env.local`, `.env.<network>` and
+`.env.<network>.local`, with variables already set in the shell winning. All
+`.env*` files are gitignored. A new wallet syncs from genesis, about 80 minutes
+on preprod; if that times out, raise `MIDNIGHT_SYNC_TIMEOUT_MS` (default 120
+minutes off local).
 
 ## Deploy without the UI
 
@@ -100,7 +107,9 @@ network (`npm run proof:up`).
 
 Off local, the deploy uses the wallet in `.env.<network>`, as `test:preprod`
 does, and needs `MIDNIGHT_PRIVATE_STATE_PASSWORD` there too: at least 16
-characters, with 3 of upper case, lower case, digits and symbols. It encrypts
+characters, with 3 of upper case, lower case, digits and symbols, no character
+more than 3 times in a row, and no runs like `1234` or `abcd`. `deploy` checks
+it before it spends anything. It encrypts
 what `deploy` keeps in `.mnkit/private-state/<network>`: the contract's private
 state and its signing key, which you need to maintain the contract later. Back
 that directory up, and keep the password.

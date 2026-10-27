@@ -29,17 +29,19 @@
 // key (needed to maintain the contract later) are kept, encrypted, in
 // .mnkit/private-state/<network>: back that directory up for a real network.
 //
-// Off local the wallet is the Alice wallet from .env.<network>
-// (MIDNIGHT_<NETWORK>_SEED, as the devnet tests use), and the store's password
-// is MIDNIGHT_PRIVATE_STATE_PASSWORD. A proof server must be running
+// Off local the wallet is the Alice wallet (MIDNIGHT_<NETWORK>_SEED), and the
+// store's password is MIDNIGHT_PRIVATE_STATE_PASSWORD, checked against the
+// private-state store's policy before anything is spent. Both come from the
+// environment or the env files the devnet tests read: .env, .env.local,
+// .env.<network> and .env.<network>.local. A proof server must be running
 // (`npm run proof:up`), on every network.
 
-import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { parseEnv } from 'node:util';
+import { loadEnv } from 'vite';
 import { WebSocket } from 'ws';
 import pino from 'pino';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
+import { validatePassword } from '@midnight-ntwrk/midnight-js-utils';
 import { deployContract, type DeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust } from '@midnight-ntwrk/mnkit-wallet';
@@ -77,11 +79,9 @@ function fail(message: string): never {
   process.exit(1);
 }
 
-/** Loads .env.<network> like the devnet tests do; variables already set win. */
-function loadEnv(network: string): void {
-  const file = fileURLToPath(new URL(`.env.${network}`, ENV_DIR));
-  if (!fs.existsSync(file)) return;
-  for (const [key, value] of Object.entries(parseEnv(fs.readFileSync(file, 'utf8')))) {
+/** Loads the env files the devnet tests read (vitest.config.ts); variables already set win. */
+function loadNetworkEnv(network: string): void {
+  for (const [key, value] of Object.entries(loadEnv(network, fileURLToPath(ENV_DIR), ''))) {
     if (process.env[key] === undefined) process.env[key] = value;
   }
 }
@@ -105,13 +105,26 @@ const entry = deployables[name];
 if (!entry) fail(`contract/deploy-args.ts has no '${name}'. It has: ${Object.keys(deployables).join(', ')}.`);
 
 const isRemote = network !== 'local';
-if (isRemote) loadEnv(network);
+if (isRemote) loadNetworkEnv(network);
 const password = isRemote ? process.env['MIDNIGHT_PRIVATE_STATE_PASSWORD'] : LOCAL_PASSWORD;
+const PASSWORD_POLICY =
+  'at least 16 characters, with 3 of upper case, lower case, digits and symbols, no character more than 3 ' +
+  "times in a row, and no runs like '1234' or 'abcd'";
 if (!password) {
   fail(
     `Set MIDNIGHT_PRIVATE_STATE_PASSWORD (in .env.${network} or the environment). It encrypts the private ` +
-      `state and signing key kept in .mnkit/private-state/${network}: at least 16 characters, with 3 of ` +
-      'upper case, lower case, digits and symbols. Keep it: without it the signing key is lost.',
+      `state and signing key kept in .mnkit/private-state/${network}: ${PASSWORD_POLICY}. Keep it: without ` +
+      'it the signing key is lost.',
+  );
+}
+// The store checks it only after the deploy is on chain, so a weak one would
+// spend DUST and then lose the signing key: check it first.
+try {
+  validatePassword(password);
+} catch (err) {
+  fail(
+    `MIDNIGHT_PRIVATE_STATE_PASSWORD is too weak: ${err instanceof Error ? err.message : String(err)}. ` +
+      `It needs ${PASSWORD_POLICY}. Nothing was deployed.`,
   );
 }
 
@@ -128,7 +141,8 @@ if (!isRemote && !((await answers(config.node)) && (await answers(config.indexer
 
 setNetworkId(config.networkId);
 const envConfig: EnvironmentConfiguration = { walletNetworkId: config.networkId, ...config };
-const syncTimeoutMs = Number(process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ?? (isRemote ? 60 * 60_000 : 10 * 60_000));
+// A wallet with no preseed syncs from genesis: about 78 minutes on preprod.
+const syncTimeoutMs = Number(process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ?? (isRemote ? 120 * 60_000 : 10 * 60_000));
 
 const setup = resolveWallet(network);
 const wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret, { fastSync: setup.fastSync });

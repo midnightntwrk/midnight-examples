@@ -64,8 +64,9 @@ describe(`__Title__ Contract (${network})`, () => {
 
   const config = getConfig();
   const isRemote = network !== 'local';
+  // A wallet with no preseed syncs from genesis: about 78 minutes on preprod.
   const syncTimeoutMs = Number(
-    process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ?? (isRemote ? 60 * 60_000 : 10 * 60_000),
+    process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ?? (isRemote ? 120 * 60_000 : 10 * 60_000),
   );
 
   // Reads the contract's public ledger state.
