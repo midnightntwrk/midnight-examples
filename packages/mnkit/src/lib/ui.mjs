@@ -55,7 +55,7 @@ import {
   scanWitnessesTs,
   typeLabel,
 } from './contract-info.mjs';
-import { MODES, selectBlocks } from './scaffold.mjs';
+import { MODES, fileHash, selectBlocks } from './scaffold.mjs';
 import { assertNoLeftoverTokens, deriveNames, fail, renderTree, substituteNames } from './template.mjs';
 import { PKG_ROOT } from './toolchain.mjs';
 
@@ -129,6 +129,38 @@ export const UI_KNOWN_TOKENS = [
  */
 export const isUiOwned = (f) => !f.seed && f.rel !== 'package.json';
 
+/** Tokens a template-owned file can use without reading the compiled contract. */
+const CONTRACT_FREE_TOKENS = new Set(['__name__', '__Name__', '__Title__', '__camelName__', '__MANAGED__', '__NETWORK_IDS__', '__NEW_UI__', '__PROJECT__']);
+
+/**
+ * Whether a UI template file (raw) is rendered from the compiled contract: it
+ * uses a token beyond the names, networks and paths. `mnkit upgrade` skips
+ * these when the contract isn't compiled, and re-renders them when only the
+ * contract changed.
+ */
+export const isContractDerived = (raw) => UI_KNOWN_TOKENS.some((t) => !CONTRACT_FREE_TOKENS.has(t) && raw.includes(t));
+
+/** The generator's own source: a change to it changes what contract-derived files render to. */
+let generatorHash = null;
+/**
+ * What a contract-derived file renders from besides the contract: its
+ * template and the generator. mnkit.json records it under `sources`; while it
+ * is unchanged, a different render means the contract changed.
+ */
+export function templateSource(raw) {
+  generatorHash ??= fileHash(['ui.mjs', 'contract-info.mjs'].map((f) => fs.readFileSync(new URL(f, import.meta.url), 'utf8')).join('\0'));
+  return fileHash(`${generatorHash}\0${raw}`);
+}
+
+/** The render steps every UI file ends with: the name and path tokens, then the leftover check. */
+function finishUiFile(out, rel, { camelName, managed, newUi, project, names }) {
+  out = out.replaceAll('__camelName__', camelName).replaceAll('__MANAGED__', managed);
+  out = out.replaceAll('__NEW_UI__', newUi).replaceAll('__PROJECT__', project);
+  out = substituteNames(out, names);
+  assertNoLeftoverTokens(rel, out, UI_KNOWN_TOKENS);
+  return out;
+}
+
 export const BASE_NETWORKS = ['undeployed', 'preview', 'preprod'];
 export const OPT_IN_NETWORKS = ['mainnet'];
 
@@ -153,6 +185,9 @@ export function standaloneUiPackageJson(raw, name) {
  *   privateState  'memory' | 'persistent'; default from the witnesses factory
  *   networks      opt-in networks (OPT_IN_NETWORKS) the network picker offers
  *   skipSeeds     leave the seed files out (re-renders)
+ *   withoutContract  render only the template-owned files that don't read the
+ *                 compiled contract (`contract` names it); `contractFiles`
+ *                 lists the others (re-renders before a compile)
  *   where         how messages name the project ('examples/x', 'this project')
  *   compileHint   the command that compiles it, for the error without output
  */
@@ -165,6 +200,7 @@ export function planUi(
     privateState: privateStateFlag = null,
     networks: extraNetworks = [],
     skipSeeds = false,
+    withoutContract = false,
     where = mode === 'monorepo' ? `examples/${name}` : 'this project',
     compileHint = mode === 'monorepo' ? `npm run compile -w @midnight-ntwrk/example-${name}` : 'npm run compile',
     templateDir = UI_TEMPLATE_DIR,
@@ -188,6 +224,29 @@ export function planUi(
   /** The generator command, and the project directory, as generated text names them. */
   const newUi = mode === 'standalone' ? 'mnkit add ui' : 'npm run new:ui';
   const project = mode === 'standalone' ? '..' : 'examples/__name__';
+  const networkIds = [...BASE_NETWORKS, ...extraNetworks].map((n) => JSON.stringify(n)).join(', ');
+
+  if (withoutContract) {
+    if (!contractFlag) fail(`ui/${UI_CONFIG} names no contract.`);
+    const names = deriveNames(name);
+    const ctx = { camelName: names.Name[0].toLowerCase() + names.Name.slice(1), managed: contractFlag, newUi, project, names };
+    const { skip, rename = {} } = MODE_FILES[mode];
+    const contractFiles = [];
+    const files = renderTree(templateDir, {
+      name,
+      skip: (rel) => {
+        if (skip.includes(rel) || SEED_FILES.has(rel)) return true;
+        if (rel === 'package.json' || !isContractDerived(fs.readFileSync(path.join(templateDir, rel), 'utf8'))) return false;
+        contractFiles.push(rename[rel] ?? substituteNames(rel, names));
+        return true;
+      },
+      render: (raw, rel) =>
+        mode === 'standalone' && rel === 'package.json'
+          ? standaloneUiPackageJson(raw, name)
+          : finishUiFile(selectBlocks(raw, mode, rel).replaceAll('__NETWORK_IDS__', networkIds), rel, ctx),
+    }).map((f) => ({ ...f, rel: rename[f.templateRel] ?? f.rel, seed: false }));
+    return { files, contractFiles };
+  }
 
   const compiled = listCompiled(dir);
   if (compiled.length === 0) {
@@ -446,7 +505,7 @@ export function planUi(
     .join(' and ');
 
   const blocks = {
-    __NETWORK_IDS__: [...BASE_NETWORKS, ...extraNetworks].map((n) => JSON.stringify(n)).join(', '),
+    __NETWORK_IDS__: networkIds,
     __CIRCUIT_UNION__: circuits.length ? circuits.map((c) => JSON.stringify(c.name)).join(' | ') : 'never',
     __WITNESS_METHOD__: hasWitnesses ? 'withWitnesses(witnesses)' : 'withVacantWitnesses',
     __WITNESS_METHOD_DOC__: hasWitnesses
@@ -636,11 +695,7 @@ export function planUi(
       : out.replaceAll('__WITNESS_IMPORT__\n', '');
     // Blocks first (they contain name tokens), then names.
     for (const [token, value] of Object.entries(blocks)) out = out.replaceAll(token, value);
-    out = out.replaceAll('__camelName__', camelName).replaceAll('__MANAGED__', managed);
-    out = out.replaceAll('__NEW_UI__', newUi).replaceAll('__PROJECT__', project);
-    out = substituteNames(out, names);
-    assertNoLeftoverTokens(rel, out, UI_KNOWN_TOKENS);
-    return out;
+    return finishUiFile(out, rel, { camelName, managed, newUi, project, names });
   }
 
   const { skip, rename = {} } = MODE_FILES[mode];
@@ -648,7 +703,12 @@ export function planUi(
     name,
     skip: (rel) => skip.includes(rel) || (skipSeeds && SEED_FILES.has(rel)),
     render,
-  }).map((f) => ({ ...f, rel: rename[f.templateRel] ?? f.rel, seed: SEED_FILES.has(f.templateRel) }));
+  }).map((f) => {
+    const seed = SEED_FILES.has(f.templateRel);
+    const raw = seed ? '' : fs.readFileSync(path.join(templateDir, f.templateRel), 'utf8');
+    // `source`: a contract-derived owned file's templateSource (mnkit upgrade).
+    return { ...f, rel: rename[f.templateRel] ?? f.rel, seed, ...(isContractDerived(raw) ? { source: templateSource(raw) } : {}) };
+  });
 
   return {
     managed,

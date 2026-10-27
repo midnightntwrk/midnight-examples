@@ -271,6 +271,77 @@ describe('mnkit upgrade', () => {
     expect(read(dir, panel)).toBe('// my panel\n');
   });
 
+  /** hello-world with its UI, as `mnkit add ui` left it. */
+  function uiProject() {
+    const dir = currentProject();
+    fs.cpSync(path.join(FIXTURES, 'hello-world', 'contract'), path.join(dir, 'contract'), { recursive: true });
+    placeCompiled('hello-world', dir);
+    fs.mkdirSync(path.join(dir, 'contract', 'managed', 'hello-world', 'keys'));
+    addUi(dir, { name: 'hello-world', skipGate: true, skipInstall: true });
+    return dir;
+  }
+  const INFO = 'contract/managed/hello-world/compiler/contract-info.json';
+  /** A second circuit in the compiled contract, as if the developer added one and compiled. */
+  function addCircuit(dir) {
+    const info = JSON.parse(read(dir, INFO));
+    info.circuits.push({ ...info.circuits[0], name: 'clearMessage', arguments: [] });
+    write(dir, INFO, JSON.stringify(info));
+  }
+
+  it('upgrades the UI without a compiled contract, skipping the files rendered from it', () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const dir = uiProject();
+    const recorded = manifestOf(dir).files;
+    fs.rmSync(path.join(dir, 'contract', 'managed'), { recursive: true });
+
+    const plan = planUpgrade(dir, { tc, version: VERSION });
+    expect(plan.files).toEqual([]);
+    expect(plan.skipped).toContain('ui/src/midnight/contract.ts');
+    expect(plan.skipped).not.toContain('ui/src/lib/tokens.ts');
+    expect(upgrade(dir, { tc, version: VERSION, check: true })).toBe(0);
+    // A template-owned file that doesn't read the contract is still upgraded.
+    write(dir, 'ui/src/lib/tokens.ts', '// an older tokens.ts\n');
+    setManifest(dir, (m) => ({ ...m, files: { ...m.files, 'ui/src/lib/tokens.ts': fileHash('// an older tokens.ts\n') } }));
+    expect(kinds(planUpgrade(dir, { tc, version: VERSION }))).toEqual({ 'ui/src/lib/tokens.ts': 'update' });
+    expect(upgrade(dir, { tc, version: VERSION, skipInstall: true })).toBe(0);
+    // The skipped files keep their bases and sources.
+    const after = manifestOf(dir);
+    expect(after.files['ui/src/midnight/contract.ts']).toBe(recorded['ui/src/midnight/contract.ts']);
+    expect(after.sources['ui/src/midnight/contract.ts']).toBeDefined();
+  });
+
+  it("re-renders the UI after a contract change without counting it as behind this mnkit", () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const dir = uiProject();
+    addCircuit(dir);
+    const plan = planUpgrade(dir, { tc, version: VERSION });
+    expect(kinds(plan)['ui/src/midnight/contract.ts']).toBe('update');
+    expect(plan.files.every((f) => f.regen)).toBe(true);
+    expect(hasChanges(plan)).toBe(false);
+    expect(upgrade(dir, { tc, version: VERSION, check: true })).toBe(0);
+    expect(upgrade(dir, { tc, version: VERSION, skipInstall: true })).toBe(0);
+    expect(read(dir, 'ui/src/midnight/contract.ts')).toContain('clearMessage');
+    expect(planUpgrade(dir, { tc, version: VERSION }).files).toEqual([]);
+
+    // Edited, then the contract changes again: a .mnkit-new, still not "behind".
+    write(dir, 'ui/src/midnight/contract.ts', `${read(dir, 'ui/src/midnight/contract.ts')}// mine\n`);
+    const info = JSON.parse(read(dir, INFO));
+    info.circuits = info.circuits.filter((c) => c.name !== 'clearMessage');
+    write(dir, INFO, JSON.stringify(info));
+    expect(kinds(planUpgrade(dir, { tc, version: VERSION }))).toEqual({ 'ui/src/midnight/contract.ts': 'conflict' });
+    expect(upgrade(dir, { tc, version: VERSION, skipInstall: true })).toBe(0);
+    expect(read(dir, 'ui/src/midnight/contract.ts.mnkit-new')).not.toContain('clearMessage');
+    expect(upgrade(dir, { tc, version: VERSION, check: true })).toBe(0);
+
+    // A template change (a different source) is behind this mnkit as before.
+    fs.rmSync(path.join(dir, 'ui/src/midnight/contract.ts.mnkit-new'));
+    addCircuit(dir);
+    setManifest(dir, (m) => ({ ...m, sources: { ...m.sources, 'ui/src/midnight/contract.ts': 'an older template' } }));
+    const behind = planUpgrade(dir, { tc, version: VERSION });
+    expect(behind.files.find((f) => f.rel === 'ui/src/midnight/contract.ts')).toMatchObject({ kind: 'conflict' });
+    expect(hasChanges(behind)).toBe(true);
+  });
+
   it('refuses outside a project', () => {
     expect(() => planUpgrade(tmpDir(), { tc })).toThrow(/one with a mnkit.json/);
   });

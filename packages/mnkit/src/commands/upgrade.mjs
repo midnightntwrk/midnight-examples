@@ -34,6 +34,14 @@
 //                               since (--force restores it)
 //   gone from the template      deleted if unedited, else left and reported
 //
+// The UI's contract-derived files (ui/src/midnight/contract.ts and others the
+// generator fills from the compiled contract) also change with the contract.
+// mnkit.json records what else they render from (`sources`: the template file
+// and the generator); while that is unchanged, a different render is your
+// contract's doing: upgrade still applies it (as above), but --check doesn't
+// count it as behind. Without a compiled contract they are skipped, with a
+// note.
+//
 // The package.json files (the project's and ui/'s) are merged instead, three
 // ways against what the last render had (mnkit.json's packageBase): the
 // toolchain pins (pinFor), the runtime packages and mnkit are moved to this
@@ -58,11 +66,18 @@ import {
 } from '../lib/scaffold.mjs';
 import { NAME_RE, fail } from '../lib/template.mjs';
 import { PKG_ROOT, loadToolchain, mnkitVersion, pinFor } from '../lib/toolchain.mjs';
+import { listCompiled } from '../lib/contract-info.mjs';
 import { UI_CONFIG, isUiOwned, planUi } from '../lib/ui.mjs';
 import { packageSpecs } from './init.mjs';
 
 const posix = (p) => p.split(path.sep).join('/');
-const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
+const readJson = (p) => {
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch (err) {
+    return fail(`${path.basename(p)}: ${err.message}`);
+  }
+};
 const sortKeys = (o) => Object.fromEntries(Object.entries(o).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
 /**
  * `rel`, a POSIX path from mnkit.json, as a path under `dir`. Fails unless it
@@ -251,6 +266,10 @@ export function planUpgrade(
   });
   /** Owned files as they render now: POSIX path → content. */
   const owned = Object.fromEntries(rendered.filter((f) => isTemplateOwned(f.rel)).map((f) => [posix(f.rel), f.content]));
+  /** Contract-derived files: POSIX path → templateSource. */
+  const sources = {};
+  /** Contract-derived files left as they are: no compiled contract to render them from. */
+  const skipped = [];
   const packages = [{ rel: 'package.json', rendered: rendered.find((f) => f.rel === 'package.json').content }];
 
   const uiConfigPath = path.join(dir, 'ui', UI_CONFIG);
@@ -263,8 +282,14 @@ export function planUpgrade(
       privateState: config.privateState,
       networks: config.networks ?? [],
       skipSeeds: true,
+      // contract/managed/ is git-ignored: a fresh clone or CI has none.
+      withoutContract: !listCompiled(dir).includes(config.contract),
     });
-    for (const f of ui.files.filter(isUiOwned)) owned[`ui/${posix(f.rel)}`] = f.content;
+    for (const f of ui.files.filter(isUiOwned)) {
+      owned[`ui/${posix(f.rel)}`] = f.content;
+      if (f.source) sources[`ui/${posix(f.rel)}`] = f.source;
+    }
+    for (const rel of ui.contractFiles ?? []) skipped.push(`ui/${posix(rel)}`);
     packages.push({ rel: 'ui/package.json', rendered: ui.files.find((f) => f.rel === 'package.json').content });
   }
 
@@ -277,8 +302,11 @@ export function planUpgrade(
     const onDisk = path.join(dir, ...rel.split('/'));
     const base = bases[rel];
     const ours = fileHash(content);
+    // Only the contract can have changed it (see the header).
+    const regen = rel in sources && manifest.sources?.[rel] === sources[rel];
+    const push = (f) => files.push(regen ? { ...f, regen } : f);
     if (unmerged.has(rel) && !force) {
-      files.push({ rel, kind: 'unmerged', content });
+      push({ rel, kind: 'unmerged', content });
       nextBases[rel] = base;
       nextConflicts[rel] = ours;
       continue;
@@ -296,17 +324,23 @@ export function planUpgrade(
     const disk = fs.readFileSync(onDisk, 'utf8');
     if (disk === content) continue;
     const theirs = fileHash(disk);
-    if (base === theirs) files.push({ rel, kind: 'update', content });
+    if (base === theirs) push({ rel, kind: 'update', content });
     else if (base === ours) continue; // only you changed it
-    else if (force) files.push({ rel, kind: 'force', content });
+    else if (force) push({ rel, kind: 'force', content });
     else {
-      files.push({ rel, kind: 'conflict', content });
+      push({ rel, kind: 'conflict', content });
       nextBases[rel] = base;
       nextConflicts[rel] = ours;
     }
   }
+  // Skipped files keep their base, source and pending merge.
+  for (const rel of skipped) {
+    if (rel in recorded) nextBases[rel] = recorded[rel];
+    if (manifest.sources?.[rel]) sources[rel] = manifest.sources[rel];
+    if (rel in conflicts) nextConflicts[rel] = conflicts[rel];
+  }
   for (const [rel, base] of Object.entries(recorded)) {
-    if (rel in owned) continue;
+    if (rel in owned || skipped.includes(rel)) continue;
     const onDisk = projectPath(dir, rel);
     if (!fs.existsSync(onDisk)) continue;
     files.push({ rel, kind: fileHash(fs.readFileSync(onDisk, 'utf8')) === base ? 'remove' : 'orphan' });
@@ -323,19 +357,24 @@ export function planUpgrade(
     ...mergePackageJson(fs.readFileSync(path.join(dir, ...rel.split('/')), 'utf8'), next, tc, manifest.packageBase?.[rel]),
   }));
 
-  const { conflicts: _, ...rest } = manifest;
+  const { conflicts: _, sources: __, ...rest } = manifest;
   const nextManifest = {
     ...rest,
     mnkit: version,
     toolchain: projectToolchain(tc),
-    files: sortKeys(Object.fromEntries(Object.entries(owned).map(([rel, content]) => [rel, nextBases[rel] ?? fileHash(content)]))),
+    files: sortKeys({
+      ...Object.fromEntries(Object.entries(owned).map(([rel, content]) => [rel, nextBases[rel] ?? fileHash(content)])),
+      ...Object.fromEntries(skipped.filter((rel) => rel in nextBases).map((rel) => [rel, nextBases[rel]])),
+    }),
     ...(Object.keys(nextConflicts).length ? { conflicts: sortKeys(nextConflicts) } : {}),
+    ...(Object.keys(sources).length ? { sources: sortKeys(sources) } : {}),
     packageBase: Object.fromEntries(packages.map(({ rel, rendered: next }) => [rel, packageBaseOf(next)])),
   };
   return {
     from: manifest.mnkit,
     to: version,
     files,
+    skipped,
     packages: merged,
     toolchain: toolchainChanges(manifest.toolchain, projectToolchain(tc)),
     manifest: `${JSON.stringify(nextManifest, null, 2)}\n`,
@@ -346,9 +385,9 @@ export function planUpgrade(
 /** File kinds that are only reported: the project isn't behind because of them. */
 const NOTES_ONLY = new Set(['deleted']);
 
-/** Whether the plan changes anything a developer would notice (mnkit.json aside). */
+/** Whether the project is behind this mnkit: changes beyond notes and the contract's own (mnkit.json aside). */
 export const hasChanges = (plan) =>
-  plan.files.some((f) => !NOTES_ONLY.has(f.kind)) || plan.packages.some((p) => p.changes.length > 0);
+  plan.files.some((f) => !NOTES_ONLY.has(f.kind) && !f.regen) || plan.packages.some((p) => p.changes.length > 0);
 
 /** Writes the plan into `dir`. */
 export function applyUpgrade(dir, plan) {
@@ -392,22 +431,27 @@ export function upgrade(dir, { check = false, force = false, skipInstall = false
     console.log('\n  Files:');
     for (const f of plan.files) {
       const copy = f.kind === 'conflict' || f.kind === 'unmerged' ? ` ${f.rel}.mnkit-new` : '';
-      console.log(`    ${f.rel}: ${LABELS[f.kind]}${copy}`);
+      console.log(`    ${f.rel}: ${f.regen ? '(your contract changed) ' : ''}${LABELS[f.kind]}${copy}`);
     }
+  }
+  if (plan.skipped.length) {
+    console.log(`\n  ui/: ${plan.skipped.length} file(s) rendered from the compiled contract skipped. Compile it first (npm run compile).`);
   }
   for (const p of plan.packages.filter((p) => p.changes.length || p.notes.length)) {
     console.log(`\n  ${p.rel}:`);
     for (const c of p.changes) console.log(`    ${c}`);
     for (const n of p.notes) console.log(`    note: ${n}`);
   }
-  if (!changed) {
-    console.log('\n✔ Up to date: nothing to change.');
+  const regen = plan.files.filter((f) => f.regen);
+  if (!changed && !(regen.length && !check)) {
+    console.log('\n✔ Up to date with this mnkit.');
+    if (regen.length) console.log('  Your contract changed since the UI was rendered: `npx mnkit upgrade` refreshes the files above.');
     if (!check && plan.manifestChanged) applyUpgrade(dir, plan);
     return 0;
   }
   if (check) {
-    const pending = plan.files.filter((f) => f.kind === 'unmerged');
-    if (pending.length < plan.files.filter((f) => !NOTES_ONLY.has(f.kind)).length || plan.packages.some((p) => p.changes.length)) {
+    const pending = plan.files.filter((f) => f.kind === 'unmerged' && !f.regen);
+    if (pending.length < plan.files.filter((f) => !NOTES_ONLY.has(f.kind) && !f.regen).length || plan.packages.some((p) => p.changes.length)) {
       console.log('\n✖ The project is behind this mnkit. Run `npx mnkit upgrade`.');
     }
     if (pending.length) console.log('\n✖ Merge the .mnkit-new copies by hand, then delete them.');

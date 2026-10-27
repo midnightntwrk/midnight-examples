@@ -115,6 +115,12 @@ tell what you changed:
   after that, your merge counts as your edit of the new version
 - a file you deleted stays deleted (`--force` restores it)
 
+The UI file rendered from your compiled contract (`ui/src/midnight/contract.ts`)
+also changes when the contract does. `upgrade` re-renders it the same way, but
+a contract change alone doesn't make `--check` fail. Without a compiled
+contract (a fresh clone, or CI before `npm run compile`), it is skipped, with
+a note.
+
 `package.json` (and `ui/package.json`) are merged: the pinned packages move to
 the new versions wherever you list them, new dependencies and scripts are
 added, a dependency or script you left as the template had it follows the

@@ -87,6 +87,10 @@ export function addUi(
     writeJson(manifestPath, {
       ...manifest,
       files: Object.fromEntries(Object.entries(files).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
+      sources: {
+        ...manifest.sources,
+        ...Object.fromEntries(plan.files.filter((f) => isUiOwned(f) && f.source).map((f) => [`ui/${posix(f.rel)}`, f.source])),
+      },
       packageBase: {
         ...manifest.packageBase,
         'ui/package.json': packageBaseOf(plan.files.find((f) => f.rel === 'package.json').content),
