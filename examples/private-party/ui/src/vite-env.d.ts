@@ -3,6 +3,13 @@
 import type { InitialAPI } from "@midnight-ntwrk/dapp-connector-api";
 
 declare global {
+  // Both optional; see .env.example and indexerEndpoints in
+  // src/midnight/providers.ts. Unset, the UI uses the wallet's indexer.
+  interface ImportMetaEnv {
+    readonly VITE_INDEXER_URI?: string;
+    readonly VITE_INDEXER_WS_URI?: string;
+  }
+
   interface Window {
     // `@midnight-ntwrk/dapp-connector-api` already augments this on import; the
     // redeclaration keeps `window.midnight` typed project-wide. It must use the

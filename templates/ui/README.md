@@ -21,6 +21,20 @@ On the local devnet, give your browser wallet DUST (and NIGHT) with
 `yarn fund:wallet <mn_dust_…> [mn_addr_…]`, run from anywhere in the repo. The
 page prints the exact command when the connected wallet has no DUST.
 
+## Indexer
+
+The UI reads public data from the indexer configured in the connected wallet.
+If that indexer is wrong or has been shut down (deploys fail with
+`Failed to fetch`), override it without touching the wallet:
+
+```bash
+cp .env.example .env.local   # in this ui/ directory; .env.local is gitignored
+# uncomment and fill in VITE_INDEXER_URI and VITE_INDEXER_WS_URI, then restart `yarn dev`
+```
+
+Set both or neither, and use an indexer on the wallet's network. Blockfrost
+needs your project id in both URLs (`?project_id=<key>`).
+
 ## Scripts
 
 | Script | What it does |

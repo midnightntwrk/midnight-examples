@@ -103,8 +103,25 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
   coins. The burn circuits' prover keys are about 20 MB each.
 - **Use your own wallets.** Never use the repo's fast-sync or seeded test
   wallets (`.env.<network>`, `yarn wallets:new`) on mainnet.
+- **Use a live indexer.** Midnight's hosted mainnet indexer was shut down on
+  2026-10-09. If your wallet still points at `indexer.mainnet.midnight.network`,
+  change it there or override it here (see [Indexer](#indexer)).
 - **One round per table.** Betting never reopens; deploy a new table for
   another round (the chips token can be reused).
+
+### Indexer
+
+The UI reads public data from the indexer configured in the connected wallet.
+If that indexer is wrong or has been shut down (deploys fail with
+`Failed to fetch`), override it without touching the wallet:
+
+```bash
+cp .env.example .env.local   # in this ui/ directory; .env.local is gitignored
+# uncomment and fill in VITE_INDEXER_URI and VITE_INDEXER_WS_URI, then restart `yarn dev`
+```
+
+Set both or neither, and use an indexer on the wallet's network. Blockfrost
+needs your project id in both URLs (`?project_id=<key>`).
 
 ## Scripts
 

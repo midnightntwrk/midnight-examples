@@ -31,6 +31,7 @@ import { useWallet } from "@/hooks/use-wallet";
 import { formatLedgerValue, type LedgerField } from "@/lib/ledger-format";
 import { storage } from "@/lib/storage";
 import type { Ledger, ShieldedChipsPrivateState } from "@/midnight/contract";
+import { indexerEndpoints } from "@/midnight/providers";
 import { useMidnightProviders } from "@/providers/midnight-providers";
 import {
   actionError,
@@ -669,7 +670,7 @@ function PlayerCard(props: {
   const bet = (color: Color) =>
     void run("betting", async () => {
       if (!contract || !providers || !address || !connectedApi || value === null) return;
-      const { indexerUri } = await connectedApi.getConfiguration();
+      const { indexerUri } = indexerEndpoints(await connectedApi.getConfiguration());
       await placeBet(contract, providers, address, indexerUri, colorHex, value, color);
     });
 

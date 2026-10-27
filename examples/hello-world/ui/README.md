@@ -99,6 +99,9 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
   yourself. Never use a hosted proof server you don't control.
 - **Use your own browser wallet.** Never use the repo's fast-sync or seeded test
   wallets (`.env.<network>`, `yarn wallets:new`) on mainnet.
+- **Use a live indexer.** Midnight's hosted mainnet indexer was shut down on
+  2026-10-09. If your wallet still points at `indexer.mainnet.midnight.network`,
+  change it there or override it here (see [Indexer](#indexer)).
 - **Versions must match.** This UI is built against the repo's pinned
   toolchain (see the version matrix in the root `README.md`). If mainnet runs a
   different ledger or protocol version, transactions fail at proving or
@@ -106,6 +109,20 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
 
 Set your wallet to Mainnet, pick `mainnet` in the header, connect, deploy, then store a
 message. Record what you ran under `mainnet` in `verification.json`.
+
+### Indexer
+
+The UI reads public data from the indexer configured in the connected wallet.
+If that indexer is wrong or has been shut down (deploys fail with
+`Failed to fetch`), override it without touching the wallet:
+
+```bash
+cp .env.example .env.local   # in this ui/ directory; .env.local is gitignored
+# uncomment and fill in VITE_INDEXER_URI and VITE_INDEXER_WS_URI, then restart `yarn dev`
+```
+
+Set both or neither, and use an indexer on the wallet's network. Blockfrost
+needs your project id in both URLs (`?project_id=<key>`).
 
 ## Proving: wallet vs local proof server
 

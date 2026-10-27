@@ -5,13 +5,13 @@
 //
 //   provider              Node harness                  Browser (here)
 //   --------------------  ----------------------------  ---------------------------------------
-//   publicDataProvider    indexer from src/config.ts    indexer URIs from the wallet's config
+//   publicDataProvider    indexer from src/config.ts    the wallet's indexer, or VITE_INDEXER_* (indexerEndpoints)
 //   zkConfigProvider      NodeZkConfigProvider (disk)   FetchZkConfigProvider (HTTP, /managed/…)
 //   proofProvider         local proof server            wallet-delegated OR local proof server
 //   privateStateProvider  LevelDB (disk)                LevelDB on IndexedDB, or in-memory (./private-state.ts)
 //   walletProvider        wallet-sdk WalletFacade       the wallet, via the DApp Connector API
 //   midnightProvider      wallet-sdk WalletFacade       the wallet, via the DApp Connector API
-import type { ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
+import type { Configuration, ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
 import { dappConnectorProofProvider } from "@midnight-ntwrk/midnight-js-dapp-connector-proof-provider";
 import { FetchZkConfigProvider } from "@midnight-ntwrk/midnight-js-fetch-zk-config-provider";
 import { httpClientProofProvider } from "@midnight-ntwrk/midnight-js-http-client-proof-provider";
@@ -75,6 +75,29 @@ export interface ProvingOptions {
 export const DEFAULT_PROOF_SERVER_URL = "http://127.0.0.1:6300";
 
 /**
+ * The indexer to read public data from: the wallet's, unless
+ * VITE_INDEXER_URI and VITE_INDEXER_WS_URI override it (set them in
+ * `.env.local`, see `.env.example`). The override is for a wallet whose
+ * configured indexer is wrong or gone, e.g. a Blockfrost endpoint in place of
+ * a decommissioned one. Set both or neither: HTTP and WebSocket have to reach
+ * the same indexer, and a WebSocket URL can't be derived from an HTTP one.
+ * Empty values count as unset.
+ */
+export function indexerEndpoints(
+  config: Pick<Configuration, "indexerUri" | "indexerWsUri">,
+): { indexerUri: string; indexerWsUri: string } {
+  const indexerUri = import.meta.env.VITE_INDEXER_URI?.trim();
+  const indexerWsUri = import.meta.env.VITE_INDEXER_WS_URI?.trim();
+  if (indexerUri && indexerWsUri) return { indexerUri, indexerWsUri };
+  if (indexerUri || indexerWsUri) {
+    throw new Error(
+      "Set both VITE_INDEXER_URI and VITE_INDEXER_WS_URI to override the wallet's indexer, or neither.",
+    );
+  }
+  return { indexerUri: config.indexerUri, indexerWsUri: config.indexerWsUri };
+}
+
+/**
  * Build the providers for one wallet connection.
  *
  * `passphrase` unlocks the encrypted private-state store and is required when
@@ -108,9 +131,12 @@ export async function createContractProviders<C extends string>(
 ): Promise<ContractProviders<C>> {
   // The wallet decides which network we're on. Everything below (indexer
   // endpoints, network id for address encoding) follows from its config, so
-  // the same build works on local `undeployed`, preview, and preprod.
+  // the same build works on local `undeployed`, preview, preprod and mainnet.
+  // Only the indexer can be overridden (indexerEndpoints), and the override
+  // has to be on the wallet's network.
   const config = await api.getConfiguration();
   setNetworkId(config.networkId);
+  const { indexerUri, indexerWsUri } = indexerEndpoints(config);
 
   // Pass the browser's WebSocket explicitly. The provider's default comes from
   // `import * as ws from 'isomorphic-ws'` and reads `ws.WebSocket`, but the
@@ -118,8 +144,8 @@ export async function createContractProviders<C extends string>(
   // is `undefined` once bundled (Vite warns about this at build time). The
   // Node harness gets around it with `globalThis.WebSocket = WebSocket`.
   const publicDataProvider = indexerPublicDataProvider(
-    config.indexerUri,
-    config.indexerWsUri,
+    indexerUri,
+    indexerWsUri,
     window.WebSocket as unknown as Parameters<typeof indexerPublicDataProvider>[2],
   );
 
