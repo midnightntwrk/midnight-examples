@@ -25,7 +25,8 @@
 // someone edits it. The template's regions say sha=0; scaffolding seals them
 // (sealRegions) after substituting tokens, so every region starts unedited.
 // Edited regions, and regions whose markers were deleted, are left alone, so code a person or model wrote is never touched. Running
-// it twice gives the same files.
+// it twice gives the same files. A CRLF file is read as LF (so sha= is the
+// same on any checkout) and written back with CRLF.
 
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -41,6 +42,7 @@ import {
   scanWitnessesTs,
   tsParams,
 } from './contract-info.mjs';
+import { toLf, withEolOf } from './template.mjs';
 
 const BEGIN_RE = /^(\s*)\/\/ @generated-stub begin ([\w-]+) sha=([0-9a-f]*)$/;
 const END_RE = /^\s*\/\/ @generated-stub end ([\w-]+)$/;
@@ -56,7 +58,7 @@ export const stubHash = (body) => createHash('sha256').update(body).digest('hex'
  * that have a generator but no region in the file.
  */
 export function fillRegions(src, generators) {
-  const lines = src.split('\n');
+  const lines = toLf(src).split('\n');
   const out = [];
   const status = {};
   for (let i = 0; i < lines.length; i++) {
@@ -83,7 +85,7 @@ export function fillRegions(src, generators) {
     i = end;
   }
   const missing = Object.keys(generators).filter((id) => !(id in status));
-  return { out: out.join('\n'), status, missing };
+  return { out: withEolOf(out.join('\n'), src), status, missing };
 }
 
 /**
@@ -92,7 +94,7 @@ export function fillRegions(src, generators) {
  * a token (__INITIAL_PRIVATE_STATE__) start out unedited after substitution.
  */
 export function sealRegions(src) {
-  const lines = src.split('\n');
+  const lines = toLf(src).split('\n');
   for (let i = 0; i < lines.length; i++) {
     const begin = lines[i].match(BEGIN_RE);
     if (!begin) continue;
@@ -102,7 +104,7 @@ export function sealRegions(src) {
     lines[i] = `${indent}// @generated-stub begin ${id} sha=${stubHash(lines.slice(i + 1, end).join('\n'))}`;
     i = end;
   }
-  return lines.join('\n');
+  return withEolOf(lines.join('\n'), src);
 }
 
 /** A Compact type from contract-info.json, written the way the source would. */
@@ -446,7 +448,10 @@ export function derive(exampleDir, name, names, { coinsPackage = '@midnight-ntwr
     ],
   ];
 
+  // Every file is filled before any is written: a broken marker in one
+  // (fillRegions throws) leaves them all as they were.
   const report = [];
+  const writes = [];
   for (const [rel, generators] of targets) {
     const file = path.join(exampleDir, rel);
     if (!fs.existsSync(file)) {
@@ -455,13 +460,20 @@ export function derive(exampleDir, name, names, { coinsPackage = '@midnight-ntwr
       continue;
     }
     const src = fs.readFileSync(file, 'utf8');
-    const { out, status, missing } = fillRegions(src, generators);
-    if (out !== src) fs.writeFileSync(file, out);
+    let filled;
+    try {
+      filled = fillRegions(src, generators);
+    } catch (err) {
+      throw new Error(`${rel}: ${err.message}; nothing was written`);
+    }
+    const { out, status, missing } = filled;
+    if (out !== src) writes.push([file, out]);
     // A region an older example never had is only worth reporting when it
     // would have held something (an example from before Phase 4 with one
     // contract and no coins has nothing to miss).
     report.push({ rel, status, missing: missing.filter((id) => generators[id]('') !== '') });
   }
+  for (const [file, out] of writes) fs.writeFileSync(file, out);
 
   // An edited witnesses region can't gain stubs for witnesses added later.
   // A witness counts as written when its name is followed by `:` or `(`. The

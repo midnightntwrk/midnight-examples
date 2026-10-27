@@ -88,3 +88,11 @@ export function snapshot(dir) {
   walk(dir);
   return out;
 }
+
+/** Rewrites every file under dir (but contract/managed) with CRLF line endings, as git's autocrlf checks them out. */
+export function toCrlf(dir) {
+  for (const [rel, content] of Object.entries(snapshot(dir))) {
+    if (rel.startsWith(path.join('contract', 'managed'))) continue;
+    fs.writeFileSync(path.join(dir, rel), content.replaceAll('\r\n', '\n').replaceAll('\n', '\r\n'));
+  }
+}

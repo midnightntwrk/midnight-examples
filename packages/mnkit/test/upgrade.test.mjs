@@ -22,7 +22,7 @@ import { applyUpgrade, hasChanges, mergePackageJson, planUpgrade, upgrade } from
 import { fileHash, renderExample } from '../src/lib/scaffold.mjs';
 import { writeFiles } from '../src/lib/template.mjs';
 import { loadToolchain, mnkitVersion } from '../src/lib/toolchain.mjs';
-import { FIXTURES, TEMPLATE_DIR, cleanup, placeCompiled, tmpDir } from './helpers.mjs';
+import { FIXTURES, TEMPLATE_DIR, cleanup, placeCompiled, tmpDir, toCrlf } from './helpers.mjs';
 
 afterEach(() => {
   cleanup();
@@ -132,6 +132,26 @@ describe('mnkit upgrade', () => {
     expect(manifestOf(dir).toolchain.npm['midnight-js']).toBe('4.1.1');
     // Your providers.ts edit is not a conflict, now or next time.
     expect(hasChanges(planUpgrade(dir, { tc, version: VERSION }))).toBe(false);
+    expect(upgrade(dir, { tc, version: VERSION, check: true })).toBe(0);
+  });
+
+  it('treats a CRLF checkout as unedited and keeps it CRLF', () => {
+    const current = currentProject();
+    toCrlf(current);
+    const plan = planUpgrade(current, { tc, version: VERSION });
+    expect(plan.files).toEqual([]);
+    expect(plan.manifestChanged).toBe(false);
+
+    const dir = olderProject();
+    toCrlf(dir);
+    expect(kinds(planUpgrade(dir, { tc, version: VERSION }))).toEqual({ 'AGENTS.md': 'update', 'compose.yml': 'update' });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    expect(upgrade(dir, { tc, version: VERSION, skipInstall: true })).toBe(0);
+    expect(read(dir, 'compose.yml')).not.toContain(OLD_IMAGE);
+    for (const rel of ['compose.yml', 'AGENTS.md', 'package.json', 'mnkit.json']) {
+      expect(read(dir, rel).replace(/\r\n/g, ''), rel).not.toContain('\n');
+    }
+    expect(fs.readdirSync(dir).filter((f) => f.endsWith('.mnkit-new'))).toEqual([]);
     expect(upgrade(dir, { tc, version: VERSION, check: true })).toBe(0);
   });
 

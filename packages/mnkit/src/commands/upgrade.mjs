@@ -64,7 +64,7 @@ import {
   projectToolchain,
   renderExample,
 } from '../lib/scaffold.mjs';
-import { NAME_RE, fail } from '../lib/template.mjs';
+import { NAME_RE, fail, toLf, withEolOf } from '../lib/template.mjs';
 import { PKG_ROOT, loadToolchain, mnkitVersion, pinFor } from '../lib/toolchain.mjs';
 import { listCompiled } from '../lib/contract-info.mjs';
 import { UI_CONFIG, isUiOwned, planUi } from '../lib/ui.mjs';
@@ -213,7 +213,7 @@ export function mergePackageJson(current, rendered, tc, base) {
     delete out.overrides[pkg];
     changes.push(`overrides: removed ${pkg}`);
   }
-  return { content: changes.length ? `${JSON.stringify(out, null, 2)}\n` : current, changes, notes };
+  return { content: changes.length ? withEolOf(`${JSON.stringify(out, null, 2)}\n`, current) : current, changes, notes };
 }
 
 /** "a.b: x → y" for every leaf of the toolchain that differs. */
@@ -304,14 +304,19 @@ export function planUpgrade(
     const ours = fileHash(content);
     // Only the contract can have changed it (see the header).
     const regen = rel in sources && manifest.sources?.[rel] === sources[rel];
-    const push = (f) => files.push(regen ? { ...f, regen } : f);
+    // What is written keeps the line endings the file has (a CRLF checkout stays CRLF).
+    const disk = fs.existsSync(onDisk) ? fs.readFileSync(onDisk, 'utf8') : null;
+    const push = (f) => {
+      const g = disk === null ? f : { ...f, content: withEolOf(f.content, disk) };
+      files.push(regen ? { ...g, regen } : g);
+    };
     if (unmerged.has(rel) && !force) {
       push({ rel, kind: 'unmerged', content });
       nextBases[rel] = base;
       nextConflicts[rel] = ours;
       continue;
     }
-    if (!fs.existsSync(onDisk)) {
+    if (disk === null) {
       if (!(rel in bases)) files.push({ rel, kind: 'add', content });
       else if (force) files.push({ rel, kind: 'restore', content });
       else {
@@ -321,8 +326,7 @@ export function planUpgrade(
       }
       continue;
     }
-    const disk = fs.readFileSync(onDisk, 'utf8');
-    if (disk === content) continue;
+    if (toLf(disk) === content) continue;
     const theirs = fileHash(disk);
     if (base === theirs) push({ rel, kind: 'update', content });
     else if (base === ours) continue; // only you changed it
@@ -358,6 +362,7 @@ export function planUpgrade(
   }));
 
   const { conflicts: _, sources: __, ...rest } = manifest;
+  const manifestOnDisk = fs.readFileSync(manifestPath, 'utf8');
   const nextManifest = {
     ...rest,
     mnkit: version,
@@ -377,8 +382,8 @@ export function planUpgrade(
     skipped,
     packages: merged,
     toolchain: toolchainChanges(manifest.toolchain, projectToolchain(tc)),
-    manifest: `${JSON.stringify(nextManifest, null, 2)}\n`,
-    manifestChanged: `${JSON.stringify(nextManifest, null, 2)}\n` !== fs.readFileSync(manifestPath, 'utf8'),
+    manifest: withEolOf(`${JSON.stringify(nextManifest, null, 2)}\n`, manifestOnDisk),
+    manifestChanged: `${JSON.stringify(nextManifest, null, 2)}\n` !== toLf(manifestOnDisk),
   };
 }
 

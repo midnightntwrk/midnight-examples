@@ -31,7 +31,7 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { sealRegions } from './derive.mjs';
-import { assertNoLeftoverTokens, deriveNames, fail, renderTree, substituteNames } from './template.mjs';
+import { assertNoLeftoverTokens, deriveNames, fail, renderTree, substituteNames, toLf } from './template.mjs';
 import { loadToolchain } from './toolchain.mjs';
 
 export const KNOWN_TOKENS = [
@@ -96,8 +96,8 @@ export const LATE_SEEDS = ['contract/deploy-args.ts'];
 /** The pins a standalone project uses, as mnkit.json records them: not the repo's comment or CI npm. */
 export const projectToolchain = (tc) => Object.fromEntries(Object.entries(tc).filter(([k]) => k !== '$comment' && k !== 'npmCli'));
 
-/** sha256 of a file's content, as mnkit.json records it. */
-export const fileHash = (content) => createHash('sha256').update(content).digest('hex');
+/** sha256 of a file's content with LF line endings, as mnkit.json records it. */
+export const fileHash = (content) => createHash('sha256').update(toLf(content)).digest('hex');
 
 /**
  * The mnkit.json `files` map: POSIX path → sha256 of every template-owned file

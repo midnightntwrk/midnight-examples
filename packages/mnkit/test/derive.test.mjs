@@ -18,7 +18,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { derive, fillRegions, sealRegions, stubHash } from '../src/lib/derive.mjs';
 import { deriveNames } from '../src/lib/template.mjs';
-import { cleanup, scaffoldFixture, snapshot } from './helpers.mjs';
+import { cleanup, scaffoldFixture, snapshot, toCrlf } from './helpers.mjs';
 
 afterEach(cleanup);
 
@@ -58,6 +58,14 @@ describe('fillRegions / sealRegions', () => {
   it('writes an empty body as no lines', () => {
     const { out } = fillRegions(sealed, { r: () => '' });
     expect(out).toBe(`a\n  // @generated-stub begin r sha=${stubHash('')}\n  // @generated-stub end r\nb`);
+  });
+
+  it('reads CRLF as LF and writes CRLF back', () => {
+    const crlf = sealed.replaceAll('\n', '\r\n');
+    expect(sealRegions(crlf)).toBe(crlf);
+    const { out, status } = fillRegions(crlf, { r: (indent) => `${indent}new` });
+    expect(status).toEqual({ r: 'filled' });
+    expect(out).toBe(fillRegions(sealed, { r: (indent) => `${indent}new` }).out.replaceAll('\n', '\r\n'));
   });
 
   it('throws on a begin marker without an end', () => {
@@ -197,6 +205,35 @@ describe('derive', () => {
     const r = run(dir, 'private-tip-jar');
     expect(snapshot(dir)).toEqual(first);
     for (const { status } of r.report) for (const s of Object.values(status ?? {})) expect(s).toBe('unchanged');
+  });
+
+  it('derives a CRLF checkout as it does an LF one, and keeps it CRLF', () => {
+    const lf = scaffoldFixture('private-tip-jar', { witnesses: true });
+    run(lf, 'private-tip-jar');
+    const dir = scaffoldFixture('private-tip-jar', { witnesses: true });
+    toCrlf(dir);
+    run(dir, 'private-tip-jar');
+    const want = snapshot(lf);
+    for (const [rel, content] of Object.entries(snapshot(dir))) {
+      if (rel.startsWith(path.join('contract', 'managed'))) continue;
+      expect(content.replace(/\r\n/g, ''), rel).not.toContain('\n');
+      expect(content.replaceAll('\r\n', '\n'), rel).toBe(want[rel]);
+    }
+    const first = snapshot(dir);
+    const r = run(dir, 'private-tip-jar');
+    expect(snapshot(dir)).toEqual(first);
+    for (const { status } of r.report) for (const s of Object.values(status ?? {})) expect(s).toBe('unchanged');
+  });
+
+  it('writes nothing when a file has a broken marker', () => {
+    const dir = scaffoldFixture('private-tip-jar', { witnesses: true });
+    const sim = path.join(dir, 'src', 'test', 'private-tip-jar.sim.test.ts');
+    fs.writeFileSync(sim, read(dir, 'src/test/private-tip-jar.sim.test.ts').replace(/^\s*\/\/ @generated-stub end privacy\n/m, ''));
+    const before = snapshot(dir);
+    expect(() => run(dir, 'private-tip-jar')).toThrow(
+      'src/test/private-tip-jar.sim.test.ts: @generated-stub begin privacy has no matching end marker; nothing was written',
+    );
+    expect(snapshot(dir)).toEqual(before);
   });
 
   it('keeps hand edits and reports witnesses left without a stub', () => {

@@ -92,6 +92,11 @@ export function assertNoLeftoverTokens(rel, content, knownTokens) {
   }
 }
 
+/** `s` with LF line endings: a CRLF checkout (git's autocrlf on Windows) reads the same as an LF one. */
+export const toLf = (s) => s.replaceAll('\r\n', '\n');
+/** `text` (LF) with the line endings of `like`: CRLF if `like` has any. */
+export const withEolOf = (text, like) => (like.includes('\r\n') ? toLf(text).replaceAll('\n', '\r\n') : text);
+
 /**
  * Walk `templateDir` and return the rendered files in memory as
  * `[{ templateRel, rel, content }]` in directory-walk order. `rel` is the output path
@@ -113,7 +118,7 @@ export function renderTree(templateDir, { name, skip = () => false, render }) {
       const templateRel = path.relative(templateDir, srcPath);
       if (skip(templateRel)) continue;
       const rel = templateRel.split(path.sep).map((s) => s.replaceAll('__name__', name)).join(path.sep);
-      out.push({ templateRel, rel, content: render(fs.readFileSync(srcPath, 'utf8'), templateRel) });
+      out.push({ templateRel, rel, content: render(toLf(fs.readFileSync(srcPath, 'utf8')), templateRel) });
     }
   };
   walk(templateDir);
