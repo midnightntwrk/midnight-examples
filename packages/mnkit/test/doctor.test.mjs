@@ -133,7 +133,7 @@ describe('mnkit doctor --network', () => {
     expect(JSON.stringify(checks)).not.toContain(PROJECT_ID);
   });
 
-  it('prefers BLOCKFROST_PROJECT_ID from the environment, and finds .env.preprod in a parent up to the repo root', () => {
+  it("prefers BLOCKFROST_PROJECT_ID from the environment, and reads a monorepo example's from the repo root", () => {
     const dir = repo(`BLOCKFROST_PROJECT_ID=${PROJECT_ID}\n`);
     const sub = path.join(dir, 'examples', 'app');
     fs.mkdirSync(sub, { recursive: true });
@@ -141,6 +141,33 @@ describe('mnkit doctor --network', () => {
     expect(blockfrostProjectId(sub, { BLOCKFROST_PROJECT_ID: ' envkey ' })).toEqual({ id: 'envkey', from: 'the environment' });
     expect(blockfrostProjectId(repo(), {})).toBeNull();
     expect(blockfrostProjectId(repo('OTHER=1\n'), {})).toBeNull();
+  });
+
+  it("reads a standalone project's own env files, as scripts/deploy.ts does, and not a parent's", () => {
+    const dir = repo(`BLOCKFROST_PROJECT_ID=${PROJECT_ID}\n`);
+    const app = path.join(dir, 'app');
+    fs.mkdirSync(app);
+    fs.writeFileSync(path.join(app, 'mnkit.json'), '{}');
+    expect(blockfrostProjectId(app, {})).toBeNull();
+
+    fs.writeFileSync(path.join(app, '.env'), 'BLOCKFROST_PROJECT_ID=from-env\n');
+    expect(blockfrostProjectId(app, {})).toEqual({ id: 'from-env', from: path.join(app, '.env') });
+    fs.writeFileSync(path.join(app, '.env.preprod'), 'BLOCKFROST_PROJECT_ID=from-preprod\n');
+    fs.writeFileSync(path.join(app, '.env.preprod.local'), 'BLOCKFROST_PROJECT_ID=from-local\n');
+    expect(blockfrostProjectId(app, {})).toEqual({ id: 'from-local', from: path.join(app, '.env.preprod.local') });
+  });
+
+  it("checks the proof server named in the network's env file, unless the environment sets one", async () => {
+    const dir = repo();
+    fs.writeFileSync(path.join(dir, '.env.preview'), 'MIDNIGHT_PROOF_SERVER=http://remote-prover:6300\n');
+    const file = fakeFetch();
+    await runNetworkChecks('preview', { tc: TC, dir, env: {}, fetch: file.fetch });
+    expect(file.urls).toContain('http://remote-prover:6300/version');
+
+    const set = fakeFetch();
+    await runNetworkChecks('preview', { tc: TC, dir, env: { MIDNIGHT_PROOF_SERVER: 'http://mine:6300' }, fetch: set.fetch });
+    expect(set.urls).toContain('http://mine:6300/version');
+    expect(set.urls).not.toContain('http://remote-prover:6300/version');
   });
 
   it('redacts project IDs in URLs', () => {

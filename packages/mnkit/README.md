@@ -93,7 +93,8 @@ npx mnkit deploy my-token               # another contract, before one that need
 in `deployments/<network>.json`. Commit the preview and preprod files; the local
 one is gitignored. The constructor arguments and initial private state come
 from `contract/deploy-args.ts`, which is yours and which `derive` fills with
-placeholders. The private state and the contract's signing key are kept,
+placeholders. A local deploy warns about any `TODO` left there; preview and
+preprod refuse it unless you pass `--allow-todos`. The private state and the contract's signing key are kept,
 encrypted with `MIDNIGHT_PRIVATE_STATE_PASSWORD` (required off local), in
 `.mnkit/private-state/<network>`. Mainnet is not supported.
 

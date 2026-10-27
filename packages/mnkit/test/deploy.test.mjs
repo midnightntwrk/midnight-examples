@@ -131,14 +131,38 @@ describe('mnkit deploy', () => {
     await expect(without('node_modules')).rejects.toThrow('Run `npm install`');
   });
 
-  it('warns about TODO placeholders left in contract/deploy-args.ts', async () => {
+  /** A project whose deploy-args.ts has one TODO placeholder. */
+  function withTodo() {
     const dir = project();
-    expect(deployArgsTodos(dir)).toBe(0);
+    expect(deployArgsTodos(dir)).toEqual([]);
     const file = path.join(dir, 'contract', 'deploy-args.ts');
     fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('initialPrivateState: {}', 'initialPrivateState: {} /* TODO secret */'));
+    return dir;
+  }
+
+  it('warns about TODO placeholders left in contract/deploy-args.ts on local', async () => {
+    const dir = withTodo();
+    expect(deployArgsTodos(dir)).toEqual(['initialPrivateState: {} /* TODO secret */,']);
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
-    await deploy(dir, stubs());
+    const s = stubs();
+    expect(await deploy(dir, s)).toBe(0);
     expect(log).toHaveBeenCalledWith(expect.stringContaining('has 1 TODO placeholder(s)'));
+    expect(s.calls.spawn).toHaveLength(1);
+  });
+
+  it('refuses TODO placeholders off local before any network call, unless --allow-todos', async () => {
+    const dir = withTodo();
+    const s = stubs();
+    await expect(deploy(dir, { network: 'preview', ...s })).rejects.toThrow(
+      /1 TODO placeholder\(s\):\n {4}initialPrivateState: \{\} \/\* TODO secret \*\/,\n.*--allow-todos/,
+    );
+    expect(s.calls.network).toEqual([]);
+    expect(s.calls.spawn).toEqual([]);
+
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const allowed = stubs();
+    expect(await deploy(dir, { network: 'preprod', allowTodos: true, ...allowed })).toBe(0);
+    expect(allowed.calls.spawn).toHaveLength(1);
   });
 
   it('takes the contract as its one argument', async () => {

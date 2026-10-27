@@ -19,11 +19,10 @@
 // proof server: a first look at whether the network side is healthy before
 // digging into your own code. Run it any time; it changes nothing.
 
-import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
-import { parseEnv } from 'node:util';
 import { resolveCompact } from '../lib/compact-install.mjs';
+import { loadNetworkEnv } from '../lib/env.mjs';
 import { checkCompactVersion, checkDocker } from '../lib/preflight.mjs';
 import { fail } from '../lib/template.mjs';
 import { loadToolchain } from '../lib/toolchain.mjs';
@@ -85,20 +84,14 @@ const withProjectId = (url, id) => (id ? `${url}${url.includes('?') ? '&' : '?'}
 
 /**
  * The Blockfrost project ID and where it came from: the environment's
- * BLOCKFROST_PROJECT_ID, else the nearest .env.preprod from `dir` up to the
- * repository root (a monorepo example keeps it at the repo root), or null.
+ * BLOCKFROST_PROJECT_ID, else the project's preprod env files (lib/env.mjs:
+ * the ones scripts/deploy.ts reads), or null.
  */
 export function blockfrostProjectId(dir, env = process.env) {
-  const set = env.BLOCKFROST_PROJECT_ID?.trim();
-  if (set) return { id: set, from: 'the environment' };
-  for (let d = path.resolve(dir); ; d = path.dirname(d)) {
-    const file = path.join(d, '.env.preprod');
-    if (fs.existsSync(file)) {
-      const id = parseEnv(fs.readFileSync(file, 'utf8')).BLOCKFROST_PROJECT_ID?.trim();
-      return id ? { id, from: file } : null;
-    }
-    if (fs.existsSync(path.join(d, '.git')) || path.dirname(d) === d) return null;
-  }
+  const { env: merged, from } = loadNetworkEnv(dir, 'preprod', env);
+  const id = merged.BLOCKFROST_PROJECT_ID?.trim();
+  if (!id) return null;
+  return { id, from: from.BLOCKFROST_PROJECT_ID ?? 'the environment' };
 }
 
 /** Why a request failed, in words: a 403 from Blockfrost is a key problem, not an outage. */
@@ -130,13 +123,15 @@ async function rpc(fetch, url, method) {
  * Checks `network` (a key of toolchain.json `networks`) from this machine;
  * returns rows like runChecks(). Preprod first needs a Blockfrost project ID;
  * every network needs a proof server whose version matches the pinned image's
- * major. `fetch` is for tests.
+ * major. Settings come from `env` over the project's env files for `network`,
+ * as scripts/deploy.ts reads them. `fetch` is for tests.
  */
 export async function runNetworkChecks(
   network,
   { tc = loadToolchain(), dir = process.cwd(), env = process.env, fetch = globalThis.fetch } = {},
 ) {
   const endpoints = tc.networks[network];
+  const settings = loadNetworkEnv(dir, network, env).env;
   const checks = [];
   let projectId = null;
   if (network === 'preprod') {
@@ -189,7 +184,7 @@ export async function runNetworkChecks(
       });
     }
   }
-  checks.push(await proofServerCheck(tc, env, fetch));
+  checks.push(await proofServerCheck(tc, settings, fetch));
   return checks.map((c) => ({ ...c, detail: redact(c.detail) }));
 }
 

@@ -47,7 +47,8 @@ Commands:
   deploy [name]     deploy the compiled contract to local, preview or preprod, compiling first
                     when needed; writes deployments/<network>.json (name: another contract
                     under contract/, default the project's; --network <net>: default local;
-                    arguments and private state come from contract/deploy-args.ts)
+                    arguments and private state come from contract/deploy-args.ts, which
+                    must have no TODOs off local unless --allow-todos)
   add contract <name>
                     add another contract under contract/ (compile and derive wire it in)
   add ui            add a browser UI in ui/ for the compiled contract (an npm workspace)
@@ -169,7 +170,7 @@ const COMMANDS = {
     },
   },
   deploy: {
-    options: { network: { type: 'string' }, 'no-install': { type: 'boolean' } },
+    options: { network: { type: 'string' }, 'no-install': { type: 'boolean' }, 'allow-todos': { type: 'boolean' } },
     run: ({ values, positionals }) => {
       if (positionals.length > 1) fail('mnkit deploy takes at most one contract: mnkit deploy tip-token');
       return deploy(process.cwd(), {
@@ -177,6 +178,7 @@ const COMMANDS = {
         contract: positionals[0] ?? null,
         version: loadToolchain().compact.compiler,
         install: !values['no-install'] && !envFlag('MNKIT_NO_INSTALL'),
+        allowTodos: values['allow-todos'],
       });
     },
   },

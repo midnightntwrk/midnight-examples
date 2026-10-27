@@ -36,16 +36,21 @@ import { printChecks, runNetworkChecks } from './doctor.mjs';
 /** The networks deploy targets. Mainnet is refused until mnkit has a mainnet config. */
 export const DEPLOY_NETWORKS = ['local', 'preview', 'preprod'];
 
-/** The `// TODO` placeholders derive left in contract/deploy-args.ts. */
+/** The lines of contract/deploy-args.ts with a `// TODO` placeholder derive left, trimmed. */
 export function deployArgsTodos(dir) {
   const src = fs.readFileSync(path.join(dir, 'contract', 'deploy-args.ts'), 'utf8');
-  return src.split('\n').filter((l) => /\/\/ TODO\b/.test(l) || /\/\* TODO\b/.test(l)).length;
+  return src
+    .split(/\r?\n/)
+    .filter((l) => /\/\/ TODO\b/.test(l) || /\/\* TODO\b/.test(l))
+    .map((l) => l.trim());
 }
 
 /**
  * Resolves to the exit status of the network checks, the compile or the deploy
- * script. `compiler`, `networkChecks` and `spawn` are for tests (compile,
- * runNetworkChecks and spawnSync).
+ * script. TODO placeholders in contract/deploy-args.ts only warn on local; on
+ * preview and preprod they fail unless `allowTodos`, since a deploy there
+ * spends DUST and can't be changed. `compiler`, `networkChecks` and `spawn`
+ * are for tests (compile, runNetworkChecks and spawnSync).
  */
 export async function deploy(
   dir,
@@ -54,6 +59,7 @@ export async function deploy(
     contract = null,
     version = null,
     install = true,
+    allowTodos = false,
     compiler = compile,
     networkChecks = runNetworkChecks,
     spawn = spawnSync,
@@ -73,6 +79,18 @@ export async function deploy(
   const viteNode = path.join(dir, 'node_modules', '.bin', 'vite-node');
   if (!fs.existsSync(viteNode)) fail('vite-node is not installed. Run `npm install` in the project first.');
 
+  const todos = deployArgsTodos(dir);
+  if (todos.length > 0) {
+    const lines = todos.map((l) => `\n    ${l}`).join('');
+    if (network !== 'local' && !allowTodos) {
+      fail(
+        `contract/deploy-args.ts still has ${todos.length} TODO placeholder(s):${lines}\n` +
+          `  Replace them with the values to deploy to ${network}, or pass --allow-todos to deploy them as written.`,
+      );
+    }
+    console.log(`⚠ contract/deploy-args.ts has ${todos.length} TODO placeholder(s); they are deployed as written:${lines}`);
+  }
+
   if (network !== 'local') {
     console.log(`• Checking ${network} first (\`npx mnkit doctor --network ${network}\`):`);
     const checks = await networkChecks(network, { dir });
@@ -87,10 +105,6 @@ export async function deploy(
     console.log('• The compiled contract is missing, older than its source or has no keys: compiling first.');
     const status = await compiler(dir, { version, install });
     if (status !== 0) return status;
-  }
-  const todos = deployArgsTodos(dir);
-  if (todos > 0) {
-    console.log(`⚠ contract/deploy-args.ts has ${todos} TODO placeholder(s): they are deployed as written.`);
   }
 
   const args = ['scripts/deploy.ts', ...(contract ? [contract] : [])];
