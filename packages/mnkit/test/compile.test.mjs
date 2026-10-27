@@ -170,7 +170,7 @@ describe('mnkit compile installs the pinned toolchain', () => {
         env: { ...process.env, ...env },
         encoding: 'utf8',
       });
-      expect(r.status).toBe(1);
+      expect(r.status).toBe(2);
       expect(r.stderr).toMatch(/^✖ Compact compiler .* is not installed/);
     }
     expect(m.updates()).toEqual([]);

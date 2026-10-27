@@ -17,5 +17,6 @@
 import { main } from '../src/cli.mjs';
 import { exitOnError } from '../src/lib/template.mjs';
 
-exitOnError();
+// Errors exit 2: 1 is `upgrade --check`'s "behind".
+exitOnError(2);
 process.exitCode = await main(process.argv.slice(2));

@@ -226,6 +226,32 @@ describe('mnkit upgrade', () => {
   it('refuses outside a project', () => {
     expect(() => planUpgrade(tmpDir(), { tc })).toThrow(/one with a mnkit.json/);
   });
+
+  it('refuses mnkit.json paths outside the project, and a bad name', () => {
+    const dir = currentProject();
+    const victim = path.join(path.dirname(dir), `victim-${path.basename(dir)}.txt`);
+    fs.writeFileSync(victim, 'keep me\n');
+    try {
+      for (const rel of [`../${path.basename(victim)}`, victim, 'scripts/../../x', 'a\\b', '']) {
+        setManifest(dir, (m) => ({ ...m, files: { ...m.files, [rel]: fileHash('keep me\n') } }));
+        expect(() => planUpgrade(dir, { tc, version: VERSION })).toThrow(/mnkit\.json: '.*' (is not a path inside|leads outside) the project/);
+        setManifest(dir, (m) => {
+          const { [rel]: _, ...files } = m.files;
+          return { ...m, files };
+        });
+      }
+      // A symlinked directory leading out.
+      fs.symlinkSync(path.dirname(dir), path.join(dir, 'out'));
+      setManifest(dir, (m) => ({ ...m, files: { ...m.files, [`out/${path.basename(victim)}`]: fileHash('keep me\n') } }));
+      expect(() => planUpgrade(dir, { tc, version: VERSION })).toThrow(/leads outside the project/);
+      expect(fs.readFileSync(victim, 'utf8')).toBe('keep me\n');
+    } finally {
+      fs.rmSync(victim, { force: true });
+    }
+    const named = currentProject();
+    setManifest(named, (m) => ({ ...m, name: '../x' }));
+    expect(() => planUpgrade(named, { tc, version: VERSION })).toThrow(/invalid project name '\.\.\/x'/);
+  });
 });
 
 describe('mergePackageJson', () => {

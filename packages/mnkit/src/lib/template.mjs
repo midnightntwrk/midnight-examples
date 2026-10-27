@@ -36,14 +36,15 @@ export function fail(msg) {
 }
 
 /**
- * For a CLI entry point: report an MnkitError as `✖ message` and exit 1,
- * anything else with its stack. Covers throws at the top level and in
- * promises nobody awaited.
+ * For a CLI entry point: report an MnkitError as `✖ message` and exit with
+ * `code`, anything else with its stack. Covers throws at the top level and in
+ * promises nobody awaited. The mnkit CLI passes 2, so that 1 can mean only
+ * "behind" (`mnkit upgrade --check`).
  */
-export function exitOnError() {
+export function exitOnError(code = 1) {
   const report = (err) => {
     console.error(err instanceof MnkitError ? `✖ ${err.message}` : err);
-    process.exit(1);
+    process.exit(code);
   };
   process.on('uncaughtException', report);
   process.on('unhandledRejection', report);

@@ -38,7 +38,7 @@ describe('mnkit CLI', () => {
   it('rejects unknown commands and options without a stack trace', () => {
     for (const args of [['frob'], ['derive', '--nope']]) {
       const r = mnkit(PKG_ROOT, ...args);
-      expect(r.status).toBe(1);
+      expect(r.status).toBe(2);
       expect(r.stderr).toMatch(/^✖ /);
       expect(r.stderr).not.toMatch(/\bat .*\.mjs:\d+/);
     }
@@ -59,7 +59,7 @@ describe('mnkit CLI', () => {
 
   it('fails derive before compile with a clear message', () => {
     const r = mnkit(tmpDir(), 'derive');
-    expect(r.status).toBe(1);
+    expect(r.status).toBe(2);
     expect(r.stderr).toContain('✖ no compiled contract under contract/managed/');
   });
 
@@ -104,7 +104,7 @@ describe('mnkit CLI', () => {
       ];
       for (const [cwd, args, message] of cases) {
         const r = mnkit(cwd, ...args);
-        expect(r.status, args.join(' ')).toBe(1);
+        expect(r.status, args.join(' ')).toBe(2);
         expect(r.stderr).toContain(message);
       }
       fs.writeFileSync(path.join(dir, 'contract', 'tip-token.compact'), '// mine\n');

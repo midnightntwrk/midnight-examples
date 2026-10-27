@@ -164,7 +164,7 @@ describe('mnkit init', () => {
     expect(fs.existsSync(path.join(cwd, 'my-app', 'contract', 'witnesses.ts'))).toBe(true);
     expect(JSON.parse(fs.readFileSync(path.join(cwd, 'my-app', 'mnkit.json'), 'utf8')).witnesses).toBe(true);
     const again = mnkit(cwd, 'init', 'my-app', '--skip-install');
-    expect(again.status).toBe(1);
+    expect(again.status).toBe(2);
     expect(again.stderr).toContain('already exists and is not an empty directory');
   });
 
@@ -175,7 +175,7 @@ describe('mnkit init', () => {
     expect(dry.stdout).toContain('package.json');
     expect(fs.existsSync(path.join(cwd, 'my-app'))).toBe(false);
     const bad = mnkit(cwd, 'init', 'My_App', '--dry-run');
-    expect(bad.status).toBe(1);
+    expect(bad.status).toBe(2);
     expect(bad.stderr).toContain("invalid project name 'My_App'");
     expect(mnkit(cwd, 'init', 'My_App', '--name', 'ok-name', '--dry-run').status).toBe(0);
   });

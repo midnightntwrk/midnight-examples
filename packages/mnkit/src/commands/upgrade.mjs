@@ -40,7 +40,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { LATE_SEEDS, RUNTIME_PACKAGES, fileHash, isTemplateOwned, projectToolchain, renderExample } from '../lib/scaffold.mjs';
-import { fail } from '../lib/template.mjs';
+import { NAME_RE, fail } from '../lib/template.mjs';
 import { PKG_ROOT, loadToolchain, mnkitVersion, pinFor } from '../lib/toolchain.mjs';
 import { UI_CONFIG, isUiOwned, planUi } from '../lib/ui.mjs';
 import { packageSpecs } from './init.mjs';
@@ -48,6 +48,33 @@ import { packageSpecs } from './init.mjs';
 const posix = (p) => p.split(path.sep).join('/');
 const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const sortKeys = (o) => Object.fromEntries(Object.entries(o).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+/**
+ * `rel`, a POSIX path from mnkit.json, as a path under `dir`. Fails unless it
+ * stays inside the project: mnkit.json is a file in the developer's tree, and
+ * upgrade deletes and writes the paths it names.
+ */
+export function projectPath(dir, rel) {
+  const segments = typeof rel === 'string' ? rel.split('/') : [];
+  if (
+    segments.length === 0 ||
+    rel.includes('\\') ||
+    path.isAbsolute(rel) ||
+    path.win32.isAbsolute(rel) ||
+    segments.some((s) => s === '' || s === '.' || s === '..')
+  ) {
+    fail(`mnkit.json: '${rel}' is not a path inside the project.`);
+  }
+  const at = path.join(dir, ...segments);
+  // A symlink on the way (a directory, or the file itself) could still lead out.
+  if (fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink()) fail(`${rel} is a symlink; mnkit upgrade won't write through it.`);
+  let parent = path.dirname(at);
+  while (!fs.existsSync(parent)) parent = path.dirname(parent);
+  const root = fs.realpathSync(dir);
+  const real = fs.realpathSync(parent);
+  if (real !== root && !real.startsWith(`${root}${path.sep}`)) fail(`mnkit.json: '${rel}' leads outside the project.`);
+  return at;
+}
+
 /** The packages mnkit versions in lockstep with itself. */
 const LOCKSTEP = [...RUNTIME_PACKAGES, 'mnkit'];
 
@@ -121,7 +148,9 @@ export function planUpgrade(
   if (!fs.existsSync(manifestPath)) fail('run this from a project mnkit init created (one with a mnkit.json).');
   const manifest = readJson(manifestPath);
   if (manifest.template !== 'example') fail(`mnkit.json: unknown template '${manifest.template}'.`);
+  if (typeof manifest.name !== 'string' || !NAME_RE.test(manifest.name)) fail(`mnkit.json: invalid project name '${manifest.name}'.`);
   const recorded = manifest.files ?? {};
+  for (const rel of Object.keys(recorded)) projectPath(dir, rel);
 
   const rendered = renderExample(path.join(PKG_ROOT, 'templates', 'example'), {
     name: manifest.name,
@@ -168,7 +197,7 @@ export function planUpgrade(
   }
   for (const [rel, base] of Object.entries(recorded)) {
     if (rel in owned) continue;
-    const onDisk = path.join(dir, ...rel.split('/'));
+    const onDisk = projectPath(dir, rel);
     if (!fs.existsSync(onDisk)) continue;
     files.push({ rel, kind: fileHash(fs.readFileSync(onDisk, 'utf8')) === base ? 'remove' : 'orphan' });
   }
@@ -206,7 +235,7 @@ export const hasChanges = (plan) => plan.files.length > 0 || plan.packages.some(
 
 /** Writes the plan into `dir`. */
 export function applyUpgrade(dir, plan) {
-  const at = (rel) => path.join(dir, ...rel.split('/'));
+  const at = (rel) => projectPath(dir, rel);
   for (const f of plan.files) {
     if (f.kind === 'remove') fs.rmSync(at(f.rel));
     else if (f.kind === 'conflict') fs.writeFileSync(`${at(f.rel)}.mnkit-new`, f.content);

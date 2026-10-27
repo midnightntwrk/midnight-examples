@@ -115,7 +115,8 @@ tell what you changed:
 `package.json` (and `ui/package.json`) are merged: the pinned packages move to
 the new versions, new dependencies and scripts are added, and your own
 dependencies and scripts stay. `npx mnkit upgrade --check` reports what would
-change and exits 1 if the project is behind, for CI.
+change and exits 1 if the project is behind, for CI. Every mnkit command exits
+2 on an error, so 1 always means "behind".
 
 ## What you get
 
