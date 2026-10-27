@@ -190,7 +190,9 @@ renders the same template as a plain npm project. Its runtime libraries are
 - `scripts/mnkit-rehearsal.sh`: publishes them to a throwaway local registry and
   tests `npx mnkit@<version>` from it, before a real release.
 - Releases: `.github/workflows/release-mnkit.yml`, on a GitHub release tagged
-  `mnkit-v<version>`.
+  `mnkit-v<version>` from a commit on `main`. The publish waits for approval in
+  the `npm-publish` environment. A pre-release goes to the `next` dist-tag; a
+  re-run skips packages already published at that version.
 
 ## License
 
