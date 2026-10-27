@@ -168,7 +168,7 @@ run. This is the number to plan against for any wallet that cannot fast-sync.
 | `packages/fast-sync/scripts/cut-preseed.ts` | Mint a new reference bundle from an empty wallet synced to tip. |
 | `packages/fast-sync/scripts/new-preprod-wallets.ts` | Mint the four wallets, write `.env.<network>`, print addresses. |
 | `src/wallet.ts` → `MidnightWalletProvider.build(…, { fastSync })` | Per-example entry point; pass `fastSync` to pre-seed, omit it for the normal `FluentWalletBuilder` path. |
-| `preseed/<network>/` | The shipped reference bundles (`manifest.json` + gzipped state per sub-wallet). |
+| `preseed/<network>/` | The shipped reference bundles (`manifest.json`, with the height, block hash, indexer and a witness per cursor, plus gzipped state per sub-wallet). |
 
 The reference contains **no secret and no user-specific data** — it is public
 chain state plus a public key that gets replaced — which is what makes it safe to
@@ -205,6 +205,30 @@ key that gets replaced on restore; a funded wallet's own coins would end up in i
 The script also loads its own output back through `loadReferenceBundle` before
 declaring success, so a malformed bundle fails loudly at cut time rather than
 degrading to a silent full sync weeks later.
+
+### Which bundle a wallet uses, and when it refuses one
+
+`findReferenceRoot(network)` returns `$MIDNIGHT_PRESEED_DIR` when set. Otherwise it
+returns the nearest `preseed/` at or above the working directory that holds
+`<network>/manifest.json`. The walk stops at the first directory with a `.git`, and
+it skips a `preseed/` that it or its parent leaves writable by other users (such
+as `/tmp/preseed`).
+
+Before seeding, `assembleWallet` checks the bundle and falls back to a genesis
+sync, logging the reason, if any check fails:
+
+- **The manifest:** the network, a height, the `blockHash` at that height, and
+  the `indexer` host it was cut against.
+- **The parts:** each part's cursor and sha256 match its witness.
+- **The indexer:** it must be the one in use. Ledger-event ids are each
+  indexer's own numbering: Blockfrost's preprod ids run 22 behind the official
+  indexer's.
+- **The chain:** the block at the bundle's height must still have the recorded
+  hash. This catches a bundle that outlives a network reset.
+
+`npm run preseed:cut -- --stamp` adds the `blockHash` to a manifest that predates
+it, for a bundle cut against the current indexer on a chain that hasn't been
+reset since. In any other case, re-cut.
 
 ## When a bundle goes bad (observed 2026-09-23, preprod)
 

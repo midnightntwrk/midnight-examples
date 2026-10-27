@@ -17,7 +17,6 @@ import {
   getConfig,
   redactUrl,
   loadReferenceBundle,
-  REFERENCE_ROOT,
   type CanonicalRole,
 } from '../src/index.js';
 
@@ -48,7 +47,9 @@ if (tip === undefined) {
 
 // Warn loudly if the reference is newer than the wallets we are about to mint:
 // that is the cut-after-generate mistake, and it fails silently at run time.
-const reference = loadReferenceBundle(REFERENCE_ROOT, config.networkId);
+const reference = loadReferenceBundle(fileURLToPath(new URL('../../../preseed', import.meta.url)), config.networkId, {
+  indexer: config.indexer,
+});
 if (reference && reference.height > tip) {
   throw new Error(
     `The ${config.networkId} reference bundle is at height ${reference.height}, ahead of the ` +

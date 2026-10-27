@@ -237,6 +237,7 @@ jobs:
       - name: Typecheck and test the runtime packages (built by postinstall)
         run: |
           npm run typecheck -w @midnight-ntwrk/mnkit-wallet
+          npm run test:sim -w @midnight-ntwrk/mnkit-wallet
           npm run typecheck -w @midnight-ntwrk/mnkit-sim
           npm run test:sim -w @midnight-ntwrk/mnkit-sim
           npm run typecheck -w @midnight-ntwrk/mnkit-coins

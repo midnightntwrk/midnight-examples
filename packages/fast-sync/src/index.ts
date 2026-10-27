@@ -24,11 +24,17 @@ export {
   type NewWalletKeys,
   type SeededSnapshots,
 } from './preseed.js';
-export { loadReferenceBundle, type EmptyRefStates } from './reference-bundle.js';
+export {
+  checkChainIdentity,
+  getBlockHash,
+  loadReferenceBundle,
+  readReferenceBundle,
+  type EmptyRefStates,
+  type ReferenceBundleResult,
+} from './reference-bundle.js';
 export {
   findReferenceRoot,
   LOCAL_SEEDS,
-  REFERENCE_ROOT,
   resolveWallet,
   type CanonicalRole,
   type ResolvedWallet,

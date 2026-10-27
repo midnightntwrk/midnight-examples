@@ -22,9 +22,10 @@
 //     transaction and hide those funds. So a re-cut means re-running
 //     `npm run wallets:new` and re-funding at the faucet. Cut first, mint second.
 
-import { createHash, randomBytes } from 'node:crypto';
-import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
@@ -33,12 +34,19 @@ import type { FacadeState } from '@midnight-ntwrk/wallet-sdk';
 import pino from 'pino';
 import {
   assembleWallet,
+  checkChainIdentity,
+  getBlockHash,
   getChainTipHeight,
   getConfig,
   redactUrl,
   loadReferenceBundle,
-  REFERENCE_ROOT,
+  readReferenceBundle,
 } from '../src/index.js';
+import { stateDigest } from '../src/reference-bundle.js';
+
+// The repo's own bundles, which this script writes: never a walk up from the
+// working directory.
+const REFERENCE_ROOT = fileURLToPath(new URL('../../../preseed', import.meta.url));
 
 const PARTS = ['shielded', 'unshielded', 'dust'] as const;
 const STREAMS: Record<string, string> = {
@@ -54,6 +62,10 @@ const network = process.env['MIDNIGHT_NETWORK'] ?? 'preprod';
 // subscription). --from-genesis takes the slow, boring road instead: no
 // restore, no dedup, just a normal sync. Use it when a bootstrapped cut fails.
 const fromGenesis = process.argv.includes('--from-genesis');
+// --stamp adds the block hash at the bundle's height to an existing manifest
+// that predates it, and changes nothing else. Only for a bundle cut against
+// this same indexer, on a network that hasn't been reset since.
+const stamp = process.argv.includes('--stamp');
 const config = getConfig(network);
 const logger = pino({
   level: process.env['LOG_LEVEL'] ?? 'info',
@@ -65,6 +77,25 @@ if (network === 'local') {
 }
 
 setNetworkId(config.networkId);
+
+if (stamp) {
+  const manifestPath = join(REFERENCE_ROOT, config.networkId, 'manifest.json');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown> & { height: number };
+  const host = new URL(config.indexer).host;
+  if (manifest['indexer'] !== host) {
+    throw new Error(`${manifestPath} was cut against ${String(manifest['indexer'] ?? 'an unrecorded indexer')}, not ${host}; re-cut it instead.`);
+  }
+  const blockHash = await getBlockHash(config.indexer, manifest.height);
+  if (blockHash === undefined) {
+    throw new Error(`Could not read block ${manifest.height} from ${redactUrl(config.indexer)}; nothing was written.`);
+  }
+  const { network: net, height, indexer, ...rest } = manifest;
+  writeFileSync(manifestPath, `${JSON.stringify({ network: net, height, blockHash, indexer, ...rest }, null, 2)}\n`);
+  const check = readReferenceBundle(REFERENCE_ROOT, config.networkId, { indexer: config.indexer });
+  if (!check.ok) throw new Error(`Stamped, but the bundle still doesn't load: ${check.reason}`);
+  logger.info(`Stamped ${manifestPath} with block ${height}'s hash ${blockHash}.`);
+  process.exit(0);
+}
 
 const envConfig: EnvironmentConfiguration = {
   walletNetworkId: config.networkId,
@@ -104,7 +135,11 @@ if (tipAtStart === undefined) {
   throw new Error(`Could not read the ${network} chain tip from ${redactUrl(config.indexer)}.`);
 }
 
-const existing = fromGenesis ? null : loadReferenceBundle(REFERENCE_ROOT, config.networkId);
+const existing = fromGenesis ? null : loadReferenceBundle(REFERENCE_ROOT, config.networkId, { indexer: config.indexer });
+const existingForeign = existing && (await checkChainIdentity(config.indexer, existing));
+if (existingForeign) {
+  throw new Error(`The current ${config.networkId} reference can't bootstrap the cutter: ${existingForeign}. Re-run with --from-genesis.`);
+}
 logger.info(
   fromGenesis
     ? `--from-genesis: syncing the cutter from genesis to tip ${tipAtStart}. Slow (~78 min on preprod) but it avoids the restore/dedup replay path entirely.`
@@ -184,6 +219,10 @@ try {
     );
   }
   const height = postSyncTip;
+  const blockHash = await getBlockHash(config.indexer, height);
+  if (blockHash === undefined) {
+    throw new Error(`Synced, but could not read block ${height}'s hash to stamp the manifest. Nothing was written; re-run.`);
+  }
 
   const states: Record<string, string> = {
     shielded: await assembled.subWallets.shielded.serializeState(),
@@ -213,7 +252,7 @@ try {
       witnesses[part] = {
         stream,
         id: offset,
-        digest: createHash('sha256').update(raw).digest('hex').slice(0, 16),
+        digest: stateDigest(raw),
       };
     }
   }
@@ -225,7 +264,7 @@ try {
   const indexer = new URL(config.indexer).host;
   writeFileSync(
     join(dir, 'manifest.json'),
-    `${JSON.stringify({ network: config.networkId, height, indexer, parts, witnesses }, null, 2)}\n`,
+    `${JSON.stringify({ network: config.networkId, height, blockHash, indexer, parts, witnesses }, null, 2)}\n`,
   );
 
   // Validate the staged bundle before it replaces anything. loadReferenceBundle
@@ -233,7 +272,7 @@ try {
   // to a full genesis sync, which is the kind of thing nobody notices for weeks.
   // It also rejects a genesis-sentinel cursor, so this doubles as proof that the
   // cutter really reached tip rather than serializing an empty state.
-  const verified = loadReferenceBundle(stagingRoot, config.networkId);
+  const verified = loadReferenceBundle(stagingRoot, config.networkId, { indexer: config.indexer });
   if (!verified) {
     rmSync(stagingRoot, { recursive: true, force: true });
     throw new Error(

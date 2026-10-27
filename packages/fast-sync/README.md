@@ -15,8 +15,10 @@ Test wallets for Midnight projects. Part of
   endpoints.
 - Pre-seed fast sync (`assembleWallet`, `findReferenceRoot`): restore a new
   wallet from a reference bundle instead of syncing from genesis. Point
-  `MIDNIGHT_PRESEED_DIR` at a bundle directory to use it. For development
-  wallets only.
+  `MIDNIGHT_PRESEED_DIR` at a bundle directory to use it. A bundle is used only
+  when its manifest, its parts, the indexer in use and the chain at its height
+  all match; otherwise the wallet syncs from genesis. For development wallets
+  only.
 
 ## Install outside mnkit
 

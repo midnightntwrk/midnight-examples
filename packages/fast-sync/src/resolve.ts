@@ -10,7 +10,7 @@
 // in, and the alias table maps it onto one of the four, so a single set of
 // funded wallets in the repo-root .env.<network> serves all eight examples.
 
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import type { WalletSecret } from './types.js';
 import type { FastSyncOptions } from './fast-wallet.js';
@@ -34,26 +34,40 @@ const ALIASES: Record<string, CanonicalRole> = {
 };
 
 /**
- * Where the pre-seed reference bundles are: $MIDNIGHT_PRESEED_DIR when set,
- * else the nearest `preseed/` at or above the working directory (the
- * monorepo's, for its examples), else null. A project without bundles
- * syncs from genesis; a missing or foreign bundle is never used
- * (reference-bundle.ts fails closed).
+ * Whether `dir` is safe to read a bundle from: owned by this user (or root)
+ * and not writable by group or others. A bundle there can't have been planted
+ * by another account, as one in a shared directory like /tmp could be. POSIX
+ * only; elsewhere every directory passes.
  */
-export function findReferenceRoot(from: string = process.cwd()): string | null {
-  const env = process.env.MIDNIGHT_PRESEED_DIR;
-  if (env) return resolve(env);
-  for (let dir = resolve(from); ; dir = dirname(dir)) {
-    if (existsSync(join(dir, 'preseed'))) return join(dir, 'preseed');
-    if (dirname(dir) === dir) return null;
+function trusted(dir: string): boolean {
+  if (typeof process.getuid !== 'function') return true;
+  const uid = process.getuid();
+  try {
+    const st = statSync(dir);
+    return (st.uid === uid || st.uid === 0) && (st.mode & 0o022) === 0;
+  } catch {
+    return false;
   }
 }
 
 /**
- * The reference root found at startup (findReferenceRoot), or `preseed/` in
- * the working directory when there is none, which holds no bundle.
+ * Where the pre-seed reference bundle for `networkId` is:
+ * $MIDNIGHT_PRESEED_DIR when set, else the nearest `preseed/` at or above
+ * `from` (the working directory) that holds a `<networkId>/manifest.json`,
+ * else null. The search stops at the first directory with a `.git` (the
+ * project or repo root) and skips a `preseed/` that it or its parent leaves
+ * open to other users. A project without bundles syncs from genesis. A bundle
+ * that is found is still checked before use (reference-bundle.ts).
  */
-export const REFERENCE_ROOT = findReferenceRoot() ?? join(process.cwd(), 'preseed');
+export function findReferenceRoot(networkId: string, from: string = process.cwd()): string | null {
+  const env = process.env.MIDNIGHT_PRESEED_DIR;
+  if (env) return resolve(env);
+  for (let dir = resolve(from); ; dir = dirname(dir)) {
+    const root = join(dir, 'preseed');
+    if (existsSync(join(root, networkId, 'manifest.json')) && trusted(root) && trusted(dir)) return root;
+    if (existsSync(join(dir, '.git')) || dirname(dir) === dir) return null;
+  }
+}
 
 /** Genesis-funded seeds on the local `undeployed` devnet. */
 export const LOCAL_SEEDS: Record<CanonicalRole, string> = {
@@ -149,7 +163,7 @@ export function resolveWallet(net: string, role?: string): ResolvedWallet {
     const secret = readSecret(prefix);
     if (!secret) continue;
     const birthday = readBirthday(prefix);
-    const referenceRoot = findReferenceRoot();
+    const referenceRoot = findReferenceRoot(net);
     return {
       secret,
       role: canonical,

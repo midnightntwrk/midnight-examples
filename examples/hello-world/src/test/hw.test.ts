@@ -14,11 +14,11 @@ import pino from 'pino';
 import { getConfig } from '../config.js';
 import { MidnightWalletProvider, syncWallet } from '../wallet.js';
 import {
+  findReferenceRoot,
   getChainTipHeight,
   getOrCreateTestWallet,
   resolveWallet,
   waitForNightThenDust,
-  REFERENCE_ROOT,
   type FastSyncOptions,
   type WalletSecret,
 } from '@midnight-ntwrk/mnkit-wallet';
@@ -102,9 +102,10 @@ async function resolveHelloWorldWallet(
       ? `Generated a new ${net} wallet (birthday ${wallet.birthday}); it will fast-sync, then you will be asked to fund it.`
       : `Reusing the saved ${net} wallet (birthday ${wallet.birthday}).`,
   );
+  const referenceRoot = findReferenceRoot(config.networkId);
   return {
     secret: { kind: 'seed', value: wallet.seed },
-    fastSync: { referenceRoot: REFERENCE_ROOT, birthday: wallet.birthday },
+    ...(referenceRoot ? { fastSync: { referenceRoot, birthday: wallet.birthday } } : {}),
     isNew,
   };
 }

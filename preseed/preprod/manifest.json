@@ -1,6 +1,7 @@
 {
   "network": "preprod",
   "height": 2779435,
+  "blockHash": "7454bb29018207481140d11eb0c77c2577af8ef5c692266433c20e9ae888b146",
   "indexer": "midnight-preprod.blockfrost.io",
   "parts": {
     "shielded": {
