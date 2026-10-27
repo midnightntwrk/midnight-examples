@@ -147,7 +147,8 @@ for a newcomer is the [Learning path](README.md#learning-path) in the root READM
   `examples/private-tip-jar/SPEC.md`.
 - **Two kinds of test.** `src/test/*.sim.test.ts` run the compiled contract in
   memory with `@midnight-ntwrk/example-sim` (`packages/sim`): `Sim.deploy`,
-  `sim.call`, `sim.as`, `expectRejects` for every guard, and
+  `sim.call`, `sim.as`, `sim.time` (block time, for deadlines),
+  `expectRejects` for every guard, and
   `assertNotInPublicState` with one entry per SPEC privacy invariant.
   `yarn test:sim` runs only these, and CI runs it before starting the network.
   `src/test/<name>.test.ts` is the devnet suite (`yarn test` excludes

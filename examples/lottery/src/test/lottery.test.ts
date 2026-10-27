@@ -57,6 +57,9 @@ const PRIVATE_STATE_ID = 'OrganizerLotteryState';
 const PLAYER_IDS = ['PlayerOneLotteryState', 'PlayerTwoLotteryState'] as const;
 const PRICE = 1_000n;
 const MAX = 3n;
+// Sales end an hour after the suite starts, so they stay open throughout: the
+// suite closes them by selling out. The after-the-deadline path is in the sim.
+const SALES_END = BigInt(Math.floor(Date.now() / 1000) + 3600);
 // The NIGHT token type: the all-zero color.
 const NIGHT = '0'.repeat(64);
 
@@ -81,12 +84,13 @@ describe(`Lottery Contract (${network})`, () => {
   );
 
   // Reads the contract's public ledger state.
-  // @generated-stub begin ledger-fields sha=4204bed4244e
+  // @generated-stub begin ledger-fields sha=c68c70fce504
   // Public ledger fields:
   //   organizer: Bytes<32>
   //   seedCommitment: Bytes<32>
   //   ticketPrice: Uint<0..18446744073709551615>
   //   maxTickets: Uint<0..65535>
+  //   salesEnd: Uint<0..18446744073709551615>
   //   state: LotteryState
   //   tickets: Map<Uint<0..65535>, Bytes<32>>
   //   ticketCount: Counter
@@ -206,12 +210,13 @@ describe(`Lottery Contract (${network})`, () => {
       compiledContract: CompiledLotteryContract,
       privateStateId: PRIVATE_STATE_ID,
       // @generated-stub begin private-state sha=29fc6a7a670f
-      initialPrivateState: createLotteryPrivateState(undefined as never /* TODO secretKey */),
+      initialPrivateState: createLotteryPrivateState(),
       // @generated-stub end private-state
       // @generated-stub begin constructor-args sha=1fcb6439d086
       args: [
         PRICE, // price: Uint<64>
         MAX, // max: Uint<16>
+        SALES_END, // end: Uint<64>
       ],
       // @generated-stub end constructor-args
     });
@@ -225,6 +230,7 @@ describe(`Lottery Contract (${network})`, () => {
     expect(l.state).toEqual(LotteryState.OPEN);
     expect(l.ticketPrice).toEqual(PRICE);
     expect(l.maxTickets).toEqual(MAX);
+    expect(l.salesEnd).toEqual(SALES_END);
     expect(l.pot).toEqual(0n);
   });
 
@@ -249,33 +255,41 @@ describe(`Lottery Contract (${network})`, () => {
     expect((await queryLedger()).ticketCount).toEqual(2n);
   });
 
-  it('closeSales: rejects a player, then the organizer closes', async () => {
+  it('closeSales: rejected before salesEnd with a ticket left, even for the organizer', async () => {
+    // The block-time check (blockTimeGte) runs on chain here.
+    await expect(call(PRIVATE_STATE_ID, 'closeSales')).rejects.toThrow();
     await expect(call(PLAYER_IDS[0], 'closeSales')).rejects.toThrow();
-    await call(PRIVATE_STATE_ID, 'closeSales');
+    expect((await queryLedger()).state).toEqual(LotteryState.OPEN);
+  });
+
+  it('closeSales: a player closes as soon as the last ticket sells', async () => {
+    await call(PLAYER_IDS[0], 'buyTicket', randomNonce());
+    expect((await queryLedger()).ticketCount).toEqual(MAX);
+    await call(PLAYER_IDS[1], 'closeSales');
     expect((await queryLedger()).state).toEqual(LotteryState.CLOSED);
   });
 
-  it('draw: the organizer draws one of the two tickets', async () => {
+  it('draw: the organizer draws one of the three tickets', async () => {
     await call(PRIVATE_STATE_ID, 'draw');
     const l = await queryLedger();
     expect(l.state).toEqual(LotteryState.DRAWN);
-    expect(l.winningTicket).toBeLessThan(2n);
+    expect(l.winningTicket).toBeLessThan(MAX);
     expect(l.winner).toEqual(l.tickets.lookup(l.winningTicket));
     logger.info(`Ticket ${l.winningTicket} won`);
   });
 
   it('claimPrize: the loser is rejected, the winner is paid the whole pot', async () => {
-    // Player i bought ticket i.
+    // Player one bought tickets 0 and 2, player two ticket 1.
     const won = Number((await queryLedger()).winningTicket);
-    const winner = PLAYER_IDS[won]!;
-    const loser = PLAYER_IDS[1 - won]!;
+    const winner = PLAYER_IDS[won % 2]!;
+    const loser = PLAYER_IDS[1 - (won % 2)]!;
     const to = { bytes: encodeUserAddress(wallet.unshieldedKeystore.getAddress()) };
 
     await expect(call(loser, 'claimPrize', to)).rejects.toThrow();
 
     const before = await night();
     await call(winner, 'claimPrize', to);
-    expect(await waitForNight(before + 2n * PRICE)).toEqual(before + 2n * PRICE);
+    expect(await waitForNight(before + MAX * PRICE)).toEqual(before + MAX * PRICE);
 
     const l = await queryLedger();
     expect(l.state).toEqual(LotteryState.PAID);

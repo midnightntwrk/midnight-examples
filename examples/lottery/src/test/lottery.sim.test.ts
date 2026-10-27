@@ -34,13 +34,17 @@ const ORGANIZER_SK = bytes32();
 const SEED = bytes32();
 const PRICE = 10n;
 const MAX = 3n;
+// Sales end at END (Unix seconds). Calls run at DURING unless a test moves
+// sim.time, so nothing depends on the real clock.
+const END = 1_800_000_000n;
+const DURING = Number(END) - 3600;
 
 const deploy = (
   max = MAX,
   w: Witnesses<LotteryPrivateState> = witnesses,
   seed = SEED,
-) =>
-  Sim.deploy({
+) => {
+  const sim = Sim.deploy({
     contract: new Contract(w),
     ledger,
     // @generated-stub begin private-state sha=f9d2b36842cc
@@ -50,9 +54,13 @@ const deploy = (
     args: [
       PRICE, // price: Uint<64>
       max, // max: Uint<16>
+      END, // end: Uint<64>
     ],
     // @generated-stub end constructor-args
   });
+  sim.time = DURING;
+  return sim;
+};
 
 type Lottery = ReturnType<typeof deploy>;
 
@@ -71,10 +79,16 @@ const sell = (sim: Lottery, players: Uint8Array[]) =>
     return nonce;
   });
 
+// Moves past the end of sales and closes them, as a player: anyone may.
+const closeAfterEnd = (sim: Lottery) => {
+  sim.time = Number(END);
+  return as(sim, bytes32()).call('closeSales');
+};
+
 // Sells a ticket to each player, closes and draws. Returns the winner's secret.
 const runDraw = (sim: Lottery, players: Uint8Array[]) => {
   sell(sim, players);
-  organizer(sim).call('closeSales');
+  closeAfterEnd(sim);
   const l = organizer(sim).call('draw').ledger;
   return players[Number(l.winningTicket)]!;
 };
@@ -86,6 +100,7 @@ const address = () => ({ bytes: bytes32() });
 //   sim.call('circuit', ...args)        one transaction; returns { result, ledger }
 //   sim.as(coinPublicKeyHex)            later calls come from another wallet
 //   sim.privateState = ...              swap the private state (another user)
+//   sim.time = unixSeconds              block time blockTimeLt/Gte see (default: now)
 //   expectRejects(() => sim.call(...), 'assert message')   every guard
 
 describe('Lottery (in memory)', () => {
@@ -94,6 +109,7 @@ describe('Lottery (in memory)', () => {
     expect(l.state).toBe(LotteryState.OPEN);
     expect(l.ticketPrice).toBe(PRICE);
     expect(l.maxTickets).toBe(MAX);
+    expect(l.salesEnd).toBe(END);
     expect(l.ticketCount).toBe(0n);
     expect(l.pot).toBe(0n);
     expect(l.tickets.isEmpty()).toBe(true);
@@ -101,7 +117,7 @@ describe('Lottery (in memory)', () => {
 
   it('rejects a free ticket or a lottery with fewer than two tickets', () => {
     expectRejects(
-      () => Sim.deploy({ contract: new Contract(witnesses), ledger, privateState: createLotteryPrivateState(), args: [0n, MAX] }),
+      () => Sim.deploy({ contract: new Contract(witnesses), ledger, privateState: createLotteryPrivateState(), args: [0n, MAX, END] }),
       'Ticket price must be positive',
     );
     expectRejects(() => deploy(1n), 'A lottery needs at least two tickets');
@@ -156,19 +172,46 @@ describe('Lottery (in memory)', () => {
     sell(sim, [bytes32(), bytes32()]);
     expectRejects(() => as(sim, bytes32()).call('buyTicket', bytes32()), 'All tickets are sold');
 
-    organizer(sim).call('closeSales');
+    // Sold out, so it can close before the end of sales.
+    as(sim, bytes32()).call('closeSales');
     expectRejects(() => as(sim, bytes32()).call('buyTicket', bytes32()), 'Ticket sales are closed');
     expect(sim.ledger().ticketCount).toBe(2n);
   });
 
-  it('closeSales: only the organizer, only while open, only after a sale', () => {
+  it('buyTicket: open until the second before salesEnd, then rejected', () => {
     const sim = deploy();
-    expectRejects(() => organizer(sim).call('closeSales'), 'No tickets were sold');
+    sim.time = Number(END) - 1;
     sell(sim, [bytes32()]);
-    expectRejects(() => as(sim, bytes32()).call('closeSales'), 'Only the organizer can close sales');
+    sim.time = Number(END);
+    expectRejects(() => as(sim, bytes32()).call('buyTicket', bytes32()), 'Ticket sales have ended');
+    expect(sim.ledger().ticketCount).toBe(1n);
+  });
 
-    expect(organizer(sim).call('closeSales').ledger.state).toBe(LotteryState.CLOSED);
+  it('closeSales: not before salesEnd while tickets are left, not even by the organizer', () => {
+    const sim = deploy();
+    sell(sim, [bytes32()]);
+    expectRejects(() => organizer(sim).call('closeSales'), 'Sales are still open');
+    sim.time = Number(END) - 1;
+    expectRejects(() => as(sim, bytes32()).call('closeSales'), 'Sales are still open');
+  });
+
+  it('closeSales: anyone, once salesEnd has passed', () => {
+    const sim = deploy();
+    sell(sim, [bytes32()]);
+    expect(closeAfterEnd(sim).ledger.state).toBe(LotteryState.CLOSED);
     expectRejects(() => organizer(sim).call('closeSales'), 'Ticket sales are closed');
+  });
+
+  it('closeSales: anyone, as soon as every ticket is sold', () => {
+    const sim = deploy();
+    sell(sim, [bytes32(), bytes32(), bytes32()]);
+    expect(as(sim, bytes32()).call('closeSales').ledger.state).toBe(LotteryState.CLOSED);
+  });
+
+  it('closeSales: not without a sale, even after salesEnd', () => {
+    const sim = deploy();
+    sim.time = Number(END);
+    expectRejects(() => as(sim, bytes32()).call('closeSales'), 'No tickets were sold');
   });
 
   it('draw: picks a sold ticket and records its holder', () => {
@@ -189,7 +232,7 @@ describe('Lottery (in memory)', () => {
       const seed = bytes32();
       const sim = deploy(MAX, witnesses, seed);
       sell(sim, [bytes32(), bytes32(), bytes32()]);
-      as(sim, ORGANIZER_SK, seed).call('closeSales');
+      as(sim, bytes32()).call('closeSales');
       wins.add(as(sim, ORGANIZER_SK, seed).call('draw').ledger.winningTicket);
     }
     expect([...wins].sort()).toEqual([0n, 1n, 2n]);
@@ -199,7 +242,7 @@ describe('Lottery (in memory)', () => {
     const sim = deploy();
     sell(sim, [bytes32()]);
     expectRejects(() => organizer(sim).call('draw'), 'Sales must be closed before the draw');
-    organizer(sim).call('closeSales');
+    closeAfterEnd(sim);
     expectRejects(() => as(sim, bytes32()).call('draw'), 'Only the organizer can draw');
     organizer(sim).call('draw');
     expectRejects(() => organizer(sim).call('draw'), 'Sales must be closed before the draw');
@@ -208,7 +251,7 @@ describe('Lottery (in memory)', () => {
   it('draw: rejects a seed other than the committed one', () => {
     const sim = deploy();
     sell(sim, [bytes32()]);
-    organizer(sim).call('closeSales');
+    closeAfterEnd(sim);
     // The organizer's key, a different seed: trying to re-roll the draw.
     expectRejects(() => as(sim, ORGANIZER_SK, bytes32()).call('draw'), 'Seed does not match the commitment');
   });
@@ -222,7 +265,7 @@ describe('Lottery (in memory)', () => {
     };
     const sim = deploy(MAX, liar);
     sell(sim, [bytes32(), bytes32()]);
-    organizer(sim).call('closeSales');
+    closeAfterEnd(sim);
     expectRejects(() => organizer(sim).call('draw'), 'Incorrect division');
 
     // And one that breaks the equation instead.
@@ -232,7 +275,7 @@ describe('Lottery (in memory)', () => {
     };
     const sim2 = deploy(MAX, wrong);
     sell(sim2, [bytes32(), bytes32()]);
-    organizer(sim2).call('closeSales');
+    closeAfterEnd(sim2);
     expectRejects(() => organizer(sim2).call('draw'), 'Incorrect division');
   });
 
@@ -265,12 +308,12 @@ describe('Lottery (in memory)', () => {
     const sim = deploy();
     const players = [bytes32(), bytes32()];
     const nonces = sell(sim, players);
-    organizer(sim).call('closeSales');
+    closeAfterEnd(sim);
     organizer(sim).call('draw');
     // Checked after the draw: the seed was used in-circuit and must still be
     // nowhere in public state.
     const l = sim.ledger();
-    expect(Object.keys(l).sort()).toEqual(['entropy', 'maxTickets', 'organizer', 'pot', 'seedCommitment', 'state', 'ticketCount', 'ticketPrice', 'tickets', 'winner', 'winningTicket']);
+    expect(Object.keys(l).sort()).toEqual(['entropy', 'maxTickets', 'organizer', 'pot', 'salesEnd', 'seedCommitment', 'state', 'ticketCount', 'ticketPrice', 'tickets', 'winner', 'winningTicket']);
     assertNotInPublicState(l, {
       organizerSecretKey: ORGANIZER_SK,
       seed: SEED,

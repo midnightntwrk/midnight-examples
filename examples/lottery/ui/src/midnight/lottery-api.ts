@@ -51,17 +51,30 @@ export interface LotteryDeployInput {
   price: bigint;
   /** How many tickets can be sold. `Uint<16>`. */
   maxTickets: bigint;
+  /** When ticket sales end, in Unix seconds. `Uint<64>`. */
+  salesEnd: bigint;
 }
 
 export const UINT16_MAX = 65535n;
 export const UINT64_MAX = 2n ** 64n - 1n;
 
-/** The constructor's asserts (and the Uint casts), as a readable reason. */
-export function deployInputError(input: LotteryDeployInput): string | null {
+/** The current time in Unix seconds, the unit `salesEnd` is in. */
+export function nowSeconds(): bigint {
+  return BigInt(Math.floor(Date.now() / 1000));
+}
+
+/**
+ * The constructor's asserts (and the Uint casts), as a readable reason. The
+ * contract accepts a `salesEnd` in the past (nobody could buy a ticket), so
+ * that check is the UI's own.
+ */
+export function deployInputError(input: LotteryDeployInput, now: bigint = nowSeconds()): string | null {
   if (input.price <= 0n) return "The ticket price must be greater than zero.";
   if (input.price > UINT64_MAX) return "The ticket price is too large.";
   if (input.maxTickets < 2n) return "A lottery needs at least two tickets.";
   if (input.maxTickets > UINT16_MAX) return `At most ${UINT16_MAX} tickets.`;
+  if (input.salesEnd <= now) return "The end of sales must be in the future.";
+  if (input.salesEnd > UINT64_MAX) return "The end of sales is too far away.";
   return null;
 }
 
@@ -75,7 +88,7 @@ export async function deployLottery(
   providers: LotteryProviders,
   input: LotteryDeployInput,
 ): Promise<{ contract: LotteryContract; address: ContractAddress }> {
-  const args: ConstructorArgs = [input.price, input.maxTickets];
+  const args: ConstructorArgs = [input.price, input.maxTickets, input.salesEnd];
   const deployed = await deployContract(providers, {
     compiledContract: CompiledLotteryContract,
     privateStateId: PRIVATE_STATE_ID,
@@ -236,20 +249,31 @@ export type LotteryCircuit = "buyTicket" | "closeSales" | "draw" | "claimPrize";
  * Mirrors each circuit's asserts in order, reworded; the contract still has
  * the final say (and its raw message if this ever drifts). `draw` also needs
  * the seed this browser committed to, which only the deploying browser has.
+ *
+ * `now` stands in for the block time. The chain checks the time when the
+ * transaction lands, so a call made in the last seconds before `salesEnd`
+ * can still be rejected.
  */
-export function actionError(circuit: LotteryCircuit, state: Ledger, view: LotteryView): string | null {
+export function actionError(
+  circuit: LotteryCircuit,
+  state: Ledger,
+  view: LotteryView,
+  now: bigint = nowSeconds(),
+): string | null {
   const s = state.state;
   const organizer = view.role === "organizer";
+  const soldOut = state.ticketCount >= state.maxTickets;
   switch (circuit) {
     case "buyTicket":
       if (s !== LotteryState.OPEN) return "Ticket sales are closed.";
+      if (now >= state.salesEnd) return "Ticket sales have ended.";
       if (organizer) return "The organizer can't buy tickets.";
-      if (state.ticketCount >= state.maxTickets) return "All tickets are sold.";
+      if (soldOut) return "All tickets are sold.";
       return null;
     case "closeSales":
-      if (!organizer) return "Only the organizer can close sales.";
       if (s !== LotteryState.OPEN) return "Sales are already closed.";
-      if (state.ticketCount === 0n) return "No tickets have been sold yet.";
+      if (now < state.salesEnd && !soldOut) return "Sales are still open: they close when time is up or every ticket is sold.";
+      if (state.ticketCount === 0n) return "No tickets were sold.";
       return null;
     case "draw":
       if (!organizer) return "Only the organizer can draw.";

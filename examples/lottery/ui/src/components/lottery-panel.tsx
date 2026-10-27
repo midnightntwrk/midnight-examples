@@ -1,5 +1,6 @@
 // The lottery, built on the seed `yarn new:ui` generated: step 1 is the
-// template's <DeploymentCard> (deploy takes a ticket price and a ticket cap),
+// template's <DeploymentCard> (deploy takes a ticket price, a ticket cap and
+// when sales end),
 // then the lottery itself. Everything the panel decides (organizer or player,
 // which tickets are yours, whether you won, which buttons are live and why)
 // comes from lotteryView / actionError in @/midnight/lottery-api, which the
@@ -39,6 +40,7 @@ import {
   ledger$,
   LotteryState,
   lotteryView,
+  nowSeconds,
   randomNonce,
   readPrivateState,
   UINT16_MAX,
@@ -54,6 +56,7 @@ const LEDGER_FIELDS: LedgerField[] = [
   { name: "seedCommitment", storage: "Cell" },
   { name: "ticketPrice", storage: "Cell" },
   { name: "maxTickets", storage: "Cell" },
+  { name: "salesEnd", storage: "Cell" },
   { name: "state", storage: "Cell", enumValues: ["OPEN", "CLOSED", "DRAWN", "PAID"] },
   { name: "tickets", storage: "Map" },
   { name: "ticketCount", storage: "Counter" },
@@ -70,10 +73,11 @@ const STATE_LABEL: Record<LotteryState, string> = {
   [LotteryState.PAID]: "Prize paid",
 };
 
-/** The buttons each role sees, in lottery order. */
+/** The buttons each role sees, in lottery order. Anyone may close sales once they're over. */
 const ACTIONS: Record<LotteryView["role"], { circuit: LotteryCircuit; label: string }[]> = {
   player: [
     { circuit: "buyTicket", label: "Buy a ticket" },
+    { circuit: "closeSales", label: "Close sales" },
     { circuit: "claimPrize", label: "Claim the prize" },
   ],
   organizer: [
@@ -135,6 +139,14 @@ export function LotteryPanel() {
 
   const view = state && ps && address ? lotteryView(state, address, ps.secretKey) : null;
 
+  // The clock, re-read every few seconds so buying stops and closing unlocks
+  // when salesEnd passes even if the ledger doesn't change.
+  const [now, setNow] = useState(nowSeconds);
+  useEffect(() => {
+    const id = setInterval(() => setNow(nowSeconds()), 5_000);
+    return () => clearInterval(id);
+  }, []);
+
   const submit = (circuit: LotteryCircuit) =>
     void run(circuit, async () => {
       if (!contract) return;
@@ -190,7 +202,7 @@ export function LotteryPanel() {
                   <div className="flex flex-col gap-3">
                     {ACTIONS[view.role].map(({ circuit, label }) => {
                       const reason =
-                        actionError(circuit, state, view) ??
+                        actionError(circuit, state, view, now) ??
                         (circuit === "claimPrize" && !me
                           ? `Couldn't read your wallet address${meError ? `: ${meError}` : "."}`
                           : null);
@@ -249,7 +261,7 @@ function actionHint(circuit: LotteryCircuit, state: Ledger): string {
     case "buyTicket":
       return `Your wallet pays ${state.ticketPrice} STAR into the pot. Buy as many as you like.`;
     case "closeSales":
-      return "Stops ticket sales so you can draw.";
+      return "Ends ticket sales so the organizer can draw. Anyone may, once time is up or every ticket is sold.";
     case "draw":
       return "Picks the winning ticket from your committed seed and every ticket's nonce.";
     case "claimPrize":
@@ -278,6 +290,8 @@ function LotterySummary({ state, view }: { state: Ledger; view: LotteryView }) {
         <dd>
           {state.ticketCount.toString()} of {state.maxTickets.toString()}
         </dd>
+        <dt className="text-muted-foreground">Sales end</dt>
+        <dd>{new Date(Number(state.salesEnd) * 1000).toLocaleString()}</dd>
         <dt className="text-muted-foreground">Ticket price</dt>
         <dd>{state.ticketPrice.toString()} STAR</dd>
         <dt className="text-muted-foreground">Pot</dt>
@@ -293,14 +307,21 @@ function LotterySummary({ state, view }: { state: Ledger; view: LotteryView }) {
   );
 }
 
-/** Ticket price and cap, pre-checked the way the constructor checks them. */
+/** Ticket price, cap and end of sales, pre-checked the way the constructor checks them. */
 function LotteryForm(props: { busy: boolean; disabled: boolean; onSubmit: (input: LotteryDeployInput) => void }) {
   const [price, setPrice] = useState("");
   const [max, setMax] = useState("");
+  const [end, setEnd] = useState("");
   const parse = (t: string) => (/^\d+$/.test(t.trim()) ? BigInt(t.trim()) : null);
   const ticketPrice = parse(price);
   const maxTickets = parse(max);
-  const input = ticketPrice !== null && maxTickets !== null ? { price: ticketPrice, maxTickets } : null;
+  // datetime-local gives local time without a zone; Date reads it as local.
+  const endMs = end ? new Date(end).getTime() : NaN;
+  const salesEnd = Number.isNaN(endMs) ? null : BigInt(Math.floor(endMs / 1000));
+  const input =
+    ticketPrice !== null && maxTickets !== null && salesEnd !== null
+      ? { price: ticketPrice, maxTickets, salesEnd }
+      : null;
   const reason = input ? deployInputError(input) : null;
 
   return (
@@ -328,6 +349,13 @@ function LotteryForm(props: { busy: boolean; disabled: boolean; onSubmit: (input
           onChange={(e) => setMax(e.target.value)}
           className="w-32"
         />
+        <Input
+          aria-label="Sales end"
+          type="datetime-local"
+          value={end}
+          onChange={(e) => setEnd(e.target.value)}
+          className="w-56"
+        />
         <Button type="submit" disabled={props.disabled || !input || reason !== null}>
           {props.busy && <Loader2 className="animate-spin" />}
           Deploy new lottery
@@ -335,7 +363,8 @@ function LotteryForm(props: { busy: boolean; disabled: boolean; onSubmit: (input
       </div>
       <p className={cn("text-xs", reason ? "text-destructive" : "text-muted-foreground")}>
         {reason ??
-          `Ticket price in STAR (1 NIGHT = 1,000,000 STAR) and how many tickets to sell (2 to ${UINT16_MAX}). ` +
+          `Ticket price in STAR (1 NIGHT = 1,000,000 STAR), how many tickets to sell (2 to ${UINT16_MAX}) ` +
+            "and when sales end. After that, or once every ticket is sold, anyone can close sales. " +
             "You become the organizer: a new secret key and draw seed are kept, encrypted, in this browser. " +
             "Lose them and the lottery can never be drawn."}
       </p>

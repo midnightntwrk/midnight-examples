@@ -13,8 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// A NIGHT lottery with a draw nobody can predict or steer, except a cheating
-// organizer (see SPEC.md → Out of scope).
+// A NIGHT lottery whose draw players can't predict or steer. The organizer is
+// trusted: they hold the seed, so they know who would win after every ticket
+// and can refuse to draw a result they dislike, or leak the seed to someone
+// who can (see SPEC.md → Out of scope). What they can't do is pick the moment
+// sales stop: that is fixed at deployment (`salesEnd`), and after it anyone
+// can close sales.
 //
 // Midnight has no on-chain randomness, so the draw combines two sources:
 //   1. a secret seed the organizer commits to in the constructor, before any
@@ -27,8 +31,8 @@
 // committed seed. The seed itself never reaches the chain.
 //
 // What an observer of the chain learns, step by step:
-//   deploy      -> the organizer key (a hash), the seed commitment, the price
-//                  and the cap.
+//   deploy      -> the organizer key (a hash), the seed commitment, the price,
+//                  the cap and the end of sales.
 //   buyTicket   -> a ticket number, the buyer's player key (a hash), the new
 //                  entropy hash and the pot. The NIGHT payment shows the
 //                  paying wallet. Not the nonce, not the secret key.
@@ -57,6 +61,10 @@ export sealed ledger organizer: Bytes<32>;
 export sealed ledger seedCommitment: Bytes<32>;
 export sealed ledger ticketPrice: Uint<64>;
 export sealed ledger maxTickets: Uint<16>;
+// When ticket sales end, in seconds since the Unix epoch. Compact can't read
+// the clock; it can only compare a time against the current block's time
+// (blockTimeLt / blockTimeGte), checked on chain when the transaction lands.
+export sealed ledger salesEnd: Uint<64>;
 
 export ledger state: LotteryState;
 // ticket number -> holder's player key. Ticket numbers run 0 .. ticketCount-1.
@@ -84,7 +92,9 @@ witness seed(): Bytes<32>;
 // circuit checks the answer (`draw`), so a lying witness can't pick the winner.
 witness divMod(value: Uint<64>, divisor: Uint<64>): [Uint<64>, Uint<64>];
 
-constructor(price: Uint<64>, max: Uint<16>) {
+// `end` isn't checked against the clock here: a deadline already past just
+// gives a lottery nobody can buy into. The UI refuses one before deploying.
+constructor(price: Uint<64>, max: Uint<16>, end: Uint<64>) {
   assert(price > 0, "Ticket price must be positive");
   assert(max >= 2, "A lottery needs at least two tickets");
 
@@ -95,6 +105,7 @@ constructor(price: Uint<64>, max: Uint<16>) {
   seedCommitment = disclose(commitSeed(seed()));
   ticketPrice = disclose(price);
   maxTickets = disclose(max);
+  salesEnd = disclose(end);
   // The running hash starts from a fixed tag. It needn't be unique per
   // deployment: the seed already is.
   entropy = pad(32, "lottery:entropy:");
@@ -142,6 +153,7 @@ circuit isOrganizer(): Boolean {
 // hash is. The client draws it at random for every ticket.
 export circuit buyTicket(nonce: Bytes<32>): [] {
   assert(state == LotteryState.OPEN, "Ticket sales are closed");
+  assert(blockTimeLt(salesEnd), "Ticket sales have ended");
   // Only catches an organizer buying with their own secret. One playing under
   // a second secret can't be detected (SPEC.md → Out of scope).
   assert(!isOrganizer(), "The organizer cannot buy tickets");
@@ -153,14 +165,19 @@ export circuit buyTicket(nonce: Bytes<32>): [] {
   const player = callerKey();
   // ticketCount < maxTickets, a Uint<16>, so the cast can't fail.
   tickets.insert(ticketCount.read() as Uint<16>, player);
-  entropy = persistentHash<Vector<3, Bytes<32>>>([entropy, player, disclose(nonce)]);
+  // The hash is disclosed, not the nonce: the compiler counts persistentHash
+  // as revealing its inputs, but only the digest reaches the ledger.
+  entropy = disclose(persistentHash<Vector<3, Bytes<32>>>([entropy, player, nonce]));
   ticketCount.increment(1);
   pot = (pot + ticketPrice) as Uint<128>;
 }
 
+// Anyone can close sales, but only once they're over: past `salesEnd`, or
+// every ticket sold. The organizer knows who would win at every moment, so
+// letting them choose when to stop would let them choose the winner.
 export circuit closeSales(): [] {
-  assert(isOrganizer(), "Only the organizer can close sales");
   assert(state == LotteryState.OPEN, "Ticket sales are closed");
+  assert(blockTimeGte(salesEnd) || ticketCount.read() == maxTickets, "Sales are still open");
   // A draw over zero tickets would divide by zero.
   assert(ticketCount.read() > 0, "No tickets were sold");
   state = LotteryState.CLOSED;
@@ -184,7 +201,8 @@ export circuit draw(): [] {
   // winningTicket = h mod ticketCount. Compact has no `%`, so the witness
   // divides and the circuit checks the result (the calculator pattern).
   // Both checks are needed: without `r < count`, a witness could return any
-  // r with a matching q and choose the winner.
+  // r with a matching q and choose the winner. Taking a 64-bit h mod at most
+  // 65535 tickets favours low ticket numbers by under 2^-48: negligible.
   const count = ticketCount.read();
   const [q, r] = divMod(h, count);
   assert(disclose(r < count && q * count + r == h), "Incorrect division");

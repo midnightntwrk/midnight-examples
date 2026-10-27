@@ -9,14 +9,18 @@ which are yours, and for the verification checklist.
 
 What it adds on top of the scaffold:
 
-- **Deploy as organizer:** a ticket-price and ticket-cap form, pre-checked
-  the way the constructor checks them. Deploying makes a fresh secret key and
+- **Deploy as organizer:** a ticket-price, ticket-cap and end-of-sales form,
+  pre-checked the way the constructor checks them (plus a check the contract
+  leaves to the UI: the end of sales must be in the future). Deploying makes a fresh secret key and
   draw seed, kept encrypted in this browser.
 - **Join as a player:** a browser that joins gets its own fresh secret.
 - **Role-aware actions:** the organizer sees *Close sales* and *Draw the
-  winner*. A player sees *Buy a ticket* and *Claim the prize*. Each button is
-  disabled with the reason when the contract would reject the call
-  (`actionError`, tested against the real circuits).
+  winner*. A player sees *Buy a ticket*, *Close sales* and *Claim the prize*.
+  *Close sales* unlocks for everyone once sales end or every ticket is sold.
+  Each button is disabled with the reason when the contract would reject the
+  call (`actionError`, tested against the real circuits at block times either
+  side of the end of sales). The panel re-reads the clock every few seconds,
+  so buttons change when sales end even if the ledger doesn't.
 - **Your tickets and the result:** the panel finds this browser's tickets and
   whether it won by recomputing its player key with the contract's
   `pureCircuits.playerKey`.
@@ -47,18 +51,26 @@ O (organizer), A and B (players), each with its own browser wallet on
 <mn_dust_…> <mn_addr_…>`; the page's "no DUST" hint prints the command.
 
 - [ ] **Unlock:** O connects and sets a passphrase; the panel appears.
-- [ ] **Deploy (wallet proving):** O deploys with price 1000, max 3; the card
-      says "You are the organizer" and "Tickets on sale".
+- [ ] **Deploy (wallet proving):** O deploys with price 1000, max 3 and sales
+      ending in about 15 minutes; the card says "You are the organizer",
+      "Tickets on sale" and shows the end of sales. A past end time is
+      refused before deploying.
 - [ ] **Organizer can't buy:** O sees no Buy button (organizer actions only).
 - [ ] **Join + buy (unshielded NIGHT in):** A and B join by address, set
       their own passphrases and buy one ticket each. The wallet adds the
       1000 STAR input while balancing; each sees "Your tickets: #n" and the
       pot shows 2000.
-- [ ] **Close + draw:** O closes sales, then draws; everyone sees the winning
-      ticket, and the winner sees "Your ticket won!".
+- [ ] **Too early to close:** with one ticket left and time remaining, *Close
+      sales* is disabled for O, A and B with "Sales are still open".
+- [ ] **Close + draw:** A buys the last ticket (pot 3000); B closes sales, then
+      O draws. Everyone sees the winning ticket, and the winner sees "Your
+      ticket won!".
+- [ ] **Deadline:** on a second lottery, let the end of sales pass with one
+      ticket sold. *Buy a ticket* disables and *Close sales* unlocks for a
+      player, whose close succeeds.
 - [ ] **Claim (unshielded NIGHT out):** the loser's Claim stays disabled. The
       winner claims; state shows "Prize paid" and their NIGHT balance rises
-      by 2000 STAR.
+      by 3000 STAR.
 - [ ] **Reload before the draw:** reload O after closing sales. After the
       same passphrase it re-joins, still shows the organizer role, and the
       draw succeeds (the seed survived).

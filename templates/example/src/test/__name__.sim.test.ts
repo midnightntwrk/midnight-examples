@@ -43,6 +43,7 @@ const deploy = () =>
 //   sim.call('circuit', ...args)        one transaction; returns { result, ledger }
 //   sim.as(coinPublicKeyHex)            later calls come from another wallet
 //   sim.privateState = ...              swap the private state (another user)
+//   sim.time = unixSeconds              block time blockTimeLt/Gte see (default: now)
 //   expectRejects(() => sim.call(...), 'assert message')   every guard
 
 describe('__Title__ (in memory)', () => {

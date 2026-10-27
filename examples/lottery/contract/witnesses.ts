@@ -35,7 +35,9 @@ export type LotteryPrivateState = {
 const random32 = (): Uint8Array => crypto.getRandomValues(new Uint8Array(32));
 
 // Fresh random secrets by default. Tests pass them explicitly when they need a
-// known organizer or a reproducible draw.
+// known organizer or a reproducible draw. Make a new state for every lottery
+// you deploy: the organizer key is a plain hash of `secretKey`, so reusing
+// one secret publishes the same key in every lottery and links them.
 export const createLotteryPrivateState = (
   secretKey: Uint8Array = random32(),
   seed: Uint8Array = random32(),

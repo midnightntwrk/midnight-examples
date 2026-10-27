@@ -4,7 +4,8 @@
 // with one secret per person. It replays the Node test's lottery
 // (src/test/lottery.test.ts), and at every step checks, for every person and
 // every circuit, that the panel's pre-check (actionError) predicts exactly
-// what the circuit accepts. It also checks that lotteryView finds each
+// what the circuit accepts, both before and after the end of sales (the block
+// time is set per call). It also checks that lotteryView finds each
 // person's own tickets and the winner through the contract's pure circuits.
 //
 // Seed file: generated once by `yarn new:ui`, then yours to edit. The drift
@@ -54,14 +55,20 @@ const two = person("player two", 3);
 const watcher = person("watcher", 4); // never buys
 const everyone = [organizer, one, two, watcher];
 
-function deploy(price: bigint, max: bigint): ChargedState {
+// Sales end at END (Unix seconds); calls run DURING sales unless told otherwise.
+const END = 1_800_000_000n;
+const DURING = END - 3600n;
+const AFTER = END;
+
+function deploy(price: bigint, max: bigint, end = END): ChargedState {
   const ps = createInitialPrivateState(organizer.secretKey, organizer.seed);
-  return contract.initialState(createConstructorContext(ps, COIN_PK), price, max).currentContractState.data;
+  return contract.initialState(createConstructorContext(ps, COIN_PK), price, max, end).currentContractState.data;
 }
 
-/** Run `circuit` as `who`, with the args the panel passes; throws when the contract rejects. */
-function call(state: ChargedState, circuit: LotteryCircuit, who: Person): ChargedState {
-  const ctx = createCircuitContext(ADDRESS, COIN_PK, state, createInitialPrivateState(who.secretKey, who.seed));
+/** Run `circuit` as `who` at block time `now`, with the args the panel passes; throws when the contract rejects. */
+function call(state: ChargedState, circuit: LotteryCircuit, who: Person, now = DURING): ChargedState {
+  const ps = createInitialPrivateState(who.secretKey, who.seed);
+  const ctx = createCircuitContext(ADDRESS, COIN_PK, state, ps, undefined, undefined, Number(now));
   const c = contract.impureCircuits;
   const { context } =
     circuit === "buyTicket"
@@ -72,21 +79,28 @@ function call(state: ChargedState, circuit: LotteryCircuit, who: Person): Charge
   return context.currentQueryContext.state;
 }
 
-/** For every person and circuit: actionError says "ok" exactly when the circuit runs. */
+/** For every person, circuit and time: actionError says "ok" exactly when the circuit runs. */
 function expectPreChecksAgree(state: ChargedState) {
   const l = ledger(state);
-  for (const who of everyone) {
-    const view = lotteryView(l, ADDRESS, who.secretKey);
-    for (const circuit of CIRCUITS) {
-      const predicted = actionError(circuit, l, view);
-      let accepted: boolean;
-      try {
-        call(state, circuit, who);
-        accepted = true;
-      } catch {
-        accepted = false;
+  for (const now of [DURING, END - 1n, AFTER]) {
+    for (const who of everyone) {
+      const view = lotteryView(l, ADDRESS, who.secretKey);
+      for (const circuit of CIRCUITS) {
+        const predicted = actionError(circuit, l, view, now);
+        let accepted: boolean;
+        try {
+          call(state, circuit, who, now);
+          accepted = true;
+        } catch {
+          accepted = false;
+        }
+        expect({ now, who: who.name, circuit, accepted }).toEqual({
+          now,
+          who: who.name,
+          circuit,
+          accepted: predicted === null,
+        });
       }
-      expect({ who: who.name, circuit, accepted }).toEqual({ who: who.name, circuit, accepted: predicted === null });
     }
   }
 }
@@ -112,7 +126,8 @@ describe("lottery contract (in memory)", () => {
     expect(lotteryView(l, ADDRESS, watcher.secretKey).myTickets).toEqual([]);
     expectPreChecksAgree(state);
 
-    state = call(state, "closeSales", organizer);
+    // Once sales end, anyone may close them: here, someone who never played.
+    state = call(state, "closeSales", watcher, AFTER);
     expect(ledger(state).state).toBe(LotteryState.CLOSED);
     expectPreChecksAgree(state);
 
@@ -132,19 +147,20 @@ describe("lottery contract (in memory)", () => {
     expectPreChecksAgree(state);
   });
 
-  it("sells out: a full lottery takes no more tickets", () => {
+  it("sells out: a full lottery takes no more tickets, and anyone can close it early", () => {
     let state = deploy(5n, 2n);
     state = call(state, "buyTicket", one);
     state = call(state, "buyTicket", one);
     const l = ledger(state);
     expect(lotteryView(l, ADDRESS, one.secretKey).myTickets).toEqual([0n, 1n]);
     expectPreChecksAgree(state);
+    expect(ledger(call(state, "closeSales", two)).state).toBe(LotteryState.CLOSED);
   });
 
   it("a player's draw from another browser is refused: only the organizer's secret and seed work", () => {
     let state = deploy(5n, 2n);
     state = call(state, "buyTicket", one);
-    state = call(state, "closeSales", organizer);
+    state = call(state, "closeSales", organizer, AFTER);
     // The organizer's key with a different seed, as from a second browser.
     expect(() => call(state, "draw", { ...organizer, seed: new Uint8Array(32) })).toThrow(
       "Seed does not match the commitment",
@@ -152,17 +168,26 @@ describe("lottery contract (in memory)", () => {
   });
 
   it("deployInputError matches the constructor on an edge grid", () => {
+    const deploys = (price: bigint, max: bigint, end: bigint) => {
+      try {
+        deploy(price, max, end);
+        return true;
+      } catch {
+        return false;
+      }
+    };
     for (const price of [0n, 1n, 2n ** 64n - 1n]) {
       for (const max of [0n, 1n, 2n, 65535n]) {
-        let accepted = true;
-        try {
-          deploy(price, max);
-        } catch {
-          accepted = false;
+        for (const end of [END, 2n ** 64n - 1n, 2n ** 64n]) {
+          const accepted = deploys(price, max, end);
+          const predicted = deployInputError({ price, maxTickets: max, salesEnd: end }, DURING) === null;
+          expect({ price, max, end, accepted }).toEqual({ price, max, end, accepted: predicted });
         }
-        expect({ price, max, accepted }).toEqual({ price, max, accepted: deployInputError({ price, maxTickets: max }) === null });
       }
     }
+    // Stricter than the contract: a deadline already past deploys, but the UI refuses it.
+    expect(deploys(1n, 2n, DURING)).toBe(true);
+    expect(deployInputError({ price: 1n, maxTickets: 2n, salesEnd: DURING }, DURING)).not.toBeNull();
   });
 });
 
