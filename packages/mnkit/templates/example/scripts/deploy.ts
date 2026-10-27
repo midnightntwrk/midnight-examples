@@ -44,7 +44,13 @@ import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { validatePassword } from '@midnight-ntwrk/midnight-js-utils';
 import { deployContract, type DeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust } from '@midnight-ntwrk/mnkit-wallet';
+import {
+  MidnightWalletProvider,
+  resolveWallet,
+  syncWallet,
+  waitForDust,
+  waitForNightThenDust,
+} from '@midnight-ntwrk/mnkit-wallet';
 import { buildProviders, type __Name__Providers } from '../src/providers.js';
 import {
   DEPLOY_NETWORKS,
@@ -154,6 +160,10 @@ try {
     await waitForNightThenDust(logger, wallet.wallet, wallet.unshieldedKeystore, envConfig, config.faucet, {
       label: setup.role,
     });
+  } else {
+    // A fresh devnet's genesis DUST is worth 0 until the first block after
+    // genesis, and a deploy balanced before then fails ("could not balance dust").
+    await waitForDust(logger, wallet.wallet, 1, syncTimeoutMs, config.indexer);
   }
 
   const providers: __Name__Providers = buildProviders(wallet, entry.zkConfigPath, config, {
