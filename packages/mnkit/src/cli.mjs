@@ -76,30 +76,41 @@ export function projectName(dir) {
   return path.basename(dir);
 }
 
-/** True when environment variable `name` is set to anything but '' or '0'. */
-const envFlag = (name) => !['', '0', undefined].includes(process.env[name]);
+/** True when environment variable `name` is set, and not to '', '0', 'false', 'no' or 'off'. */
+export const envFlag = (name, env = process.env) =>
+  !['', '0', 'false', 'no', 'off'].includes((env[name] ?? '').trim().toLowerCase());
 
-/** `mnkit add <what>`: one entry per thing that can be added. */
+/**
+ * `mnkit add <what>`: one entry per thing that can be added, with the options
+ * it takes. `mnkit add` parses the options of all of them, so each refuses
+ * the others' (`add contract --dry-run` would otherwise write the file).
+ */
 const ADD = {
-  contract: ({ args }) => {
-    if (args.length !== 1) fail('mnkit add contract takes one name: mnkit add contract my-token');
-    const dir = process.cwd();
-    addContract(dir, args[0], { project: projectName(dir) });
-    printAddContractNextSteps(args[0]);
-    return 0;
+  contract: {
+    options: [],
+    run: ({ args }) => {
+      if (args.length !== 1) fail('mnkit add contract takes one name: mnkit add contract my-token');
+      const dir = process.cwd();
+      addContract(dir, args[0], { project: projectName(dir) });
+      printAddContractNextSteps(args[0]);
+      return 0;
+    },
   },
-  ui: ({ values, args }) => {
-    if (args.length) fail('mnkit add ui takes no arguments: run it in the project directory.');
-    const dir = process.cwd();
-    addUi(dir, {
-      name: projectName(dir),
-      contract: values.contract ?? null,
-      privateState: values['private-state'] ?? null,
-      dryRun: values['dry-run'],
-      skipGate: values['skip-gate'],
-      skipInstall: values['skip-install'],
-    });
-    return 0;
+  ui: {
+    options: ['contract', 'private-state', 'dry-run', 'skip-gate', 'skip-install'],
+    run: ({ values, args }) => {
+      if (args.length) fail('mnkit add ui takes no arguments: run it in the project directory.');
+      const dir = process.cwd();
+      addUi(dir, {
+        name: projectName(dir),
+        contract: values.contract ?? null,
+        privateState: values['private-state'] ?? null,
+        dryRun: values['dry-run'],
+        skipGate: values['skip-gate'],
+        skipInstall: values['skip-install'],
+      });
+      return 0;
+    },
   },
 };
 
@@ -116,10 +127,13 @@ const COMMANDS = {
       const [what, ...args] = positionals;
       const add = ADD[what];
       if (!add) fail(`mnkit add takes one of: ${Object.keys(ADD).join(', ')}${what ? ` (got '${what}')` : ''}.`);
-      return add({ values, args });
+      const extra = Object.keys(values).filter((o) => o !== 'help' && !add.options.includes(o));
+      if (extra.length) fail(`mnkit add ${what} doesn't take ${extra.map((o) => `--${o}`).join(', ')}.`);
+      return add.run({ values, args });
     },
   },
   compile: {
+    noArgs: true,
     options: { 'skip-zk': { type: 'boolean' }, 'no-install': { type: 'boolean' } },
     run: ({ values }) =>
       compile(process.cwd(), {
@@ -129,6 +143,7 @@ const COMMANDS = {
       }),
   },
   derive: {
+    noArgs: true,
     options: {},
     run: () => {
       runDerive(process.cwd(), projectName(process.cwd()), { next: 'npm run typecheck && npm run test:sim' });
@@ -136,6 +151,7 @@ const COMMANDS = {
     },
   },
   validate: {
+    noArgs: true,
     options: { 'keep-net': { type: 'boolean' }, report: { type: 'string' } },
     run: async ({ values }) => {
       const dir = process.cwd();
@@ -180,16 +196,16 @@ const COMMANDS = {
     },
   },
   upgrade: {
+    noArgs: true,
     options: { check: { type: 'boolean' }, force: { type: 'boolean' }, 'skip-install': { type: 'boolean' } },
     run: ({ values }) =>
       upgrade(process.cwd(), { check: values.check, force: values.force, skipInstall: values['skip-install'] }),
   },
   doctor: {
+    noArgs: true,
     options: { network: { type: 'string' } },
-    run: ({ values, positionals }) => {
-      if (positionals.length) fail('mnkit doctor takes no arguments: mnkit doctor --network preview');
-      return doctor({ network: values.network ?? null });
-    },
+    // An empty --network= is an unknown network, not "no network".
+    run: ({ values }) => doctor({ network: values.network ?? null }),
   },
 };
 
@@ -215,6 +231,9 @@ export async function main(argv) {
   if (parsed.values.help) {
     console.log(USAGE);
     return 0;
+  }
+  if (spec.noArgs && parsed.positionals.length) {
+    fail(`mnkit ${command} takes no arguments (got '${parsed.positionals.join(' ')}'): run it in the project directory.`);
   }
   return (await spec.run(parsed)) ?? 0;
 }

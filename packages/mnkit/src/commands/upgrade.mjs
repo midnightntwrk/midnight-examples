@@ -466,9 +466,9 @@ export function upgrade(dir, { check = false, force = false, skipInstall = false
   const conflicts = plan.files.filter((f) => f.kind === 'conflict' || f.kind === 'unmerged');
   if (plan.packages.some((p) => p.changes.length) && !skipInstall) {
     console.log('\n▶ npm install');
-    if (spawnSync('npm', ['install'], { cwd: dir, stdio: 'inherit' }).status !== 0) {
-      fail('npm install failed. Fix the problem and run it again in the project.');
-    }
+    const r = spawnSync('npm', ['install'], { cwd: dir, stdio: 'inherit' });
+    if (r.error) fail(`could not run npm: ${r.error.message}. Run \`npm install\` in the project yourself.`);
+    if (r.status !== 0) fail('npm install failed. Fix the problem and run it again in the project.');
   }
   console.log(`\n✔ Upgraded to mnkit ${plan.to}.`);
   if (conflicts.length) {

@@ -51,18 +51,20 @@ export function exitOnError(code = 1) {
 }
 
 /**
- * Return a problem string unless the running Node satisfies the root
- * package.json `engines.node` (a `>=MAJOR…` range), else null. npm doesn't
- * enforce `engines`, and a shell that defaults to an older Node produces UIs
- * whose dev server then crashes.
+ * Return a problem string unless `version` (the running Node's) satisfies
+ * `root`'s package.json `engines.node` (a `>=MAJOR…` range), else null. npm
+ * doesn't enforce `engines`, and a shell that defaults to an older Node
+ * produces UIs whose dev server then crashes. `who` names what needs it: the
+ * repo by default, or the mnkit package (whose users have no .nvmrc).
  */
-export function checkNode(repoRoot) {
-  const range = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).engines?.node;
+export function checkNode(root, { who = 'this repo', version = process.versions.node } = {}) {
+  const range = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).engines?.node;
   const min = Number(/^>=\s*(\d+)/.exec(range ?? '')?.[1]);
   if (!min) return null;
-  const major = Number(process.versions.node.split('.')[0]);
+  const major = Number(version.split('.')[0]);
   if (major < min) {
-    return `Node ${process.versions.node} is too old: this repo needs Node ${range} (see .nvmrc). Try \`nvm use\`.`;
+    const hint = who === 'this repo' ? ' (see .nvmrc). Try `nvm use`.' : '.';
+    return `Node ${version} is too old: ${who} needs Node ${range}${hint}`;
   }
   return null;
 }

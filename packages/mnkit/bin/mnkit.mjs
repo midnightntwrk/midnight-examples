@@ -14,9 +14,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { main } from '../src/cli.mjs';
-import { exitOnError } from '../src/lib/template.mjs';
+import { fileURLToPath } from 'node:url';
+import { checkNode, exitOnError, fail } from '../src/lib/template.mjs';
 
 // Errors exit 2: 1 is `upgrade --check`'s "behind".
 exitOnError(2);
+// Before loading the CLI: its modules import Node APIs an older Node lacks
+// (node:util parseEnv), which fail at link time with no useful message.
+// template.mjs uses only fs and path.
+const tooOld = checkNode(fileURLToPath(new URL('..', import.meta.url)), { who: 'mnkit' });
+if (tooOld) fail(tooOld);
+const { main } = await import('../src/cli.mjs');
 process.exitCode = await main(process.argv.slice(2));

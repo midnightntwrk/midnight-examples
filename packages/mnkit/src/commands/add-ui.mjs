@@ -36,7 +36,11 @@ const readJson = (p) => JSON.parse(fs.readFileSync(p, 'utf8'));
 const writeJson = (p, value) => fs.writeFileSync(p, `${JSON.stringify(value, null, 2)}\n`);
 
 /** Runs `npm <args>` in dir with the output shown; returns whether it passed. */
-const npm = (dir, args) => spawnSync('npm', args, { cwd: dir, stdio: 'inherit' }).status === 0;
+const npm = (dir, args) => {
+  const r = spawnSync('npm', args, { cwd: dir, stdio: 'inherit' });
+  if (r.error) fail(`could not run \`npm ${args.join(' ')}\`: ${r.error.message}`);
+  return r.status === 0;
+};
 
 /**
  * Scaffolds ui/ in the standalone project `dir` (or with dryRun, prints what

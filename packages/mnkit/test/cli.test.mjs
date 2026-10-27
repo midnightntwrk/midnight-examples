@@ -18,7 +18,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { renderExample } from '../src/lib/scaffold.mjs';
-import { writeFiles } from '../src/lib/template.mjs';
+import { envFlag } from '../src/cli.mjs';
+import { checkNode, writeFiles } from '../src/lib/template.mjs';
 import { FIXTURES, PKG_ROOT, TEMPLATE_DIR, cleanup, placeCompiled, scaffoldFixture, snapshot, tmpDir } from './helpers.mjs';
 
 afterEach(cleanup);
@@ -42,6 +43,33 @@ describe('mnkit CLI', () => {
       expect(r.stderr).toMatch(/^✖ /);
       expect(r.stderr).not.toMatch(/\bat .*\.mjs:\d+/);
     }
+  });
+
+  it('refuses arguments to commands that take none', () => {
+    for (const command of ['compile', 'derive', 'validate', 'upgrade', 'doctor']) {
+      const r = mnkit(tmpDir(), command, 'contract/foo.compact');
+      expect(r.status, command).toBe(2);
+      expect(r.stderr).toContain(`✖ mnkit ${command} takes no arguments (got 'contract/foo.compact')`);
+    }
+  });
+
+  it('refuses an empty --network instead of skipping the network checks', () => {
+    const r = mnkit(tmpDir(), 'doctor', '--network=');
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("✖ unknown network ''");
+    expect(r.stdout).not.toContain('Ready.');
+  });
+
+  it("reads MNKIT_NO_INSTALL=false, no and off as unset", () => {
+    for (const value of [undefined, '', '0', 'false', 'FALSE', 'no', 'off']) {
+      expect(envFlag('MNKIT_NO_INSTALL', { MNKIT_NO_INSTALL: value }), String(value)).toBe(false);
+    }
+    for (const value of ['1', 'true', 'yes']) expect(envFlag('MNKIT_NO_INSTALL', { MNKIT_NO_INSTALL: value })).toBe(true);
+  });
+
+  it('refuses a Node older than its engines before loading the CLI', () => {
+    expect(checkNode(PKG_ROOT, { who: 'mnkit', version: '18.19.1' })).toBe('Node 18.19.1 is too old: mnkit needs Node >=22.0.0.');
+    expect(checkNode(PKG_ROOT, { who: 'mnkit', version: '22.0.0' })).toBeNull();
   });
 
   it('derives the project named in mnkit.json, idempotently', () => {
@@ -100,6 +128,7 @@ describe('mnkit CLI', () => {
         [dir, ['add', 'contract', 'private-tip-jar'], "is the project's own contract"],
         [dir, ['add', 'contract'], 'takes one name'],
         [dir, ['add', 'frob'], 'mnkit add takes one of: contract'],
+        [dir, ['add', 'contract', 'tip-token', '--dry-run'], "mnkit add contract doesn't take --dry-run"],
         [tmpDir(), ['add', 'contract', 'tip-token'], 'run this from a project directory'],
       ];
       for (const [cwd, args, message] of cases) {
@@ -107,6 +136,7 @@ describe('mnkit CLI', () => {
         expect(r.status, args.join(' ')).toBe(2);
         expect(r.stderr).toContain(message);
       }
+      expect(fs.existsSync(path.join(dir, 'contract', 'tip-token.compact'))).toBe(false);
       fs.writeFileSync(path.join(dir, 'contract', 'tip-token.compact'), '// mine\n');
       const r = mnkit(dir, 'add', 'contract', 'tip-token');
       expect(r.stderr).toContain('contract/tip-token.compact already exists');

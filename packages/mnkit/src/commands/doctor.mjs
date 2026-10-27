@@ -231,12 +231,12 @@ export function checkNetwork(network, tc = loadToolchain()) {
 
 /** Prints the checks (and `network`'s, when given); returns 1 if any failed. */
 export async function doctor({ network = null } = {}) {
-  if (network) checkNetwork(network);
+  if (network !== null) checkNetwork(network);
   const local = await runChecks();
-  const remote = network ? await runNetworkChecks(network) : [];
+  const remote = network !== null ? await runNetworkChecks(network) : [];
   printChecks([...local, ...remote]);
   const failed = [...local, ...remote].filter((c) => !c.ok);
-  const before = network ? `compiling and testing on ${network}` : 'compiling and testing';
+  const before = network !== null ? `compiling and testing on ${network}` : 'compiling and testing';
   console.log(failed.length ? `\n${failed.length} problem(s) to fix before ${before}.` : '\nReady.');
   return failed.length ? 1 : 0;
 }

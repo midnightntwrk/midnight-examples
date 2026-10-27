@@ -81,6 +81,7 @@ export function init(target, { witnesses = false, dryRun = false, skipInstall = 
   if (!skipInstall) {
     console.log('\n▶ npm install');
     const r = spawnSync('npm', ['install'], { cwd: dir, stdio: 'inherit' });
+    if (r.error) fail(`could not run npm: ${r.error.message}. Run \`npm install\` in ${dir} yourself.`);
     if (r.status !== 0) fail(`npm install failed in ${dir} (exit ${r.status ?? 1}). Fix the problem and run it again there.`);
   }
   return { dir, files };
