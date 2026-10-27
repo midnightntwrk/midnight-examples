@@ -124,6 +124,23 @@ else
   new_mnkit() { MNKIT_LOCAL_PACKAGES="$PKGS" npx --yes --package="$PKGS/mnkit-$VERSION.tgz" mnkit "$@"; }
 fi
 
+# What the EXIT trap undoes: the old mnkit's worktree, and a local network a
+# failed step left up (validate --keep-net, or a deploy), whose service logs
+# it saves to <project>/logs/compose.log first.
+OLD_SRC=
+NET_UP=
+cleanup() {
+  local status=$?
+  if [ -n "$NET_UP" ]; then
+    echo "▶ saving the service logs to $NET_UP/logs/compose.log, then npm run env:down" >&2
+    mkdir -p "$NET_UP/logs"
+    (cd "$NET_UP" && docker compose logs --no-color --timestamps > logs/compose.log 2>&1; npm run env:down) || true
+  fi
+  if [ -n "$OLD_SRC" ]; then git -C "$REPO" worktree remove --force "$OLD_SRC" 2> /dev/null || true; fi
+  exit "$status"
+}
+trap cleanup EXIT
+
 if [ -n "$UPGRADE_FROM" ]; then
   if git -C "$REPO" rev-parse --verify --quiet "$UPGRADE_FROM^{commit}" > /dev/null; then
     OLD_SRC="$WORK/old-src"
@@ -131,7 +148,6 @@ if [ -n "$UPGRADE_FROM" ]; then
     echo "▶ packing mnkit at $UPGRADE_FROM (a worktree in $OLD_SRC) into $OLD_PKGS"
     git -C "$REPO" worktree remove --force "$OLD_SRC" 2> /dev/null || rm -rf "$OLD_SRC"
     git -C "$REPO" worktree add --detach "$OLD_SRC" "$UPGRADE_FROM" > /dev/null
-    trap 'git -C "$REPO" worktree remove --force "$OLD_SRC" 2> /dev/null || true' EXIT
     # Commits before the move to npm install with Yarn. Delete this branch once
     # MNKIT_UPGRADE_FROM in ci.yaml is a published (npm-era) version.
     if [ -f "$OLD_SRC/package-lock.json" ]; then
@@ -170,8 +186,8 @@ first_compile() {
 
 # mnkit deploy of every contract of project $1 on the running local network:
 # the others first (a constructor may need their address), then $1's own.
-# Each must then have an address in deployments/local.json. Called after `||`,
-# where set -e is off, so each step returns its own failure.
+# Each must then have an address in deployments/local.json. Each step returns
+# its own failure, so this also works where set -e is off.
 deploy_all() {
   local primary=$1 c contracts=()
   for c in contract/*.compact; do
@@ -230,11 +246,11 @@ for fixture in "${SELECTED[@]}"; do
   npm run test:unit --workspace ui
   npm run build --workspace ui
   if [ "$DEVNET" = 1 ]; then
+    NET_UP=$PWD
     npm run validate -- --keep-net
-    deployed=0
-    deploy_all "$fixture" || deployed=$?
+    deploy_all "$fixture"
     npm run env:down
-    [ "$deployed" = 0 ] || exit "$deployed"
+    NET_UP=
   fi
   echo "✔ $fixture"
 done
