@@ -26,7 +26,12 @@
 //   only the template changed   the file is replaced
 //   only you changed it         left alone
 //   both changed                the new version goes to <file>.mnkit-new for
-//                               you to merge (--force replaces the file)
+//                               you to merge (--force replaces the file). Until
+//                               you delete <file>.mnkit-new the file stays
+//                               unmerged (and --check fails); after that, your
+//                               merge counts as your edit of the new version
+//   you deleted it              left deleted; noted if the template changed it
+//                               since (--force restores it)
 //   gone from the template      deleted if unedited, else left and reported
 //
 // The package.json files (the project's and ui/'s) are merged instead: the
@@ -137,7 +142,8 @@ function toolchainChanges(before = {}, after) {
 /**
  * What upgrading the project in `dir` would do, without doing it: `files`
  * ([{ rel, kind, content }] with kind update | add | restore | conflict |
- * force | remove | orphan), `packages` ([{ rel, content, changes, notes }]),
+ * unmerged | force | deleted | remove | orphan | seed), `packages`
+ * ([{ rel, content, changes, notes }]),
  * `toolchain` (changed pins) and the new mnkit.json content.
  */
 export function planUpgrade(
@@ -150,7 +156,16 @@ export function planUpgrade(
   if (manifest.template !== 'example') fail(`mnkit.json: unknown template '${manifest.template}'.`);
   if (typeof manifest.name !== 'string' || !NAME_RE.test(manifest.name)) fail(`mnkit.json: invalid project name '${manifest.name}'.`);
   const recorded = manifest.files ?? {};
-  for (const rel of Object.keys(recorded)) projectPath(dir, rel);
+  const conflicts = manifest.conflicts ?? {};
+  for (const rel of [...Object.keys(recorded), ...Object.keys(conflicts)]) projectPath(dir, rel);
+  // A conflict whose .mnkit-new is gone has been merged: from then on its base
+  // is the version it was merged against.
+  const bases = { ...recorded };
+  const unmerged = new Set();
+  for (const [rel, hash] of Object.entries(conflicts)) {
+    if (fs.existsSync(`${projectPath(dir, rel)}.mnkit-new`)) unmerged.add(rel);
+    else bases[rel] = hash;
+  }
 
   const rendered = renderExample(path.join(PKG_ROOT, 'templates', 'example'), {
     name: manifest.name,
@@ -180,20 +195,41 @@ export function planUpgrade(
   }
 
   const files = [];
+  /** The base mnkit.json records for each owned file; the new render's unless set here. */
+  const nextBases = {};
+  /** Conflicts still waiting for a merge: file → hash of its .mnkit-new. */
+  const nextConflicts = {};
   for (const [rel, content] of Object.entries(owned)) {
     const onDisk = path.join(dir, ...rel.split('/'));
+    const base = bases[rel];
+    const ours = fileHash(content);
+    if (unmerged.has(rel) && !force) {
+      files.push({ rel, kind: 'unmerged', content });
+      nextBases[rel] = base;
+      nextConflicts[rel] = ours;
+      continue;
+    }
     if (!fs.existsSync(onDisk)) {
-      files.push({ rel, kind: rel in recorded ? 'restore' : 'add', content });
+      if (!(rel in bases)) files.push({ rel, kind: 'add', content });
+      else if (force) files.push({ rel, kind: 'restore', content });
+      else {
+        // You deleted it: it stays deleted, against the base you deleted.
+        if (base !== ours) files.push({ rel, kind: 'deleted' });
+        nextBases[rel] = base;
+      }
       continue;
     }
     const disk = fs.readFileSync(onDisk, 'utf8');
     if (disk === content) continue;
-    const base = recorded[rel];
     const theirs = fileHash(disk);
-    const ours = fileHash(content);
     if (base === theirs) files.push({ rel, kind: 'update', content });
     else if (base === ours) continue; // only you changed it
-    else files.push({ rel, kind: force ? 'force' : 'conflict', content });
+    else if (force) files.push({ rel, kind: 'force', content });
+    else {
+      files.push({ rel, kind: 'conflict', content });
+      nextBases[rel] = base;
+      nextConflicts[rel] = ours;
+    }
   }
   for (const [rel, base] of Object.entries(recorded)) {
     if (rel in owned) continue;
@@ -213,11 +249,13 @@ export function planUpgrade(
     ...mergePackageJson(fs.readFileSync(path.join(dir, ...rel.split('/')), 'utf8'), next, tc),
   }));
 
+  const { conflicts: _, ...rest } = manifest;
   const nextManifest = {
-    ...manifest,
+    ...rest,
     mnkit: version,
     toolchain: projectToolchain(tc),
-    files: sortKeys(Object.fromEntries(Object.entries(owned).map(([rel, content]) => [rel, fileHash(content)]))),
+    files: sortKeys(Object.fromEntries(Object.entries(owned).map(([rel, content]) => [rel, nextBases[rel] ?? fileHash(content)]))),
+    ...(Object.keys(nextConflicts).length ? { conflicts: sortKeys(nextConflicts) } : {}),
   };
   return {
     from: manifest.mnkit,
@@ -230,18 +268,23 @@ export function planUpgrade(
   };
 }
 
+/** File kinds that are only reported: the project isn't behind because of them. */
+const NOTES_ONLY = new Set(['deleted']);
+
 /** Whether the plan changes anything a developer would notice (mnkit.json aside). */
-export const hasChanges = (plan) => plan.files.length > 0 || plan.packages.some((p) => p.changes.length > 0);
+export const hasChanges = (plan) =>
+  plan.files.some((f) => !NOTES_ONLY.has(f.kind)) || plan.packages.some((p) => p.changes.length > 0);
 
 /** Writes the plan into `dir`. */
 export function applyUpgrade(dir, plan) {
   const at = (rel) => projectPath(dir, rel);
   for (const f of plan.files) {
     if (f.kind === 'remove') fs.rmSync(at(f.rel));
-    else if (f.kind === 'conflict') fs.writeFileSync(`${at(f.rel)}.mnkit-new`, f.content);
-    else if (f.kind !== 'orphan') {
+    else if (f.kind === 'conflict' || f.kind === 'unmerged') fs.writeFileSync(`${at(f.rel)}.mnkit-new`, f.content);
+    else if (f.content !== undefined) {
       fs.mkdirSync(path.dirname(at(f.rel)), { recursive: true });
       fs.writeFileSync(at(f.rel), f.content);
+      if (f.kind === 'force') fs.rmSync(`${at(f.rel)}.mnkit-new`, { force: true });
     }
   }
   for (const p of plan.packages) if (p.changes.length) fs.writeFileSync(at(p.rel), p.content);
@@ -252,9 +295,11 @@ const LABELS = {
   update: 'updated',
   add: 'added (new in the template)',
   seed: 'added (new in the template, and yours from now on: `npx mnkit derive` fills it)',
-  restore: 'restored (it was deleted)',
+  restore: 'restored (--force; you had deleted it)',
   force: 'replaced (--force; it had your edits)',
   conflict: 'you edited it and so did the template: the new version is in',
+  unmerged: 'not merged yet: merge it with',
+  deleted: 'you deleted it, and the template has changed it since: left deleted (--force restores it)',
   remove: 'removed (no longer in the template)',
   orphan: 'no longer in the template, but you edited it: left in place',
 };
@@ -271,7 +316,8 @@ export function upgrade(dir, { check = false, force = false, skipInstall = false
   if (plan.files.length) {
     console.log('\n  Files:');
     for (const f of plan.files) {
-      console.log(`    ${f.rel}: ${LABELS[f.kind]}${f.kind === 'conflict' ? ` ${f.rel}.mnkit-new` : ''}`);
+      const copy = f.kind === 'conflict' || f.kind === 'unmerged' ? ` ${f.rel}.mnkit-new` : '';
+      console.log(`    ${f.rel}: ${LABELS[f.kind]}${copy}`);
     }
   }
   for (const p of plan.packages.filter((p) => p.changes.length || p.notes.length)) {
@@ -285,11 +331,15 @@ export function upgrade(dir, { check = false, force = false, skipInstall = false
     return 0;
   }
   if (check) {
-    console.log('\n✖ The project is behind this mnkit. Run `npx mnkit upgrade`.');
+    const pending = plan.files.filter((f) => f.kind === 'unmerged');
+    if (pending.length < plan.files.filter((f) => !NOTES_ONLY.has(f.kind)).length || plan.packages.some((p) => p.changes.length)) {
+      console.log('\n✖ The project is behind this mnkit. Run `npx mnkit upgrade`.');
+    }
+    if (pending.length) console.log('\n✖ Merge the .mnkit-new copies by hand, then delete them.');
     return 1;
   }
   applyUpgrade(dir, plan);
-  const conflicts = plan.files.filter((f) => f.kind === 'conflict');
+  const conflicts = plan.files.filter((f) => f.kind === 'conflict' || f.kind === 'unmerged');
   if (plan.packages.some((p) => p.changes.length) && !skipInstall) {
     console.log('\n▶ npm install');
     if (spawnSync('npm', ['install'], { cwd: dir, stdio: 'inherit' }).status !== 0) {

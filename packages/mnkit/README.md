@@ -110,7 +110,10 @@ tell what you changed:
 - a file only the template changed is replaced
 - a file only you changed is left alone
 - a file you both changed keeps your version, and the new one is written next
-  to it as `<file>.mnkit-new` for you to merge (`--force` replaces it)
+  to it as `<file>.mnkit-new` for you to merge (`--force` replaces it). Until
+  you delete the `.mnkit-new` the file counts as unmerged and `--check` fails;
+  after that, your merge counts as your edit of the new version
+- a file you deleted stays deleted (`--force` restores it)
 
 `package.json` (and `ui/package.json`) are merged: the pinned packages move to
 the new versions, new dependencies and scripts are added, and your own

@@ -134,7 +134,7 @@ describe('mnkit upgrade', () => {
     expect(upgrade(dir, { tc, version: VERSION, check: true })).toBe(0);
   });
 
-  it('writes <file>.mnkit-new when both you and the template changed a file, once', () => {
+  it('writes <file>.mnkit-new when both you and the template changed a file, and remembers it until merged', () => {
     const dir = olderProject();
     write(dir, 'compose.yml', `${read(dir, 'compose.yml')}# my port mapping\n`);
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -144,12 +144,27 @@ describe('mnkit upgrade', () => {
     expect(kinds(plan)['compose.yml']).toBe('conflict');
     applyUpgrade(dir, plan);
     expect(read(dir, 'compose.yml')).toContain(OLD_IMAGE);
-    expect(read(dir, 'compose.yml.mnkit-new')).not.toContain(OLD_IMAGE);
-    // The base moved to the new template: no conflict on the next run.
-    expect(kinds(planUpgrade(dir, { tc, version: VERSION }))['compose.yml']).toBeUndefined();
+    const merged = read(dir, 'compose.yml.mnkit-new');
+    expect(merged).not.toContain(OLD_IMAGE);
+
+    // Still unmerged while the .mnkit-new is there: --check keeps failing.
+    expect(kinds(planUpgrade(dir, { tc, version: VERSION }))).toEqual({ 'compose.yml': 'unmerged' });
+    expect(upgrade(dir, { tc, version: VERSION, check: true })).toBe(1);
+    expect(upgrade(dir, { tc, version: VERSION, skipInstall: true })).toBe(0);
+    expect(read(dir, 'compose.yml.mnkit-new')).toBe(merged);
+
+    // Merged and deleted: your merge is your edit of the new version.
+    write(dir, 'compose.yml', `${merged}# my port mapping\n`);
+    fs.rmSync(path.join(dir, 'compose.yml.mnkit-new'));
+    const after = planUpgrade(dir, { tc, version: VERSION });
+    expect(hasChanges(after)).toBe(false);
+    applyUpgrade(dir, after);
+    expect(manifestOf(dir).conflicts).toBeUndefined();
+    expect(manifestOf(dir).files['compose.yml']).toBe(fileHash(merged));
+    expect(upgrade(dir, { tc, version: VERSION, check: true })).toBe(0);
   });
 
-  it('replaces an edited file with --force', () => {
+  it('replaces an edited file with --force, and an unmerged one', () => {
     const dir = olderProject();
     write(dir, 'compose.yml', `${read(dir, 'compose.yml')}# my port mapping\n`);
     const plan = planUpgrade(dir, { tc, version: VERSION, force: true });
@@ -157,24 +172,55 @@ describe('mnkit upgrade', () => {
     applyUpgrade(dir, plan);
     expect(read(dir, 'compose.yml')).not.toContain('# my port mapping');
     expect(fs.existsSync(path.join(dir, 'compose.yml.mnkit-new'))).toBe(false);
+
+    const pending = olderProject();
+    write(pending, 'compose.yml', `${read(pending, 'compose.yml')}# my port mapping\n`);
+    applyUpgrade(pending, planUpgrade(pending, { tc, version: VERSION }));
+    const forced = planUpgrade(pending, { tc, version: VERSION, force: true });
+    expect(kinds(forced)).toEqual({ 'compose.yml': 'force' });
+    applyUpgrade(pending, forced);
+    expect(fs.existsSync(path.join(pending, 'compose.yml.mnkit-new'))).toBe(false);
+    expect(manifestOf(pending).conflicts).toBeUndefined();
+    expect(hasChanges(planUpgrade(pending, { tc, version: VERSION }))).toBe(false);
   });
 
-  it('deletes a file the template dropped unless you edited it, and restores a deleted one', () => {
+  it('deletes a file the template dropped unless you edited it', () => {
     const dir = currentProject();
     write(dir, 'scripts/old.ts', '// from an older template\n');
     write(dir, 'scripts/older.ts', '// from an older template, edited\n');
-    fs.rmSync(path.join(dir, 'vitest.config.ts'));
     setManifest(dir, (m) => ({
       ...m,
       files: { ...m.files, 'scripts/old.ts': fileHash('// from an older template\n'), 'scripts/older.ts': fileHash('// unedited\n') },
     }));
     const plan = planUpgrade(dir, { tc, version: VERSION });
-    expect(kinds(plan)).toEqual({ 'scripts/old.ts': 'remove', 'scripts/older.ts': 'orphan', 'vitest.config.ts': 'restore' });
+    expect(kinds(plan)).toEqual({ 'scripts/old.ts': 'remove', 'scripts/older.ts': 'orphan' });
     applyUpgrade(dir, plan);
     expect(fs.existsSync(path.join(dir, 'scripts', 'old.ts'))).toBe(false);
     expect(read(dir, 'scripts/older.ts')).toContain('edited');
-    expect(fs.existsSync(path.join(dir, 'vitest.config.ts'))).toBe(true);
     expect(manifestOf(dir).files['scripts/older.ts']).toBeUndefined();
+  });
+
+  it('leaves a file you deleted deleted, notes a template change to it, and restores it with --force', () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const dir = currentProject();
+    fs.rmSync(path.join(dir, 'AGENTS.md'));
+    expect(kinds(planUpgrade(dir, { tc, version: VERSION }))).toEqual({});
+    expect(upgrade(dir, { tc, version: VERSION, check: true })).toBe(0);
+
+    // The template changed it since: a note, not "behind".
+    setManifest(dir, (m) => ({ ...m, files: { ...m.files, 'AGENTS.md': fileHash('an older AGENTS.md\n') } }));
+    const plan = planUpgrade(dir, { tc, version: VERSION });
+    expect(kinds(plan)).toEqual({ 'AGENTS.md': 'deleted' });
+    expect(hasChanges(plan)).toBe(false);
+    expect(upgrade(dir, { tc, version: VERSION, check: true })).toBe(0);
+    expect(upgrade(dir, { tc, version: VERSION, skipInstall: true })).toBe(0);
+    expect(fs.existsSync(path.join(dir, 'AGENTS.md'))).toBe(false);
+    expect(manifestOf(dir).files['AGENTS.md']).toBe(fileHash('an older AGENTS.md\n'));
+
+    const forced = planUpgrade(dir, { tc, version: VERSION, force: true });
+    expect(kinds(forced)).toEqual({ 'AGENTS.md': 'restore' });
+    applyUpgrade(dir, forced);
+    expect(fs.existsSync(path.join(dir, 'AGENTS.md'))).toBe(true);
   });
 
   it('adds the deploy files to a project that predates them, and seeds deploy-args.ts once', () => {
@@ -195,7 +241,7 @@ describe('mnkit upgrade', () => {
     expect(hasChanges(again)).toBe(false);
   });
 
-  it('upgrades the UI: restores its owned files and merges ui/package.json', () => {
+  it('upgrades the UI: updates its owned files and merges ui/package.json', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const dir = currentProject();
     fs.cpSync(path.join(FIXTURES, 'hello-world', 'contract'), path.join(dir, 'contract'), { recursive: true });
@@ -208,12 +254,13 @@ describe('mnkit upgrade', () => {
     uiPkg.dependencies['@midnight-ntwrk/midnight-js-types'] = '4.1.0';
     uiPkg.dependencies['date-fns'] = '^4.0.0';
     write(dir, 'ui/package.json', `${JSON.stringify(uiPkg, null, 2)}\n`);
-    fs.rmSync(path.join(dir, 'ui', 'src', 'lib', 'tokens.ts'));
+    write(dir, 'ui/src/lib/tokens.ts', '// an older tokens.ts\n');
+    setManifest(dir, (m) => ({ ...m, files: { ...m.files, 'ui/src/lib/tokens.ts': fileHash('// an older tokens.ts\n') } }));
     const panel = 'ui/src/components/hello-world-panel.tsx';
     write(dir, panel, '// my panel\n');
 
     const plan = planUpgrade(dir, { tc, version: VERSION });
-    expect(kinds(plan)).toEqual({ 'ui/src/lib/tokens.ts': 'restore' });
+    expect(kinds(plan)).toEqual({ 'ui/src/lib/tokens.ts': 'update' });
     expect(plan.packages[1]).toMatchObject({
       rel: 'ui/package.json',
       changes: ['dependencies: @midnight-ntwrk/midnight-js-types 4.1.0 → 4.1.1'],
