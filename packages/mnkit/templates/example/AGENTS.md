@@ -92,12 +92,12 @@ indexer's lag, the proof server's version and, on preprod, the Blockfrost key.
   `shieldedBalance` / `waitForShieldedBalance` (a received coin shows up
   seconds after the transaction is accepted). For a mint, use `recipientOf`,
   `encryptionKeys` and `mintNonce`. In a sim test, `simCoin(value, color)`
-  makes a coin. `--derive` imports them when a circuit takes a coin. Don't
+  makes a coin. Derive imports them when a circuit takes a coin. Don't
   copy the local helpers in older examples' tests.
 - A second contract (a test-only token the tests mint from) needs no script
   edits. Add `contract/<it>.compact`: `npm run compile` and `npm run compile:fast`
   compile every contract under `contract/` (skipping modules and imported
-  files). `--derive` then adds its exports to `contract/index.ts`, plus a
+  files). Derive then adds its exports to `contract/index.ts`, plus a
   provider set and a deploy test before the main one in the devnet test. A
   second contract with witnesses of its own is wired by hand.
 - The circuit-id union in `src/providers.ts` is derived from the compiled

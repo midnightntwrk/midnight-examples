@@ -161,9 +161,16 @@ witnesses file and the contract source:
 | `contract/<c>.compact` (else every `contract/*.compact`) | only which token operations it calls (`mint*Token`, `send*`/`receive*` for both shielded and unshielded tokens, `unshieldedBalance*`), for the circuits-test hints and the ⚠ lines in §3 |
 
 The create-time choices, `--contract` and `--private-state`, are written to
+<!-- @if monorepo -->
 `ui/new-ui.json`. `--check` and `--sync` read them back, so they re-render
 exactly what was created (CI runs `--check` with no flags). To change a
 choice, edit `new-ui.json` and `--sync`.
+<!-- @endif -->
+<!-- @if standalone -->
+`ui/new-ui.json`. `npx mnkit upgrade` reads them back, so it re-renders
+exactly what was created. To change a choice, edit `new-ui.json` and run
+`npx mnkit upgrade`.
+<!-- @endif -->
 
 `--private-state` defaults to `persistent` when the private-state factory
 takes arguments (per-user values such as a secret key), with or without
@@ -393,8 +400,10 @@ never rewrites them.
   `evaluate()` is checked this way on an edge-value grid).
 - **`README.md`:** what the UI adds, and a "TODO: end-to-end verification
   with a wallet" checklist until those steps pass.
+<!-- @if monorepo -->
 - **`verification.json`:** the status of the steps CI can't run (see the
   Verification checklist).
+<!-- @endif -->
 
 When deploying needs constructor args, or the private-state factory takes
 arguments, the generator cannot invent values:

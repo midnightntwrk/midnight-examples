@@ -38,7 +38,12 @@ import {
   // @generated-stub end contract-imports
 } from '../../contract/index.js';
 // Shielded-coin helpers, imported here when a circuit takes a coin or a
+// @if monorepo
 // second contract mints them. See packages/coins/src/index.ts.
+// @endif
+// @if standalone
+// second contract mints them. See @midnight-ntwrk/mnkit-coins and its README.
+// @endif
 // @generated-stub begin coin-imports sha=0
 // @generated-stub end coin-imports
 
