@@ -1,6 +1,6 @@
 {
   "name": "@midnight-ntwrk/mnkit-coins",
-  "version": "0.2.0",
+  "version": "0.2.0-rc.1",
   "type": "module",
   "description": "Shielded-coin helpers for Midnight tests: token colors, fresh coins as circuit arguments, a wallet's coins and balances and waiting for them, and the arguments a mint to another wallet needs. Part of mnkit.",
   "license": "Apache-2.0",

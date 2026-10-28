@@ -1,6 +1,6 @@
 {
   "name": "mnkit",
-  "version": "0.2.0",
+  "version": "0.2.0-rc.1",
   "type": "module",
   "description": "Write your Midnight contract; mnkit writes everything around it: scaffold a project, then derive witness stubs, constructor args and test skeletons from the compiled contract.",
   "license": "Apache-2.0",
