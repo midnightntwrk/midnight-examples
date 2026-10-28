@@ -17,10 +17,11 @@
 // `npm run toolchain:check`: fails when any copy of a pin disagrees with
 // toolchain.json. The copies: the README table, every workflow's compact-version
 // and npm, .nvmrc, the root package.json (engines, devEngines, overrides), every
-// compose.yml image, the pinned deps and engines of every example, UI,
-// template and package, the runtime packages' README overrides, and every
-// contract's pragma. experimental/ is left out on purpose: it tracks release
-// candidates. It also fails when
+// compose.yml/compose.yaml image, the pinned deps and engines of every example,
+// UI, template and package (any other @midnight-ntwrk dependency is unpinned,
+// and fails), the runtime packages' README overrides, and the pragma of every
+// contract and engine test fixture. experimental/ is left out on purpose: it
+// tracks release candidates. It also fails when
 // package-lock.json nests a package inside a workspace (see below).
 // Zero dependencies — Node built-ins only.
 
@@ -83,7 +84,8 @@ const projects = [
   for (const name of fs.readdirSync(dir).filter((n) => /\.ya?ml$/.test(n))) {
     const f = path.join(dir, name);
     const src = read(f);
-    const hits = [...src.matchAll(/compact-version:\s*'?([0-9][0-9.]*)'?/g)];
+    // Any value form: bare, '…' or "…". Anything but a plain version is a mismatch.
+    const hits = [...src.matchAll(/compact-version:\s*['"]?([^'"\s#]*)['"]?/g)];
     if (hits.length === 0 && name === 'ci.yaml') problems.push(`${rel(f)}: no compact-version found`);
     for (const m of hits) expect(`${rel(f)}:${lineOf(src, m.index)}`, 'compact-version', m[1], tc.compact.compiler);
     for (const m of src.matchAll(/\bnpm@([0-9][^\s'"]*)/g)) expect(`${rel(f)}:${lineOf(src, m.index)}`, 'npm', m[1], tc.npmCli);
@@ -145,12 +147,12 @@ for (const name of ['fast-sync', 'sim', 'coins']) {
   }
 }
 
-// --- compose.yml images ------------------------------------------------------
-for (const dir of projects) {
-  const f = path.join(dir, 'compose.yml');
+// --- compose images ----------------------------------------------------------
+// Both names docker compose reads. An image with no tag is a mismatch too.
+for (const f of projects.flatMap((d) => ['compose.yml', 'compose.yaml'].map((n) => path.join(d, n)))) {
   if (!fs.existsSync(f)) continue;
   const src = read(f);
-  for (const m of src.matchAll(/image:\s*['"]?([^'"\s]+):([^'"\s]+)['"]?/g)) {
+  for (const m of src.matchAll(/image:\s*['"]?([^'"\s:]+(?::\d+\/[^'"\s:]+)?)(?::([^'"\s]+))?['"]?/g)) {
     const [, image, tag] = m;
     const want = tc.images[image];
     if (want) expect(`${rel(f)}:${lineOf(src, m.index)}`, image, tag, want);
@@ -168,16 +170,26 @@ for (const dir of projects) {
     for (const [pkg, spec] of Object.entries(p[field] ?? {})) {
       const want = pinFor(tc, pkg, { peer: field === 'peerDependencies' });
       if (want) expect(rel(f), `${field}["${pkg}"]`, spec, want);
+      // Every other Midnight package but the lockstep runtime packages needs a pin.
+      else if (pkg.startsWith('@midnight-ntwrk/') && !/^@midnight-ntwrk\/(mnkit-|example-)/.test(pkg)) {
+        problems.push(`${rel(f)}: ${field}["${pkg}"] is not pinned in toolchain.json (add it to npm, and to pinFor)`);
+      }
     }
   }
 }
 
 // --- pragmas -----------------------------------------------------------------
-for (const dir of projects) {
-  const contractDir = path.join(dir, 'contract');
-  if (!fs.existsSync(contractDir)) continue;
-  for (const name of fs.readdirSync(contractDir).filter((n) => n.endsWith('.compact'))) {
-    const f = path.join(contractDir, name);
+// Every .compact under a project's contract/, subfolders included, and the
+// engine's compiled test fixtures.
+const compactFiles = (d) =>
+  fs.existsSync(d)
+    ? fs
+        .readdirSync(d, { recursive: true, withFileTypes: true })
+        .filter((e) => e.isFile() && e.name.endsWith('.compact') && !e.parentPath.includes(`${path.sep}node_modules`))
+        .map((e) => path.join(e.parentPath, e.name))
+    : [];
+for (const dir of [...projects, ...dirsUnder(path.join('packages', 'mnkit', 'test', 'fixtures'))]) {
+  for (const f of compactFiles(path.join(dir, 'contract'))) {
     const src = read(f);
     const m = /pragma\s+language_version\s+([^;]+);/.exec(src);
     // A module-only file (zk-loan's schnorr.compact) may leave the pragma to its importer.

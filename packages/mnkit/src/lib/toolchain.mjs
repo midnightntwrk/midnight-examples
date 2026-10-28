@@ -41,7 +41,8 @@ export const mnkitVersion = () => JSON.parse(fs.readFileSync(path.join(PKG_ROOT,
 /**
  * The version spec toolchain `tc` pins `pkg` to in a package.json, or null if
  * it doesn't pin it. Exact: every midnight-js-* package, testkit-js,
- * wallet-sdk, dapp-connector-api and vite (vitest's peer, and the UIs'
+ * wallet-sdk and the wallet-sdk-* packages `npm` names, dapp-connector-api,
+ * the packages in `overrides` (ledger-v8 and its runtimes) and vite (vitest's peer, and the UIs'
  * bundler: one Vite for the whole project, so npm hoists the same
  * one). vitest is a caret range on the pinned floor. In peerDependencies
  * (`peer`), an exact pin becomes a tilde range, so a project can pick up
@@ -52,6 +53,9 @@ export function pinFor(tc, pkg, { peer = false } = {}) {
     if (pkg.startsWith('@midnight-ntwrk/midnight-js-')) return tc.npm['midnight-js'];
     if (pkg === '@midnight-ntwrk/testkit-js') return tc.npm['testkit-js'];
     if (pkg === '@midnight-ntwrk/wallet-sdk') return tc.npm['wallet-sdk'];
+    // The sub-packages version on their own; pin the ones a project imports.
+    if (pkg.startsWith('@midnight-ntwrk/wallet-sdk-')) return tc.npm[pkg.slice('@midnight-ntwrk/'.length)] ?? null;
+    if (pkg.startsWith('@midnight-ntwrk/') && tc.overrides?.[pkg]) return tc.overrides[pkg];
     if (pkg === '@midnight-ntwrk/dapp-connector-api') return tc.npm['dapp-connector-api'];
     if (pkg === 'vite') return tc.npm.vite;
     if (pkg === 'vitest') return `^${tc.npm.vitest}`;
