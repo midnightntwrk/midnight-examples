@@ -30,10 +30,33 @@ trust recalled APIs over it.
 
 ## Identity and commitments
 
-- **Identity comes from a witness secret.** The pattern is
-  `persistentHash([pad(32, "<app>:pk:"), sk])`. Add `kernel.self()` to the hash
-  so the same secret gives an unlinkable key in each deployment.
-  ([private-bid](../examples/private-bid/contract/private-bid.compact), [LESSONS §6](../examples/shielded-chips/LESSONS.md#6-patterns-that-didnt))
+- **Identity comes from a witness secret, bound to the deployment.** Derive
+  every key as `persistentHash([pad(32, "<app>:<role>:"), binding, sk])`.
+  Without a `binding`, the same `sk` gives the same key in every deployment:
+  a frontend that reuses a secret makes its user linkable across all of them,
+  and a key that authorizes something in one deployment authorizes it in all
+  of them. The contract can't stop a frontend from reusing a secret, so it has
+  to bind the key itself. The same goes for any commitment or nullifier built
+  from `sk`. Pick the binding by where the key is first derived:
+  - **At call time** (in a circuit): `kernel.self().bytes`, the contract's
+    address. Addresses are unique, so the contract enforces the binding
+    whatever the deployer or the frontend does.
+    ([private-bid `derive`](../examples/private-bid/contract/private-bid.compact),
+    [election `voterKey`](../examples/election/contract/election.compact))
+  - **In the constructor** (an owner, organizer or admin key stored at
+    deploy): a random `instanceNonce` constructor argument, stored in a
+    `sealed` field so circuits can derive the same key later. Don't use
+    `kernel.self()` here. The contract has no address until its constructor
+    has run, so inside the constructor `kernel.self()` is the same all-zero
+    placeholder in every deployment, and the stored key would not match the
+    one a circuit derives later. A deploy carries no proof and its address
+    depends on the state the constructor produced, so there's nothing unique
+    the constructor could use instead. The nonce's freshness is the deployer's
+    responsibility; `assert` that it isn't zero to catch a frontend that
+    forgot it.
+    ([election `organizerKey`](../examples/election/contract/election.compact),
+    `election.sim.test.ts` → `keys bound to the deployment`)
+  ([LESSONS §6](../examples/shielded-chips/LESSONS.md#6-patterns-that-didnt), [issue #65](https://github.com/midnightntwrk/midnight-examples/issues/65))
 - **Use one secret per job.** If identity, mint authority and blinding share
   one `sk`, then opening any commitment gives away the rest.
   ([LESSONS §6](../examples/shielded-chips/LESSONS.md#6-patterns-that-didnt))

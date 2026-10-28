@@ -6,26 +6,37 @@
 ## What it teaches
 
 - **Commit-reveal voting.** While voting is open, a voter commits
-  `persistentHash` of their vote and their witness secret into
-  `hashedVoteMap`. After it closes, `revealVote` recomputes the commitment from
-  the witnesses and asserts it matches before counting the vote.
-- **Witness-derived identity.** `getDappPubKey(localSk())` is the organizer's
-  and each voter's key in this contract; the secret never leaves the witness.
+  `persistentHash` of their vote, the contract address and their witness
+  secret into `hashedVoteMap`. After it closes, `revealVote` recomputes the
+  commitment from the witnesses and asserts it matches before counting the
+  vote.
+- **Witness-derived identity, bound to the deployment.** Every key is
+  `deriveKey(purpose, binding, localSk())`, a hash of all three; the secret
+  never leaves the witness. A voter key is derived at call time, so its binding
+  is `kernel.self().bytes` (`voterKey`). The organizer key is written by the
+  constructor, where `kernel.self()` is the same all-zero placeholder in every
+  deployment, so its binding is `instanceNonce`, a random sealed constructor
+  argument (`organizerKey`). This is the repo's reference for a role key set in
+  the constructor.
 - **`Set`-based guards** against registering twice, voting twice and revealing
   twice (`registeredVoters`, `hashedVoteMap`, `revealedVoters`).
 - **`Counter` tallies** and a winner computed on chain by `checkWinner`.
-- **`sealed` ledger fields** (organizer, both candidates) set once in the
-  constructor, and a `VotingState` state machine gating every circuit.
+- **`sealed` ledger fields** (instance nonce, organizer, both candidates) set
+  once in the constructor, and a `VotingState` state machine gating every
+  circuit.
 
 ## Layout
 
 - `contract/election.compact` (committed), `contract/index.ts`
   (+ `contract/witnesses.ts` when the contract declares witnesses).
-- `src/` harness; `src/test/election.test.ts`.
+- `src/` harness; `src/test/election.sim.test.ts` (in memory: every guard, and
+  the key binding across two deployments); `src/test/election.test.ts`
+  (devnet).
 
 ## Run
 
 ```bash
+yarn compile:fast && yarn test:sim   # seconds, no Docker
 yarn compile
 yarn env:up && yarn wait:dust
 yarn test:local
@@ -40,3 +51,12 @@ yarn env:down
 - The circuit-id union in `src/providers.ts` is derived from the compiled
   contract (`keyof ImpureCircuits`), so it never needs editing when circuits
   change.
+- Deploy with a fresh `randomBytes(32)` as the third constructor argument. The
+  contract rejects an all-zero nonce, but it can't detect a reused one: a
+  reused nonce gives the same secret the same organizer key in both
+  deployments (the sim suite shows this).
+- Off chain, compute a key with `pureCircuits.deriveKey(purpose, binding, sk)`.
+  `purpose` is the UTF-8 string zero-padded to 32 bytes, as the contract's
+  `pad(32, "...")` does (`pad32` in the tests). `binding` is the nonce for the
+  organizer, and the contract address as bytes (`Buffer.from(address, 'hex')`)
+  for a voter.

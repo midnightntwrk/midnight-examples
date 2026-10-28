@@ -1,12 +1,18 @@
 # Election Example
 
-A two-candidate election using commit-reveal. Voters register a DApp-specific
-key derived from a witness secret. While voting is open, each voter commits a
-hash of their vote and secret, so the tally can't be read during voting. After
-the organizer closes voting, each voter reveals: the contract recomputes the
-commitment, rejects a changed vote, and counts it. `Set`s stop double
-registration, double voting and double reveals; `Counter`s hold the tally; and
-the organizer and candidates are `sealed` at deployment.
+A two-candidate election using commit-reveal. Voters register a key derived
+from a witness secret and bound to this deployment, so the same secret gives
+an unrelated key in any other election. While voting is open, each voter
+commits a hash of their vote and secret, so the tally can't be read during
+voting. After the organizer closes voting, each voter reveals: the contract
+recomputes the commitment, rejects a changed vote, and counts it. `Set`s stop
+double registration, double voting and double reveals; `Counter`s hold the
+tally; and the organizer and candidates are `sealed` at deployment.
+
+The constructor takes the two candidates and a random 32-byte instance nonce:
+`args: [candidateA, candidateB, randomBytes(32)]`. Use a fresh nonce for every
+deployment. It is what keeps the organizer's key unique to this election (see
+[Keys bound to the deployment](../../docs/compact-gotchas.md#identity-and-commitments)).
 
 ## Set up
 

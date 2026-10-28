@@ -28,11 +28,12 @@ Entries name a symbol rather than a line number, so search the file for it.
 | Hash commitment of a witness secret | secret-message | `secret-message.compact` → `publishMessageHash`, `hashMessageWithSeparator` |
 | Domain-separated hashing, binding to `kernel.self()` | secret-message | `secret-message.compact` → `hashMessageWithAddress` |
 | First caller becomes the owner; owner-only removal | secret-message | `secret-message.compact` → `publishMessageHashWithOwner`, `removeMessageHash` |
-| Identity key derived from a witness secret | election, battleship | `getDappPubKey(localSk())` |
-| Per-deployment identity (`kernel.self()` in the key) | private-bid | `private-bid.compact` → `derive` |
+| Identity key derived from a witness secret, bound to the deployment (use this for every new key; see [gotchas](compact-gotchas.md#identity-and-commitments)) | election | `election.compact` → `deriveKey` |
+| Key derived at call time, bound to `kernel.self()` | election, private-bid | `election.compact` → `voterKey`; `private-bid.compact` → `derive` |
+| Role key written in the constructor, bound to a random `instanceNonce` (`kernel.self()` is a placeholder there) | election | `election.compact` → `constructor`, `organizerKey` |
 | Salted `persistentCommit`, then reveal | private-bid | `private-bid.compact` → `placeBid`, `revealBid` |
 | Value stays private while a public bound is proven | private-bid | `placeBid` (`amount >= minimumBid`) |
-| Commit-reveal with `persistentHash(value, sk)` | election | `election.compact` → `commitVote`, `revealVote`, `commitWithSk` |
+| Commit-reveal with `persistentHash(value, kernel.self(), sk)` | election | `election.compact` → `commitVote`, `revealVote`, `commitWithSk` |
 | Commitment made in the constructor, revealed later | silent-auction | `silent-auction.compact` → `constructor`, `commitPrice`, `revealWin` |
 | `sealed` (set-once) ledger fields | silent-auction, election, private-party | `export sealed ledger …` |
 | State machine on an `enum` ledger field | battleship, silent-auction, election | `TurnState`, `AuctionState`, `VotingState` |
@@ -73,6 +74,7 @@ Entries name a symbol rather than a line number, so search the file for it.
 | In-memory contract tests (no network, no proofs): `Sim.deploy`, `call`, `expectRejects` | calculator, private-tip-jar | `src/test/*.sim.test.ts`; API in [`packages/sim/src/index.ts`](../packages/sim/src/index.ts) |
 | Asserting a secret never reaches public state | private-tip-jar (in memory), shielded-chips (devnet) | `private-tip-jar.sim.test.ts` → `assertNotInPublicState`; `src/test/privacy.test.ts` |
 | Swapping caller or private state between calls | private-tip-jar | `private-tip-jar.sim.test.ts` → `sim.as(...)`, `sim.privateState = ...` |
+| One secret gives unrelated keys in two deployments (two `Sim.deploy`s) | election | `election.sim.test.ts` → `keys bound to the deployment` |
 | A lying witness is rejected by the circuit | calculator | `calculator.sim.test.ts` → `rejects a witness that lies` |
 | A hand-written simulator class (many tests, custom fixtures) | zk-loan | `zk-loan.simulator.ts`, `zk-loan.sim.test.ts` |
 
