@@ -46,12 +46,12 @@ mn-examples/
 │   └── battleship/       # Compact contract as a state machine, RBAC, private state + browser UI (ui/)
 ├── packages/
 │   ├── mnkit/            # the scaffolder: engine, CLI and templates/example (copied by `npm run new:example`)
+│   │   └── templates/ui/ # browser UI scaffold rendered by `npm run new:ui`
 │   ├── fast-sync/        # @midnight-ntwrk/mnkit-wallet: wallet provider, pre-seed fast sync, .env seeds, funding gate
 │   ├── sim/              # @midnight-ntwrk/mnkit-sim: in-memory contract harness for *.sim.test.ts
 │   └── coins/            # @midnight-ntwrk/mnkit-coins: shielded-coin helpers for tests
 ├── preseed/              # pre-seed reference bundles, per network
 ├── toolchain.json        # the one toolchain pin (`npm run toolchain:check`)
-├── packages/mnkit/templates/ui/         # browser UI scaffold rendered by `npm run new:ui`
 ├── tsconfig.base.json    # shared TypeScript compiler options
 ├── vitest.config.ts      # aggregate test projects (per-example configs still own env)
 └── .github/workflows/    # CI: compile-and-run every example on a matrix

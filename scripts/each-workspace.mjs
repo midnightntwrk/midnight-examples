@@ -16,13 +16,13 @@
 
 // Runs one package script in every workspace that has it, in parallel:
 // `npm run <script> --workspaces` runs them one at a time. The root
-// package.json's compile, compile:fast, typecheck and build:packages use it;
+// package.json's compile, compile:fast, typecheck, build:packages and postinstall use it;
 // the test scripts stay sequential (`npm run … --workspaces --if-present`).
 //
-//   node scripts/each-workspace.mjs <script> [--include <glob>] [--jobs <n>]
+//   node scripts/each-workspace.mjs <script> [--include <glob>] [--jobs <n>] [-- <args>]
 //
 // --include keeps the workspaces whose package name matches <glob> (`*` is
-// the only wildcard). As with `yarn workspaces foreach --parallel`, which this
+// the only wildcard). Arguments after `--` are passed to each script. As with `yarn workspaces foreach --parallel`, which this
 // replaces: at most half the CPUs by default, and each workspace's output is
 // printed in one piece when it finishes. Exits 1 if any workspace failed.
 // Zero dependencies — Node built-ins only.
@@ -34,25 +34,30 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const USAGE = 'Usage: node scripts/each-workspace.mjs <script> [--include <glob>] [--jobs <n>]';
+const USAGE = 'Usage: node scripts/each-workspace.mjs <script> [--include <glob>] [--jobs <n>] [-- <args>]';
 
 function fail(msg) {
   console.error(`✖ ${msg}`);
   process.exit(1);
 }
 
-const args = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const dashes = argv.indexOf('--');
+const args = dashes === -1 ? argv : argv.slice(0, dashes);
+const forwarded = dashes === -1 ? [] : argv.slice(dashes + 1);
 let script;
 let include;
 let jobs = Math.ceil(os.availableParallelism() / 2);
+/** The value after the flag at args[i]: a missing one is a usage error, not "no filter". */
+const valueAt = (i) => (i < args.length && !args[i].startsWith('-') ? args[i] : fail(USAGE));
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
-  if (a === '--include') include = args[++i];
-  else if (a === '--jobs') jobs = Number(args[++i]);
+  if (a === '--include') include = valueAt(++i);
+  else if (a === '--jobs') jobs = Number(valueAt(++i));
   else if (a.startsWith('-') || script) fail(USAGE);
   else script = a;
 }
-if (!script || (include !== undefined && !include) || !(jobs >= 1)) fail(USAGE);
+if (!script || include === '' || !(jobs >= 1)) fail(USAGE);
 
 /** The directories the root package.json's `workspaces` globs match (`*` segments only). */
 function workspaceDirs() {
@@ -94,7 +99,7 @@ if (targets.length === 0) fail(`no workspace has a "${script}" script${include ?
 function runOne({ dir, pkg }) {
   return new Promise((resolve) => {
     const started = Date.now();
-    const child = spawn(...npmCommand(['run', script]), { cwd: dir });
+    const child = spawn(...npmCommand(['run', script, ...(forwarded.length ? ['--', ...forwarded] : [])]), { cwd: dir });
     let output = '';
     child.stdout.on('data', (d) => (output += d));
     child.stderr.on('data', (d) => (output += d));

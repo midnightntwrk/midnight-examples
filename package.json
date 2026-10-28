@@ -19,7 +19,7 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "npm run build:packages",
+    "postinstall": "node scripts/each-workspace.mjs build --include \"@midnight-ntwrk/mnkit-*\"",
     "build:packages": "node scripts/each-workspace.mjs build --include \"@midnight-ntwrk/mnkit-*\"",
     "new:example": "node scripts/new-example.mjs",
     "new:ui": "node scripts/new-ui.mjs",
@@ -54,5 +54,15 @@
       "@swc/core": "1.15.47",
       "uuid": "11.1.1"
     }
+  },
+  "allowScripts": {
+    "esbuild": false,
+    "@swc/core": false,
+    "classic-level": false,
+    "cpu-features": false,
+    "dtrace-provider": false,
+    "msgpackr-extract": false,
+    "protobufjs": false,
+    "ssh2": false
   }
 }
