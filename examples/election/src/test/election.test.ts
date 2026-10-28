@@ -58,6 +58,7 @@ import {
   CompiledElectionContract,
   Contract,
   ledger,
+  pureCircuits,
   zkConfigPath,
 } from '../../contract/index.js';
 import {
@@ -86,6 +87,13 @@ const PRIVATE_STATE_IDS = {
 
 const CANDIDATE_0 = 'Ada';
 const CANDIDATE_1 = 'Grace';
+
+// A key's purpose, padded the way the contract's pad(32, "...") does it.
+const pad32 = (s: string): Uint8Array => {
+  const out = new Uint8Array(32);
+  out.set(new TextEncoder().encode(s));
+  return out;
+};
 
 const logger = pino({
   level: process.env['LOG_LEVEL'] ?? 'info',
@@ -134,6 +142,9 @@ describe(`Election Contract (${network})`, () => {
     randomBytes(32),
     VoteChoice.BAD,
   );
+  // This deployment's instance nonce: fresh random bytes, as the constructor
+  // requires.
+  const instanceNonce = new Uint8Array(randomBytes(32));
 
   // Reads the contract's public ledger state.
   async function queryLedger() {
@@ -208,7 +219,9 @@ describe(`Election Contract (${network})`, () => {
       privateStateId: PRIVATE_STATE_IDS.ORGANIZER,
       // The constructor invokes localSk(): deploy as the organizer.
       initialPrivateState: organizerState,
-      args: [CANDIDATE_0, CANDIDATE_1],
+      // A fresh instance nonce per deployment binds the organizer key to this
+      // election (see `organizerKey` in election.compact).
+      args: [CANDIDATE_0, CANDIDATE_1, instanceNonce],
     });
 
     contractAddress = deployed.deployTxData.public.contractAddress;
@@ -228,7 +241,10 @@ describe(`Election Contract (${network})`, () => {
     expect(state.votingState).toEqual(VotingState.CLOSED);
     expect(state.candidate0).toEqual(CANDIDATE_0);
     expect(state.candidate1).toEqual(CANDIDATE_1);
-    expect(state.organizer).toBeInstanceOf(Uint8Array);
+    expect(state.instanceNonce).toEqual(instanceNonce);
+    expect(state.organizer).toEqual(
+      pureCircuits.deriveKey(pad32('election:organizer:'), instanceNonce, organizerState.sk),
+    );
     expect(state.registeredVoters.isEmpty()).toBe(true);
     expect(state.hashedVoteMap.isEmpty()).toBe(true);
     expect(state.totalVoteCount).toEqual(0n);
@@ -257,6 +273,13 @@ describe(`Election Contract (${network})`, () => {
 
     const state = await queryLedger();
     expect(state.registeredVoters.size()).toEqual(3n);
+    // Voter keys are bound to the deployed contract's address.
+    const address = new Uint8Array(Buffer.from(contractAddress, 'hex'));
+    for (const voter of [voterOneState, voterTwoState, voterThreeState]) {
+      expect(
+        state.registeredVoters.member(pureCircuits.deriveKey(pad32('election:voter:'), address, voter.sk)),
+      ).toBe(true);
+    }
   });
 
   it('rejects a duplicate registration', async () => {

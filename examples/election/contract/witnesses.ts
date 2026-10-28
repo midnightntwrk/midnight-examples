@@ -20,7 +20,9 @@
 //   witness localGetVote(): VoteChoice;  // the caller's chosen vote
 //
 // A participant's on-chain identity is derived *inside the circuit* from `sk`
-// (getDappPubKey hashes it), never from the wallet. That means one wallet can
+// (organizerKey and voterKey hash it together with a value unique to this
+// deployment, so the same `sk` gives unrelated keys in another election),
+// never from the wallet. That means one wallet can
 // act as many distinct election identities — the organizer and each voter —
 // simply by swapping which private state it presents. This is the pattern the
 // test suite uses to run a whole election from a single wallet.

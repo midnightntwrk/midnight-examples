@@ -14,11 +14,19 @@ export enum VoteChoice {
 }
 
 // sealed ledger values cannot be changed after constructor execution
+//
+// instanceNonce: a random value the deployer picks for this election. It is
+// what makes the organizer key unique to this deployment (see organizerKey).
+// It is public, and that is fine: it hides nothing, it only has to differ
+// per deployment.
+export sealed ledger instanceNonce: Bytes<32>;
 export sealed ledger organizer: Bytes<32>;
 export sealed ledger candidate0: Opaque<"string">;
 export sealed ledger candidate1: Opaque<"string">;
 export ledger votingState: VotingState;
+// voter key -> that voter's vote commitment (see commitWithSk)
 export ledger hashedVoteMap: Map<Bytes<32>, Bytes<32>>;
+// voter keys (see voterKey), never the secrets behind them
 export ledger registeredVoters: Set<Bytes<32>>;
 // tracks who has already revealed, so a vote can only be counted once
 export ledger revealedVoters: Set<Bytes<32>>;
@@ -30,10 +38,20 @@ export ledger winner: VoteChoice;
 witness localGetVote(): VoteChoice;
 witness localSk(): Bytes<32>;
 
-constructor(candidateA: Opaque<"string">, candidateB: Opaque<"string">) {
-    const _sk = localSk();
-    const pubKey = getDappPubKey(_sk);
-    organizer = pubKey;
+// `nonce` must be fresh random bytes for every deployment (the tests and any
+// frontend use randomBytes(32)). The contract cannot check that it is fresh:
+// a constructor runs off chain and its result is published without a proof, so
+// it has no unique input other than what the deployer gives it.
+constructor(candidateA: Opaque<"string">, candidateB: Opaque<"string">, nonce: Bytes<32>) {
+    // Catches a frontend that forgot to pass a nonce. It can't catch one that
+    // reuses a nonce; that would make the organizer key linkable again.
+    assert(nonce != default<Bytes<32>>, "The instance nonce must be random, not zero");
+    instanceNonce = disclose(nonce);
+
+    // kernel.self() can't be used here: the contract has no address until
+    // this constructor has run, so inside it kernel.self() is the same
+    // all-zero placeholder in every deployment. The nonce stands in for it.
+    organizer = disclose(organizerKey(localSk()));
     candidate0 = disclose(candidateA);
     candidate1 = disclose(candidateB);
     votingState = VotingState.CLOSED;
@@ -43,7 +61,9 @@ constructor(candidateA: Opaque<"string">, candidateB: Opaque<"string">) {
 // should be available time based
 export circuit registerToVote(): [] {
     const _sk = localSk();
-    const pubKey = getDappPubKey(_sk);
+    // The key goes into a ledger Set, so it must be disclosed. Only the hash
+    // is made public, never _sk.
+    const pubKey = disclose(voterKey(_sk));
     assert(!registeredVoters.member(pubKey), "You are already registered to vote");
     assert(votingState == VotingState.CLOSED, "You can only register before voting starts");
 
@@ -52,7 +72,7 @@ export circuit registerToVote(): [] {
 
 export circuit openVoting(): [] {
     const _sk = localSk();
-    const pubKey = getDappPubKey(_sk);
+    const pubKey = disclose(organizerKey(_sk));
     assert(organizer == pubKey, "You are not the organizer");
     assert(votingState == VotingState.CLOSED, "Voting has already been openend");
     assert(!registeredVoters.isEmpty(), "There are no registered voters");
@@ -63,7 +83,7 @@ export circuit openVoting(): [] {
 export circuit commitVote(): [] {
     assert(votingState == VotingState.OPEN, "Voting has not opened yet");
     const _sk = localSk();
-    const pubKey = getDappPubKey(_sk);
+    const pubKey = disclose(voterKey(_sk));
     assert(registeredVoters.member(pubKey), "You are not registered to vote.");
     assert(!hashedVoteMap.member(pubKey), "Attempt to double vote");
     const _currentVote = localGetVote();
@@ -80,7 +100,7 @@ export circuit revealVote(): [] {
     assert(votingState == VotingState.CLOSED, "Voting is still open");
 
     const _sk = localSk();
-    const pubKey = getDappPubKey(_sk);
+    const pubKey = disclose(voterKey(_sk));
     // we want to check that they have already voted..
     assert(hashedVoteMap.member(pubKey), "You have not voted yet");
     assert(registeredVoters.member(pubKey), "You are not a registered voter");
@@ -106,7 +126,7 @@ export circuit revealVote(): [] {
 // should be time based
 export circuit closeVoting(): [] {
     const _sk = localSk();
-    const pubKey = getDappPubKey(_sk);
+    const pubKey = disclose(organizerKey(_sk));
     assert(organizer == pubKey, "You are not the organizer");
     assert(!hashedVoteMap.isEmpty(), "You can't close the voting with no votes");
     votingState = VotingState.CLOSED;
@@ -114,7 +134,7 @@ export circuit closeVoting(): [] {
 
 export circuit checkWinner(): [] {
     const _sk = localSk();
-    const pubKey = getDappPubKey(_sk);
+    const pubKey = disclose(organizerKey(_sk));
     assert(organizer == pubKey, "You are not an organizer");
     assert(votingState == VotingState.CLOSED, "Voting is still open");
 
@@ -128,12 +148,42 @@ export circuit checkWinner(): [] {
     }
 }
 
-// hashing commitment with _sk makes it impossible to brute force a simple 1 or 2
-circuit commitWithSk(_vote: Bytes<32>, _sk: Bytes<32>) : Bytes<32> {
-    return disclose(persistentHash<Vector<2, Bytes<32>>>([_vote, _sk]));
+// --- Keys bound to this deployment --------------------------------------------
+//
+// Every key is persistentHash([purpose, binding, sk]):
+// - `purpose` separates the jobs one secret does, so an organizer key can never
+//   equal a voter key made from the same sk.
+// - `binding` ties the key to this election. Without it the same sk would give
+//   the same key in every election: whoever reused a secret would be
+//   recognizable across all of them, and a key valid in one would be valid in
+//   all of them.
+// - `sk` is the witness secret, which never leaves the caller's machine.
+
+// Exported and pure, so off-chain code (tests, a frontend) can compute the same
+// keys from pureCircuits.deriveKey without a transaction.
+export pure circuit deriveKey(purpose: Bytes<32>, binding: Bytes<32>, sk: Bytes<32>): Bytes<32> {
+    return persistentHash<Vector<3, Bytes<32>>>([purpose, binding, sk]);
 }
 
-// hash a random "public key" that is only traceable in this dapp
-circuit getDappPubKey(_sk: Bytes<32>): Bytes<32> {
-  return disclose(persistentHash<Vector<2, Bytes<32>>>([pad(32, "election:pk:"), _sk]));
+// The organizer key is written by the constructor, so it is bound to
+// instanceNonce, the one per-deployment value the constructor has (see the
+// constructor for why kernel.self() can't be used there). Its uniqueness
+// therefore rests on the deployer choosing a fresh nonce.
+circuit organizerKey(sk: Bytes<32>): Bytes<32> {
+    return deriveKey(pad(32, "election:organizer:"), instanceNonce, sk);
+}
+
+// A voter key is only ever derived at call time, so it is bound to the
+// contract's own address. Addresses are unique, so the contract itself
+// guarantees that a voter's key here matches none of their keys in any other
+// election, whatever the deployer does.
+circuit voterKey(sk: Bytes<32>): Bytes<32> {
+    return deriveKey(pad(32, "election:voter:"), kernel.self().bytes, sk);
+}
+
+// The vote commitment. Mixing in _sk stops anyone brute-forcing it from the
+// two possible votes; mixing in the address stops the same voter casting the
+// same vote in two elections from producing the same commitment in both.
+circuit commitWithSk(_vote: Bytes<32>, _sk: Bytes<32>) : Bytes<32> {
+    return disclose(persistentHash<Vector<3, Bytes<32>>>([_vote, kernel.self().bytes, _sk]));
 }
