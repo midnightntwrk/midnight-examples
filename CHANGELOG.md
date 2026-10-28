@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## mnkit 0.2.0 (unreleased)
 
-The first npm release of `mnkit` and its runtime packages `@midnight-ntwrk/mnkit-wallet`, `@midnight-ntwrk/mnkit-sim` and `@midnight-ntwrk/mnkit-coins`. All four share one version. `0.2.0-rc.1` goes to the `next` dist-tag first.
+The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-wallet`, `@midnightntwrk/mnkit-sim` and `@midnightntwrk/mnkit-coins`. All four share one version. `0.2.0-rc.1` goes to the `next` dist-tag first.
 
 ### Added
 
@@ -21,4 +21,4 @@ The first npm release of `mnkit` and its runtime packages `@midnight-ntwrk/mnkit
 - `mnkit doctor` checks the machine, and with `--network <net>` checks the network's node, indexer and proof server.
 - `mnkit add ui` adds a browser UI as a workspace, and `mnkit add contract <name>` adds another contract.
 - `mnkit upgrade` moves a project to the current templates and toolchain with a three-way merge (`--check`, `--force`).
-- `@midnight-ntwrk/mnkit-wallet` (wallet sync with preseed bundles, `MidnightWalletProvider`, `fundWallet`, `waitForDust`), `@midnight-ntwrk/mnkit-sim` and `@midnight-ntwrk/mnkit-coins`.
+- `@midnightntwrk/mnkit-wallet` (wallet sync with preseed bundles, `MidnightWalletProvider`, `fundWallet`, `waitForDust`), `@midnightntwrk/mnkit-sim` and `@midnightntwrk/mnkit-coins`.

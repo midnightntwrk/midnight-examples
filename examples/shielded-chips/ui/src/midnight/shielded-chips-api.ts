@@ -413,7 +413,7 @@ export async function placeBet(
 /**
  * The Zswap Merkle-tree index of the coin a bet escrowed.
  *
- * The Node tests use the same logic from `@midnight-ntwrk/mnkit-coins`
+ * The Node tests use the same logic from `@midnightntwrk/mnkit-coins`
  * (`contractCoinMtIndex`). This copy stays because that package is Node-only
  * (it imports `node:crypto`), and the UI's package.json is template-owned.
  *

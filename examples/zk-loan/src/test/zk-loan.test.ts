@@ -28,7 +28,7 @@ import {
   transientHash,
 } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { resolveWallet, waitForNightThenDust } from '@midnight-ntwrk/mnkit-wallet';
+import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';

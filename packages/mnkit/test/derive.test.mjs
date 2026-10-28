@@ -172,11 +172,11 @@ describe('derive', () => {
 
     const devnet = read(dir, 'src/test/private-tip-jar.test.ts');
     expect(devnet).toContain("it('deploys tip-token'");
-    expect(region(devnet, 'coin-imports')).toContain("from '@midnight-ntwrk/mnkit-coins';");
+    expect(region(devnet, 'coin-imports')).toContain("from '@midnightntwrk/mnkit-coins';");
     expect(region(devnet, 'circuits')).toContain('coin: freshCoin(color, value)');
 
     const sim = read(dir, 'src/test/private-tip-jar.sim.test.ts');
-    expect(region(sim, 'coin-imports')).toBe("import { simCoin } from '@midnight-ntwrk/mnkit-coins';");
+    expect(region(sim, 'coin-imports')).toBe("import { simCoin } from '@midnightntwrk/mnkit-coins';");
     expect(region(sim, 'circuits')).toContain("it.todo('ownerKey(sk: Bytes<32>) (pure)');");
     expect(region(sim, 'privacy')).toContain("toEqual(['owner', 'pot', 'tipColor'])");
 

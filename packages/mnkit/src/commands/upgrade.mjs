@@ -48,8 +48,11 @@
 // mnkit's wherever they are listed, a dependency or script you left as the
 // template had it follows the template, new ones are added, overrides and
 // engines follow the toolchain key by key, and your own changes stay (with a
-// note where the template changed the same entry). Seed files
-// (the contracts, tests, README, SPEC and the UI's seeds) are never touched.
+// note where the template changed the same entry). A runtime package listed
+// under an earlier name (RENAMED_PACKAGES) moves to its name now, and so do
+// imports of it in files upgrade otherwise leaves alone. Other than that, seed
+// files (the contracts, tests, README, SPEC and the UI's seeds) are never
+// touched.
 // Then mnkit.json records the new hashes and toolchain, and npm install runs.
 
 import { spawnSync } from 'node:child_process';
@@ -57,6 +60,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   LATE_SEEDS,
+  RENAMED_PACKAGES,
   RUNTIME_PACKAGES,
   fileHash,
   isTemplateOwned,
@@ -140,11 +144,12 @@ function mergeObject(cur, next, base) {
  *   overrides, engines                      merged key by key (mergeObject)
  */
 export function mergePackageJson(current, rendered, tc, base) {
-  const cur = JSON.parse(current);
-  const next = JSON.parse(rendered);
-  const out = structuredClone(cur);
   const changes = [];
   const notes = [];
+  const cur = renameDeps(JSON.parse(current), changes);
+  base = base && renameDeps(structuredClone(base), []);
+  const next = JSON.parse(rendered);
+  const out = structuredClone(cur);
   const fieldOf = (pkg, o) => DEP_FIELDS.find((f) => o?.[f]?.[pkg] !== undefined);
   const baseSpec = (pkg) => base?.[fieldOf(pkg, base)]?.[pkg];
   for (const field of DEP_FIELDS) {
@@ -216,6 +221,32 @@ export function mergePackageJson(current, rendered, tc, base) {
   return { content: changes.length ? withEolOf(`${JSON.stringify(out, null, 2)}\n`, current) : current, changes, notes };
 }
 
+/** `pkg` (a package.json object) with RENAMED_PACKAGES moved to their names now, each move pushed to `changes`. */
+function renameDeps(pkg, changes) {
+  for (const field of DEP_FIELDS) {
+    const deps = pkg[field];
+    if (!deps || !Object.keys(deps).some((d) => d in RENAMED_PACKAGES)) continue;
+    pkg[field] = sortKeys(Object.fromEntries(Object.entries(deps).map(([d, spec]) => [RENAMED_PACKAGES[d] ?? d, spec])));
+    for (const d of Object.keys(deps)) if (d in RENAMED_PACKAGES) changes.push(`${field}: ${d} → ${RENAMED_PACKAGES[d]}`);
+  }
+  return pkg;
+}
+
+const OLD_NAME_RE = new RegExp(Object.keys(RENAMED_PACKAGES).map((n) => n.replace(/[/-]/g, '\\$&')).join('|'), 'g');
+const CODE_RE = /\.(?:[cm]?[jt]s|[jt]sx)$/;
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'managed']);
+
+/** POSIX paths of the code files under `dir` that import a runtime package by an earlier name. */
+function filesWithOldNames(dir, rel = '') {
+  return fs.readdirSync(path.join(dir, rel), { withFileTypes: true }).flatMap((e) => {
+    const r = rel ? `${rel}/${e.name}` : e.name;
+    if (e.isDirectory()) return e.name.startsWith('.') || SKIP_DIRS.has(e.name) ? [] : filesWithOldNames(dir, r);
+    if (!e.isFile() || !CODE_RE.test(e.name)) return [];
+    OLD_NAME_RE.lastIndex = 0;
+    return OLD_NAME_RE.test(fs.readFileSync(path.join(dir, r), 'utf8')) ? [r] : [];
+  });
+}
+
 /** "a.b: x → y" for every leaf of the toolchain that differs. */
 function toolchainChanges(before = {}, after) {
   const flat = (o, prefix = '') =>
@@ -231,7 +262,7 @@ function toolchainChanges(before = {}, after) {
 /**
  * What upgrading the project in `dir` would do, without doing it: `files`
  * ([{ rel, kind, content }] with kind update | add | restore | conflict |
- * unmerged | force | deleted | remove | orphan | seed), `packages`
+ * unmerged | force | deleted | remove | orphan | seed | rename), `packages`
  * ([{ rel, content, changes, notes }]),
  * `toolchain` (changed pins) and the new mnkit.json content.
  */
@@ -354,6 +385,13 @@ export function planUpgrade(
     const seed = rendered.find((f) => posix(f.rel) === rel);
     if (seed && !fs.existsSync(path.join(dir, ...rel.split('/')))) files.push({ rel, kind: 'seed', content: seed.content });
   }
+  // Imports of a renamed runtime package, in files nothing above rewrites.
+  const written = new Set(files.filter((f) => f.content !== undefined && f.kind !== 'conflict' && f.kind !== 'unmerged').map((f) => f.rel));
+  for (const rel of filesWithOldNames(dir)) {
+    if (written.has(rel)) continue;
+    const disk = fs.readFileSync(path.join(dir, ...rel.split('/')), 'utf8');
+    files.push({ rel, kind: 'rename', content: disk.replace(OLD_NAME_RE, (n) => RENAMED_PACKAGES[n]) });
+  }
   files.sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
 
   const merged = packages.map(({ rel, rendered: next }) => ({
@@ -421,6 +459,7 @@ const LABELS = {
   deleted: 'you deleted it, and the template has changed it since: left deleted (--force restores it)',
   remove: 'removed (no longer in the template)',
   orphan: 'no longer in the template, but you edited it: left in place',
+  rename: 'imports of @midnight-ntwrk/mnkit-* renamed to @midnightntwrk/mnkit-*',
 };
 
 /** `mnkit upgrade`: returns the exit code. */

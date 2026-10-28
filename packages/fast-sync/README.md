@@ -1,4 +1,4 @@
-# @midnight-ntwrk/mnkit-wallet
+# @midnightntwrk/mnkit-wallet
 
 Test wallets for Midnight projects. Part of
 [mnkit](https://www.npmjs.com/package/mnkit), whose devnet tests and
@@ -26,7 +26,7 @@ An mnkit project already has these. Anywhere else, install the peers at
 exactly these versions and add the `overrides` to your `package.json`:
 
 ```sh
-npm install --save-exact @midnight-ntwrk/mnkit-wallet \
+npm install --save-exact @midnightntwrk/mnkit-wallet \
   @midnight-ntwrk/midnight-js-network-id@4.1.1 @midnight-ntwrk/midnight-js-protocol@4.1.1 \
   @midnight-ntwrk/midnight-js-types@4.1.1 @midnight-ntwrk/midnight-js-utils@4.1.1 \
   @midnight-ntwrk/testkit-js@4.1.1 @midnight-ntwrk/wallet-sdk@1.2.0

@@ -1,4 +1,4 @@
-# @midnight-ntwrk/mnkit-coins
+# @midnightntwrk/mnkit-coins
 
 Shielded-coin helpers for Midnight tests. Part of
 [mnkit](https://www.npmjs.com/package/mnkit); `mnkit derive` imports them

@@ -57,7 +57,7 @@ import {
   encodeRawTokenType,
 } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/ledger';
-import { contractCoinMtIndex, freshCoin } from '@midnight-ntwrk/mnkit-coins';
+import { contractCoinMtIndex, freshCoin } from '@midnightntwrk/mnkit-coins';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
@@ -84,7 +84,7 @@ import {
   type RoulettePrivateState,
 } from '../../contract/witnesses.js';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { resolveWallet, waitForNightThenDust } from '@midnight-ntwrk/mnkit-wallet';
+import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import { WebSocket } from 'ws';
 
 // Required for GraphQL subscriptions in Node.js

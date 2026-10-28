@@ -36,7 +36,7 @@ import {
   MidnightWalletProvider,
   syncWallet,
 } from '../wallet.js';
-import { resolveWallet, waitForNightThenDust } from '@midnight-ntwrk/mnkit-wallet';
+import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import { buildProviders, type TokenTransfersProviders } from '../providers.js';
 import {
   CompiledTokenTransfersContract,

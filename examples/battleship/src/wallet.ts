@@ -43,7 +43,7 @@ import type { Logger } from 'pino';
 // The secret and the fast-sync plumbing now live in the shared harness package
 // so all eight examples resolve wallets the same way. Re-exported here so the
 // existing `from './wallet.js'` imports keep working.
-import { assembleWallet, type FastSyncOptions, type WalletSecret } from '@midnight-ntwrk/mnkit-wallet';
+import { assembleWallet, type FastSyncOptions, type WalletSecret } from '@midnightntwrk/mnkit-wallet';
 
 export type { WalletSecret };
 

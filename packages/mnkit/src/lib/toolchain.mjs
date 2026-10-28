@@ -50,6 +50,7 @@ export const mnkitVersion = () => JSON.parse(fs.readFileSync(path.join(PKG_ROOT,
  */
 export function pinFor(tc, pkg, { peer = false } = {}) {
   const pin = (() => {
+    // The SDK is still on the @midnight-ntwrk scope; add its @midnightntwrk names here when it moves.
     if (pkg.startsWith('@midnight-ntwrk/midnight-js-')) return tc.npm['midnight-js'];
     if (pkg === '@midnight-ntwrk/testkit-js') return tc.npm['testkit-js'];
     if (pkg === '@midnight-ntwrk/wallet-sdk') return tc.npm['wallet-sdk'];

@@ -145,7 +145,7 @@ for a newcomer is the [Learning path](README.md#learning-path) in the root READM
   code exists; keep it in step with the code afterwards. Worked example:
   `examples/private-tip-jar/SPEC.md`.
 - **Two kinds of test.** `src/test/*.sim.test.ts` run the compiled contract in
-  memory with `@midnight-ntwrk/mnkit-sim` (`packages/sim`): `Sim.deploy`,
+  memory with `@midnightntwrk/mnkit-sim` (`packages/sim`): `Sim.deploy`,
   `sim.call`, `sim.as`, `expectRejects` for every guard, and
   `assertNotInPublicState` with one entry per SPEC privacy invariant.
   `npm run test:sim` runs only these, and CI runs it before starting the network.
@@ -157,10 +157,10 @@ for a newcomer is the [Learning path](README.md#learning-path) in the root READM
   (+ `witnesses.ts` where needed); `src/` for the TypeScript test harness;
   `scripts/` for helpers; `compose.yml` for the local network.
 - Remote-network wiring is shared, not copied: depend on
-  `@midnight-ntwrk/mnkit-wallet` and use its `resolveWallet(network, role)`
+  `@midnightntwrk/mnkit-wallet` and use its `resolveWallet(network, role)`
   and `waitForNightThenDust(...)` rather than writing a per-example seed resolver.
   `vitest.config.ts` loads `.env.<network>` from the REPO ROOT via `loadEnv`.
-- Shielded coins in tests are shared too: `@midnight-ntwrk/mnkit-coins`
+- Shielded coins in tests are shared too: `@midnightntwrk/mnkit-coins`
   (`packages/coins`) has the token color, `freshCoin(color, value)` for a coin
   argument, balances, mint arguments and `simCoin` for sim tests. Don't copy
   the local helpers in `private-tip-jar`'s or `shielded-chips`' tests. A coin

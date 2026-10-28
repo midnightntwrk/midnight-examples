@@ -131,7 +131,7 @@ export function DeploymentCard<T, I = void>({
  * @endif
  * @if standalone
  * (a contract may charge it). The script is the project's
- * scripts/fund-wallet.ts (fundWallet from @midnight-ntwrk/mnkit-wallet).
+ * scripts/fund-wallet.ts (fundWallet from @midnightntwrk/mnkit-wallet).
  * @endif
  */
 function NoDustWarning({ cap, networkId }: { cap: bigint; networkId: string | null }) {

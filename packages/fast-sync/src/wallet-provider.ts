@@ -98,7 +98,7 @@ export class MidnightWalletProvider implements MidnightProvider, WalletProvider 
    *
    * You don't need this to pay a contract. A coin a circuit `receiveShielded`s
    * is a NEW coin the transaction creates: pass `freshCoin(color, value)` from
-   * @midnight-ntwrk/mnkit-coins, and the wallet pays for it from whichever
+   * @midnightntwrk/mnkit-coins, and the wallet pays for it from whichever
    * coins it selects and makes change. That pays an exact amount, and since
    * the nonce is fresh, nobody who knows your wallet's coins (whoever minted or
    * sent them) can recognise it. Earlier examples did a self-transfer like

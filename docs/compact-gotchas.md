@@ -53,7 +53,7 @@ trust recalled APIs over it.
 - **The coin you pass to `receiveShielded` is a new coin, not a wallet coin.**
   The circuit creates a Zswap output to the contract, and the wallet balances
   it from whichever of its coins it selects, making change. So build the
-  argument with `freshCoin(color, amount)` from `@midnight-ntwrk/mnkit-coins`
+  argument with `freshCoin(color, amount)` from `@midnightntwrk/mnkit-coins`
   (it wraps the ledger's `createShieldedCoinInfo`: a uniform random nonce), never
   from `availableCoins`. Its nonce is then in no commitment but the contract's,
   so storing the coin publicly links to nobody, and any amount works without a

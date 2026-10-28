@@ -244,12 +244,12 @@ jobs:
 
       - name: Typecheck and test the runtime packages (built by postinstall)
         run: |
-          npm run typecheck -w @midnight-ntwrk/mnkit-wallet
-          npm run test:sim -w @midnight-ntwrk/mnkit-wallet
-          npm run typecheck -w @midnight-ntwrk/mnkit-sim
-          npm run test:sim -w @midnight-ntwrk/mnkit-sim
-          npm run typecheck -w @midnight-ntwrk/mnkit-coins
-          npm run test:sim -w @midnight-ntwrk/mnkit-coins
+          npm run typecheck -w @midnightntwrk/mnkit-wallet
+          npm run test:sim -w @midnightntwrk/mnkit-wallet
+          npm run typecheck -w @midnightntwrk/mnkit-sim
+          npm run test:sim -w @midnightntwrk/mnkit-sim
+          npm run typecheck -w @midnightntwrk/mnkit-coins
+          npm run test:sim -w @midnightntwrk/mnkit-coins
 
       - name: Scaffold, compile:fast and derive a throwaway example
         run: |
@@ -265,7 +265,7 @@ jobs:
           npm run new:example -- ci-derive --derive
           grep -q 'CompiledTipTokenContract = CompiledContract.make' examples/ci-derive/contract/index.ts
           grep -q "it('deploys tip-token'" examples/ci-derive/src/test/ci-derive.test.ts
-          grep -q "from '@midnight-ntwrk/mnkit-coins'" examples/ci-derive/src/test/ci-derive.sim.test.ts
+          grep -q "from '@midnightntwrk/mnkit-coins'" examples/ci-derive/src/test/ci-derive.sim.test.ts
           cp -r examples/ci-derive "$RUNNER_TEMP/first"
           npm run new:example -- ci-derive --derive
           diff -r --exclude=node_modules --exclude=managed "$RUNNER_TEMP/first" examples/ci-derive

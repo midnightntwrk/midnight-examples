@@ -11,7 +11,7 @@ written for the tests), with what the tests need:
 - `overlay/` (end-to-end fixtures only): the completed files copied over a
   derived project, so `scripts/mnkit-e2e.sh` can run its tests. For
   `private-tip-jar` these are the example's own witnesses and tests, with the
-  wallet imported from `@midnight-ntwrk/mnkit-wallet`, and a completed
+  wallet imported from `@midnightntwrk/mnkit-wallet`, and a completed
   `contract/deploy-args.ts`: `mnkit deploy` deploys tip-token first and gives
   the jar that token's color.
 

@@ -54,7 +54,7 @@ import {
   syncWallet,
   waitForDust,
   waitForNightThenDust,
-} from '@midnight-ntwrk/mnkit-wallet';
+} from '@midnightntwrk/mnkit-wallet';
 import { buildProviders, type __Name__Providers } from '../src/providers.js';
 import {
   DEPLOY_NETWORKS,

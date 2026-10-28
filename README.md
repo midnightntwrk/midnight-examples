@@ -47,9 +47,9 @@ mn-examples/
 ├── packages/
 │   ├── mnkit/            # the scaffolder: engine, CLI and templates/example (copied by `npm run new:example`)
 │   │   └── templates/ui/ # browser UI scaffold rendered by `npm run new:ui`
-│   ├── fast-sync/        # @midnight-ntwrk/mnkit-wallet: wallet provider, pre-seed fast sync, .env seeds, funding gate
-│   ├── sim/              # @midnight-ntwrk/mnkit-sim: in-memory contract harness for *.sim.test.ts
-│   └── coins/            # @midnight-ntwrk/mnkit-coins: shielded-coin helpers for tests
+│   ├── fast-sync/        # @midnightntwrk/mnkit-wallet: wallet provider, pre-seed fast sync, .env seeds, funding gate
+│   ├── sim/              # @midnightntwrk/mnkit-sim: in-memory contract harness for *.sim.test.ts
+│   └── coins/            # @midnightntwrk/mnkit-coins: shielded-coin helpers for tests
 ├── preseed/              # pre-seed reference bundles, per network
 ├── toolchain.json        # the one toolchain pin (`npm run toolchain:check`)
 ├── tsconfig.base.json    # shared TypeScript compiler options
@@ -182,7 +182,7 @@ and asserts that he has no DUST of his own.
 npm CLI (`npx mnkit init my-app`) that scaffolds a standalone project around a
 developer's own contract. `npm run new:example` is its monorepo mode; `mnkit init`
 renders the same template as a plain npm project. Its runtime libraries are
-`packages/fast-sync` (`@midnight-ntwrk/mnkit-wallet`), `packages/sim` and
+`packages/fast-sync` (`@midnightntwrk/mnkit-wallet`), `packages/sim` and
 `packages/coins`, all versioned with mnkit.
 
 - `npm run test:engine`: the engine's unit tests, over committed compiler output

@@ -21,7 +21,7 @@ import {
   waitForNightThenDust,
   type FastSyncOptions,
   type WalletSecret,
-} from '@midnight-ntwrk/mnkit-wallet';
+} from '@midnightntwrk/mnkit-wallet';
 import { buildProviders, type HelloWorldProviders } from '../providers.js';
 
 // Where an auto-generated throwaway wallet is cached (gitignored). Only used

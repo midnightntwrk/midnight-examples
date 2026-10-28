@@ -18,8 +18,8 @@
 // toolchain.json. The copies: the README table, every workflow's compact-version
 // and npm, .nvmrc, the root package.json (engines, devEngines, overrides), every
 // compose.yml/compose.yaml image, the pinned deps and engines of every example,
-// UI, template and package (any other @midnight-ntwrk dependency is unpinned,
-// and fails), the runtime packages' README overrides, and the pragma of every
+// UI, template and package (any other @midnight-ntwrk or @midnightntwrk
+// dependency is unpinned, and fails), the runtime packages' README overrides, and the pragma of every
 // contract and engine test fixture. experimental/ is left out on purpose: it
 // tracks release candidates. It also fails when
 // package-lock.json nests a package inside a workspace (see below).
@@ -171,7 +171,7 @@ for (const dir of projects) {
       const want = pinFor(tc, pkg, { peer: field === 'peerDependencies' });
       if (want) expect(rel(f), `${field}["${pkg}"]`, spec, want);
       // Every other Midnight package but the lockstep runtime packages needs a pin.
-      else if (pkg.startsWith('@midnight-ntwrk/') && !/^@midnight-ntwrk\/(mnkit-|example-)/.test(pkg)) {
+      else if (/^@(midnight-ntwrk|midnightntwrk)\//.test(pkg) && !/^(@midnightntwrk\/mnkit-|@midnight-ntwrk\/example-)/.test(pkg)) {
         problems.push(`${rel(f)}: ${field}["${pkg}"] is not pinned in toolchain.json (add it to npm, and to pinFor)`);
       }
     }

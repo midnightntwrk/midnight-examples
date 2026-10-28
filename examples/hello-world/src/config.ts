@@ -1,4 +1,4 @@
-import { preprodConfig } from '@midnight-ntwrk/mnkit-wallet';
+import { preprodConfig } from '@midnightntwrk/mnkit-wallet';
 
 export type NetworkConfig = {
   networkId: string;
@@ -34,7 +34,7 @@ export const PREVIEW_CONFIG: NetworkConfig = {
 
 // Preprod goes through Blockfrost, which needs a project token on every
 // request (BLOCKFROST_PROJECT_ID in the gitignored repo-root .env.preprod). The
-// config is shared with the wallet harness in @midnight-ntwrk/mnkit-wallet
+// config is shared with the wallet harness in @midnightntwrk/mnkit-wallet
 // and built on demand, so it sees the env vitest loads from .env.preprod.
 export function getConfig(): NetworkConfig {
   const network = process.env['MIDNIGHT_NETWORK'] ?? 'local';

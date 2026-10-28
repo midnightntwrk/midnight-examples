@@ -575,7 +575,7 @@ suites' DUST. Don't copy it into an example; extend the shared one.
 `npm run fund:wallet <mn_dust_…> [mn_addr_…]`, run from the project root (not
 `ui/`), solves this without any wallet action. It is the project's
 `scripts/fund-wallet.ts`, which calls
-`fundWallet` from `@midnight-ntwrk/mnkit-wallet`:
+`fundWallet` from `@midnightntwrk/mnkit-wallet`:
 1. Genesis (Alice) sends NIGHT to a throwaway sponsor wallet. There is one
    sponsor per browser wallet, derived from its DUST address.
 2. The sponsor registers that NIGHT for DUST generation with the browser

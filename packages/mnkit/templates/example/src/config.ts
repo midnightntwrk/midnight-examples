@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { preprodConfig } from '@midnight-ntwrk/mnkit-wallet';
+import { preprodConfig } from '@midnightntwrk/mnkit-wallet';
 
 // The main purpose of this file is to hold network configurations. Add configs for new networks
 // (such as Preprod) and modify the code in getConfig() to set `const network` appropriately
@@ -57,7 +57,7 @@ export const PREVIEW_CONFIG: NetworkConfig = {
 // @if standalone
 // request (BLOCKFROST_PROJECT_ID in the gitignored .env.preprod). The
 // @endif
-// config is shared with the wallet harness in @midnight-ntwrk/mnkit-wallet
+// config is shared with the wallet harness in @midnightntwrk/mnkit-wallet
 // and built on demand, so it sees the env vitest loads from .env.preprod.
 export function getConfig(): NetworkConfig {
   const network = process.env['MIDNIGHT_NETWORK'] ?? 'local';

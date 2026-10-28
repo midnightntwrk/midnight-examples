@@ -46,7 +46,7 @@ contract. All six pass:
       Tests  6 passed (6)
 ```
 
-The tests use `@midnight-ntwrk/mnkit-sim`, a small helper package in midnight-examples that runs
+The tests use `@midnightntwrk/mnkit-sim`, a small helper package in midnight-examples that runs
 a compiled contract in memory. `Sim.deploy` runs the constructor with an owner secret, a made-up
 token color, and a made-up coin public key for the deployer:
 
@@ -63,7 +63,7 @@ const deploy = () =>
 
 In memory, a coin is just an object, and the simulator doesn't check that anyone paid for it.
 The tests make up coins of any color and value with `simCoin`, from the repo's
-`@midnight-ntwrk/mnkit-coins` package, which gives each one a random nonce. That is also what a
+`@midnightntwrk/mnkit-coins` package, which gives each one a random nonce. That is also what a
 tipper's client does on a real network, as you'll see in the devnet suite:
 
 ```typescript title="src/test/private-tip-jar.sim.test.ts"
@@ -252,7 +252,7 @@ chain with the contract's pure circuit:
 ### 3. Bob tips twice
 
 Bob tips 40 and then 60, both from the single 100-coin Alice minted him. Each tip is a new coin,
-made up by the test with `freshCoin` from `@midnight-ntwrk/mnkit-coins`: the jar's color, the
+made up by the test with `freshCoin` from `@midnightntwrk/mnkit-coins`: the jar's color, the
 tip's value, and a random nonce. It is not a coin from Bob's wallet. His wallet pays for it while
 it balances the `tip` transaction, spending the minted coin and taking the change back under a new
 nonce. So Bob needs no coin of the exact value first, and Alice, who knows the minted coin's

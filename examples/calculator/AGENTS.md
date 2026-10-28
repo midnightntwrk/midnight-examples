@@ -16,7 +16,7 @@
 - `contract/calculator.compact` (committed), `contract/index.ts`,
   `contract/witnesses.ts` (implements the `divMod` witness).
 - `src/` harness. `src/test/calculator.sim.test.ts`: the reference in-memory
-  test (`@midnight-ntwrk/mnkit-sim`): every circuit, a lying `divMod`
+  test (`@midnightntwrk/mnkit-sim`): every circuit, a lying `divMod`
   witness, overflow rejections; `npm run compile:fast && npm run test:sim`, no
   Docker. `src/test/calculator.test.ts`: the same circuits on the devnet.
 

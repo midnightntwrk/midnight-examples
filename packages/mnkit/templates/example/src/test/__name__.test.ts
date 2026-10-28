@@ -23,7 +23,7 @@ import {
 } from '@midnight-ntwrk/midnight-js-contracts';
 import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust } from '@midnight-ntwrk/mnkit-wallet';
+import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
@@ -42,7 +42,7 @@ import {
 // second contract mints them. See packages/coins/src/index.ts.
 // @endif
 // @if standalone
-// second contract mints them. See @midnight-ntwrk/mnkit-coins and its README.
+// second contract mints them. See @midnightntwrk/mnkit-coins and its README.
 // @endif
 // @generated-stub begin coin-imports sha=0
 // @generated-stub end coin-imports

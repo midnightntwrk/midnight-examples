@@ -18,7 +18,7 @@
 // network (compose.yml), config and providers, an in-memory and a devnet test
 // with @generated-stub regions, SPEC.md and AGENTS.md. Then `npm install`.
 //
-// The runtime packages (@midnight-ntwrk/mnkit-*) and mnkit itself are pinned
+// The runtime packages (@midnightntwrk/mnkit-*) and mnkit itself are pinned
 // to this mnkit's version. MNKIT_LOCAL_PACKAGES=<dir> pins them to the
 // tarballs `npm pack` left in <dir> instead, for testing before a release.
 

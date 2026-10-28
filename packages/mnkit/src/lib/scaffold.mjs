@@ -55,7 +55,14 @@ export const KNOWN_TOKENS = [
 export const MODES = ['monorepo', 'standalone'];
 
 /** The runtime packages a project depends on, versioned with mnkit. */
-export const RUNTIME_PACKAGES = ['@midnight-ntwrk/mnkit-coins', '@midnight-ntwrk/mnkit-sim', '@midnight-ntwrk/mnkit-wallet'];
+export const RUNTIME_PACKAGES = ['@midnightntwrk/mnkit-coins', '@midnightntwrk/mnkit-sim', '@midnightntwrk/mnkit-wallet'];
+
+/** Runtime packages' earlier names → their names now (mnkit upgrade moves a project's dependencies and imports). */
+export const RENAMED_PACKAGES = {
+  '@midnight-ntwrk/mnkit-coins': '@midnightntwrk/mnkit-coins',
+  '@midnight-ntwrk/mnkit-sim': '@midnightntwrk/mnkit-sim',
+  '@midnight-ntwrk/mnkit-wallet': '@midnightntwrk/mnkit-wallet',
+};
 
 /**
  * Template files only one mode gets: `skip` in the other mode; in standalone,

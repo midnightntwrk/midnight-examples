@@ -18,14 +18,14 @@
 //   npm run fund:wallet <mn_dust_undeployed1...> [mn_addr_undeployed1...]
 //
 // The UI's "no DUST" hint prints this command with the wallet's addresses.
-// fundWallet (@midnight-ntwrk/mnkit-wallet) has the genesis wallet register
+// fundWallet (@midnightntwrk/mnkit-wallet) has the genesis wallet register
 // NIGHT for DUST generation with the browser wallet as the receiver, and with
 // the mn_addr_… address also sends it 1,000 NIGHT. Safe to rerun.
 
 import pino from 'pino';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { fundWallet } from '@midnight-ntwrk/mnkit-wallet';
+import { fundWallet } from '@midnightntwrk/mnkit-wallet';
 import { getConfig } from '../src/config.js';
 
 const logger = pino({

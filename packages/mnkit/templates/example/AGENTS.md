@@ -77,7 +77,7 @@ indexer's lag, the proof server's version and, on preprod, the Blockfrost key.
   regions nobody has edited (new circuits, constructor parameters, witnesses,
   the initial private state in both tests and in `contract/deploy-args.ts`)
   and leaves the rest alone.
-- Shielded coins in tests come from `@midnight-ntwrk/mnkit-coins`. A
+- Shielded coins in tests come from `@midnightntwrk/mnkit-coins`. A
   `ShieldedCoinInfo` argument (a tip, a bet, a deposit: anything the circuit
   `receiveShielded`s) is a new coin the
   transaction creates, not one of the wallet's coins. Pass
@@ -104,7 +104,7 @@ indexer's lag, the proof server's version and, on preprod, the Blockfrost key.
   contract (`keyof ImpureCircuits`), so it never needs editing when circuits
   change.
 - Remote-network wiring is shared, not copied. `MidnightWalletProvider` (with
-  `syncWallet`) comes from `@midnight-ntwrk/mnkit-wallet`; its `build` takes an
+  `syncWallet`) comes from `@midnightntwrk/mnkit-wallet`; its `build` takes an
   optional `{ fastSync }`, and the test resolves its wallet with
   `resolveWallet(network, role)` from the same package. Do not
   write a per-example seed resolver; the shared one knows every suite's role

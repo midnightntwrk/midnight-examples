@@ -19,7 +19,7 @@
 // jar's private state (.mnkit/private-state/<network>).
 
 import { randomBytes } from 'node:crypto';
-import { tokenColor } from '@midnight-ntwrk/mnkit-coins';
+import { tokenColor } from '@midnightntwrk/mnkit-coins';
 import { deployable, type Deployable, type DeployContext } from '../src/deployments.js';
 import {
   CompiledPrivateTipJarContract,

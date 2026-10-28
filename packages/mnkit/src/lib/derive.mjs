@@ -155,7 +155,7 @@ const signature = (c) => `${c.name}(${c.arguments.map((a) => `${a.name}: ${descr
  * coin helpers, `coinsPackage`. Throws on anything that stops it; returns a
  * report of what it did.
  */
-export function derive(exampleDir, name, names, { coinsPackage = '@midnight-ntwrk/mnkit-coins' } = {}) {
+export function derive(exampleDir, name, names, { coinsPackage = '@midnightntwrk/mnkit-coins' } = {}) {
   const compiled = listCompiled(exampleDir);
   if (compiled.length === 0) {
     throw new Error('no compiled contract under contract/managed/. Run the compile:fast script first.');

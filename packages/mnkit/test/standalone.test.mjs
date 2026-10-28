@@ -125,7 +125,7 @@ describe('renderExample in standalone mode', () => {
     expect(files['.gitignore']).toBeUndefined();
     expect(files['mnkit.json']).toBeUndefined();
     expect(JSON.parse(files['tsconfig.json']).extends).toBe('../../tsconfig.base.json');
-    expect(JSON.parse(files['package.json']).dependencies['@midnight-ntwrk/mnkit-sim']).toBe('*');
+    expect(JSON.parse(files['package.json']).dependencies['@midnightntwrk/mnkit-sim']).toBe('*');
   });
 });
 
@@ -143,12 +143,12 @@ describe('the standalone tsconfig', () => {
 describe('packageSpecs', () => {
   it('points at local tarballs when asked, and says which one is missing', () => {
     const dir = tmpDir();
-    for (const f of ['midnight-ntwrk-mnkit-coins-0.1.0.tgz', 'midnight-ntwrk-mnkit-sim-0.1.0.tgz', 'midnight-ntwrk-mnkit-wallet-0.1.0.tgz']) {
+    for (const f of ['midnightntwrk-mnkit-coins-0.1.0.tgz', 'midnightntwrk-mnkit-sim-0.1.0.tgz', 'midnightntwrk-mnkit-wallet-0.1.0.tgz']) {
       fs.writeFileSync(path.join(dir, f), '');
     }
     expect(() => packageSpecs('0.1.0', dir)).toThrow(/mnkit-0\.1\.0\.tgz not found/);
     fs.writeFileSync(path.join(dir, 'mnkit-0.1.0.tgz'), '');
-    expect(packageSpecs('0.1.0', dir)['@midnight-ntwrk/mnkit-sim']).toBe(`file:${path.join(dir, 'midnight-ntwrk-mnkit-sim-0.1.0.tgz')}`);
+    expect(packageSpecs('0.1.0', dir)['@midnightntwrk/mnkit-sim']).toBe(`file:${path.join(dir, 'midnightntwrk-mnkit-sim-0.1.0.tgz')}`);
   });
 });
 

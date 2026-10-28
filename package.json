@@ -19,8 +19,8 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "node scripts/each-workspace.mjs build --include \"@midnight-ntwrk/mnkit-*\"",
-    "build:packages": "node scripts/each-workspace.mjs build --include \"@midnight-ntwrk/mnkit-*\"",
+    "postinstall": "node scripts/each-workspace.mjs build --include \"@midnightntwrk/mnkit-*\"",
+    "build:packages": "node scripts/each-workspace.mjs build --include \"@midnightntwrk/mnkit-*\"",
     "new:example": "node scripts/new-example.mjs",
     "new:ui": "node scripts/new-ui.mjs",
     "spec:lint": "node scripts/spec-lint.mjs",
@@ -28,9 +28,9 @@
     "test:engine": "npm test -w mnkit --",
     "fixtures:regen": "node packages/mnkit/test/fixtures/regen.mjs",
     "pipeline": "node scripts/pipeline.mjs",
-    "wallets:new": "npm run wallets:new -w @midnight-ntwrk/mnkit-wallet --",
-    "preseed:cut": "npm run preseed:cut -w @midnight-ntwrk/mnkit-wallet --",
-    "fund:wallet": "npm run fund:wallet -w @midnight-ntwrk/mnkit-wallet --",
+    "wallets:new": "npm run wallets:new -w @midnightntwrk/mnkit-wallet --",
+    "preseed:cut": "npm run preseed:cut -w @midnightntwrk/mnkit-wallet --",
+    "fund:wallet": "npm run fund:wallet -w @midnightntwrk/mnkit-wallet --",
     "compile": "node scripts/each-workspace.mjs compile",
     "compile:fast": "node scripts/each-workspace.mjs compile:fast",
     "typecheck": "node scripts/each-workspace.mjs typecheck",

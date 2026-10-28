@@ -19,7 +19,7 @@ import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-p
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
 import { levelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider';
-import { type MidnightWalletProvider } from '@midnight-ntwrk/mnkit-wallet';
+import { type MidnightWalletProvider } from '@midnightntwrk/mnkit-wallet';
 import { type NetworkConfig } from './config.js';
 import { type ImpureCircuits } from '../contract/index.js';
 

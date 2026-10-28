@@ -1,5 +1,5 @@
 {
-  "name": "@midnight-ntwrk/mnkit-sim",
+  "name": "@midnightntwrk/mnkit-sim",
   "version": "0.2.0-rc.1",
   "type": "module",
   "description": "In-memory contract harness for Midnight tests: deploy and call a compiled Compact contract without a network, expect rejections, and check that no secret reaches public state. Part of mnkit.",

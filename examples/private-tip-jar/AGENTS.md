@@ -11,7 +11,7 @@
 - **The coin argument is a new coin, not a wallet coin.** `receiveShielded`
   creates a Zswap output to the contract. The tipper's wallet balances the
   transaction from whichever of its coins it selects and makes change. So the
-  client passes `freshCoin(color, amount)` from `@midnight-ntwrk/mnkit-coins`,
+  client passes `freshCoin(color, amount)` from `@midnightntwrk/mnkit-coins`,
   a coin with a fresh random nonce. That nonce is in no commitment but the contract's own, so
   publishing it links to nobody, and any amount works without a split first.
   There is no re-nonce to `kernel.self()`: that only repairs a client that
@@ -96,7 +96,7 @@ is exactly `owner`, `tipColor` and `pot`.
 - `SPEC.md`: the design card (the worked example for `packages/mnkit/templates/example/SPEC.md`).
 - `src/test/private-tip-jar.sim.test.ts`: the same guards, flow and privacy
   invariants in memory (`npm run compile:fast && npm run test:sim`, under a second),
-  using `@midnight-ntwrk/mnkit-sim`'s `assertNotInPublicState`.
+  using `@midnightntwrk/mnkit-sim`'s `assertNotInPublicState`.
 - `src/test/private-tip-jar.test.ts`: Alice (owner, token minter) and Bob
   (tipper). Covers mint, deploy, two fresh-nonce tips paid from one minted
   coin, the privacy test, a negative test for every guard (wrong color, zero
@@ -127,7 +127,7 @@ npm run env:down
   seed files. See `packages/mnkit/templates/ui/AGENTS.md`.
 
 - A tip is the coin passed to `tip`, built fresh with `freshCoin(color, amount)`
-  (`@midnight-ntwrk/mnkit-coins`; the sim tests use its `simCoin`).
+  (`@midnightntwrk/mnkit-coins`; the sim tests use its `simCoin`).
   Never pass a coin from `availableCoins`: its nonce is shared with your
   wallet coin. The wallet pays for the tip and makes change, so no split or
   exact-value coin is needed. `splitShieldedCoin` in `src/wallet.ts` is
@@ -144,6 +144,6 @@ npm run env:down
   change.
 - Remote-network wiring is shared, not copied. `src/wallet.ts` takes an optional
   `{ fastSync }` and the test resolves its wallet with
-  `resolveWallet(network, role)` from `@midnight-ntwrk/mnkit-wallet`. Do not
+  `resolveWallet(network, role)` from `@midnightntwrk/mnkit-wallet`. Do not
   write a per-example seed resolver; the shared one knows every suite's role
   names and reads the repo-root `.env.<network>`. See `FAST-SYNC.md`.

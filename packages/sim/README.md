@@ -1,4 +1,4 @@
-# @midnight-ntwrk/mnkit-sim
+# @midnightntwrk/mnkit-sim
 
 An in-memory harness for testing a compiled Compact contract: deploy it and
 call its circuits with `@midnight-ntwrk/midnight-js-protocol`'s compact
@@ -7,7 +7,7 @@ runtime, with no network and no proofs. Part of
 `src/test/*.sim.test.ts`.
 
 ```ts
-import { Sim, assertNotInPublicState, expectRejects } from '@midnight-ntwrk/mnkit-sim';
+import { Sim, assertNotInPublicState, expectRejects } from '@midnightntwrk/mnkit-sim';
 import { Contract, ledger } from '../../contract/managed/calculator/contract/index.js';
 import { createCalculatorPrivateState, witnesses } from '../../contract/witnesses.js';
 

@@ -1,6 +1,6 @@
 name: Release mnkit
 
-# Publishes mnkit and its runtime packages (@midnight-ntwrk/mnkit-sim,
+# Publishes mnkit and its runtime packages (@midnightntwrk/mnkit-sim,
 # -coins, -wallet) to npm when a GitHub release tagged mnkit-v<version> is
 # published, then smoke-tests the published packages the way a user gets
 # them: `npx mnkit@<version> init`, compile, derive, test:sim and validate on
@@ -175,7 +175,7 @@ jobs:
           PKGS: ${{ runner.temp }}/pkgs
         run: |
           set -euo pipefail
-          for name in @midnight-ntwrk/mnkit-sim @midnight-ntwrk/mnkit-coins @midnight-ntwrk/mnkit-wallet mnkit; do
+          for name in @midnightntwrk/mnkit-sim @midnightntwrk/mnkit-coins @midnightntwrk/mnkit-wallet mnkit; do
             if [ -n "$(npm view "$name@$VERSION" version 2>/dev/null || true)" ]; then
               echo "::notice::$name@$VERSION is already on npm, skipping it"
               continue
@@ -216,7 +216,7 @@ jobs:
           VERSION: ${{ needs.publish.outputs.version }}
         run: |
           for i in $(seq 1 30); do
-            npm view "mnkit@$VERSION" version && npm view "@midnight-ntwrk/mnkit-wallet@$VERSION" version && exit 0
+            npm view "mnkit@$VERSION" version && npm view "@midnightntwrk/mnkit-wallet@$VERSION" version && exit 0
             sleep 10
           done
           echo "::error::mnkit@$VERSION is not on npm after 5 minutes"

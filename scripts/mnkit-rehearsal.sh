@@ -25,11 +25,11 @@
 # Every other package is proxied from registry.npmjs.org.
 #
 # Your npm config is neither read nor written: npm uses user and global
-# config files in the work dir, which set the registry, the @midnight-ntwrk
-# scope registry and the publish token (a dummy, Verdaccio accepts anonymous
-# publishes here). npm takes a scoped package's registry from a scope line
-# before --registry, so a `@midnight-ntwrk:registry` line in ~/.npmrc would
-# otherwise send the publishes to the real npm. The npm cache is a fresh one
+# config files in the work dir, which set the registry, the @midnightntwrk
+# and @midnight-ntwrk scope registries and the publish token (a dummy,
+# Verdaccio accepts anonymous publishes here). npm takes a scoped package's
+# registry from a scope line before --registry, so a `@midnightntwrk:registry`
+# line in ~/.npmrc would otherwise send the publishes to the real npm. The npm cache is a fresh one
 # in the work dir too, so no rehearsal tarball lands in your own cache.
 # Verdaccio is stopped on exit. MNKIT_E2E_DIR picks the work dir (default: a
 # temp dir).
@@ -58,7 +58,7 @@ packages:
   'mnkit':
     access: \$all
     publish: \$anonymous
-  '@midnight-ntwrk/mnkit-*':
+  '@midnightntwrk/mnkit-*':
     access: \$all
     publish: \$anonymous
   '**':
@@ -69,6 +69,7 @@ EOF
 
 cat > "$WORK/npmrc" <<EOF
 registry=$REGISTRY
+@midnightntwrk:registry=$REGISTRY
 @midnight-ntwrk:registry=$REGISTRY
 //localhost:$PORT/:_authToken=rehearsal
 EOF
@@ -106,7 +107,7 @@ for lock in "$WORK"/*/package-lock.json; do
   node -e '
     const lock = require(process.argv[1]);
     for (const [k, v] of Object.entries(lock.packages)) {
-      if (/node_modules\/(mnkit|@midnight-ntwrk\/mnkit-[a-z]+)$/.test(k)) console.log(`  ${k.replace(/.*node_modules\//, "")}@${v.version}  ${v.resolved}`);
+      if (/node_modules\/(mnkit|@midnightntwrk\/mnkit-[a-z]+)$/.test(k)) console.log(`  ${k.replace(/.*node_modules\//, "")}@${v.version}  ${v.resolved}`);
     }' "$lock"
 done
 echo "✔ rehearsal passed: mnkit@$VERSION installs and works from a registry"

@@ -33,7 +33,7 @@ import {
   MidnightWalletProvider,
   syncWallet,
 } from '../wallet.js';
-import { resolveWallet, waitForNightThenDust } from '@midnight-ntwrk/mnkit-wallet';
+import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import { buildProviders, type SecretMessageProviders } from '../providers.js';
 import {
   createSecretMessagePrivateState,

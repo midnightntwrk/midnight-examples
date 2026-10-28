@@ -137,7 +137,7 @@ change and exits 1 if the project is behind, for CI. Every mnkit command exits
 | `contract/<name>.compact` | Your contract. Add more `.compact` files beside it (a test token, say) and they compile too |
 | `contract/index.ts` | The compiled contract(s), ready for `deployContract` |
 | `contract/witnesses.ts` | With `--witnesses`: your witness implementations and private state |
-| `src/test/<name>.sim.test.ts` | In-memory tests with `@midnight-ntwrk/mnkit-sim`: logic, guards, privacy invariants |
+| `src/test/<name>.sim.test.ts` | In-memory tests with `@midnightntwrk/mnkit-sim`: logic, guards, privacy invariants |
 | `src/test/<name>.test.ts` | The devnet suite: deploy and call on a real network |
 | `src/config.ts`, `src/providers.ts` | Network config (local, preview, preprod) and the midnight-js providers |
 | `contract/deploy-args.ts` | What `mnkit deploy` deploys: constructor arguments and initial private state, per contract |
@@ -149,7 +149,7 @@ change and exits 1 if the project is behind, for CI. Every mnkit command exits
 | `ui/` | With `mnkit add ui`: the browser UI |
 
 The wallet provider, the in-memory harness and the coin helpers are libraries
-(`@midnight-ntwrk/mnkit-wallet`, `mnkit-sim`, `mnkit-coins`), not copied code,
+(`@midnightntwrk/mnkit-wallet`, `mnkit-sim`, `mnkit-coins`), not copied code,
 so fixes reach your project with `npm update`.
 
 ## Commands

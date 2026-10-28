@@ -4,7 +4,7 @@
 // covers the same circuits end to end.
 
 import { describe, expect, it } from 'vitest';
-import { Sim, expectRejects } from '@midnight-ntwrk/mnkit-sim';
+import { Sim, expectRejects } from '@midnightntwrk/mnkit-sim';
 import { Contract, ledger } from '../../contract/managed/calculator/contract/index.js';
 import { createCalculatorPrivateState, witnesses } from '../../contract/witnesses.js';
 

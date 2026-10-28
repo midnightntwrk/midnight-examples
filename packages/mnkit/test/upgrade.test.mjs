@@ -110,7 +110,7 @@ describe('mnkit upgrade', () => {
     expect(root.changes).toEqual(
       expect.arrayContaining([
         'dependencies: @midnight-ntwrk/midnight-js-contracts 4.1.0 → 4.1.1',
-        `dependencies: @midnight-ntwrk/mnkit-wallet ^0.0.9 → ^${VERSION}`,
+        `dependencies: @midnightntwrk/mnkit-wallet ^0.0.9 → ^${VERSION}`,
         `devDependencies: mnkit ^0.0.9 → ^${VERSION}`,
         'devDependencies: vitest ^5.0.0 → ^5.0.4',
         'overrides: vite-plugin-top-level-await → {"@swc/core":"1.15.47","uuid":"11.1.1"}',
@@ -362,6 +362,35 @@ describe('mnkit upgrade', () => {
     expect(hasChanges(behind)).toBe(true);
   });
 
+  it('moves the runtime packages from their @midnight-ntwrk names, in package.json and in your imports', () => {
+    // As an mnkit from before the rename scaffolded it: every file with the old names, and mnkit.json's hashes of them.
+    const dir = currentProject();
+    const old = (text) => text.replaceAll('@midnightntwrk/mnkit-', '@midnight-ntwrk/mnkit-');
+    const manifest = manifestOf(dir);
+    for (const rel of [...Object.keys(manifest.files), 'package.json', 'src/test/hello-world.test.ts']) {
+      const text = read(dir, rel);
+      if (old(text) === text) continue;
+      write(dir, rel, old(text));
+      if (rel in manifest.files) manifest.files[rel] = fileHash(old(text));
+    }
+    manifest.packageBase['package.json'] = JSON.parse(old(JSON.stringify(manifest.packageBase['package.json'])));
+    write(dir, 'mnkit.json', `${JSON.stringify(manifest, null, 2)}\n`);
+    write(dir, 'src/mine.ts', "import { syncWallet } from '@midnight-ntwrk/mnkit-wallet';\nexport { syncWallet };\n");
+
+    const plan = planUpgrade(dir, { tc, version: VERSION });
+    expect(kinds(plan)).toMatchObject({ 'src/providers.ts': 'update', 'src/test/hello-world.test.ts': 'rename', 'src/mine.ts': 'rename' });
+    expect(plan.packages[0].changes).toEqual(
+      expect.arrayContaining(['dependencies: @midnight-ntwrk/mnkit-wallet → @midnightntwrk/mnkit-wallet']),
+    );
+    applyUpgrade(dir, plan);
+    const pkg = JSON.parse(read(dir, 'package.json'));
+    expect(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter((d) => d.includes('midnight-ntwrk/mnkit-'))).toEqual([]);
+    expect(pkg.dependencies['@midnightntwrk/mnkit-wallet']).toBeDefined();
+    expect(read(dir, 'src/mine.ts')).toContain("from '@midnightntwrk/mnkit-wallet'");
+    expect(read(dir, 'src/test/hello-world.test.ts')).not.toContain('@midnight-ntwrk/mnkit-');
+    expect(hasChanges(planUpgrade(dir, { tc, version: VERSION }))).toBe(false);
+  });
+
   it('refuses outside a project', () => {
     expect(() => planUpgrade(tmpDir(), { tc })).toThrow(/one with a mnkit.json/);
   });
@@ -442,6 +471,19 @@ describe('mergePackageJson', () => {
     const base = { dependencies: { pino: '^9.0.0' } };
     expect(merge({}, base, base)).toMatchObject({ changes: [], notes: [] });
     expect(merge({}, { dependencies: { pino: '^9.1.0' } }, base).notes).toEqual([expect.stringMatching(/^pino: you removed it/)]);
+  });
+
+  it('moves a runtime package from its earlier name to its name now, in the field it is in', () => {
+    const base = { dependencies: { '@midnight-ntwrk/mnkit-wallet': '^0.1.0' }, devDependencies: { '@midnight-ntwrk/mnkit-sim': '^0.1.0' } };
+    const next = { dependencies: { '@midnightntwrk/mnkit-wallet': `^${VERSION}` }, devDependencies: { '@midnightntwrk/mnkit-sim': `^${VERSION}` } };
+    const r = merge(base, next, base);
+    expect(r.pkg).toEqual(next);
+    expect(r.changes).toEqual(
+      expect.arrayContaining([
+        'dependencies: @midnight-ntwrk/mnkit-wallet → @midnightntwrk/mnkit-wallet',
+        'devDependencies: @midnight-ntwrk/mnkit-sim → @midnightntwrk/mnkit-sim',
+      ]),
+    );
   });
 
   it('takes a template change to a script you left alone', () => {

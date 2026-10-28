@@ -29,12 +29,12 @@ import {
 } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/ledger';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { freshCoin } from '@midnight-ntwrk/mnkit-coins';
-import { resolveWallet, waitForNightThenDust } from '@midnight-ntwrk/mnkit-wallet';
+import { freshCoin } from '@midnightntwrk/mnkit-coins';
+import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
-import { MidnightWalletProvider, syncWallet } from '@midnight-ntwrk/mnkit-wallet';
+import { MidnightWalletProvider, syncWallet } from '@midnightntwrk/mnkit-wallet';
 import { buildProviders, type PrivateTipJarProviders } from '../providers.js';
 import { createPrivateTipJarPrivateState } from '../../contract/witnesses.js';
 import {
