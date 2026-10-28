@@ -29,8 +29,8 @@ npm run dev -w @midnight-ntwrk/example-__name__-ui           # http://localhost:
 ```
 
 On the local devnet, give your browser wallet DUST (and NIGHT) with
-`npm run fund:wallet <mn_dust_…> [mn_addr_…]`, run from anywhere in the repo. The
-page prints the exact command when the connected wallet has no DUST.
+`npm run fund:wallet <mn_dust_…> [mn_addr_…]`, run from the repo root (npm runs
+only the current workspace's scripts). The page prints the exact command when the connected wallet has no DUST.
 
 <!-- @endif -->
 <!-- @if standalone -->
@@ -43,8 +43,8 @@ npm run dev --workspace ui           # http://localhost:5173
 ```
 
 On the local devnet, give your browser wallet DUST (and NIGHT) with
-`npm run fund:wallet <mn_dust_…> [mn_addr_…]`, run in the project. The page
-prints the exact command when the connected wallet has no DUST.
+`npm run fund:wallet <mn_dust_…> [mn_addr_…]`, run from the project root (not
+`ui/`). The page prints the exact command when the connected wallet has no DUST.
 
 <!-- @endif -->
 ## Scripts

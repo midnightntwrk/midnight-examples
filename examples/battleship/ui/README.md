@@ -82,7 +82,7 @@ npm run dev -w @midnight-ntwrk/example-battleship-ui           # http://localhos
 ```
 
 On the local devnet, give **each** browser wallet DUST with
-`npm run fund:wallet <mn_dust_…> [mn_addr_…]`, from anywhere in the repo. The UI shows the
+`npm run fund:wallet <mn_dust_…> [mn_addr_…]`, from the repo root. The UI shows the
 exact command when the connected wallet has none.
 
 ### Mainnet

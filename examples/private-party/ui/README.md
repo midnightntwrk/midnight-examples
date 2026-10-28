@@ -73,7 +73,7 @@ npm run dev -w @midnight-ntwrk/example-private-party-ui           # http://local
 ```
 
 On the local devnet, give your browser wallet DUST (and NIGHT) with
-`npm run fund:wallet <mn_dust_…> [mn_addr_…]`, run from anywhere in the repo. The
+`npm run fund:wallet <mn_dust_…> [mn_addr_…]`, run from the repo root. The
 page prints the exact command when the connected wallet has no DUST.
 
 ### Mainnet

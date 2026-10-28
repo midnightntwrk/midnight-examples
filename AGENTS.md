@@ -59,7 +59,7 @@ truth over your own recollection of Midnight/Compact APIs.
 ```bash
 nvm use                  # Node 22 (.nvmrc). Shells often default to 20, which the
                          # generators and UI dev/build refuse to run on
-npm install -g npm@11                   # npm 11.10+ (Node 22 bundles npm 10): the lockfile and .npmrc's age gate need it
+npm install -g npm@11                   # npm 11.10+ (Node 22 bundles npm 10, which ignores .npmrc's age gate and rewrites the lockfile)
 npm install                             # whole-workspace install (one lockfile)
 npm run compile                         # compile all contracts (foreach, parallel)
 npm run compile:fast                    # same with --skip-zk: no proving keys, seconds (enough for typecheck and test:sim)

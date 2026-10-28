@@ -152,7 +152,7 @@ function NoDustWarning({ cap, networkId }: { cap: bigint; networkId: string | nu
       {cap === 0n && networkId === "undeployed" && dustAddress && (
         <>
           <p className="text-muted-foreground">
-            On the local devnet, run this anywhere in the repo to have DUST generated for this
+            On the local devnet, run this from the repo root to have DUST generated for this
             wallet{nightAddress && " and 1,000 NIGHT sent to it"}:
           </p>
           <code className="break-all rounded bg-muted px-2 py-1 text-xs">

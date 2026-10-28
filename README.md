@@ -82,9 +82,11 @@ version changes happen in a coordinated pass. The pins live in
 ## Prerequisites
 
 - **Node.js 22** (`nvm use`).
-- **npm 11.10 or newer.** Node 22 bundles npm 10, which can't install this
-  lockfile and ignores the 7-day release-age gate in `.npmrc`:
-  `npm install -g npm@11`. (`package.json` `devEngines` warns on an older npm.)
+- **npm 11.10 or newer.** Node 22 bundles npm 10. It can `npm ci` this
+  lockfile, but it silently ignores the 7-day release-age gate in `.npmrc`,
+  and its `npm install` strips the lockfile's `libc` entries:
+  `npm install -g npm@11`. (`package.json` `devEngines` warns on an older npm,
+  and the repo scripts that write the lockfile refuse one.)
 - **Docker** (the examples spin up a local Midnight network via `docker compose`).
 - **Compact compiler** on `PATH` (`compact`); CI installs it via `setup-compact-action`.
 

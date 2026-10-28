@@ -159,10 +159,10 @@ function NoDustWarning({ cap, networkId }: { cap: bigint; networkId: string | nu
         <>
           <p className="text-muted-foreground">
             {/* @if monorepo */}
-            On the local devnet, run this anywhere in the repo to have DUST generated for this
+            On the local devnet, run this from the repo root to have DUST generated for this
             {/* @endif */}
             {/* @if standalone */}
-            On the local devnet, run this in the project to have DUST generated for this
+            On the local devnet, run this from the project root to have DUST generated for this
             {/* @endif */}
             wallet{nightAddress && " and 1,000 NIGHT sent to it"}:
           </p>

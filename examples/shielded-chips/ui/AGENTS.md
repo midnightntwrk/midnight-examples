@@ -403,8 +403,8 @@ no "register for DUST" button (Lace, for one, has none), and the local devnet
 has no faucet.
 
 The root script `npm run fund:wallet <mn_dust_…> [mn_addr_…]` solves this
-without any wallet action. It runs from anywhere in the repo, for any
-generated UI. The source is `packages/fast-sync/scripts/fund-wallet.ts`, with
+without any wallet action. Run it from the repo root (inside a workspace, npm
+finds only that workspace's scripts); it works for any generated UI. The source is `packages/fast-sync/scripts/fund-wallet.ts`, with
 `transferNight` / `registerNightForDust` in `packages/fast-sync/src/local-funding.ts`.
 1. Genesis (Alice) sends NIGHT to a throwaway sponsor wallet. There is one
    sponsor per browser wallet, derived from its DUST address.
