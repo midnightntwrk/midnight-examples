@@ -187,9 +187,9 @@ renders the same template as a plain npm project. Its runtime libraries are
 
 - `npm run test:engine`: the engine's unit tests, over committed compiler output
   (`npm run fixtures:regen -- --check` keeps it current).
-- `scripts/mnkit-e2e.sh [--devnet]`: packs the four packages and runs the packed
+- `bash scripts/mnkit-e2e.sh [--devnet]`: packs the four packages and runs the packed
   CLI in a directory outside the repo, the way a user gets it (CI: `mnkit-e2e`).
-- `scripts/mnkit-rehearsal.sh`: publishes them to a throwaway local registry and
+- `bash scripts/mnkit-rehearsal.sh`: publishes them to a throwaway local registry and
   tests `npx mnkit@<version>` from it, before a real release.
 - Releases: `.github/workflows/release-mnkit.yml`, on a GitHub release tagged
   `mnkit-v<version>` from a commit on `main`. The publish waits for approval in

@@ -101,8 +101,9 @@ placeholders from the contract, and a constructor that needs another contract's
 address can read it from `ctx.deployments`. Deploy that contract first.
 
 The address and transaction go into `deployments/<network>.json`. Commit
-`preview.json` and `preprod.json`, so others (and the UI's Join) can find the
-contract; `local.json` is gitignored. A proof server must be running on every
+`preview.json` and `preprod.json`, so teammates and scripts can find the
+contract (the UI doesn't read them: paste the address into its Join);
+`local.json` is gitignored. A proof server must be running on every
 network (`npm run proof:up`).
 
 Off local, the deploy uses the wallet in `.env.<network>`, as `test:preprod`
