@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## mnkit 0.2.0 (unreleased)
+## mnkit 0.2.0
 
-The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-wallet`, `@midnightntwrk/mnkit-sim` and `@midnightntwrk/mnkit-coins`. All four share one version. `0.2.0-rc.1` goes to the `next` dist-tag first.
+The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-wallet`, `@midnightntwrk/mnkit-sim` and `@midnightntwrk/mnkit-coins`. All four share one version, published with npm provenance. `0.2.0-rc.1` was the release candidate, on the `next` dist-tag.
 
 ### Added
 
