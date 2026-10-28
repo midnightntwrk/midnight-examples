@@ -71,6 +71,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { listCompiled } from '../packages/mnkit/src/lib/contract-info.mjs';
 import { fixPlanMarkdown, triage } from './lib/devnet-triage.mjs';
+import { lockfileNpmProblem, npmCommand } from './lib/npm.mjs';
 import {
   compileIsStale,
   contractInfos,
@@ -166,8 +167,10 @@ function log(entry) {
 /** Run a command to completion, capturing its output. */
 function run(id, cmd, args, cwd = DIR) {
   if (!opts.json) console.log(`▶ ${id}: ${[cmd, ...args].join(' ')}`);
+  // `npm` is the npm that runs this script (see scripts/lib/npm.mjs).
+  const [file, argv] = cmd === 'npm' ? npmCommand(args) : [cmd, args];
   const t0 = Date.now();
-  const r = spawnSync(cmd, args, {
+  const r = spawnSync(file, argv, {
     cwd,
     encoding: 'utf8',
     maxBuffer: 256 * 1024 * 1024,
@@ -498,6 +501,10 @@ const seedFiles = [
   `src/__tests__/${name}-circuits.test.ts`,
 ].map((f) => path.join(UI_DIR, f));
 if (opts.ui && !fs.existsSync(UI_DIR)) {
+  // Check before new:ui writes ui/: a rerun skips this block once ui/ exists, so
+  // a refused `npm install` below would never be retried.
+  const tooOld = lockfileNpmProblem(REPO_ROOT);
+  if (tooOld) stop({ kind: 'infra', step: '5', reason: tooOld, run: [`npx npm@11 run pipeline ${name}`] });
   // Several compiled contracts (a test-only faucet beside the jar): the UI is
   // for the one named after the example, as --derive assumes.
   const contractArg = listCompiled(DIR).length > 1 && listCompiled(DIR).includes(name) ? ['--contract', name] : [];

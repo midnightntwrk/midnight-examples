@@ -50,6 +50,7 @@ import { fileURLToPath } from 'node:url';
 import { NAME_RE, assertNodeVersion, exitOnError, fail, writeFiles } from '../packages/mnkit/src/lib/template.mjs';
 import { gatePath, readJson, sourceHash } from '../packages/mnkit/src/lib/gates.mjs';
 import { SEED_FILES, UI_TEMPLATE_DIR, planUi, uiDetails, uiWarnings } from '../packages/mnkit/src/lib/ui.mjs';
+import { assertLockfileNpm, npmCommand } from './lib/npm.mjs';
 import { readAll, renderBlock, skeleton, VERIFICATION_FILE, withBlock } from './lib/verification.mjs';
 
 exitOnError();
@@ -120,11 +121,9 @@ function runAll(each) {
   const failed = names.filter(
     (n) => spawnSync(process.execPath, [script, n, `--${each}`], { stdio: 'inherit' }).status !== 0,
   );
-  // No `shell:` option (opengrep flags any non-false value). Windows can only
-  // run npm.cmd through cmd.exe, so call it explicitly; the args are literals.
+  // The npm that runs this script, not PATH's (see scripts/lib/npm.mjs); the args are literals.
   const npm = (args) => {
-    const [cmd, argv] =
-      process.platform === 'win32' ? ['cmd.exe', ['/d', '/s', '/c', 'npm', ...args]] : ['npm', args];
+    const [cmd, argv] = npmCommand(args);
     return spawnSync(cmd, argv, { cwd: REPO_ROOT, stdio: 'inherit' }).status === 0;
   };
   if (each === 'check') {
@@ -141,6 +140,7 @@ function runAll(each) {
   const changed = names.filter((n) => pkgJson(n) !== before[n]);
   if (changed.length) {
     console.log(`\n  package.json changed in ${changed.join(', ')}: running npm install`);
+    assertLockfileNpm(REPO_ROOT);
     if (!npm(['install'])) return 1;
     console.log('  Commit the updated package-lock.json; CI installs with npm ci.');
   }
