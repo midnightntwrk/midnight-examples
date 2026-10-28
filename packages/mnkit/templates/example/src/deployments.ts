@@ -16,8 +16,10 @@
 // The deploy records `scripts/deploy.ts` writes, one file per network
 // (deployments/<network>.json), and the types contract/deploy-args.ts uses to
 // say what to deploy. Commit deployments/preview.json and preprod.json: they
-// are how the team, the UI's Join and later scripts find a contract.
-// deployments/local.json is ignored, because the local devnet starts empty.
+// are how the team and later scripts find a contract (the UI's Join takes a
+// pasted address). deployments/local.json is ignored, because the local devnet
+// starts empty. Deploying a contract again keeps the old record under
+// `previous`.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,6 +43,8 @@ export type DeploymentRecord = {
   /** The private state's id in .mnkit/private-state/<network>, when it has one. */
   privateStateId?: string;
   deployedAt: string;
+  /** Earlier deploys of this contract on this network, newest first. */
+  previous?: Omit<DeploymentRecord, 'previous'>[];
 };
 
 export type DeploymentsFile = {
@@ -80,15 +84,30 @@ export function readDeployments(network: string): DeploymentsFile | null {
   return fs.existsSync(file) ? (JSON.parse(fs.readFileSync(file, 'utf8')) as DeploymentsFile) : null;
 }
 
-/** Adds or replaces contract `name` in deployments/<network>.json and returns the file's path. */
-export function writeDeployment(network: string, networkId: string, name: string, record: DeploymentRecord): string {
+/**
+ * Records contract `name` in deployments/<network>.json and returns the file's
+ * path. A record already there moves to the new one's `previous`. The contracts
+ * in `stale` (deployed on a chain that no longer exists) are removed first,
+ * history and all.
+ */
+export function writeDeployment(
+  network: string,
+  networkId: string,
+  name: string,
+  record: DeploymentRecord,
+  stale: readonly string[] = [],
+): string {
   const file = deploymentsPath(network);
-  const current = readDeployments(network);
-  const next: DeploymentsFile = {
-    network,
-    networkId,
-    contracts: { ...(current?.contracts ?? {}), [name]: record },
-  };
+  const contracts = { ...(readDeployments(network)?.contracts ?? {}) };
+  for (const s of stale) delete contracts[s];
+  const old = contracts[name];
+  if (old) {
+    const { previous = [], ...oldRecord } = old;
+    contracts[name] = { ...record, previous: [oldRecord, ...previous] };
+  } else {
+    contracts[name] = record;
+  }
+  const next: DeploymentsFile = { network, networkId, contracts };
   fs.mkdirSync(DEPLOYMENTS_DIR, { recursive: true });
   fs.writeFileSync(file, `${JSON.stringify(next, null, 2)}\n`);
   return file;

@@ -33,7 +33,7 @@ export const LOCAL_CONFIG: NetworkConfig = {
   indexerWS: 'ws://localhost:8088/api/v4/graphql/ws',
   node: 'http://localhost:9944',
   nodeWS: 'ws://localhost:9944',
-  proofServer: 'http://localhost:6300',
+  proofServer: process.env['MIDNIGHT_PROOF_SERVER'] ?? 'http://localhost:6300',
   faucet: '',
 };
 

@@ -172,3 +172,42 @@ describe('mnkit deploy', () => {
     await expect(main(['deploy', '--contract', 'tip-token'])).rejects.toThrow("Unknown option '--contract'");
   });
 });
+
+describe('the template deployments records', () => {
+  /** The rendered src/deployments.ts of a fresh project, imported. */
+  async function deploymentsModule() {
+    const dir = project({ compiled: false });
+    return { dir, mod: await import(path.join(dir, 'src', 'deployments.ts')) };
+  }
+  const record = (address, blockHeight) => ({
+    address,
+    txId: `tx-${address}`,
+    txHash: `hash-${address}`,
+    blockHeight,
+    blockHash: `block-${blockHeight}`,
+    deployer: 'mn_addr_undeployed1x',
+    deployedAt: '2026-10-27T00:00:00.000Z',
+  });
+
+  it('keeps an earlier deploy of the same contract under previous, newest first', async () => {
+    const { mod } = await deploymentsModule();
+    mod.writeDeployment('preview', 'preview', 'tip-token', record('a1', 10));
+    mod.writeDeployment('preview', 'preview', 'tip-token', record('a2', 20));
+    mod.writeDeployment('preview', 'preview', 'tip-token', record('a3', 30));
+    const { contracts } = mod.readDeployments('preview');
+    expect(contracts['tip-token'].address).toBe('a3');
+    expect(contracts['tip-token'].previous.map((r) => r.address)).toEqual(['a2', 'a1']);
+    expect(contracts['tip-token'].previous.every((r) => !('previous' in r))).toBe(true);
+  });
+
+  it('removes stale contracts, history and all, and keeps the rest', async () => {
+    const { mod } = await deploymentsModule();
+    mod.writeDeployment('local', 'undeployed', 'tip-token', record('t1', 10));
+    mod.writeDeployment('local', 'undeployed', 'tip-token', record('t2', 20));
+    mod.writeDeployment('local', 'undeployed', 'other', record('o1', 15));
+    mod.writeDeployment('local', 'undeployed', 'tip-token', record('t3', 5), ['tip-token']);
+    const { contracts } = mod.readDeployments('local');
+    expect(contracts['tip-token']).toEqual(record('t3', 5));
+    expect(contracts.other.address).toBe('o1');
+  });
+});

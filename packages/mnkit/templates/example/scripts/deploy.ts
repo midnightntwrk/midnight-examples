@@ -28,6 +28,10 @@
 // deployments/<network>.json. The private state and the contract's signing
 // key (needed to maintain the contract later) are kept, encrypted, in
 // .mnkit/private-state/<network>: back that directory up for a real network.
+// Deploying a contract again keeps its old record under `previous`. A record
+// whose deploy block isn't on the network's chain (it was reset, as the local
+// devnet is by `env:down`) is dropped, so contract/deploy-args.ts never sees
+// an address from an earlier chain.
 //
 // Off local the wallet is the Alice wallet (MIDNIGHT_<NETWORK>_SEED), and the
 // store's password is MIDNIGHT_PRIVATE_STATE_PASSWORD, checked against the
@@ -58,6 +62,7 @@ import {
   writeDeployment,
   type DeployContext,
   type DeployNetwork,
+  type DeploymentRecord,
 } from '../src/deployments.js';
 import { deployables } from '../contract/deploy-args.js';
 
@@ -100,6 +105,36 @@ async function answers(url: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * The contracts in `deployments` deployed on a chain that no longer exists:
+ * the block at their height has another hash, or the chain is shorter. If the
+ * indexer can't be asked, every record is kept.
+ */
+async function staleDeployments(indexer: string, deployments: Record<string, DeploymentRecord>): Promise<string[]> {
+  const stale: string[] = [];
+  for (const [contract, record] of Object.entries(deployments)) {
+    const height = Math.trunc(record.blockHeight);
+    let data: { tip?: { height: number } | null; at?: { hash: string } | null } | undefined;
+    try {
+      const res = await fetch(indexer, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ query: `query { tip: block { height } at: block(offset: { height: ${height} }) { hash } }` }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      data = res.ok ? ((await res.json()) as { data?: typeof data }).data : undefined;
+    } catch {
+      data = undefined;
+    }
+    if (!data?.tip) {
+      logger.warn(`Couldn't ask the indexer whether ${contract}'s deploy block is still on chain; keeping its record.`);
+      continue;
+    }
+    if (data.at ? data.at.hash !== record.blockHash : data.tip.height < height) stale.push(contract);
+  }
+  return stale;
 }
 
 const network = process.env['MIDNIGHT_NETWORK'] ?? 'local';
@@ -150,6 +185,25 @@ const envConfig: EnvironmentConfiguration = { walletNetworkId: config.networkId,
 // A wallet with no preseed syncs from genesis: about 78 minutes on preprod.
 const syncTimeoutMs = Number(process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ?? (isRemote ? 120 * 60_000 : 10 * 60_000));
 
+const deployments = { ...(readDeployments(network)?.contracts ?? {}) };
+const stale = await staleDeployments(config.indexer, deployments);
+for (const contract of stale) {
+  logger.warn(
+    `${contract} in deployments/${network}.json (${deployments[contract]?.address}) was deployed on a chain that ` +
+      `no longer exists. It's ignored, and its record is removed once this deploy is recorded.` +
+      (contract === name ? '' : ` Deploy it again if ${name} needs it.`),
+  );
+  delete deployments[contract];
+}
+const ctx: DeployContext = { network: network as DeployNetwork, deployments };
+const replaced = deployments[name];
+if (replaced) {
+  logger.warn(
+    `${name} is already deployed to '${network}' at ${replaced.address}. Deploying it again: the new ` +
+      `address replaces it in deployments/${network}.json, which keeps the old record under previous.`,
+  );
+}
+
 const setup = resolveWallet(network);
 const wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret, { fastSync: setup.fastSync });
 await wallet.start();
@@ -171,10 +225,6 @@ try {
     storeName: '__name__-deploy',
     password,
   });
-  const ctx: DeployContext = {
-    network: network as DeployNetwork,
-    deployments: readDeployments(network)?.contracts ?? {},
-  };
   const withPrivateState = entry.privateStateId !== undefined;
 
   logger.info(`Deploying ${name} to '${network}'...`);
@@ -186,7 +236,7 @@ try {
   } as never)) as DeployedContract<any>;
 
   const tx = deployed.deployTxData.public;
-  const file = writeDeployment(network, config.networkId, name, {
+  const record: DeploymentRecord = {
     address: tx.contractAddress,
     txId: tx.txId,
     txHash: tx.txHash,
@@ -195,7 +245,8 @@ try {
     deployer: String(wallet.unshieldedKeystore.getBech32Address()),
     ...(withPrivateState ? { privateStateId: entry.privateStateId } : {}),
     deployedAt: new Date().toISOString(),
-  });
+  };
+  const file = writeDeployment(network, config.networkId, name, record, stale);
   logger.info(`✔ ${name} deployed to '${network}' at ${tx.contractAddress} (block ${tx.blockHeight})`);
   logger.info(`  Recorded in ${file}`);
 } catch (err) {
