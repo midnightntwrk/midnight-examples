@@ -71,7 +71,7 @@ logger.info(`Sponsor DUST balance: ${dust} SPECK`);
 if (dust === 0n) {
   logger.warn(
     'Sponsor has ZERO DUST and cannot pay for anything. Its NIGHT must be registered ' +
-      'for DUST generation — plain NIGHT is not enough. Run `yarn wait:dust` locally.',
+      'for DUST generation — plain NIGHT is not enough. Run `npm run wait:dust` locally.',
   );
 }
 

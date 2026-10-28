@@ -19,26 +19,26 @@ For a guided walkthrough of the contract and its cheat-check tests, see the
 
 From the repo root, install dependencies (one lockfile for the whole workspace) and compile:
 ```bash
-yarn install
-yarn compile
+npm install
+npm run compile
 ```
 
 Or compile just this example, from `examples/battleship`:
 ```bash
-yarn compile
+npm run compile
 ```
 
 ## Start the local Midnight network
 
 Ensure the Docker engine is running, then from `examples/battleship`:
 ```bash
-yarn env:up
-yarn wait:dust     # wait until the dev wallets have spendable DUST for fees
+npm run env:up
+npm run wait:dust     # wait until the dev wallets have spendable DUST for fees
 ```
 
 ## Run the test suite
 ```bash
-yarn test:local
+npm run test:local
 ```
 
 The test script will begin to display output from your local devnet and test suite. The tests will progress the contract deployment and interaction programatically:
@@ -99,8 +99,8 @@ zkir-lint: scanned 5 file(s)
 
 Tear the network down when finished:
 ```bash
-yarn env:down
+npm run env:down
 ```
 
-To run the suite against **preprod** or **preview** instead (`yarn test:preprod`,
-`yarn test:preview`), see [FAST-SYNC.md](../../FAST-SYNC.md) at the repo root.
+To run the suite against **preprod** or **preview** instead (`npm run test:preprod`,
+`npm run test:preview`), see [FAST-SYNC.md](../../FAST-SYNC.md) at the repo root.

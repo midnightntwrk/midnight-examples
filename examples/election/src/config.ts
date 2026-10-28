@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { preprodConfig } from '@midnight-ntwrk/example-fast-sync';
+import { preprodConfig } from '@midnightntwrk/mnkit-wallet';
 
 // The main purpose of this file is to hold network configurations. Add configs for new networks
 // (such as Preprod) and modify the code in getConfig() to set `const network` appropriately
@@ -36,7 +36,7 @@ export const LOCAL_CONFIG: NetworkConfig = {
   indexerWS: 'ws://127.0.0.1:8088/api/v4/graphql/ws',
   node: 'http://127.0.0.1:9944',
   nodeWS: 'ws://127.0.0.1:9944',
-  proofServer: 'http://127.0.0.1:6300',
+  proofServer: process.env['MIDNIGHT_PROOF_SERVER'] ?? 'http://127.0.0.1:6300',
   faucet: '',
 };
 
@@ -52,7 +52,7 @@ export const PREVIEW_CONFIG: NetworkConfig = {
 
 // Preprod goes through Blockfrost, which needs a project token on every
 // request (BLOCKFROST_PROJECT_ID in the gitignored repo-root .env.preprod). The
-// config is shared with the wallet harness in @midnight-ntwrk/example-fast-sync
+// config is shared with the wallet harness in @midnightntwrk/mnkit-wallet
 // and built on demand, so it sees the env vitest loads from .env.preprod.
 export function getConfig(): NetworkConfig {
   const network = process.env['MIDNIGHT_NETWORK'] ?? 'local';

@@ -14,8 +14,8 @@ documented privacy assumptions actually hold against live on-chain state.
 
 ## 1. Ran the DApp on local — 17/17 e2e tests passed
 
-`yarn compile` built both contracts with full PLONK proving keys
-(`chips.compact` → 11 circuits, `roulette.compact` → 6 circuits). `yarn
+`npm run compile` built both contracts with full PLONK proving keys
+(`chips.compact` → 11 circuits, `roulette.compact` → 6 circuits). `npm run
 test:local` then drove the whole flow against the live devnet with real proofs.
 
 **`src/test/roulette.test.ts` — 17 passed / 17 (408 s):**
@@ -103,17 +103,17 @@ matching `collect*Bytes` function, or the leak check silently stops covering it.
 
 ## 4. Reproduce
 
-From `examples/shielded-chips` (after `yarn install` at the repo root):
+From `examples/shielded-chips` (after `npm install` at the repo root):
 
 ```bash
-yarn compile          # both contracts + ZK keys
-yarn env:up           # node + indexer + proof-server
-yarn wait:dust        # genesis wallet has DUST for fees
+npm run compile    # both contracts + ZK keys
+npm run env:up     # node + indexer + proof-server
+npm run wait:dust  # genesis wallet has DUST for fees
 
-yarn test:local                                   # both suites, sequentially (29 tests)
-MIDNIGHT_NETWORK=local yarn vitest run src/test/privacy.test.ts   # privacy checks only (12 tests)
+npm run test:local                                                  # both suites, sequentially (29 tests)
+MIDNIGHT_NETWORK=local npx vitest run src/test/privacy.test.ts  # privacy checks only (12 tests)
 
-yarn env:down         # tear down the devnet
+npm run env:down         # tear down the devnet
 ```
 
 Proof generation dominates runtime (~7 min for the e2e, ~3 min for the privacy

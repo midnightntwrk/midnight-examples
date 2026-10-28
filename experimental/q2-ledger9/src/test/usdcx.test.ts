@@ -44,7 +44,7 @@ const artifactPresent = bridgedUsdcMintArtifactExists();
 if (!artifactPresent) {
   console.log(
     '\n=== GAP === usdcx: BridgedUsdcMint not compiled. Build with' +
-      "\n            `yarn compile` (usdcx needs --feature-zkir-v3, wired in" +
+      "\n            `npm run compile` (usdcx needs --feature-zkir-v3, wired in" +
       '\n            scripts/compile.mts).\n',
   );
 }

@@ -19,7 +19,7 @@ import type {
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import * as Rx from 'rxjs';
 import type { Logger } from 'pino';
-import { assembleWallet, type FastSyncOptions, type WalletSecret } from '@midnight-ntwrk/example-fast-sync';
+import { assembleWallet, type FastSyncOptions, type WalletSecret } from '@midnightntwrk/mnkit-wallet';
 
 export type { WalletSecret };
 
@@ -186,4 +186,4 @@ export async function syncWallet(
 
 // waitForDust now lives in the shared harness package, next to the funding
 // gate that drives it. Re-exported so existing imports keep working.
-export { waitForDust } from '@midnight-ntwrk/example-fast-sync';
+export { waitForDust } from '@midnightntwrk/mnkit-wallet';

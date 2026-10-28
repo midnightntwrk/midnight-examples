@@ -29,7 +29,7 @@ import type { Logger } from 'pino';
 import type { WalletSecret } from './types.js';
 import { dedupingDustBuilder, dedupingShieldedBuilder } from './dedup.js';
 import { isSeedable, preSeedNewWallet } from './preseed.js';
-import { loadReferenceBundle } from './reference-bundle.js';
+import { checkChainIdentity, readReferenceBundle } from './reference-bundle.js';
 
 const DUST_OPTIONS: DustWalletOptions = {
   ledgerParams: LedgerParameters.initialParameters(),
@@ -138,9 +138,15 @@ export async function assembleWallet(
   let referenceHeight: number | null = null;
 
   if (fastSync) {
-    const reference = loadReferenceBundle(fastSync.referenceRoot, networkId);
+    const read = readReferenceBundle(fastSync.referenceRoot, networkId, { indexer: env.indexer });
+    const reference = read.ok ? read.bundle : null;
     const birthday = fastSync.birthday ?? (await getChainTipHeight(env.indexer));
-    if (reference && isSeedable(reference, birthday)) {
+    const foreign = reference && (await checkChainIdentity(env.indexer, reference));
+    if (!read.ok) {
+      logger.info(`Fast-sync: ${read.reason} — syncing from genesis`);
+    } else if (foreign) {
+      logger.info(`Fast-sync: ${foreign} — syncing from genesis`);
+    } else if (reference && isSeedable(reference, birthday)) {
       seededSnaps = preSeedNewWallet({ shieldedSecretKeys: zswapSecretKeys, unshieldedPublicKey, dustSecretKey }, networkId, reference);
       if (seededSnaps) referenceHeight = reference.height;
     } else if (reference) {
@@ -149,8 +155,6 @@ export async function assembleWallet(
           ? 'Fast-sync: no chain tip to compare against — syncing from genesis'
           : `Fast-sync: reference (height ${reference.height}) is newer than birthday ${birthday} — syncing from genesis`,
       );
-    } else {
-      logger.info(`Fast-sync: no reference bundle for '${networkId}' — syncing from genesis`);
     }
   }
 

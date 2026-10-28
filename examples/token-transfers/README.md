@@ -11,7 +11,7 @@ example of one operation rather than a full application.
 Install dependencies (from the repo root — one lockfile for the whole workspace):
 
 ```bash
-yarn install
+npm install
 ```
 
 ## Compile the contract
@@ -19,7 +19,7 @@ yarn install
 Write your contract in `contract/token-transfers.compact`, then:
 
 ```bash
-yarn compile
+npm run compile
 ```
 
 ## Start the local Midnight network
@@ -27,29 +27,29 @@ yarn compile
 Ensure the Docker engine is running, then:
 
 ```bash
-yarn env:up
+npm run env:up
 ```
 
 ## Run the test suite
 
 ```bash
-yarn wait:dust     # wait until the dev wallet has spendable DUST for fees
-yarn test:local
+npm run wait:dust     # wait until the dev wallet has spendable DUST for fees
+npm run test:local
 ```
 
 Tear the network down when finished:
 
 ```bash
-yarn env:down
+npm run env:down
 ```
 
 This example is set up for a local devnet running via Docker.
 
 To run it against **preprod** or **preview** instead, see
 [FAST-SYNC.md](../../FAST-SYNC.md) at the repo root. In short: start a local proof
-server (`yarn proof:up`), then from the repo root run `yarn preseed:cut` followed
-by `yarn wallets:new`, fund the printed addresses at the faucet, and run
-`yarn test:preprod`. The wallet seeds live in one repo-root `.env.<network>` that
+server (`npm run proof:up`), then from the repo root run `npm run preseed:cut` followed
+by `npm run wallets:new`, fund the printed addresses at the faucet, and run
+`npm run test:preprod`. The wallet seeds live in one repo-root `.env.<network>` that
 every example shares.
 
 ## Browser UI
@@ -59,5 +59,5 @@ ledger to show, so it shows your wallet's balances as tokens move. See
 [`ui/README.md`](ui/README.md).
 
 ```bash
-yarn workspace @midnight-ntwrk/example-token-transfers-ui dev
+npm run dev -w @midnight-ntwrk/example-token-transfers-ui
 ```

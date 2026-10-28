@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => ({
   // `<origin>/keys/<circuit>.{prover,verifier}` and `<origin>/zkir/<circuit>.bzkir`,
   // which is exactly the layout of contract/managed/zk-loan — so pointing
   // publicDir at it replaces upstream's copy-contract-keys step, and the UI can
-  // never serve keys from a stale compile. `yarn compile` in examples/zk-loan
+  // never serve keys from a stale compile. `npm run compile` in examples/zk-loan
   // must have run first.
   publicDir: path.resolve(here, '../contract/managed/zk-loan'),
   plugins: [

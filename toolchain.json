@@ -1,0 +1,60 @@
+{
+  "$comment": "The one toolchain pin. Every other copy (README table, ci.yaml, compose.yml, package.json, .nvmrc, pragmas) must agree: `npm run toolchain:check`. Bump versions here first, in one coordinated pass. `networks` holds each network's public endpoints, which every src/config.ts must use and `mnkit doctor --network` probes; preprod is Blockfrost, whose project ID is added at runtime from BLOCKFROST_PROJECT_ID and never stored here.",
+  "compact": {
+    "compiler": "0.31.1",
+    "language": "0.23",
+    "cli": "0.5.3",
+    "installerSha256": "5ad9c8f53dd09c39ebd4290dc47d1742d36b01ad65859eed41e7658ac65bdff8"
+  },
+  "node": "22",
+  "npmCli": "11.21.0",
+  "npm": {
+    "midnight-js": "4.1.1",
+    "testkit-js": "4.1.1",
+    "wallet-sdk": "1.2.0",
+    "wallet-sdk-abstractions": "2.1.0",
+    "wallet-sdk-address-format": "3.1.2",
+    "dapp-connector-api": "4.0.1",
+    "vitest": "5.0.4",
+    "vite": "6.4.4"
+  },
+  "images": {
+    "midnightntwrk/proof-server": "8.1.3",
+    "midnightntwrk/indexer-standalone": "4.3.5",
+    "midnightntwrk/midnight-node": "1.0.400"
+  },
+  "networks": {
+    "local": {
+      "networkId": "undeployed",
+      "node": "http://127.0.0.1:9944",
+      "nodeWS": "ws://127.0.0.1:9944",
+      "indexer": "http://127.0.0.1:8088/api/v4/graphql",
+      "indexerWS": "ws://127.0.0.1:8088/api/v4/graphql/ws",
+      "faucet": ""
+    },
+    "preview": {
+      "networkId": "preview",
+      "node": "https://rpc.preview.midnight.network",
+      "nodeWS": "wss://rpc.preview.midnight.network",
+      "indexer": "https://indexer.preview.midnight.network/api/v4/graphql",
+      "indexerWS": "wss://indexer.preview.midnight.network/api/v4/graphql/ws",
+      "faucet": "https://midnight-tmnight-preview.nethermind.dev/"
+    },
+    "preprod": {
+      "networkId": "preprod",
+      "node": "https://rpc.midnight-preprod.blockfrost.io",
+      "nodeWS": "wss://rpc.midnight-preprod.blockfrost.io",
+      "indexer": "https://midnight-preprod.blockfrost.io/api/v0",
+      "indexerWS": "wss://midnight-preprod.blockfrost.io/api/v0/ws",
+      "faucet": "https://midnight-tmnight-preprod.nethermind.dev/"
+    }
+  },
+  "overrides": {
+    "@midnight-ntwrk/wallet-sdk": "1.2.0",
+    "@midnight-ntwrk/ledger-v8": "8.1.2",
+    "@midnight-ntwrk/onchain-runtime-v3": "3.1.1",
+    "@midnight-ntwrk/zkir-v2": "2.1.1",
+    "vite-plugin-top-level-await/@swc/core": "1.15.47",
+    "vite-plugin-top-level-await/uuid": "11.1.1"
+  }
+}

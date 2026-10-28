@@ -361,7 +361,7 @@ would hand over mint authority.
 - **The regression is now in-repo.** `src/test/privacy.test.ts` captures each
   round's secret nonces (escrowed bet coin, payout coin) and the player's wallet
   key and asserts none of them appear in either contract's public ledger state —
-  the "write the attack, keep it runnable" principle wired into `yarn test`, so a
+  the "write the attack, keep it runnable" principle wired into `npm test`, so a
   future change that reintroduces a §2-class leak fails a test instead of shipping.
 - **Cheap negative controls make results trustworthy.** Testing all three
   candidate wallets against every coin meant a hit was meaningful: the two wrong

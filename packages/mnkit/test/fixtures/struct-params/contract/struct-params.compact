@@ -1,0 +1,29 @@
+// Not an example: constructor parameters the compiler writes as inline
+// objects in index.d.ts (an unexported struct, a ShieldedCoinInfo).
+pragma language_version 0.23;
+import CompactStandardLibrary;
+
+export struct Limits {
+  min: Uint<64>;
+  max: Uint<64>;
+}
+
+export ledger limits: Limits;
+export ledger color: Bytes<32>;
+
+struct Window {
+  start: Uint<32>;
+  end: Uint<32>;
+}
+
+export ledger window: Window;
+
+constructor(cfg: Limits, w: Window, coin: ShieldedCoinInfo, owner: Bytes<32>) {
+  limits = disclose(cfg);
+  color = disclose(coin.color);
+  window = disclose(w);
+}
+
+export circuit setLimits(cfg: Limits): [] {
+  limits = disclose(cfg);
+}

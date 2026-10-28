@@ -1,5 +1,5 @@
-// Template-owned: edit templates/ui/src/hooks/use-wallet-balances.ts, then
-// `yarn new:ui --sync-all`.
+// Template-owned: edit packages/mnkit/templates/ui/src/hooks/use-wallet-balances.ts, then
+// `npm run new:ui -- --sync-all`.
 import { useEffect, useState } from "react";
 import { useWallet } from "@/hooks/use-wallet";
 

@@ -25,8 +25,39 @@ function hasNight(s: FacadeState): boolean {
   return Object.values(s.unshielded.balances).some((v) => v > 0n);
 }
 
+/** How long one indexer request may take before it counts as unanswered. */
+const INDEXER_REQUEST_TIMEOUT_MS = 10_000;
+
+/**
+ * The indexer's latest block timestamp, or undefined while it can't be read.
+ * Bounded by `timeoutMs`: a stalled indexer would otherwise hold the request
+ * for undici's 300-second default, well past the caller's deadline.
+ */
+async function latestBlockTime(indexerHttpUrl: string, timeoutMs: number): Promise<Date | undefined> {
+  try {
+    const res = await fetch(indexerHttpUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query: '{ block { timestamp } }' }),
+      signal: AbortSignal.timeout(Math.max(1, timeoutMs)),
+    });
+    const body = (await res.json()) as { data?: { block?: { timestamp?: number } } };
+    const ts = body.data?.block?.timestamp;
+    return typeof ts === 'number' ? new Date(ts) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Block until the wallet holds at least `minCoins` spendable DUST coin(s).
+ *
+ * With `indexerHttpUrl`, also block until that DUST is worth something at the
+ * latest block's time, which is the time the wallet values DUST at when it
+ * balances a transaction. On a fresh local devnet the DUST coins exist from
+ * genesis, but until the first block after genesis the latest block carries
+ * the genesis timestamp, when they are worth 0: a transaction balanced then
+ * fails with Wallet.InsufficientFunds ("could not balance dust").
  *
  * Shared by the funding gate and each example's scripts/wait-for-dust.ts.
  */
@@ -35,9 +66,11 @@ export async function waitForDust(
   wallet: WalletFacade,
   minCoins = 1,
   timeoutMs = 180_000,
+  indexerHttpUrl?: string,
 ): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
   logger.info(`Waiting for >=${minCoins} spendable DUST coin(s) (timeout ${timeoutMs}ms)...`);
-  await Rx.firstValueFrom(
+  const state = await Rx.firstValueFrom(
     wallet.state().pipe(
       Rx.tap((s: FacadeState) =>
         logger.info(`dust: ${s.dust.availableCoins.length} coin(s), balance ${s.dust.balance(new Date())} STAR`),
@@ -50,6 +83,20 @@ export async function waitForDust(
       }),
     ),
   );
+  if (indexerHttpUrl) {
+    for (;;) {
+      const blockTime = await latestBlockTime(indexerHttpUrl, Math.min(INDEXER_REQUEST_TIMEOUT_MS, deadline - Date.now()));
+      const atBlock = blockTime ? state.dust.balance(blockTime) : 0n;
+      if (atBlock > 0n) {
+        logger.info(`dust: balance ${atBlock} STAR at the latest block (${blockTime?.toISOString()})`);
+        break;
+      }
+      if (Date.now() > deadline) {
+        throw new Error(`DUST still worth 0 at the latest block after ${timeoutMs}ms (block time ${blockTime?.toISOString() ?? 'unknown'})`);
+      }
+      await new Promise((r) => setTimeout(r, 2_000));
+    }
+  }
   logger.info('DUST ready.');
 }
 
@@ -73,8 +120,8 @@ export interface FundingGateOptions {
  * cheap on every run after the first — the funding prompt only appears when
  * the wallet genuinely has no NIGHT.
  *
- * `envConfig` is unused since registration moved off testkit's waitForFunds;
- * it stays in the signature so the example suites' call sites don't change.
+ * The DUST wait reads `envConfig.indexer` for the latest block's time, so the
+ * DUST is spendable at block time, not just present (see waitForDust).
  */
 export async function waitForNightThenDust(
   logger: Logger,
@@ -129,7 +176,7 @@ export async function waitForNightThenDust(
 
   logger.info(`${label}: NIGHT present; registering NIGHT->DUST generation...`);
   await registerNightForDust(logger, wallet, keystore);
-  await waitForDust(logger, wallet, 1, FUND_TIMEOUT_MS);
+  await waitForDust(logger, wallet, 1, FUND_TIMEOUT_MS, envConfig.indexer);
   logger.info(`${label}: funded and ready.`);
 }
 
