@@ -1032,6 +1032,7 @@ __metadata:
   resolution: "@midnight-ntwrk/example-election@workspace:examples/election"
   dependencies:
     "@midnight-ntwrk/example-fast-sync": "workspace:^"
+    "@midnight-ntwrk/example-sim": "workspace:^"
     "@midnight-ntwrk/midnight-js-contracts": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-http-client-proof-provider": "npm:4.1.1"
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "npm:4.1.1"
