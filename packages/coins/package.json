@@ -1,26 +1,45 @@
 {
-  "name": "@midnight-ntwrk/example-coins",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@midnightntwrk/mnkit-coins",
+  "version": "0.2.0-rc.1",
   "type": "module",
-  "description": "Shielded-coin helpers for the examples' tests: token colors, fresh coins as circuit arguments, a wallet's coins and balances and waiting for them, and the arguments a mint to another wallet needs.",
+  "description": "Shielded-coin helpers for Midnight tests: token colors, fresh coins as circuit arguments, a wallet's coins and balances and waiting for them, and the arguments a mint to another wallet needs. Part of mnkit.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/midnightntwrk/midnight-examples.git",
+    "directory": "packages/coins"
+  },
+  "homepage": "https://github.com/midnightntwrk/midnight-examples/tree/main/packages/coins#readme",
+  "bugs": "https://github.com/midnightntwrk/midnight-examples/issues",
   "engines": {
     "node": ">=22.0.0"
   },
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
     "./package.json": "./package.json"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "tsc -p tsconfig.build.json && node ../../scripts/pack-extras.mjs add LICENSE",
+    "postpack": "node ../../scripts/pack-extras.mjs remove LICENSE",
     "typecheck": "tsc --noEmit -p .",
     "test:sim": "vitest run"
   },
-  "dependencies": {
-    "@midnight-ntwrk/midnight-js-protocol": "4.1.1"
+  "peerDependencies": {
+    "@midnight-ntwrk/midnight-js-protocol": "~4.1.1"
   },
   "devDependencies": {
+    "@midnight-ntwrk/midnight-js-protocol": "4.1.1",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
-    "vitest": "^4.1.0"
+    "vite": "6.4.4",
+    "vitest": "^5.0.4"
   }
 }

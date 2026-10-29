@@ -1,0 +1,238 @@
+name: Release mnkit
+
+# Publishes mnkit and its runtime packages (@midnightntwrk/mnkit-sim,
+# -coins, -wallet) to npm when a GitHub release tagged mnkit-v<version> is
+# published, then smoke-tests the published packages the way a user gets
+# them: `npx mnkit@<version> init`, compile, derive, test:sim and validate on
+# a local network. All four packages share one version (lockstep).
+#
+# Two jobs, so no dependency code runs while a publish token exists. `build`
+# installs, tests and packs with no id-token, and uploads the tarballs the
+# e2e tested. `publish` has the id-token and runs nothing from the repo: it
+# downloads those tarballs and runs `npm publish <tgz> --ignore-scripts`.
+# It runs in the `npm-publish` environment, which needs a reviewer's approval
+# and allows only mnkit-v* tags. `build` also refuses a commit not on main.
+#
+# Auth: npm trusted publishing (OIDC), no long-lived token. Each package must
+# have this repository, this workflow file (release-mnkit.yml) and the
+# environment npm-publish configured as its trusted publisher on npmjs.com.
+# Provenance is attached automatically for a public repository and package.
+# Trusted publishing needs npm 11.5.1+ and Node 22.14+, hence the npm install
+# step below.
+#
+# Dist-tags: a prerelease (0.3.0-rc.1, marked as a pre-release on GitHub)
+# goes to `next`; a stable version below the current `latest` (a 0.2.1 after
+# 0.3.0) goes to `release-<major>.<minor>`; anything else is `latest`. A
+# re-run skips the packages already on npm at this version, so a partial
+# publish can be finished.
+
+# Lock down top-level permissions. Grant per-job.
+permissions: {}
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: startsWith(github.event.release.tag_name, 'mnkit-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  #v7.0.1
+        with:
+          persist-credentials: false
+          # The main check below needs origin/main.
+          fetch-depth: 0
+
+      - name: Check the release commit is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_SHA is not on main. Release only from main."
+            exit 1
+          fi
+
+      - name: Setup Compact Compiler
+        uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
+        with:
+          compact-version: '0.31.1'
+          # No cache in a publishing workflow (cache poisoning).
+          cache-enabled: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  #v7.1.0
+        with:
+          node-version-file: .nvmrc
+          # No dependency cache in a publishing workflow (cache poisoning).
+          package-manager-cache: false
+
+      - name: Check the tag matches every package version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          set -euo pipefail
+          version="${TAG#mnkit-v}"
+          for p in mnkit fast-sync sim coins; do
+            v=$(node -p "require('./packages/$p/package.json').version")
+            if [ "$v" != "$version" ]; then
+              echo "::error::packages/$p is at $v, but the tag says $version"
+              exit 1
+            fi
+          done
+          case "$version" in *-*) want=true ;; *) want=false ;; esac
+          if [ "$PRERELEASE" != "$want" ]; then
+            echo "::error::$version needs the GitHub release's pre-release box set to $want"
+            exit 1
+          fi
+
+      - name: Install dependencies (builds the runtime packages)
+        # npm 11 for the repo (its lockfile and .npmrc need 11.10+), through npx: Node's own npm
+        # stays on PATH, and mnkit-e2e.sh runs the scaffolded projects with it, as users do.
+        run: npx --yes npm@11.21.0 ci
+
+      - name: Pins, engine tests and compiled fixtures
+        run: |
+          npm run toolchain:check
+          npm run test:engine
+          npm run fixtures:regen -- --check
+
+      - name: Tarball end to end (in-memory gate)
+        run: bash scripts/mnkit-e2e.sh
+        env:
+          MNKIT_E2E_DIR: ${{ runner.temp }}/mnkit-e2e
+
+      # The tarballs the e2e just tested are the ones published.
+      - name: Upload the tested tarballs
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  #v7.0.2
+        with:
+          name: mnkit-tarballs
+          path: ${{ runner.temp }}/mnkit-e2e/pkgs/*.tgz
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm-publish
+    permissions:
+      id-token: write # OIDC token for npm trusted publishing
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  #v7.1.0
+        with:
+          # .nvmrc's version: this job has no checkout to read it from.
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      - name: Use an npm that supports trusted publishing
+        run: npm install -g npm@11.21.0
+
+      - name: Download the tested tarballs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  #v8.0.2
+        with:
+          name: mnkit-tarballs
+          path: ${{ runner.temp }}/pkgs
+
+      - name: Pick the version and dist-tag
+        id: version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#mnkit-v}"
+          latest=$(npm view mnkit dist-tags.latest 2>/dev/null || true)
+          tag=$(node -e '
+            const [v, latest] = process.argv.slice(1);
+            const parts = (s) => s.split(".").map(Number);
+            const below = (a, b) => { for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] < b[i]; return false; };
+            if (v.includes("-")) console.log("next");
+            else if (latest && below(parts(v), parts(latest))) console.log(`release-${parts(v).slice(0, 2).join(".")}`);
+            else console.log("latest");
+          ' "$version" "$latest")
+          echo "mnkit@$version → dist-tag $tag (latest is ${latest:-none})"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=$tag" >> "$GITHUB_OUTPUT"
+
+      # Runtime packages first: a project mnkit scaffolds depends on them.
+      - name: Publish to npm
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          DIST_TAG: ${{ steps.version.outputs.dist_tag }}
+          PKGS: ${{ runner.temp }}/pkgs
+        run: |
+          set -euo pipefail
+          for name in @midnightntwrk/mnkit-sim @midnightntwrk/mnkit-coins @midnightntwrk/mnkit-wallet mnkit; do
+            if [ -n "$(npm view "$name@$VERSION" version 2>/dev/null || true)" ]; then
+              echo "::notice::$name@$VERSION is already on npm, skipping it"
+              continue
+            fi
+            file="${name#@}"
+            tgz="$PKGS/${file//\//-}-$VERSION.tgz"
+            npm publish "$tgz" --ignore-scripts --access public --tag "$DIST_TAG"
+          done
+
+  smoke:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  #v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Compact Compiler
+        uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
+        with:
+          compact-version: '0.31.1'
+          cache-enabled: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  #v7.1.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+
+      - name: Wait until npm serves the new version
+        env:
+          VERSION: ${{ needs.publish.outputs.version }}
+        run: |
+          for i in $(seq 1 30); do
+            npm view "mnkit@$VERSION" version && npm view "@midnightntwrk/mnkit-wallet@$VERSION" version && exit 0
+            sleep 10
+          done
+          echo "::error::mnkit@$VERSION is not on npm after 5 minutes"
+          exit 1
+
+      - name: npx mnkit init, derive, test:sim and validate from npm
+        run: bash scripts/mnkit-e2e.sh --from-registry "$VERSION" --devnet hello-world
+        env:
+          VERSION: ${{ needs.publish.outputs.version }}
+          MNKIT_E2E_DIR: ${{ runner.temp }}/mnkit-smoke
+
+      - name: Upload service logs on failure
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  #v7.0.2
+        with:
+          name: mnkit-smoke-logs
+          path: ${{ runner.temp }}/mnkit-smoke/hello-world/logs/
+          if-no-files-found: ignore
+          retention-days: 7

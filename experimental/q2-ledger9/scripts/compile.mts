@@ -105,7 +105,7 @@ if (!COMPACTC || !fs.existsSync(COMPACTC)) {
   console.error(
     `compactc ${EXPECTED_VERSION} not found${COMPACTC ? ` at ${COMPACTC}` : ''}.\n` +
       `Download it from ${RELEASE_URL}, unzip it, and run\n` +
-      `  COMPACTC=/path/to/compactc-${EXPECTED_VERSION}/compactc yarn compile`,
+      `  COMPACTC=/path/to/compactc-${EXPECTED_VERSION}/compactc npm run compile`,
   );
   process.exit(1);
 }

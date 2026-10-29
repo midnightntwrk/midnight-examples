@@ -60,7 +60,7 @@ export type ContractProviders<C extends string> = MidnightProviders<
  * Where ZK proofs get generated.
  *  - "wallet": the connected wallet proves (ConnectedAPI.getProvingProvider).
  *    There's nothing else to run, and witness data never leaves the wallet.
- *  - "local": a proof server you run yourself (`yarn proof:up` in
+ *  - "local": a proof server you run yourself (`npm run proof:up` in
  *    examples/battleship), same as the Node test harness.
  * Avoid public/hosted proof servers: whoever runs them sees your proof inputs.
  */

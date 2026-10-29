@@ -19,13 +19,13 @@ This example demonstrates:
 Install dependencies (from the repo root, one lockfile for the whole workspace):
 
 ```bash
-yarn install
+npm install
 ```
 
 ## Compile the contract
 
 ```bash
-yarn compile
+npm run compile
 ```
 
 ## Start the local Midnight network
@@ -33,20 +33,20 @@ yarn compile
 Ensure the Docker engine is running, then:
 
 ```bash
-yarn env:up
+npm run env:up
 ```
 
 ## Run the test suite
 
 ```bash
-yarn wait:dust     # wait until the dev wallet has spendable DUST for fees
-yarn test:local
+npm run wait:dust     # wait until the dev wallet has spendable DUST for fees
+npm run test:local
 ```
 
 Tear the network down when finished:
 
 ```bash
-yarn env:down
+npm run env:down
 ```
 
 This repository is currently only set up to support a local devnet running via

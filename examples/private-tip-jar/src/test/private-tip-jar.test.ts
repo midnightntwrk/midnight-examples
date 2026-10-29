@@ -29,8 +29,8 @@ import {
 } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/ledger';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { freshCoin } from '@midnight-ntwrk/example-coins';
-import { resolveWallet, waitForNightThenDust } from '@midnight-ntwrk/example-fast-sync';
+import { freshCoin } from '@midnightntwrk/mnkit-coins';
+import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';

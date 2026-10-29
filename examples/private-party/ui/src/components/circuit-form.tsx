@@ -10,8 +10,8 @@
 //   - drops the coins this call took as `shieldedCoin` arguments, which the
 //     tx has now spent or handed over.
 //
-// Template-owned: edit templates/ui/src/components/circuit-form.tsx, then
-// `yarn new:ui <name> --sync`.
+// Template-owned: edit packages/mnkit/templates/ui/src/components/circuit-form.tsx, then
+// `npm run new:ui -- <name> --sync`.
 import { useContext, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";

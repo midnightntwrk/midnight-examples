@@ -5,7 +5,7 @@
 > What makes a wallet safe to pre-seed is not where its seed came from but
 > whether we know, and recorded, the height it was created at. The two paths
 > here mint the seed themselves and write down the chain tip at that instant, so
-> the birthday is true by construction: `yarn wallets:new` (into
+> the birthday is true by construction: `npm run wallets:new` (into
 > `.env.<network>`) and hello-world's throwaway wallet (into
 > `.fast-sync-wallets/`).
 >
@@ -36,18 +36,18 @@ depend on moth-wallet.
 ## Running the examples against a remote network
 
 ```bash
-cd examples/hello-world && yarn proof:up   # a local proof server is still required
+cd examples/hello-world && npm run proof:up   # a local proof server is still required
 cd ../..
 
-yarn preseed:cut     # 1. re-cut the reference bundle        (~10 min)
-yarn wallets:new     # 2. mint 4 wallets, print 4 addresses
+npm run preseed:cut  # 1. re-cut the reference bundle        (~10 min)
+npm run wallets:new  # 2. mint 4 wallets, print 4 addresses
 #                      3. fund those addresses at the faucet  (manual)
-yarn test:preprod    # 4. run every suite
+npm run test:preprod    # 4. run every suite
 ```
 
 **Step 1 must come before step 2.** See [Ordering](#ordering-cut-before-you-mint).
 
-`yarn wallets:new` writes four seeds to a repo-root `.env.<network>` (gitignored,
+`npm run wallets:new` writes four seeds to a repo-root `.env.<network>` (gitignored,
 mode 0600) together with a `_BIRTHDAY` for each — the chain tip at the moment the
 seed was minted. One file serves all eight examples: each `vitest.config.ts` loads
 it with vite's `loadEnv` from the repo root, and shell env still wins over file
@@ -68,7 +68,7 @@ and it asserts he has none, so the funding gate skips DUST registration for him.
 seeds a wallet whose birthday is at or after the reference height, and a seed with
 no recorded birthday is indistinguishable from a wallet with arbitrary history. So:
 
-- **Only `yarn wallets:new` should ever write a `_BIRTHDAY` line.** It reads the
+- **Only `npm run wallets:new` should ever write a `_BIRTHDAY` line.** It reads the
   chain tip at the instant it generates the seed, so the value is true by
   construction.
 - **Never add one next to a wallet you already had.** Omit it and that wallet does
@@ -88,7 +88,7 @@ Fast-sync: reference (height N) is newer than birthday M — syncing from genesi
 
 The same rule means **re-cutting invalidates fast-sync for already-funded
 wallets**: seeding them from a newer reference would start them past their own
-funding transaction. A re-cut therefore implies re-running `yarn wallets:new` and
+funding transaction. A re-cut therefore implies re-running `npm run wallets:new` and
 re-funding at the faucet. That is the cost of a fresh bundle; weigh it against the
 catch-up time a stale one charges.
 
@@ -168,7 +168,7 @@ run. This is the number to plan against for any wallet that cannot fast-sync.
 | `packages/fast-sync/scripts/cut-preseed.ts` | Mint a new reference bundle from an empty wallet synced to tip. |
 | `packages/fast-sync/scripts/new-preprod-wallets.ts` | Mint the four wallets, write `.env.<network>`, print addresses. |
 | `src/wallet.ts` → `MidnightWalletProvider.build(…, { fastSync })` | Per-example entry point; pass `fastSync` to pre-seed, omit it for the normal `FluentWalletBuilder` path. |
-| `preseed/<network>/` | The shipped reference bundles (`manifest.json` + gzipped state per sub-wallet). |
+| `preseed/<network>/` | The shipped reference bundles (`manifest.json`, with the height, block hash, indexer and a witness per cursor, plus gzipped state per sub-wallet). |
 
 The reference contains **no secret and no user-specific data** — it is public
 chain state plus a public key that gets replaced — which is what makes it safe to
@@ -183,7 +183,7 @@ Pre-seeding done wrong **silently hides funds**. The one rule that prevents it:
 > it past its own history, and those coins never get scanned.
 
 `isSeedable()` enforces this. Both paths that enable fast-sync record the birthday
-at the moment they mint the seed — `yarn wallets:new` into `.env.<network>`, and
+at the moment they mint the seed — `npm run wallets:new` into `.env.<network>`, and
 hello-world's throwaway wallet into `.fast-sync-wallets/` — so in both cases the
 birthday is true by construction and seeding is safe.
 
@@ -205,6 +205,30 @@ key that gets replaced on restore; a funded wallet's own coins would end up in i
 The script also loads its own output back through `loadReferenceBundle` before
 declaring success, so a malformed bundle fails loudly at cut time rather than
 degrading to a silent full sync weeks later.
+
+### Which bundle a wallet uses, and when it refuses one
+
+`findReferenceRoot(network)` returns `$MIDNIGHT_PRESEED_DIR` when set. Otherwise it
+returns the nearest `preseed/` at or above the working directory that holds
+`<network>/manifest.json`. The walk stops at the first directory with a `.git`, and
+it skips a `preseed/` that it or its parent leaves writable by other users (such
+as `/tmp/preseed`).
+
+Before seeding, `assembleWallet` checks the bundle and falls back to a genesis
+sync, logging the reason, if any check fails:
+
+- **The manifest:** the network, a height, the `blockHash` at that height, and
+  the `indexer` host it was cut against.
+- **The parts:** each part's cursor and sha256 match its witness.
+- **The indexer:** it must be the one in use. Ledger-event ids are each
+  indexer's own numbering: Blockfrost's preprod ids run 22 behind the official
+  indexer's.
+- **The chain:** the block at the bundle's height must still have the recorded
+  hash. This catches a bundle that outlives a network reset.
+
+`npm run preseed:cut -- --stamp` adds the `blockHash` to a manifest that predates
+it, for a bundle cut against the current indexer on a chain that hasn't been
+reset since. In any other case, re-cut.
 
 ## When a bundle goes bad (observed 2026-09-23, preprod)
 
@@ -233,7 +257,7 @@ prints `shielded=false (19459/…)` and a stuck `appliedIndex` across successive
 emissions is the tell. Booleans alone cannot distinguish a stall from a slow
 sync.
 
-**Fixing it.** `yarn preseed:cut --from-genesis` skips `restore()` and the dedup
+**Fixing it.** `npm run preseed:cut -- --from-genesis` skips `restore()` and the dedup
 path entirely and syncs a throwaway wallet from genesis (~78 min on preprod).
 Slower, but it is the only path that does not depend on an existing bundle being
 consistent, and it is how a first bundle for a network gets made. Bootstrapping
@@ -255,7 +279,7 @@ assuming the network is slow.
   indexer's collapsed-update endpoints.
 - **The shipped reference goes stale.** A stale reference is only slower, never
   wrong — the wallet syncs forward from it (~½ second of catch-up per hour of age).
-  Re-cut with `yarn preseed:cut`, and read
+  Re-cut with `npm run preseed:cut`, and read
   [Ordering](#ordering-cut-before-you-mint) first: a re-cut means re-minting and
   re-funding the wallets.
 - **Reference size grows with the chain.** The preprod dust state is ~5 MB

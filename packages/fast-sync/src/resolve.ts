@@ -10,7 +10,8 @@
 // in, and the alias table maps it onto one of the four, so a single set of
 // funded wallets in the repo-root .env.<network> serves all eight examples.
 
-import { fileURLToPath } from 'node:url';
+import { existsSync, statSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import type { WalletSecret } from './types.js';
 import type { FastSyncOptions } from './fast-wallet.js';
 
@@ -32,8 +33,41 @@ const ALIASES: Record<string, CanonicalRole> = {
   BIDDER_TWO: 'CHARLIE',
 };
 
-/** The shipped reference bundles, at the repo root. */
-export const REFERENCE_ROOT = fileURLToPath(new URL('../../../preseed', import.meta.url));
+/**
+ * Whether `dir` is safe to read a bundle from: owned by this user (or root)
+ * and not writable by group or others. A bundle there can't have been planted
+ * by another account, as one in a shared directory like /tmp could be. POSIX
+ * only; elsewhere every directory passes.
+ */
+function trusted(dir: string): boolean {
+  if (typeof process.getuid !== 'function') return true;
+  const uid = process.getuid();
+  try {
+    const st = statSync(dir);
+    return (st.uid === uid || st.uid === 0) && (st.mode & 0o022) === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Where the pre-seed reference bundle for `networkId` is:
+ * $MIDNIGHT_PRESEED_DIR when set, else the nearest `preseed/` at or above
+ * `from` (the working directory) that holds a `<networkId>/manifest.json`,
+ * else null. The search stops at the first directory with a `.git` (the
+ * project or repo root) and skips a `preseed/` that it or its parent leaves
+ * open to other users. A project without bundles syncs from genesis. A bundle
+ * that is found is still checked before use (reference-bundle.ts).
+ */
+export function findReferenceRoot(networkId: string, from: string = process.cwd()): string | null {
+  const env = process.env.MIDNIGHT_PRESEED_DIR;
+  if (env) return resolve(env);
+  for (let dir = resolve(from); ; dir = dirname(dir)) {
+    const root = join(dir, 'preseed');
+    if (existsSync(join(root, networkId, 'manifest.json')) && trusted(root) && trusted(dir)) return root;
+    if (existsSync(join(dir, '.git')) || dirname(dir) === dir) return null;
+  }
+}
 
 /** Genesis-funded seeds on the local `undeployed` devnet. */
 export const LOCAL_SEEDS: Record<CanonicalRole, string> = {
@@ -109,7 +143,7 @@ function readBirthday(prefix: string): number | undefined {
  * whole safety story: `isSeedable()` refuses to seed a wallet that could have
  * been active before the reference was cut, and a seed with no recorded
  * birthday is exactly such a wallet. Never hand-write a _BIRTHDAY line — only
- * `yarn wallets:new`, which reads the chain tip at the moment it mints the
+ * `npm run wallets:new`, which reads the chain tip at the moment it mints the
  * seed, is entitled to.
  */
 export function resolveWallet(net: string, role?: string): ResolvedWallet {
@@ -129,17 +163,18 @@ export function resolveWallet(net: string, role?: string): ResolvedWallet {
     const secret = readSecret(prefix);
     if (!secret) continue;
     const birthday = readBirthday(prefix);
+    const referenceRoot = findReferenceRoot(net);
     return {
       secret,
       role: canonical,
-      ...(birthday === undefined ? {} : { fastSync: { referenceRoot: REFERENCE_ROOT, birthday } }),
+      ...(birthday === undefined || referenceRoot === null ? {} : { fastSync: { referenceRoot, birthday } }),
     };
   }
 
   throw new Error(
     `No wallet for role '${canonical}' on network '${net}'. Set ` +
       `MIDNIGHT_${upper}_${canonical}_SEED (plus MIDNIGHT_${upper}_${canonical}_BIRTHDAY ` +
-      `to enable fast-sync) in the repo-root .env.${net}. ` +
-      `Run \`yarn wallets:new\` to generate and \`yarn preseed:cut\` first — see FAST-SYNC.md.`,
+      `to enable fast-sync) in .env.${net}: the project's, or the repo root's in midnight-examples, ` +
+      `where \`npm run preseed:cut\` then \`npm run wallets:new\` generate them — see its FAST-SYNC.md.`,
   );
 }

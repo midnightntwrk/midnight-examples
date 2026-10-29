@@ -30,7 +30,7 @@ import {
   MidnightWalletProvider,
   syncWallet,
 } from '../wallet.js';
-import { resolveWallet, waitForNightThenDust } from '@midnight-ntwrk/example-fast-sync';
+import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import { buildProviders, type CalculatorProviders } from '../providers.js';
 import { createCalculatorPrivateState } from '../../contract/witnesses.js';
 import {

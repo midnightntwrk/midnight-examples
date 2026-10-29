@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Standalone entry point: `yarn attestation:start` (from examples/zk-loan).
+// Standalone entry point: `npm run attestation:start` (from examples/zk-loan).
 // Ported from midnightntwrk/example-zkloan
 // (zkloan-credit-scorer-attestation-api/src/index.ts).
 //

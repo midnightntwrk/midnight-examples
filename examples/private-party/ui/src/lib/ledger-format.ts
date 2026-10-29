@@ -1,7 +1,7 @@
 // Best-effort text for a decoded ledger field, used by the generated panel's
 // ledger readout.
 //
-// `yarn new:ui` describes each exported ledger field from contract-info.json
+// `npm run new:ui` describes each exported ledger field from contract-info.json
 // (`ledger[].storage` and `ledger[].type`) as a LedgerField. The decoded
 // values are what the compiler-generated `ledger()` returns (see `Ledger` in
 // contract/managed/<c>/contract/index.d.ts):
@@ -13,8 +13,8 @@
 //   List      { length(), head(), [Symbol.iterator] }     "N: a, b, c" (head first)
 //   Map       { size(), [Symbol.iterator] of [k, v] }     "N: k → v, ..."
 //
-// Template-owned: edit templates/ui/src/lib/ledger-format.ts, then
-// `yarn new:ui <name> --sync`.
+// Template-owned: edit packages/mnkit/templates/ui/src/lib/ledger-format.ts, then
+// `npm run new:ui -- <name> --sync`.
 
 export interface LedgerField {
   name: string;

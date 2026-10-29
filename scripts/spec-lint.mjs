@@ -14,11 +14,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Lint an example's SPEC.md (scripts/lib/spec-lint.mjs):
+// Lint an example's SPEC.md (packages/mnkit/src/lib/spec-lint.mjs):
 //
-//   yarn spec:lint <name> [--design] [--json]
-//   yarn spec:lint --file <path> [--witnesses | --no-witnesses] [--json]
-//   yarn spec:lint --all [--json]
+//   npm run spec:lint -- <name> [--design] [--json]
+//   npm run spec:lint -- --file <path> [--witnesses | --no-witnesses] [--json]
+//   npm run spec:lint -- --all [--json]
 //
 //   <name>          examples/<name>/SPEC.md: the design checks, then, once the
 //                   contract is compiled, the code checks (the card against
@@ -35,14 +35,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { listCompiled } from './lib/contract-info.mjs';
-import { lintCode, lintDesign } from './lib/spec-lint.mjs';
-import { fail } from './lib/template.mjs';
+import { listCompiled } from '../packages/mnkit/src/lib/contract-info.mjs';
+import { lintCode, lintDesign } from '../packages/mnkit/src/lib/spec-lint.mjs';
+import { exitOnError, fail } from '../packages/mnkit/src/lib/template.mjs';
+
+exitOnError();
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const EXAMPLES_DIR = path.join(REPO_ROOT, 'examples');
 const USAGE =
-  'Usage: yarn spec:lint <name> [--design] [--json] | --file <path> [--witnesses|--no-witnesses] [--json] | --all [--json]';
+  'Usage: npm run spec:lint -- <name> [--design] [--json] | --file <path> [--witnesses|--no-witnesses] [--json] | --all [--json]';
 
 const args = process.argv.slice(2);
 const opts = { json: false, design: false, all: false, file: null, witnessesFlag: undefined, name: null };
@@ -67,7 +69,7 @@ function lintExample(name) {
   const results = [{ example: name, stage: 'design', problems: lintDesign(fs.readFileSync(spec, 'utf8')) }];
   if (opts.design) return results;
   if (listCompiled(dir).length === 0) {
-    results.push({ example: name, stage: 'code', skipped: 'not compiled: run yarn compile:fast', problems: [] });
+    results.push({ example: name, stage: 'code', skipped: 'not compiled: run `npm run compile:fast`', problems: [] });
   } else {
     results.push({ example: name, stage: 'code', problems: lintCode(dir) });
   }

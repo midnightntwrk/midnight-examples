@@ -17,39 +17,18 @@
 // Compiles every contract of one example. An example's `compile` and
 // `compile:fast` scripts run this from its own directory:
 //
-//   yarn compile        → node ../../scripts/compile-contracts.mjs
-//   yarn compile:fast   → node ../../scripts/compile-contracts.mjs --skip-zk
+//   npm run compile        → node ../../scripts/compile-contracts.mjs
+//   npm run compile:fast   → node ../../scripts/compile-contracts.mjs --skip-zk
 //
-// Each contract/<c>.compact compiles to contract/managed/<c>, one after the
-// other, stopping at the first failure. Modules and files another contract
-// imports or includes are skipped (contractSources in lib/contract-info.mjs).
-// So a second contract (a test-only token beside the main one) needs no
-// package.json edit: add contract/<token>.compact, compile, and
-// `yarn new:example <name> --derive` wires it into contract/index.ts and the
-// devnet test.
+// A thin wrapper over mnkit's compile command (packages/mnkit/src/commands/compile.mjs).
+// It runs the default compiler, which CI sets to the pin.
 
-import { spawnSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
-import { contractSources } from './lib/contract-info.mjs';
-import { fail } from './lib/template.mjs';
+import { compile } from '../packages/mnkit/src/commands/compile.mjs';
+import { exitOnError, fail } from '../packages/mnkit/src/lib/template.mjs';
+
+exitOnError();
 
 const args = process.argv.slice(2);
 const unknown = args.filter((a) => a !== '--skip-zk');
 if (unknown.length) fail(`unknown argument(s): ${unknown.join(' ')}. Usage: compile-contracts.mjs [--skip-zk]`);
-const skipZk = args.includes('--skip-zk');
-
-const EXAMPLE_DIR = process.cwd();
-if (!fs.existsSync(path.join(EXAMPLE_DIR, 'contract'))) {
-  fail('run this from an example directory (one with contract/), via `yarn compile` or `yarn compile:fast`.');
-}
-const contracts = contractSources(EXAMPLE_DIR);
-if (contracts.length === 0) fail('no contract/*.compact to compile.');
-
-for (const { name } of contracts) {
-  const cmd = ['compile', ...(skipZk ? ['--skip-zk'] : []), `contract/${name}.compact`, `contract/managed/${name}`];
-  console.log(`• compact ${cmd.join(' ')}`);
-  const r = spawnSync('compact', cmd, { cwd: EXAMPLE_DIR, stdio: 'inherit' });
-  if (r.error) fail(`could not run compact: ${r.error.message}`);
-  if (r.status !== 0) process.exit(r.status ?? 1);
-}
+process.exitCode = await compile(process.cwd(), { skipZk: args.includes('--skip-zk') });

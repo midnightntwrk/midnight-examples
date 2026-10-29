@@ -3,7 +3,7 @@
 <!--
 The design card for this example (generation flow step 1, docs/generation-flow.md).
 Written after the fact for the Phase 1 baseline run, as the worked example of
-templates/example/SPEC.md. AGENTS.md → "Privacy" has the longer reasoning.
+packages/mnkit/templates/example/SPEC.md. AGENTS.md → "Privacy" has the longer reasoning.
 -->
 
 ## Purpose

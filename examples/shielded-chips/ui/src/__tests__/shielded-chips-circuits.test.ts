@@ -11,7 +11,7 @@
 // Token movements aren't ledger state; the deposits and bets are checked on
 // the call's Effects. On chain, those are what the wallet balances.
 //
-// Seed file: generated once by `yarn new:ui`, then yours to edit. The drift
+// Seed file: generated once by `npm run new:ui`, then yours to edit. The drift
 // check ignores it.
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import type { FinalizedCallTxData } from "@midnight-ntwrk/midnight-js-contracts";

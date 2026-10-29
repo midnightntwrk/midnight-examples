@@ -8,7 +8,7 @@
 // checks that dappPublicKey / guestCommitment, which re-derive the contract's
 // unexported helpers, match what the circuits wrote to the ledger.
 //
-// Seed file: generated once by `yarn new:ui`, then yours to edit. The drift
+// Seed file: generated once by `npm run new:ui`, then yours to edit. The drift
 // check ignores it.
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { FinalizedCallTxData } from "@midnight-ntwrk/midnight-js-contracts";
