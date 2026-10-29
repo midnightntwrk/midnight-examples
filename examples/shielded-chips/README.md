@@ -11,7 +11,10 @@ The subtler part is doing all of that without leaving a coin nonce in public
 state, because a public nonce is enough to unmask the wallets involved. The game
 is deliberately simple so the coin operations stay in focus.
 
-- [`TUTORIAL.md`](./TUTORIAL.md): a step-by-step walkthrough of writing both contracts.
+- [The Shielded Chips tutorial](./tutorials/index.mdx): a guided walkthrough of both contracts
+  and the end-to-end game, also published at
+  [docs.midnight.network](https://docs.midnight.network/tutorials/shielded-chips). It is step 5
+  of the [learning path](../../README.md#learning-path).
 - [`LESSONS.md`](./LESSONS.md): what a privacy audit of an earlier version found,
   and how the nonce leaks were fixed.
 - [`privacy-tests.md`](./privacy-tests.md): what `src/test/privacy.test.ts`
