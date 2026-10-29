@@ -3,5 +3,5 @@
 # A ledger field declaration, not a credential.
 experimental/q3-ledger9/signature-verify/contract/signature_auth.compact:generic-api-key:74
 # Sample devnet log output in the tutorial: a token color and a public match key.
-examples/shielded-chips/TUTORIAL.md:generic-api-key:1181
-examples/shielded-chips/TUTORIAL.md:generic-api-key:1195
+examples/shielded-chips/tutorials/test-suite.mdx:generic-api-key:188
+examples/shielded-chips/tutorials/test-suite.mdx:generic-api-key:202

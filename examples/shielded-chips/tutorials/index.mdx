@@ -1,0 +1,200 @@
+---
+SPDX-License-Identifier: Apache-2.0
+copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+title: Shielded Chips
+description: "Shielded tokens end to end: a MIP-0011 native shielded token, a roulette contract that holds and pays out its coins, and how a coin's nonce can name a wallet."
+sidebar_position: 38
+tags:
+  - tutorials
+  - shielded-chips
+  - compact
+  - shielded-tokens
+  - privacy
+  - advanced
+  - midnight-network
+---
+
+import PersonaTiles from '@site/src/components/PersonaTiles';
+
+# Shielded chips tutorial
+
+**Prerequisites:** work through the [Private tip jar](/tutorials/private-tip-jar) tutorial first.
+This tutorial assumes you have seen a shielded coin move into a contract: `receiveShielded` on a
+fresh coin the caller's wallet pays for, `insertCoin` to store it, and a test suite that deploys
+two contracts and connects them by a token color.
+
+The tip jar's demo token existed only so there was something to tip with. Here the token is the
+subject. This tutorial walks through the two Compact contracts at the heart of the example:
+
+1. `chips.compact`, a **native shielded token** implementing
+   [MIP-0011](https://github.com/midnightntwrk/midnight-improvement-proposals/blob/main/mips/mip-0011-native-shielded-token.md),
+   which the house mints and hands out to players. Chip holdings live inside Zswap UTXOs rather
+   than in a public balance map.
+2. `roulette.compact`, a RED/BLACK betting game that takes chip coins as bets and pays winners 2×.
+
+The repo provides everything else. The tutorial focuses on the shielded-token operations
+(minting, sending, receiving, custodying, and burning coins) and stays brief on the parts that
+aren't token-specific: enum plumbing, the roulette wheel's color table, and identity hashing.
+
+It also spends real time on one thing that is easy to get wrong and hard to notice: **where a
+coin's nonce ends up**. Two contracts can use the same token primitives, look equally "shielded",
+and differ completely in whether an observer can name the wallets involved.
+[The rule](#01-the-rule-that-shapes-both-contracts) below explains why, and you will see it drive
+concrete decisions in both files.
+
+The source for this tutorial is
+[`examples/shielded-chips`](https://github.com/midnightntwrk/midnight-examples/tree/main/examples/shielded-chips)
+in midnight-examples. Beside it are
+[`LESSONS.md`](https://github.com/midnightntwrk/midnight-examples/blob/main/examples/shielded-chips/LESSONS.md),
+what a privacy audit of an earlier version found and how the nonce leaks were fixed, and
+[`privacy-tests.md`](https://github.com/midnightntwrk/midnight-examples/blob/main/examples/shielded-chips/privacy-tests.md),
+what the privacy test suite checks against live chain state.
+
+## Set up
+
+You need:
+
+- the [Compact toolchain](/getting-started/installation);
+- Node.js 22;
+- Docker, with the engine running. The example's `compose.yml` provides the local devnet: a node,
+  an indexer and a proof server. You don't start a proof server yourself.
+
+Clone midnight-examples, install the workspace and compile every contract. The workspace needs
+npm 11.10 or newer (`npm install -g npm@11`):
+
+```bash
+git clone https://github.com/midnightntwrk/midnight-examples.git
+cd midnight-examples
+npm install && npm run compile
+```
+
+Then move into the example:
+
+```bash
+cd examples/shielded-chips
+```
+
+You'll start the local network in the last part, when you run the game.
+
+## 0. What's in the example
+
+The example directory holds the two contracts and the TypeScript around them:
+
+```
+contract/
+  chips.compact     # the MIP-0011 native shielded token
+  roulette.compact  # the game that custodies chip coins
+  index.ts          # exports both compiled contracts to TypeScript (CompiledContract.make)
+  witnesses.ts      # localSecretKey (shared) + the roulette escrow witnesses
+src/
+  config.ts         # network endpoints
+  providers.ts      # wires wallet + proof server + indexer into a provider set
+  wallet.ts         # MidnightWalletProvider, wallet sync
+  test/roulette.test.ts   # the end-to-end game, driven through the SDK
+  test/privacy.test.ts    # asserts no secret nonce or wallet key reaches the chain
+compose.yml         # local devnet (node + indexer + proof server)
+scripts/            # wait-for-dust.ts, used by `npm run wait:dust`
+```
+
+`npm run compile` turns the two `.compact` files into `contract/managed/`: the compiled circuits,
+their proving and verifying keys, and the TypeScript type definitions the rest of the example
+imports.
+
+The mental model for the two contracts:
+
+```
+  chips.compact (MIP-0011)               roulette.compact
+  ────────────────────────               ────────────────
+  house mints a shielded token   ──────► players bet chip COINS
+  color = tokenType(domain,      color         (custodied by the contract)
+          contract address)      ──────► winners get 2× back via sendShielded
+```
+
+The roulette contract never mints chips. It only receives, holds, and sends chip coins that the
+chips contract created, which is exactly what makes the shielded-token plumbing the interesting
+part.
+
+### 0.1 The rule that shapes both contracts
+
+Before reading either file, learn one protocol fact. It determines several design decisions that
+would otherwise look arbitrary.
+
+**A coin commitment is a deterministic function of `(nonce, color, value, owner)`.** That is what
+lands on chain when a coin is created. The owner is inside the hash, so the commitment itself
+reveals nothing.
+
+**But every coin derived from a coin has a nonce derived from the source nonce alone.** Both
+`sendShielded` and `mergeCoin` compute their output nonce as roughly:
+
+```
+outputNonce = hash("midnight:kernel:nonce_evolve", sourceNonce)
+```
+
+Nothing about the recipient, the value, or the transaction enters that derivation. So if you know
+a coin's nonce, you know the nonce of the coin a contract spends it into, and the coin after that,
+for as long as contracts keep spending it. The chain ends when a wallet spends the coin, because a
+wallet picks a fresh random nonce for each output it builds. It also ends when the coin is the
+second argument to `mergeCoin`, which derives the merged nonce from its first argument only.
+
+Put those two facts together and you get the rule:
+
+> **Any coin nonce in public ledger state is a linkability oracle.**
+
+Given a guessed wallet key, anyone can recompute `commitment(nonce, color, value, guess)` and
+check whether it appears on chain. A match is a confirmation, and a mismatch is a refutation. It
+works in both directions:
+
+- **inbound:** which wallet funded the coin you stored;
+- **outbound:** which wallet was paid out of it, because the payout nonce follows from the stored
+  nonce.
+
+Guessing a wallet key sounds hard, but in practice the attacker rarely has to guess. A token
+issuer knows every recipient it paid. Any past counterparty knows yours. Published or registered
+addresses hand them over for free. The candidate set for a real application is small, and the
+oracle turns a small candidate set into certainty.
+
+So deriving a pseudonym from a secret unrelated to your wallet keys, which both contracts do, is
+**necessary but nowhere near sufficient**. A pseudonym is only as private as the coins recorded
+under it. You will see this shape the code three times:
+
+| Where | Decision | Why |
+|---|---|---|
+| `chips.compact`, [`mint`](/tutorials/shielded-chips/chips-token#13-mint-and-why-this-contract-refuses-the-derived-nonce-extension) | caller-supplied secret nonce, no nonce chain on the ledger | a nonce derivable from public state makes every mint recipient recomputable |
+| `roulette.compact`, [`betColor`](/tutorials/shielded-chips/roulette#24-housedeposit-and-betcolor-two-ways-to-take-custody) | store a *commitment* to the escrowed coin, not the coin | the payout nonce follows from the escrow nonce, so publishing it would identify the winner |
+| `roulette.compact`, [`claimWinnings`](/tutorials/shielded-chips/roulette#26-claimwinnings-paying-2-in-one-circuit-unlinkably) | the player's coin is `mergeCoin`'s **first** argument | the merged nonce is derived from the first input only |
+
+One more fact keeps the rule cheap to follow on the way **in**. The coin you hand to a circuit
+that calls `receiveShielded` is not one of your wallet's coins. It describes a *new* coin the
+transaction creates for the contract, and your wallet pays for it from whichever coins it selects,
+making change. So give it a fresh random nonce (`freshCoin(color, amount)` in the tests). Then that
+nonce appears in exactly one commitment, the contract's own, and nobody else, not even the issuer
+who minted your chips, has seen it. Copy a nonce from your wallet's `availableCoins` instead and you
+have published a link to your wallet coin. [Run the game](/tutorials/shielded-chips/test-suite)
+shows the client side.
+
+<PersonaTiles tiles={[
+  {
+    title: "The chips token",
+    body: "Read chips.compact: MIP-0011 state and metadata, a recipient-private mint, the two burn circuits and why each needs its own spend path, and what supply accounting costs in privacy.",
+    to: "/tutorials/shielded-chips/chips-token",
+    cta: "Read the token",
+  },
+  {
+    title: "The roulette contract",
+    body: "Read roulette.compact: two ways to take custody of a coin, a commitment instead of a stored coin, a 2× payout in one circuit, and the price of a private escrow. Then compile both.",
+    to: "/tutorials/shielded-chips/roulette",
+    cta: "Read the game",
+  },
+  {
+    title: "Run the game",
+    body: "The player's side of the escrow, then a full round on a local devnet: mint, bet, reveal, claim, forfeit, sweep, burn, and read the chain back to check the privacy claims.",
+    to: "/tutorials/shielded-chips/test-suite",
+    cta: "Run the tests",
+  },
+  {
+    title: "Cheat-sheet",
+    body: "Every shielded-token operation the example uses, with its coin types, and the privacy rules from this tutorial in one place.",
+    to: "/tutorials/shielded-chips/cheat-sheet",
+    cta: "Open the cheat-sheet",
+  },
+]} />

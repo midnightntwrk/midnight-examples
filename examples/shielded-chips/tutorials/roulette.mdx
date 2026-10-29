@@ -1,0 +1,663 @@
+---
+SPDX-License-Identifier: Apache-2.0
+copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+sidebar_label: "The roulette contract"
+title: "The roulette contract"
+description: "Read roulette.compact: how a game holds players' shielded chips without putting them in public state, pays 2× privately in one circuit, and what that costs."
+sidebar_position: 20
+toc_max_heading_level: 3
+tags:
+  - tutorials
+  - shielded-chips
+  - compact
+  - shielded-tokens
+  - privacy
+  - advanced
+  - midnight-network
+---
+
+# The roulette contract
+
+This part walks through `contract/roulette.compact`, a RED/BLACK betting game that takes chip
+coins as bets and pays winners 2×. Then it compiles both contracts.
+
+## Prerequisites
+
+- [The chips token](/tutorials/shielded-chips/chips-token), so you know where the coins come from
+  and what a token color is.
+- [The rule that shapes both contracts](/tutorials/shielded-chips#01-the-rule-that-shapes-both-contracts).
+
+Open `examples/shielded-chips/contract/roulette.compact` in your editor and keep it beside this
+page.
+
+The roulette contract is longer than the token, but game logic accounts for most of that length:
+assertions, the wheel, and a commit and reveal of the winning number. This page moves quickly
+through those and slows down every time a chip coin moves.
+
+## 2.1 Enums, ledger state and witnesses
+
+```compact title="contract/roulette.compact"
+pragma language_version 0.23;
+import CompactStandardLibrary;
+
+export enum BetState {
+    CLOSED,
+    OPEN
+}
+
+// GREEN is the zero-pocket only; bets are restricted to RED or BLACK.
+export enum Color {
+    GREEN,
+    RED,
+    BLACK
+}
+
+export sealed ledger theHouse: Bytes<32>;
+export sealed ledger chipColor: Bytes<32>;
+export sealed ledger winningNumHash: Bytes<32>;
+export ledger betState: BetState;
+export ledger winningColor: Color;
+export ledger bets: Map<Bytes<32>, Color>;
+// A commitment to the player's escrowed coin — deliberately NOT the coin.
+// Storing the coin (as Map.insertCoin does) would publish its nonce, which is
+// enough to identify both the wallet that funded the bet and the wallet paid
+// out of it. Only the player can reopen this.
+export ledger betCommits: Map<Bytes<32>, Bytes<32>>;
+// The bet size is public by design, and is what claimWinnings checks the
+// house's match coin against. A value alone identifies nobody.
+export ledger betValues: Map<Bytes<32>, Uint<64>>;
+// Players who have been paid, so a win can only be claimed once.
+export ledger paidWinners: Set<Bytes<32>>;
+// Alice's pre-deposited match coins, plus anything losers have forfeited.
+// A deposit is stored under the fresh nonce it was created with, a forfeit
+// under a nonce the contract derived from the secret escrow coin. Neither is
+// shared with any wallet coin, so publishing them links nothing to a wallet.
+export ledger houseCoins: Map<Bytes<32>, QualifiedShieldedCoinInfo>;
+```
+
+The interesting part is the deliberate asymmetry between how the contract stores the house's
+coins and how it stores the players':
+
+- `houseCoins: Map<Bytes<32>, QualifiedShieldedCoinInfo>` holds the house's pre-deposited "match"
+  coins, stored **as coins**. Storing a `QualifiedShieldedCoinInfo` in ledger state is the normal
+  way a contract keeps custody of a coin between transactions: it received the coin earlier, and it
+  remembers the qualified handle so it can `sendShielded` that exact coin later.
+- `betCommits: Map<Bytes<32>, Bytes<32>>` holds each player's escrowed chip, stored **as a
+  commitment**. The contract holds the coin, but nothing that identifies the coin reaches the
+  chain.
+- `betValues: Map<Bytes<32>, Uint<64>>` holds the bet size, public on purpose. A value on its own
+  identifies nobody, and `claimWinnings` needs it to check the house's match coin.
+
+Why the difference? [The nonce rule](/tutorials/shielded-chips#01-the-rule-that-shapes-both-contracts).
+A stored coin publishes its nonce. Both kinds of coin arrive with a fresh nonce, so a stored coin
+says nothing about the wallet that funded it. But a stored nonce still identifies whoever is paid
+*out* of the coin later, because the payout nonce is derived from it. For the house that is
+acceptable and documented: the house is publicly identified by `theHouse` anyway, and it needs
+its pool coins spendable by a circuit that only it calls. For a player, whose payout would then be
+traceable, it would defeat the entire point of the pseudonym.
+
+That choice has a price, and it is worth being upfront about it. Because only the player can
+reopen their own commitment, **only the player can move their escrowed coin.** The house cannot
+sweep a loser's stake. The loser has to call `forfeit()` ([2.7](#27-forfeit-the-cost-of-the-private-escrow)).
+Privacy and unilateral recovery are in genuine tension here, and this contract picks privacy.
+
+`chipColor` is `sealed`, and the constructor binds it at deploy time. It is the color the game
+accepts: the chips contract's color, which the deployer derives off chain with `rawTokenType`.
+
+### Witnesses
+
+```compact title="contract/roulette.compact"
+witness localSecretKey(): Bytes<32>;
+// The player's blinding factor for their escrow commitment. With a fresh coin
+// nonce the commitment is already unguessable. The salt keeps it that way even
+// if a client reused a known nonce (say, one the chip issuer minted), which
+// the contract has no way to check.
+witness escrowSalt(): Bytes<32>;
+// The escrowed coin, replayed from the player's private state at claim time.
+// The contract cannot look this up: that is the whole point.
+witness escrowedCoin(): QualifiedShieldedCoinInfo;
+```
+
+`localSecretKey` is the same identity witness the chips contract uses. The two extra witnesses
+exist to make the escrow commitment reopenable:
+
+- `escrowSalt()` is the player's blinding factor. A bet coin with a fresh nonce already makes the
+  commitment unguessable, but the contract can't check that the nonce is fresh. If a client
+  reused the nonce of a coin it was minted, the salt still stops the chip issuer, who knows that
+  coin, from recomputing the commitment and matching it to the pseudonym.
+- `escrowedCoin()` is the coin itself, replayed from private state at claim time. The contract
+  cannot look it up. That is the point.
+
+Both read straight out of the player's private state in `contract/witnesses.ts`:
+
+```typescript title="contract/witnesses.ts"
+// Both the roulette and chips contracts declare the same
+// `witness localSecretKey(): Bytes<32>` function and share an identity
+// derivation, so a single private-state shape and witness object backs
+// them both.
+//
+// `escrowSalt` and `escrowedCoin` exist because roulette deliberately does not
+// store the player's escrowed coin on chain — only a commitment to it. The
+// player is therefore the only party who can reopen that commitment, so the
+// coin has to be replayed out of private state at claim time. `mt_index` is
+// assigned when the bet transaction lands, so it is filled in after the fact
+// (see rememberEscrow).
+export type RoulettePrivateState = {
+  sk: Uint8Array;
+  escrowSalt: Uint8Array;
+  escrowedCoin: QualifiedCoin;
+};
+```
+
+```typescript title="contract/witnesses.ts"
+export const rouletteWitnesses = {
+  localSecretKey: ({
+    privateState,
+  }: WitnessContext<RouletteLedger, RoulettePrivateState>): [
+    RoulettePrivateState,
+    Uint8Array,
+  ] => {
+    return [privateState, privateState.sk];
+  },
+
+  escrowSalt: ({
+    privateState,
+  }: WitnessContext<RouletteLedger, RoulettePrivateState>): [
+    RoulettePrivateState,
+    Uint8Array,
+  ] => {
+    return [privateState, privateState.escrowSalt];
+  },
+
+  escrowedCoin: ({
+    privateState,
+  }: WitnessContext<RouletteLedger, RoulettePrivateState>): [
+    RoulettePrivateState,
+    QualifiedCoin,
+  ] => {
+    return [privateState, privateState.escrowedCoin];
+  },
+};
+```
+
+## 2.2 Constructor
+
+Bind the chip color and commit to the winning number:
+
+```compact title="contract/roulette.compact"
+constructor(_winningNum: Uint<8>, allowedChipColor: Bytes<32>) {
+    assert(_winningNum >= 0 && _winningNum <= 36, "Cheat Detected: theHouse: Please keep the number on the table");
+
+    const _sk = localSecretKey();
+    theHouse = disclose(getDappPublicKey(_sk));
+    chipColor = disclose(allowedChipColor);
+    winningNumHash = commitWithSk(_winningNum as Bytes<32>, _sk);
+    betState = BetState.OPEN;
+}
+```
+
+The one token-relevant line is `chipColor = disclose(allowedChipColor)`. The deployer passes in
+the chips contract's color, and from then on the game only accepts coins of that color. The
+constructor stores the winning number as a *commitment* (`commitWithSk` hashes it with the house
+secret) and reveals it later. That is a standard commit and reveal, not token-specific.
+
+One thing to fix before you ship anything like this: `commitWithSk` reuses `_sk`, the DApp
+identity secret, as the commitment's blinding factor, and that same `_sk` is also the mint
+authority in `chips.compact`. Publishing the commitment's opening to prove you didn't cheat would
+hand over mint authority with it. Use a separate blinding witness in real code.
+
+## 2.3 A helper circuit
+
+The escrow needs a commitment over a coin:
+
+```compact title="contract/roulette.compact"
+// Bind an escrowed coin to a player-held salt. mt_index is deliberately left
+// out: it is assigned when the transaction lands, so it is not known here and
+// would make the commitment impossible to reopen.
+circuit escrowCommit(coin: QualifiedShieldedCoinInfo, salt: Bytes<32>): Bytes<32> {
+    return persistentCommit<Vector<3, Bytes<32>>>(
+        [coin.nonce, coin.color, coin.value as Bytes<32>],
+        salt
+    );
+}
+```
+
+`escrowCommit` is the commit half of a commit and reveal over a coin. Note what it omits:
+`mt_index` is assigned by the ledger when the transaction is included, so it is unknown at commit
+time. Commit to `(nonce, color, value)` and let the claimant supply `mt_index` separately. It is
+not a secret. It is just not known yet.
+
+An earlier version of this contract had a second helper, `reNonceToSelf`: receive the coin, send
+it straight back to `kernel.self()`, and store the result, so the nonce written to the ledger was
+not the depositor's. It only repaired a client that had passed one of its own wallet coins, and
+only partly, because the new nonce is a public function of the old one. With [fresh
+coins](/tutorials/shielded-chips#01-the-rule-that-shapes-both-contracts) there is nothing to
+repair, so the contract stores the coin it receives.
+
+## 2.4 `houseDeposit` and `betColor`: two ways to take custody
+
+Before any bets pay out, the house parks matching coins in the contract:
+
+```compact title="contract/roulette.compact"
+// Alice deposits a chip coin to back a future bet. `coin` is a fresh coin
+// (random nonce) that Alice's wallet pays for, and it is stored under its own
+// nonce. That nonce is in no commitment but this contract-owned coin's, so
+// publishing it does not point at Alice's wallet.
+export circuit houseDeposit(coin: ShieldedCoinInfo): [] {
+    const _sk = localSecretKey();
+    assert(getDappPublicKey(_sk) == theHouse, "Only the house can deposit match funds");
+    assert(coin.color == chipColor, "Deposit must be made with roulette chips");
+    // The key is caller-chosen and public. A coin with an existing key's nonce
+    // and a different value is a different coin, so Zswap would accept it, and
+    // insertCoin would overwrite that entry and strand its coin for good.
+    assert(!houseCoins.member(disclose(coin.nonce)), "A match coin with that nonce is already deposited");
+
+    // `disclose` here acknowledges that the coin flows into a public effect
+    // (the zswap output to this contract) and, below, into the ledger. Both
+    // are fine for a fresh nonce.
+    receiveShielded(disclose(coin));
+    // .insertCoin transforms ShieldedCoinInfo into QualifiedShieldedCoinInfo,
+    // filling in the tree index the ledger assigns when this tx lands.
+    houseCoins.insertCoin(
+        disclose(coin.nonce),
+        disclose(coin),
+        right<ZswapCoinPublicKey, ContractAddress>(kernel.self())
+    );
+}
+```
+
+This is the private tip jar's [`tip`](/tutorials/private-tip-jar/smart-contract#tipping) again,
+behind a house check. `coin` is not one of Alice's wallet coins: it is the new coin this
+transaction creates for the contract, which her client gave a fresh random nonce and her wallet
+pays for. The color guard refuses anything that isn't a roulette chip, `receiveShielded` claims
+the coin for the contract, and `houseCoins.insertCoin` stores it as a `QualifiedShieldedCoinInfo`
+under its own nonce. `insertCoin` finds the `mt_index` among this transaction's outputs, so it
+only works for a coin the transaction created, like this one.
+
+Keying by the coin's nonce means the contract needs no deposit counter. But the caller chose that
+nonce, and it is public. A coin with an existing key's nonce and a different value is a different
+coin, so Zswap would accept it, and `insertCoin` would overwrite the entry and strand the coin
+already there. Hence the `!houseCoins.member(...)` guard.
+
+Now the player side. Same custody problem, different privacy requirement:
+
+```compact title="contract/roulette.compact"
+export circuit betColor(coin: ShieldedCoinInfo, colorBet: Color): [] {
+    assert(betState == BetState.OPEN, "Not ready to accept bets yet");
+    assert(colorBet == Color.RED || colorBet == Color.BLACK, "Only RED or BLACK bets are allowed");
+
+    const _sk = localSecretKey();
+    const player = getDappPublicKey(_sk);
+    assert(player != theHouse, "theHouse cannot make bets");
+
+    const pubPlayer = disclose(player);
+    assert(!betCommits.member(pubPlayer), "Already placed a bet this round");
+    assert(disclose(coin.color) == chipColor, "Bet must be made with roulette chips");
+
+    receiveShielded(disclose(coin));
+
+    // The coin is now in the contract's custody, but nothing that identifies
+    // it reaches the chain — only a commitment the player can reopen later.
+    // Note there is no insertCoin call here. The payout in claimWinnings is
+    // derived from this coin's nonce, so publishing it, fresh or not, would
+    // let anyone confirm which wallet was paid.
+    const q = QualifiedShieldedCoinInfo {
+        nonce: coin.nonce,
+        color: coin.color,
+        value: coin.value,
+        mt_index: 0 as Uint<64>
+    };
+    betCommits.insert(pubPlayer, disclose(escrowCommit(q, escrowSalt())));
+    betValues.insert(pubPlayer, disclose(coin.value) as Uint<64>);
+    bets.insert(pubPlayer, disclose(colorBet));
+}
+```
+
+`receiveShielded` is identical, and the player's coin is fresh too. **But there is no
+`insertCoin` call, and that omission is the fix.** The natural thing to write is the same receive
+and insert pair as `houseDeposit`:
+
+```compact
+// DON'T DO THIS for a coin that came from a user
+betCoins.insertCoin(pubPlayer, disclose(coin), right(kernel.self()));
+```
+
+That publishes `nonce`, `color`, `value`, and `mt_index` for the escrowed coin, keyed by the
+player's pseudonym. The payout in [2.6](#26-claimwinnings-paying-2-in-one-circuit-unlinkably) is
+derived from the escrow nonce, so anyone with a candidate wallet key can then confirm who got
+paid, and so who is behind the pseudonym. A fresh nonce doesn't help with that: it is the
+derivation *out* of the coin that leaks. (The original version of this line was worse still,
+because the tests passed a wallet coin's own nonce, which leaked the funding wallet too. Measured
+on a live devnet, it resolved both test players to their wallets exactly, with wrong candidates
+cleanly refuted.)
+
+Instead the contract stores `persistentCommit([nonce, color, value], salt)`. The coin is in
+custody, the contract can prove later that a claimant's coin is the one they escrowed, and nothing
+coin-shaped is readable on chain.
+
+The bet's `value` and `colorBet` still go in the clear. That is the deliberate trade-off:
+**behavior is public, identity is not.** An observer can read that some pseudonym staked 100 on
+RED and won. They cannot tell whose wallet that was. Hiding value and color too is the same
+technique applied twice more: commit to them and re-prove them on claim.
+
+Note the `disclose(coin)` calls too. `disclose` is a compiler acknowledgment that a
+witness-derived value crosses a trust boundary, here into the transaction's Zswap offer, which
+carries only the coin's commitment. It is not what publishes a value: what reaches the public
+ledger is whatever the circuit writes there, the whole coin in `houseDeposit` and only a
+commitment in `betColor`.
+The chips token's [supply counters](/tutorials/shielded-chips/chips-token#16-supply-accounting-is-a-privacy-trade)
+turn on the same distinction.
+
+## 2.5 `revealWinningNumber`
+
+Once the bets are in, `theHouse` spins the wheel and reveals the winning number:
+
+```compact title="contract/roulette.compact"
+export circuit revealWinningNumber(winningNum: Uint<8>): [] {
+    const _sk = localSecretKey();
+    assert(getDappPublicKey(_sk) == theHouse, "Only the House can reveal the number");
+
+    const hash = commitWithSk(winningNum as Bytes<32>, _sk);
+    assert(hash == winningNumHash, "Cheat Detected: theHouse: tried to change the winning number");
+
+    betState = BetState.CLOSED;
+    winningColor = getColor(disclose(winningNum));
+}
+```
+
+No tokens move. The house re-hashes the number and checks it against the commitment made at
+deploy time, so it can't change the outcome after seeing the bets. Then it closes betting and
+publishes the winning color.
+
+## 2.6 `claimWinnings`: paying 2× in one circuit, unlinkably
+
+A winner gets 2× their stake: their own coin plus a matching coin from the house.
+
+```compact title="contract/roulette.compact"
+// A winner takes their 2x in one call.
+//
+// PRIVACY: mergeCoin derives the merged coin's nonce from its FIRST input
+// only, so passing the player's secret escrow coin first means the payout coin
+// inherits a nonce nobody can recompute. Merging the other way round — house
+// coin first — would derive it from a nonce that is sitting in public state,
+// and an observer could then confirm which wallet was paid.
+export circuit claimWinnings(matchKey: Bytes<32>): [] {
+    assert(betState == BetState.CLOSED, "Winning number has not been revealed");
+
+    const _sk = localSecretKey();
+    const player = disclose(getDappPublicKey(_sk));
+
+    assert(bets.member(player), "You did not place a bet");
+    assert(bets.lookup(player) == winningColor, "You did not place a winning bet");
+    assert(!paidWinners.member(player), "Already claimed");
+
+    // Reopen the escrow commitment from private state.
+    const coin = escrowedCoin();
+    assert(betCommits.lookup(player) == disclose(escrowCommit(coin, escrowSalt())),
+           "Escrowed coin does not match your commitment");
+
+    assert(houseCoins.member(disclose(matchKey)), "Match coin not available");
+    const matchCoin = houseCoins.lookup(disclose(matchKey));
+    assert(matchCoin.value == betValues.lookup(player) as Uint<128>,
+           "Match coin must equal your bet value");
+
+    const merged = mergeCoin(disclose(coin), matchCoin);
+    const mergedQ = QualifiedShieldedCoinInfo {
+        nonce: merged.nonce,
+        color: merged.color,
+        value: merged.value,
+        mt_index: 0 as Uint<64>
+    };
+    sendShielded(
+        mergedQ,
+        left<ZswapCoinPublicKey, ContractAddress>(ownPublicKey()),
+        merged.value as Uint<128>
+    );
+
+    houseCoins.remove(disclose(matchKey));
+    betCommits.remove(player);
+    betValues.remove(player);
+    paidWinners.insert(player);
+}
+```
+
+Four things to take from this circuit:
+
+- **Reopening the commitment.** `escrowedCoin()` and `escrowSalt()` come from the player's private
+  state, and the assertion against `betCommits.lookup(player)` is what makes the witness
+  trustworthy. A player who supplies a different coin fails the check. This is the reveal half of
+  the commit in `betColor`, and it is what lets a contract custody a coin it cannot describe.
+
+- **`mergeCoin` argument order is a privacy decision.** `mergeCoin(a, b)` combines two coins the
+  contract owns into one `ShieldedCoinInfo`, and the merged coin's nonce is derived **from `a`'s
+  nonce only**. Passing the player's secret escrow coin first means the payout coin inherits a
+  nonce nobody can recompute. Swap the arguments and the merged nonce derives from `matchCoin`,
+  whose nonce is sitting in `houseCoins` in plain view, and the winner becomes identifiable to
+  anyone holding a candidate wallet key. Same two coins, same 2×, same everything else: argument
+  order alone decides whether the payout is private.
+
+- **One payout, not two.** Merging first means the payout is a single `sendShielded` of one 2×
+  coin. Paying the stake and the match as two separate sends would mean more coin operations in
+  one call, and an earlier version of this contract had to split the claim across two
+  transactions. Merging is both cheaper on transactions and better on privacy. It is not free:
+  `claimWinnings` compiles to about 42,000 rows at k=16, against about 17,000 for `betColor`.
+
+- **The circuit enforces value equality.** `matchCoin.value == betValues.lookup(player)` reads
+  both sides from public ledger state, so the 2× is mechanically exactly 2×, with no off-chain
+  trust between house and player. This is the one place the public `betValues` map earns its keep.
+
+`ownPublicKey()` returns the caller's `ZswapCoinPublicKey`, the wallet calling the circuit. A
+payout has to land in an actual wallet key, and using `ownPublicKey()` is safe here because the
+circuit has already authenticated the caller against `bets` and `paidWinners`. It is a
+*recipient*, never an identifier the contract writes down.
+
+## 2.7 `forfeit`: the cost of the private escrow
+
+A loser's stake belongs to the house, but the house cannot take it: only the player can reopen
+their commitment. So the loser hands it over.
+
+```compact title="contract/roulette.compact"
+// A loser hands their escrowed coin over to the house's pool. Only the player
+// can do this, because only the player can reopen the escrow commitment — the
+// price of keeping the escrowed coin out of public state.
+export circuit forfeit(): [] {
+    assert(betState == BetState.CLOSED, "Winning number has not been revealed");
+
+    const _sk = localSecretKey();
+    const player = disclose(getDappPublicKey(_sk));
+
+    assert(bets.member(player), "You did not place a bet");
+    assert(bets.lookup(player) != winningColor, "You won — claim instead");
+    assert(betCommits.member(player), "Nothing to forfeit");
+
+    const coin = escrowedCoin();
+    assert(betCommits.lookup(player) == disclose(escrowCommit(coin, escrowSalt())),
+           "Escrowed coin does not match your commitment");
+
+    // Move the coin into the public pool by spending it to the contract and
+    // storing the new coin, rather than storing the escrow coin itself. That
+    // way the escrow nonce stays private (the pool coin's nonce is derived
+    // from it one-way), and the pool entry's mt_index comes from this
+    // transaction, not from the player's unchecked witness: a pool coin with
+    // a wrong index could never be swept.
+    const result = sendShielded(
+        disclose(coin),
+        right<ZswapCoinPublicKey, ContractAddress>(kernel.self()),
+        disclose(coin.value) as Uint<128>
+    );
+    houseCoins.insertCoin(
+        disclose(result.sent.nonce),
+        disclose(result.sent),
+        right<ZswapCoinPublicKey, ContractAddress>(kernel.self())
+    );
+
+    betCommits.remove(player);
+    betValues.remove(player);
+}
+```
+
+The coin moves from the private escrow into the public `houseCoins` pool. It is spent and
+re-created rather than stored as it is, for two reasons. The escrow nonce stays private, because
+the pool coin's nonce is derived from it one-way. And the pool entry's `mt_index` comes from this
+transaction, not from the player's witness, which nothing checks: a pool coin with a wrong index
+could never be swept. After that it is an ordinary pool coin, and `houseClaimMatch` handles it.
+
+Be honest with yourself about this circuit: **a losing player has no incentive to call it.** In
+this tutorial that is fine, and the end-to-end test simply has Charlie do it. A real deployment
+needs something structural: a bond posted at bet time, a deadline after which the stake is
+claimable some other way, or a design where the stake never sits in a form only the player can
+move. This is the concrete cost of keeping the escrowed coin off chain, and it is the right kind of
+trade-off to notice before you copy the pattern.
+
+## 2.8 `houseClaimMatch`: sweeping the pool
+
+```compact title="contract/roulette.compact"
+// Alice sweeps an unconsumed match coin — or a forfeited bet — back to her
+// wallet. Both live in houseCoins and are contract-owned, so this is a plain
+// one-coin send.
+export circuit houseClaimMatch(matchKey: Bytes<32>): [] {
+    const _sk = localSecretKey();
+    assert(getDappPublicKey(_sk) == theHouse, "Only the house can sweep");
+
+    assert(houseCoins.member(disclose(matchKey)), "Match coin not available");
+
+    const coin = houseCoins.lookup(disclose(matchKey));
+    sendShielded(
+        coin,
+        left<ZswapCoinPublicKey, ContractAddress>(ownPublicKey()),
+        coin.value as Uint<128>
+    );
+    houseCoins.remove(disclose(matchKey));
+}
+```
+
+The plainest shape in the file: look up a custodied `QualifiedShieldedCoinInfo`, `sendShielded`
+it to `ownPublicKey()`, and remove it from the map. It handles both unused match coins and
+forfeited stakes, since both live in `houseCoins`.
+
+This circuit is also the one accepted identity leak in the contract. It spends a coin whose nonce
+is public, so the payout nonce is derivable, so the house's wallet key is confirmable by anyone
+who cares to guess it. That is fine here, because `theHouse` is public and the house wants to be
+identified. But it is worth seeing clearly, because the same code in a player-facing circuit would
+be a bug. In a live run this is exactly what a post-fix audit still finds: the two sweeps resolve
+to the house's wallet, and no player resolves to anything.
+
+## 2.9 The wheel and identity helpers
+
+```compact title="contract/roulette.compact"
+// A simplified single-zero wheel: odd numbers are RED, even are BLACK, and
+// zero is GREEN. (A real wheel's colors don't follow odd and even.)
+circuit getOdd(num: Uint<8>): Boolean {
+    if (
+        num == 1 ||
+        num == 3 ||
+        num == 5 ||
+        num == 7 ||
+        num == 9 ||
+        num == 11 ||
+        num == 13 ||
+        num == 15 ||
+        num == 17 ||
+        num == 19 ||
+        num == 21 ||
+        num == 23 ||
+        num == 25 ||
+        num == 27 ||
+        num == 29 ||
+        num == 31 ||
+        num == 33 ||
+        num == 35
+    ) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+circuit getColor(num: Uint<8>): Color {
+    if (num == 0) {
+        return Color.GREEN;
+    }
+    if (getOdd(num) == true) {
+        return Color.RED;
+    } else {
+        return Color.BLACK;
+    }
+}
+
+// hash a publicKey specific to this DApp so that users cannot be tracked
+// across DApps. The _secret should be a high-entropy 32-byte value.
+circuit getDappPublicKey(_secret: Bytes<32>): Bytes<32> {
+    return persistentHash<Vector<2, Bytes<32>>>([pad(32, "roulette:pk:"), _secret]);
+}
+
+circuit commitWithSk(_winningNum: Bytes<32>, _sk: Bytes<32>): Bytes<32> {
+    return disclose(persistentHash<Vector<2, Bytes<32>>>([_winningNum, _sk]));
+}
+```
+
+Pure helper circuits: a simplified single-zero wheel (zero is GREEN, odd numbers RED, even numbers
+BLACK), the shared pseudonym derivation (identical to the chips contract's, so the house has one
+identity across both), and the winning-number commitment.
+
+## Compile
+
+You compiled every contract during set-up. To recompile just this example's two contracts, run
+this from `examples/shielded-chips`:
+
+```bash
+npm run compile
+```
+
+It compiles `chips.compact` into `contract/managed/chips` and then `roulette.compact` into
+`contract/managed/roulette`. The output lists each circuit with its size:
+
+```
+Compiling 11 circuits:
+  circuit "burn" (k=16, rows=45754)
+  circuit "burnFromTreasury" (k=16, rows=32984)
+  circuit "decimals" (k=6, rows=26)
+  circuit "mint" (k=14, rows=14775)
+  circuit "mintToTreasury" (k=15, rows=20305)
+  circuit "name" (k=6, rows=26)
+  circuit "symbol" (k=6, rows=26)
+  circuit "tokenColor" (k=13, rows=3969)
+  circuit "totalBurned" (k=6, rows=26)
+  circuit "totalMinted" (k=6, rows=26)
+  circuit "totalSupply" (k=9, rows=86)
+Overall progress [====================] 11/11
+Compiling 6 circuits:
+  circuit "betColor" (k=15, rows=17250)
+  circuit "claimWinnings" (k=16, rows=41915)
+  circuit "forfeit" (k=16, rows=35067)
+  circuit "houseClaimMatch" (k=15, rows=16756)
+  circuit "houseDeposit" (k=15, rows=16537)
+  circuit "revealWinningNumber" (k=14, rows=8542)
+Overall progress [====================] 6/6
+```
+
+`k` is a circuit's size class, room for up to 2^k rows, and the proving key follows `k` rather
+than the exact row count: in this build every k=16 key is about 19.5 MB and every k=15 key about
+10 MB. The row counts are worth reading as a cost signal:
+
+- **Reads are almost free.** `name`, `symbol`, `decimals`, `totalMinted`, and `totalBurned` are 26
+  rows each. MIP-0011 specifies them as circuits so on-chain consumers can call them. Off chain you
+  just read the ledger directly and pay nothing. `tokenColor` costs more (3,969 rows) because it
+  hashes.
+- **Coin operations dominate everything else.** `revealWinningNumber` moves no coins: 8,500 rows.
+  `betColor` and `houseDeposit` each receive one coin: about 17,000. Most circuits that *spend*
+  jump to k=16 and 33,000–46,000 rows: `forfeit` (escrow to pool), `claimWinnings` (a merge and a
+  send), and `burn` (a receive and two transient sends). The exception is `houseClaimMatch`, a
+  single send with no other coin work, at k=15 and 16,756 rows. `houseDeposit` used to be one of
+  the k=16 circuits (34,428 rows) when it re-sent each deposit to the contract; storing the fresh
+  coin as it is halved it.
+- **Cheaper is sometimes also more standard.** `mint` is 14,775 rows here, against 30,828 in an
+  earlier draft that minted to the contract and then sent the coin on. MIP-0011's `_mint` goes
+  straight to the recipient: one fewer coin operation, half the circuit.
+
+So privacy and standards work that adds a send is not free. It is just usually worth it.
+
+## Next
+
+[Run the game](/tutorials/shielded-chips/test-suite): the player's side of the private escrow,
+then a full round on a local devnet.
