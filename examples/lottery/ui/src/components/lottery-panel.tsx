@@ -1,4 +1,4 @@
-// The lottery, built on the seed `yarn new:ui` generated: step 1 is the
+// The lottery, built on the seed `npm run new:ui` generated: step 1 is the
 // template's <DeploymentCard> (deploy takes a ticket price, a ticket cap and
 // when sales end),
 // then the lottery itself. Everything the panel decides (organizer or player,
@@ -10,7 +10,7 @@
 // private state. buyTicket gets a fresh random nonce per ticket, and
 // claimPrize pays to the wallet's own unshielded address.
 //
-// Seed file: generated once by `yarn new:ui`, then yours to edit. The drift
+// Seed file: generated once by `npm run new:ui`, then yours to edit. The drift
 // check ignores it.
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";

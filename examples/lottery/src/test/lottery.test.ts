@@ -24,7 +24,7 @@ import {
 import { type ContractAddress, encodeUserAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 import { SucceedEntirely } from '@midnight-ntwrk/midnight-js-types';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { resolveWallet, waitForNightThenDust } from '@midnight-ntwrk/example-fast-sync';
+import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import { firstValueFrom } from 'rxjs';
 import pino from 'pino';
 

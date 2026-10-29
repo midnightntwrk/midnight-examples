@@ -3,7 +3,7 @@
 Browser frontend for `examples/lottery`: connect a Midnight wallet,
 deploy or join the contract, watch its public ledger, and call its circuits.
 
-Scaffolded by `yarn new:ui lottery` from `templates/ui/`. See
+Scaffolded by `npm run new:ui lottery` from `packages/mnkit/templates/ui/`. See
 `AGENTS.md` next to this file for which files are template-owned and
 which are yours, and for the verification checklist.
 
@@ -39,16 +39,16 @@ Tickets are paid in unshielded NIGHT (`ticketPrice` in STAR: 1 NIGHT =
 ## TODO: end-to-end verification with a wallet
 
 Not yet run. Everything below needs a human to approve wallet prompts. What *has* been
-verified is in `templates/ui/VERIFIED.md`, generated from this UI's
+verified is in `packages/mnkit/templates/ui/VERIFIED.md`, generated from this UI's
 `verification.json`. When you run these, tick them off. Once all pass, set
 `walletDeploy` and `walletCalls` to `verified` in `verification.json` (with the
-date and what ran), run `yarn new:ui lottery --sync`, and delete this section.
+date and what ran), run `npm run new:ui -- lottery --sync`, and delete this section.
 
-Setup: `yarn env:up && yarn wait:dust` in `examples/lottery`, `yarn
-workspace @midnight-ntwrk/example-lottery-ui dev`, and three Chrome profiles:
+Setup: `npm run env:up && npm run wait:dust` in `examples/lottery`, `npm run dev -w
+@midnight-ntwrk/example-lottery-ui`, and three Chrome profiles:
 O (organizer), A and B (players), each with its own browser wallet on
-`undeployed`. Fund all three, NIGHT included, with `yarn fund:wallet
-<mn_dust_…> <mn_addr_…>`; the page's "no DUST" hint prints the command.
+`undeployed`. Fund all three, NIGHT included, with `npm run fund:wallet
+<mn_dust_…> <mn_addr_…>` from the repo root; the page's "no DUST" hint prints the command.
 
 - [ ] **Unlock:** O connects and sets a passphrase; the panel appears.
 - [ ] **Deploy (wallet proving):** O deploys with price 1000, max 3 and sales
@@ -80,13 +80,13 @@ O (organizer), A and B (players), each with its own browser wallet on
 ## Run
 
 ```bash
-yarn workspace @midnight-ntwrk/example-lottery run compile   # contract first
-cd examples/lottery && yarn env:up && yarn wait:dust            # local devnet
-yarn workspace @midnight-ntwrk/example-lottery-ui dev           # http://localhost:5173
+npm run compile -w @midnight-ntwrk/example-lottery          # contract first
+cd examples/lottery && npm run env:up && npm run wait:dust  # local devnet
+npm run dev -w @midnight-ntwrk/example-lottery-ui           # http://localhost:5173
 ```
 
 On the local devnet, give your browser wallet DUST (and NIGHT) with
-`yarn fund:wallet <mn_dust_…> [mn_addr_…]`, run from anywhere in the repo. The
+`npm run fund:wallet <mn_dust_…> [mn_addr_…]`, from the repo root. The
 page prints the exact command when the connected wallet has no DUST.
 
 ## Scripts

@@ -14,15 +14,15 @@
 // limitations under the License.
 
 // In-memory tests: the compiled contract runs with compact-runtime, with no
-// network and no proofs. `yarn compile:fast && yarn test:sim` runs them in
+// network and no proofs. `npm run compile:fast && npm run test:sim` runs them in
 // seconds; put contract logic, every guard and the privacy invariants here,
 // and keep the devnet suite (lottery.test.ts) for the end-to-end flow.
-// `yarn new:example lottery --derive` (repo root) fills the @generated-stub
+// `npm run new:example -- lottery --derive` (repo root) fills the @generated-stub
 // regions from the compiled contract; once you edit a region it is left alone.
 
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { Sim, assertNotInPublicState, expectRejects } from '@midnight-ntwrk/example-sim';
+import { Sim, assertNotInPublicState, expectRejects } from '@midnightntwrk/mnkit-sim';
 import { Contract, LotteryState, ledger, pureCircuits, type Witnesses } from '../../contract/managed/lottery/contract/index.js';
 // @generated-stub begin coin-imports sha=e3b0c44298fc
 // @generated-stub end coin-imports

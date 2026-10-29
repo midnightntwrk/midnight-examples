@@ -8,7 +8,7 @@
 // time is set per call). It also checks that lotteryView finds each
 // person's own tickets and the winner through the contract's pure circuits.
 //
-// Seed file: generated once by `yarn new:ui`, then yours to edit. The drift
+// Seed file: generated once by `npm run new:ui`, then yours to edit. The drift
 // check ignores it.
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { FinalizedCallTxData } from "@midnight-ntwrk/midnight-js-contracts";

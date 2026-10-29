@@ -14,7 +14,7 @@
 // (actionError). The circuits test runs them against the real compiled
 // contract so they can't drift from its asserts.
 //
-// Seed file: generated once by `yarn new:ui` from contract-info.json, then
+// Seed file: generated once by `npm run new:ui` from contract-info.json, then
 // yours to edit. The drift check ignores it.
 import {
   deployContract,
