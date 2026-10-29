@@ -66,6 +66,11 @@ export class Sim<C extends SimContract<PS>, PS, L> {
   coinPublicKey: string;
   /** The private state the next call's witnesses see. Assign to swap it. */
   privateState: PS;
+  /**
+   * Block time for the next call(), in seconds since the Unix epoch: what
+   * blockTimeLt / blockTimeGte compare against. Unset, it's the real clock.
+   */
+  time: number | undefined;
   /** The context the last call returned: zswap inputs/outputs, gas, etc. */
   lastContext: CircuitContext<PS> | undefined;
 
@@ -105,7 +110,15 @@ export class Sim<C extends SimContract<PS>, PS, L> {
   call<K extends CircuitName<C>>(circuit: K, ...args: CircuitArgs<C, K>): { result: CircuitResult<C, K>; ledger: L } {
     const fn = (this.contract.impureCircuits as Record<string, unknown>)[circuit];
     if (typeof fn !== 'function') throw new Error(`${circuit} is not an impure circuit of this contract`);
-    const context = createCircuitContext(this.address, this.coinPublicKey, this.state, this.privateState);
+    const context = createCircuitContext(
+      this.address,
+      this.coinPublicKey,
+      this.state,
+      this.privateState,
+      undefined,
+      undefined,
+      this.time,
+    );
     const out = (fn as (ctx: CircuitContext<PS>, ...a: unknown[]) => CircuitResults<PS, CircuitResult<C, K>>).call(
       this.contract.impureCircuits,
       context,

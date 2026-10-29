@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `@midnightntwrk/mnkit-sim`: `sim.time` sets the block time (Unix seconds) that the next `call()` sees, so tests can cross a `blockTimeLt` / `blockTimeGte` deadline.
+
 ## mnkit 0.2.0 (unreleased)
 
 The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-wallet`, `@midnightntwrk/mnkit-sim` and `@midnightntwrk/mnkit-coins`. All four share one version. `0.2.0-rc.1` goes to the `next` dist-tag first.

@@ -1,0 +1,4 @@
+{
+  "contract": "lottery",
+  "privateState": "persistent"
+}

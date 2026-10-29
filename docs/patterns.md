@@ -44,14 +44,18 @@ Entries name a symbol rather than a line number, so search the file for it.
 | Nested `Map`s; batched migration | zk-loan | `zk-loan.compact` → `loans`, `changePin` |
 | Admin key, blacklist, admin rotation | zk-loan | `blacklistUser`, `rotateAdmin` |
 | In-circuit Schnorr signature check (Jubjub) | zk-loan | `schnorr.compact` → `schnorrVerify`, `schnorrChallenge` |
-| `pure circuit` reused off chain | zk-loan | `deriveUserPublicKey`, `schnorrChallenge` |
+| `pure circuit` reused off chain | zk-loan, lottery | `deriveUserPublicKey`, `schnorrChallenge`; `organizerKey`, `playerKey` |
+| A draw players can't steer: committed seed + per-ticket entropy, seed never published | lottery | `lottery.compact` → `constructor`, `buyTicket`, `draw` |
+| `x mod n` in a circuit (witness divides, circuit checks `q*n + r == x` and `r < n`) | lottery, calculator | `lottery.compact` → `draw`; `calculator.compact` → `divide` |
+| A key the constructor stores can't use `kernel.self()` | lottery, secret-message | `lottery.compact` → `organizerKey` |
+| A deadline: sealed Unix-seconds field checked with `blockTimeLt` / `blockTimeGte`, so anyone can close once it passes | lottery | `lottery.compact` → `salesEnd`, `buyTicket`, `closeSales`; sim tests set `sim.time` |
 
 ## Tokens
 
 | You need | Example | File → symbol |
 |---|---|---|
 | Mint an unshielded token, then send or receive it | token-transfers | `mintAndReceive`, `sendToUser`, `receiveTokens` |
-| Receive and send NIGHT | token-transfers, private-party | `receiveNightTokens`, `sendNightTokensToUser`; `checkIn`, `claimFees` |
+| Receive and send NIGHT | token-transfers, private-party, lottery | `receiveNightTokens`, `sendNightTokensToUser`; `checkIn`, `claimFees`; `buyTicket`, `claimPrize` |
 | Check the contract's own balance | private-party | `claimFees` (`unshieldedBalanceGte`) |
 | An unshielded NFT plus a NIGHT deposit and settlement | silent-auction | `receiveTokens`, `claimWin` |
 | Shielded mint, send and receive | token-transfers | `mintShieldedToSelf`, `mintAndSendShielded`, `sendShieldedToUser` |
@@ -73,6 +77,7 @@ Entries name a symbol rather than a line number, so search the file for it.
 | In-memory contract tests (no network, no proofs): `Sim.deploy`, `call`, `expectRejects` | calculator, private-tip-jar | `src/test/*.sim.test.ts`; API in [`packages/sim/src/index.ts`](../packages/sim/src/index.ts) |
 | Asserting a secret never reaches public state | private-tip-jar (in memory), shielded-chips (devnet) | `private-tip-jar.sim.test.ts` → `assertNotInPublicState`; `src/test/privacy.test.ts` |
 | Swapping caller or private state between calls | private-tip-jar | `private-tip-jar.sim.test.ts` → `sim.as(...)`, `sim.privateState = ...` |
+| Setting the block time in memory (deadlines) | lottery | `lottery.sim.test.ts` → `sim.time = ...` |
 | A lying witness is rejected by the circuit | calculator | `calculator.sim.test.ts` → `rejects a witness that lies` |
 | A hand-written simulator class (many tests, custom fixtures) | zk-loan | `zk-loan.simulator.ts`, `zk-loan.sim.test.ts` |
 
