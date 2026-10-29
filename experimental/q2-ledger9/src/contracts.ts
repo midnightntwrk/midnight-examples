@@ -54,7 +54,7 @@ export function contractAddressBytes(contractAddress: string): Uint8Array {
 
 /* ── load + bind ──────────────────────────────────────────────────────────── */
 
-/** True if `yarn compile` has emitted this contract's TS bindings. */
+/** True if `npm run compile` has emitted this contract's TS bindings. */
 export function artifactExists(managedDir: string): boolean {
   return fs.existsSync(path.join(managedDir, 'contract', 'index.js'));
 }
@@ -71,7 +71,7 @@ export async function loadContract(
 ): Promise<LoadedContract> {
   const indexPath = path.join(managedDir, 'contract', 'index.js');
   if (!fs.existsSync(indexPath)) {
-    throw new Error(`compiled contract not found: ${indexPath}. Run \`yarn compile\` first.`);
+    throw new Error(`compiled contract not found: ${indexPath}. Run \`npm run compile\` first.`);
   }
   const imported: unknown = await import(pathToFileURL(indexPath).href);
   const module = assertCompiledModule(indexPath, imported);

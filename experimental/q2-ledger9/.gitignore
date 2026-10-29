@@ -1,9 +1,6 @@
 node_modules/
 
-# Yarn 4 install state (machine-local)
-.yarn/install-state.gz
-
-# Compactc-generated artifacts (rebuilt by `yarn compile`)
+# Compactc-generated artifacts (rebuilt by `npm run compile`)
 contracts/**/managed/
 
 # levelPrivateStateProvider writes private-state DBs to CWD

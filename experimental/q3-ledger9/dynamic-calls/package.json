@@ -14,11 +14,11 @@
     "@midnight-ntwrk/midnight-js-bundled-contract-module-provider": "5.0.0-rc.2",
     "@noble/curves": "2.4.0",
     "@noble/hashes": "2.4.0",
-    "@q3/harness": "workspace:^"
+    "@q3/harness": "*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.8.0",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.12"
   }
 }

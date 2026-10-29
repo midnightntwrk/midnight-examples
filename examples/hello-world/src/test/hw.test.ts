@@ -14,14 +14,14 @@ import pino from 'pino';
 import { getConfig } from '../config.js';
 import { MidnightWalletProvider, syncWallet } from '../wallet.js';
 import {
+  findReferenceRoot,
   getChainTipHeight,
   getOrCreateTestWallet,
   resolveWallet,
   waitForNightThenDust,
-  REFERENCE_ROOT,
   type FastSyncOptions,
   type WalletSecret,
-} from '@midnight-ntwrk/example-fast-sync';
+} from '@midnightntwrk/mnkit-wallet';
 import { buildProviders, type HelloWorldProviders } from '../providers.js';
 
 // Where an auto-generated throwaway wallet is cached (gitignored). Only used
@@ -102,9 +102,10 @@ async function resolveHelloWorldWallet(
       ? `Generated a new ${net} wallet (birthday ${wallet.birthday}); it will fast-sync, then you will be asked to fund it.`
       : `Reusing the saved ${net} wallet (birthday ${wallet.birthday}).`,
   );
+  const referenceRoot = findReferenceRoot(config.networkId);
   return {
     secret: { kind: 'seed', value: wallet.seed },
-    fastSync: { referenceRoot: REFERENCE_ROOT, birthday: wallet.birthday },
+    ...(referenceRoot ? { fastSync: { referenceRoot, birthday: wallet.birthday } } : {}),
     isNew,
   };
 }

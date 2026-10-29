@@ -46,21 +46,27 @@ mn-examples/
 │   ├── lottery/   # NIGHT lottery: committed-seed draw proven in ZK, ticket pot paid to the winner + browser UI (ui/)
 │   └── battleship/       # Compact contract as a state machine, RBAC, private state + browser UI (ui/)
 ├── packages/
-│   └── fast-sync/        # shared remote-network wallet harness (pre-seed, .env, funding gate)
+│   ├── mnkit/            # the scaffolder: engine, CLI and templates/example (copied by `npm run new:example`)
+│   │   └── templates/ui/ # browser UI scaffold rendered by `npm run new:ui`
+│   ├── fast-sync/        # @midnightntwrk/mnkit-wallet: wallet provider, pre-seed fast sync, .env seeds, funding gate
+│   ├── sim/              # @midnightntwrk/mnkit-sim: in-memory contract harness for *.sim.test.ts
+│   └── coins/            # @midnightntwrk/mnkit-coins: shielded-coin helpers for tests
 ├── preseed/              # pre-seed reference bundles, per network
-├── templates/example/    # scaffold copied by `yarn new:example`
-├── templates/ui/         # browser UI scaffold rendered by `yarn new:ui`
+├── toolchain.json        # the one toolchain pin (`npm run toolchain:check`)
 ├── tsconfig.base.json    # shared TypeScript compiler options
 ├── vitest.config.ts      # aggregate test projects (per-example configs still own env)
 └── .github/workflows/    # CI: compile-and-run every example on a matrix
 ```
 
-Each example is a Yarn workspace and remains independently runnable.
+Each example is an npm workspace and remains independently runnable.
 
 ## Pinned toolchain (Phase 1 baseline)
 
 All Phase 1 examples are frozen on one generation. Do not bump these piecemeal;
-version changes happen in a coordinated pass.
+version changes happen in a coordinated pass. The pins live in
+[`toolchain.json`](toolchain.json): change them there first, then run
+`npm run toolchain:check`, which fails until this table, `ci.yaml`, `.nvmrc`, every
+`compose.yml`, `package.json` and contract pragma agree.
 
 | Component | Version |
 |---|---|
@@ -70,38 +76,45 @@ version changes happen in a coordinated pass.
 | `@midnight-ntwrk/testkit-js` | `4.1.1` |
 | wallet SDK | `1.2.0` |
 | Node.js | `22` (see `.nvmrc`) |
-| Yarn | `4.18.0` (Berry, `node-modules` linker) |
-| Vitest | `4.1.0` |
+| npm | `11.21.0` (CI; `11.10.0` or newer locally) |
+| Vitest | `5.0.4` |
+| Vite | `6.4.4` |
 
 ## Prerequisites
 
 - **Node.js 22** (`nvm use`).
-- **Corepack** for Yarn 4: `corepack enable`.
+- **npm 11.10 or newer.** Node 22 bundles npm 10. It can `npm ci` this
+  lockfile, but it silently ignores the 7-day release-age gate in `.npmrc`,
+  and its `npm install` strips the lockfile's `libc` entries:
+  `npm install -g npm@11`. (`package.json` `devEngines` warns on an older npm,
+  and the repo scripts that write the lockfile refuse one.)
 - **Docker** (the examples spin up a local Midnight network via `docker compose`).
 - **Compact compiler** on `PATH` (`compact`); CI installs it via `setup-compact-action`.
 
 ## Getting started
 
 ```bash
-corepack enable
-yarn install          # one lockfile for the whole workspace
-yarn compile          # compile every example's contract (parallel)
+npm install      # one lockfile for the whole workspace
+npm run compile  # compile every example's contract (parallel)
 ```
+
+Flags for a script go after `--`, or npm takes them as its own options:
+`npm run new:ui -- <name> --check`.
 
 Run a single example end-to-end (compile is already done above):
 
 ```bash
 cd examples/battleship
-yarn env:up           # start the local Midnight network (Docker)
-yarn wait:dust        # wait for DUST to accrue for fees
-yarn test:local       # run the test suite against the local network
-yarn env:down
+npm run env:up      # start the local Midnight network (Docker)
+npm run wait:dust   # wait for DUST to accrue for fees
+npm run test:local  # run the test suite against the local network
+npm run env:down
 ```
 
 Run every example's tests from the root:
 
 ```bash
-yarn test:local       # yarn workspaces foreach ... run test:local
+npm run test:local       # npm run test:local --workspaces --if-present
 ```
 
 ## Running against a remote network (preprod / preview)
@@ -116,20 +129,20 @@ restores from instead, bringing that down to about **75 seconds**. See
 [FAST-SYNC.md](./FAST-SYNC.md).
 
 ```bash
-cd examples/hello-world && yarn proof:up   # local proof server on :6300
+cd examples/hello-world && npm run proof:up   # local proof server on :6300
 cd ../..
 
-yarn preseed:cut     # 1. re-cut the reference bundle       (~10 min)
-yarn wallets:new     # 2. mint 4 wallets, print 4 addresses
+npm run preseed:cut  # 1. re-cut the reference bundle       (~10 min)
+npm run wallets:new  # 2. mint 4 wallets, print 4 addresses
 #                      3. fund those addresses at the faucet (manual)
-yarn test:preprod    # 4. run every suite, sequentially
+npm run test:preprod    # 4. run every suite, sequentially
 ```
 
 **Step 1 must come before step 2** — a bundle cut after the wallets exist cannot
 be used to seed them, and every run silently falls back to the 78-minute sync.
 FAST-SYNC.md explains why.
 
-`yarn wallets:new` writes a repo-root `.env.preprod` (gitignored) holding four
+`npm run wallets:new` writes a repo-root `.env.preprod` (gitignored) holding four
 seeds — **Alice, Bob, Charlie and Dave** — and prints their addresses for the
 [faucet](https://midnight-tmnight-preprod.nethermind.dev/). One file serves all
 eight examples; suites with other role names (silent-auction's
@@ -147,21 +160,42 @@ and asserts that he has no DUST of his own.
 
 ## Adding / working with examples
 
-- **Scaffold a new example with `yarn new:example <name> [--witnesses]`.** It
-  copies `templates/example/` into `examples/<name>`, wires the harness, and
-  registers the example in the CI matrix and the docs tables. You then only
-  write the `.compact` contract and the test bodies. See `templates/example/`.
-- **Add a browser UI with `yarn new:ui <name>`** once the contract compiles and
-  its tests pass. It renders `templates/ui/` into `examples/<name>/ui`, deriving
+- **Scaffold a new example with `npm run new:example -- <name> [--witnesses]`.** It
+  copies `packages/mnkit/templates/example/` into `examples/<name>`, wires the
+  harness, and registers the example in the CI matrix and the docs tables. You
+  then only write the `.compact` contract and the test bodies. See
+  `packages/mnkit/templates/example/`.
+- **Add a browser UI with `npm run new:ui <name>`** once the contract compiles and
+  its tests pass. It renders `packages/mnkit/templates/ui/` into `examples/<name>/ui`, deriving
   circuits, witnesses and ledger fields from the compiled contract, so the UI
   typechecks, tests and builds before any use-case code is written. See
-  `templates/ui/AGENTS.md` (copied into every generated UI).
+  `packages/mnkit/templates/ui/AGENTS.md` (copied into every generated UI).
 - The scripted generation pipeline (prompt, scaffold, generate, devnet test, UI
   generator, UI code, serve) is drawn in [`docs/generation-flow.md`](./docs/generation-flow.md).
 - The `.compact` **source is committed** (only generated `contract/managed/` output is
   gitignored). Do not re-introduce a `.gitignore` rule that hides `*.compact`.
 - Each example carries an `AGENTS.md` describing what it teaches and how to run it.
 - See `AGENTS.md` at the repo root for agent-oriented conventions.
+
+## mnkit: the scaffolder, outside this repo
+
+[`packages/mnkit`](packages/mnkit/README.md) is the same engine packaged as an
+npm CLI (`npx mnkit init my-app`) that scaffolds a standalone project around a
+developer's own contract. `npm run new:example` is its monorepo mode; `mnkit init`
+renders the same template as a plain npm project. Its runtime libraries are
+`packages/fast-sync` (`@midnightntwrk/mnkit-wallet`), `packages/sim` and
+`packages/coins`, all versioned with mnkit.
+
+- `npm run test:engine`: the engine's unit tests, over committed compiler output
+  (`npm run fixtures:regen -- --check` keeps it current).
+- `bash scripts/mnkit-e2e.sh [--devnet]`: packs the four packages and runs the packed
+  CLI in a directory outside the repo, the way a user gets it (CI: `mnkit-e2e`).
+- `bash scripts/mnkit-rehearsal.sh`: publishes them to a throwaway local registry and
+  tests `npx mnkit@<version>` from it, before a real release.
+- Releases: `.github/workflows/release-mnkit.yml`, on a GitHub release tagged
+  `mnkit-v<version>` from a commit on `main`. The publish waits for approval in
+  the `npm-publish` environment. A pre-release goes to the `next` dist-tag; a
+  re-run skips packages already published at that version.
 
 ## License
 

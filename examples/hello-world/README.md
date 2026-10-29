@@ -13,7 +13,7 @@ git clone git@github.com:midnightntwrk/example-hello-world.git
 Install dependencies:
 
 ```bash
-yarn install
+npm install
 ```
 
 ## Create the contract file
@@ -95,7 +95,7 @@ Now that your contract is compiled, it needs to be deployed to the blockchain so
 
 Be sure the Docker engine is running and in a *separate terminal* start the proof server from the project root:
 ```bash
-yarn env:up
+npm run env:up
 ```
 
 Leave the proof server running for the following steps.
@@ -105,7 +105,7 @@ To deploy the contract, you'll need a wallet. The local devnet package comes wit
 
 Run the deployment script:
 ```bash
-yarn test:local
+npm run test:local
 ```
 
 The test script will begin to show output from your local devnet and will progress the contract deployment and interaction programatically:
@@ -123,21 +123,21 @@ The test script will begin to show output from your local devnet and will progre
 
 Stop the Docker container:
 ```bash
-yarn env:down
+npm run env:down
 ```
 
 Hello World! You are now ready to explore [Tutorials](https://docs.midnight.network/category/tutorials) for more detailed instructions on building DApps on Midnight!
 
 ## Deploy Contract to Live Testnet
 
-A brand-new wallet on Preprod normally takes **~78 minutes** to sync for the first time — almost all of it spent building the chain-wide DUST generation tree. To avoid that, this repo uses **fast-sync**: it seeds each fresh wallet from a pre-computed reference bundle shipped under `preseed/` at the repo root, so a new wallet is ready in seconds. Fast-sync is the default path for `yarn test:preview` and `yarn test:preprod`; see [`FAST-SYNC.md`](../../FAST-SYNC.md) for how it works and why it's safe.
+A brand-new wallet on Preprod normally takes **~78 minutes** to sync for the first time — almost all of it spent building the chain-wide DUST generation tree. To avoid that, this repo uses **fast-sync**: it seeds each fresh wallet from a pre-computed reference bundle shipped under `preseed/` at the repo root, so a new wallet is ready in seconds. Fast-sync is the default path for `npm run test:preview` and `npm run test:preprod`; see [`FAST-SYNC.md`](../../FAST-SYNC.md) for how it works and why it's safe.
 
 > ⚠️ **Fast-sync is for development wallets only.** It is intended for the throwaway testnet wallets this suite generates. Do **not** use it for a mainnet wallet or any wallet holding real funds — a wallet with history must sync from genesis, and seeding it can silently hide funds. See [`FAST-SYNC.md`](../../FAST-SYNC.md#safety--read-this-before-trusting-it) for the safety rules.
 
 To run the test script on Preview or Preprod:
 
-1. Start the proof server: `yarn proof:up`
-1. Start the test: `yarn test:preview` (small reference, quick) or `yarn test:preprod` (the headline network).
+1. Start the proof server: `npm run proof:up`
+1. Start the test: `npm run test:preview` (small reference, quick) or `npm run test:preprod` (the headline network).
 
 The suite drives the rest of the flow for you:
 
@@ -145,7 +145,7 @@ The suite drives the rest of the flow for you:
 1. Because a fresh wallet holds no funds, the suite **prints the wallet's address and the faucet URL, then pauses**. Fund it once with tNIGHT at the faucet — [Preview](https://midnight-tmnight-preview.nethermind.dev/) or [Preprod](https://midnight-tmnight-preprod.nethermind.dev/). The faucet is a human-facing web page (no programmatic drip endpoint). See [Environments and endpoints](https://docs.midnight.network/relnotes/network) for reference.
 1. Once the tNIGHT arrives, the suite **resumes automatically**: it registers the NIGHT for DUST generation, waits for spendable tDUST to accrue, then runs the deploy and call tests. You do **not** need to delegate DUST manually.
 
-> **Use the shared wallets instead.** If a repo-root `.env.<network>` exists (written by `yarn wallets:new` from the repo root), this suite uses Alice from it rather than generating its own throwaway wallet — the same wallet every other example runs as, so you fund one set once. The self-generating path above is the fallback for when that file is absent, which keeps hello-world usable as a zero-setup smoke test.
+> **Use the shared wallets instead.** If a repo-root `.env.<network>` exists (written by `npm run wallets:new` from the repo root), this suite uses Alice from it rather than generating its own throwaway wallet — the same wallet every other example runs as, so you fund one set once. The self-generating path above is the fallback for when that file is absent, which keeps hello-world usable as a zero-setup smoke test.
 >
 > **Bring your own wallet.** To use an existing wallet that already has on-chain history, copy the repo-root `.env.<network>.example` and set `MIDNIGHT_<NET>_ALICE_SEED` (or `_MNEMONIC`) — but leave `_BIRTHDAY` unset. That wallet must already hold tNIGHT and tDUST. Without a birthday it takes a normal full sync rather than fast-sync, which on Preprod takes hours; that is correct, and setting a birthday you cannot vouch for would be the unsafe shortcut. See [`FAST-SYNC.md`](../../FAST-SYNC.md#safety--read-this-before-trusting-it).
 ## Frontend
@@ -153,7 +153,7 @@ The suite drives the rest of the flow for you:
 [`ui/`](ui/) is a browser dApp for the same contract: connect a Midnight wallet, deploy or join, watch `message` update live, and call `storeMessage`, with proofs generated by the wallet or by your local proof server. With the contract compiled:
 
 ```bash
-cd ui && yarn dev
+cd ui && npm run dev
 ```
 
 See [`ui/README.md`](ui/README.md) for wallet setup, the proving toggle, and how each browser provider maps to the Node harness in `src/`.

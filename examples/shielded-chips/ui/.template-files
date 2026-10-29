@@ -1,4 +1,4 @@
-# Template-owned files, written by `yarn new:ui`. Do not edit; --sync rewrites it.
+# Template-owned files, written by `npm run new:ui`. Do not edit; --sync rewrites it.
 AGENTS.md
 index.html
 package.json

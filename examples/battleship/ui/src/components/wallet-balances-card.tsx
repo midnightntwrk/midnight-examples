@@ -1,13 +1,13 @@
 // The connected wallet's token balances, for contracts that move tokens.
-// `yarn new:ui` puts one in the generated panel when the contract calls a
+// `npm run new:ui` puts one in the generated panel when the contract calls a
 // token operation (mint, send or receive, shielded or unshielded).
 //
 // It shows the wallet's side only. A contract's own balance isn't here: the
 // indexer's contract-balance query reports balances as of the deploy, not
 // after later calls (see examples/token-transfers/src/test/).
 //
-// Template-owned: edit templates/ui/src/components/wallet-balances-card.tsx,
-// then `yarn new:ui --sync-all`.
+// Template-owned: edit packages/mnkit/templates/ui/src/components/wallet-balances-card.tsx,
+// then `npm run new:ui -- --sync-all`.
 import type { ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWalletBalances } from "@/hooks/use-wallet-balances";

@@ -1,12 +1,12 @@
 // In-memory tests for the tip jar: every guard, the tip → withdraw flow, and
 // the privacy invariants in SPEC.md, with no network and no proofs.
-// `yarn compile:fast` then `yarn test:sim`. The devnet suite in
+// `npm run compile:fast` then `npm run test:sim`. The devnet suite in
 // private-tip-jar.test.ts runs the same flow with real wallets and coins.
 
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { simCoin } from '@midnight-ntwrk/example-coins';
-import { Sim, assertNotInPublicState, expectRejects, findInPublicState } from '@midnight-ntwrk/example-sim';
+import { simCoin } from '@midnightntwrk/mnkit-coins';
+import { Sim, assertNotInPublicState, expectRejects, findInPublicState } from '@midnightntwrk/mnkit-sim';
 import { Contract, ledger, pureCircuits } from '../../contract/managed/private-tip-jar/contract/index.js';
 import { createPrivateTipJarPrivateState, witnesses } from '../../contract/witnesses.js';
 

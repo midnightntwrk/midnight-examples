@@ -68,7 +68,7 @@ const present = artifactExists(MANAGED);
 if (!present) {
   console.log(
     '\n=== GAP === eth-addr-secp: not compiled. Build with' +
-      "\n            `COMPACTC=/path/to/compactc-0.33.0-rc.2/compactc yarn compile`" +
+      "\n            `COMPACTC=/path/to/compactc-0.33.0-rc.2/compactc npm run compile`" +
       '\n            (needs --feature-zkir-v3, wired in scripts/compile.mts).\n',
   );
 }

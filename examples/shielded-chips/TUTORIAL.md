@@ -34,12 +34,12 @@ Before you begin this tutorial, ensure you have:
 - Docker, with the engine running — `compose.yml` provides the local devnet
 - Completed a beginner tutorial (optional)
 
-You do **not** need to start a proof server yourself. `yarn env:up` brings up
+You do **not** need to start a proof server yourself. `npm run env:up` brings up
 the node, the indexer, and a proof server together, and `src/config.ts` already
 points at them.
 
-This example lives in the `mn-examples` monorepo. Run `corepack enable` and
-`yarn install` once from the repo root (one lockfile for the whole workspace);
+This example lives in the `mn-examples` monorepo. With npm 11.10 or newer
+(`npm install -g npm@11`), run `npm install` once from the repo root (one lockfile for the whole workspace);
 every other command below runs from `examples/shielded-chips`.
 
 ---
@@ -59,8 +59,8 @@ contract/
   index.ts         # exports the compiled contracts to TS (CompiledContract.make)
   witnesses.ts     # localSecretKey (shared) + the roulette escrow witnesses
 compose.yml        # local devnet (node + indexer + proof server)
-scripts/           # wait-for-dust.ts, used by `yarn wait:dust`
-package.json       # `yarn compile`, `yarn test:local`, etc.
+scripts/           # wait-for-dust.ts, used by `npm run wait:dust`
+package.json       # `npm run compile`, `npm run test:local`, etc.
 ```
 
 The two things you write in this tutorial are:
@@ -68,7 +68,7 @@ The two things you write in this tutorial are:
 - `contract/chips.compact`
 - `contract/roulette.compact`
 
-and then you run `yarn compile`, which generates the missing
+and then you run `npm run compile`, which generates the missing
 `contract/managed/` directory with compiled circuits, proving/verifying keys, and
 the TypeScript type definitions the scaffolding imports.
 
@@ -1068,7 +1068,7 @@ So don't. The argument is a new coin, so make it up:
 
 ```ts
 // src/test/roulette.test.ts
-import { freshCoin } from '@midnight-ntwrk/example-coins';
+import { freshCoin } from '@midnightntwrk/mnkit-coins';
 const chip = freshCoin(chipColorHex, BET_SIZE); // uniform random nonce (the ledger's createShieldedCoinInfo)
 ```
 
@@ -1090,7 +1090,7 @@ because the DApp Connector can't list a wallet's coins in the first place.
 With both `.compact` files written, generate the compiled artifacts:
 
 ```bash
-yarn compile
+npm run compile
 ```
 
 Successful output:
@@ -1158,19 +1158,19 @@ mint, mint to the treasury, or burn from it.
 Be sure that the Docker engine is running and start the local devnet:
 
 ```bash
-yarn env:up
-yarn wait:dust     # wait until the genesis wallet has DUST to pay fees
+npm run env:up
+npm run wait:dust     # wait until the genesis wallet has DUST to pay fees
 ```
 
 Run the test script:
 
 ```bash
-yarn test:local
+npm run test:local
 ```
 
 This runs both suites one after the other: `roulette.test.ts` below, then
 `privacy.test.ts` (see [`privacy-tests.md`](./privacy-tests.md)). Tear the
-devnet down with `yarn env:down` when you are done.
+devnet down with `npm run env:down` when you are done.
 
 Successful output looks like this (wallet-sync chatter trimmed):
 

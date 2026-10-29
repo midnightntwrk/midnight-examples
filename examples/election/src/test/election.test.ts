@@ -48,7 +48,7 @@ import {
   MidnightWalletProvider,
   syncWallet,
 } from '../wallet.js';
-import { resolveWallet, waitForNightThenDust } from '@midnight-ntwrk/example-fast-sync';
+import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import { buildProviders, type ElectionProviders } from '../providers.js';
 import {
   createElectionPrivateState,

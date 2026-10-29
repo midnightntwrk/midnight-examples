@@ -1,4 +1,4 @@
-// Token transfers, built on the seed `yarn new:ui` generated: step 1 is the
+// Token transfers, built on the seed `npm run new:ui` generated: step 1 is the
 // template's <DeploymentCard>, then the three families of circuits the Node
 // test exercises (src/test/token-transfers.test.ts):
 //
@@ -19,7 +19,7 @@
 // random bytes on every call, so they get small purpose-built forms that
 // generate it and book the coins they return.
 //
-// Seed file: generated once by `yarn new:ui`, then yours to edit. The drift
+// Seed file: generated once by `npm run new:ui`, then yours to edit. The drift
 // check ignores it.
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";

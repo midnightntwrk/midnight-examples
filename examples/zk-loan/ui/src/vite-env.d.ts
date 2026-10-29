@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 // All optional — defaults live next to each use. Set them in the shell, e.g.
-//   VITE_NETWORK_ID=preview yarn dev
+//   VITE_NETWORK_ID=preview npm run dev
 interface ImportMetaEnv {
   readonly VITE_NETWORK_ID?: string; // default 'preprod'
   readonly VITE_LOGGING_LEVEL?: string; // default 'info'

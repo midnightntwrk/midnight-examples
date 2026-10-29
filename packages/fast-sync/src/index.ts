@@ -24,10 +24,17 @@ export {
   type NewWalletKeys,
   type SeededSnapshots,
 } from './preseed.js';
-export { loadReferenceBundle, type EmptyRefStates } from './reference-bundle.js';
 export {
+  checkChainIdentity,
+  getBlockHash,
+  loadReferenceBundle,
+  readReferenceBundle,
+  type EmptyRefStates,
+  type ReferenceBundleResult,
+} from './reference-bundle.js';
+export {
+  findReferenceRoot,
   LOCAL_SEEDS,
-  REFERENCE_ROOT,
   resolveWallet,
   type CanonicalRole,
   type ResolvedWallet,
@@ -38,5 +45,7 @@ export {
   waitForNightThenDust,
   type FundingGateOptions,
 } from './funding.js';
+export { fundWallet, type FundWalletOptions } from './fund-wallet.js';
 export { getOrCreateTestWallet, type PersistedWallet } from './test-wallet.js';
 export { registerNightForDust, transferNight } from './local-funding.js';
+export { MidnightWalletProvider, syncWallet } from './wallet-provider.js';

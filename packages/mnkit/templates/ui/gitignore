@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# copy:zk output (keys and zkir from ../contract/managed)
+public/managed/

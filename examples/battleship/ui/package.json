@@ -8,8 +8,8 @@
   },
   "scripts": {
     "copy:zk": "node scripts/copy-zk.mjs",
-    "dev": "yarn copy:zk && vite",
-    "build": "yarn copy:zk && tsc -b && vite build",
+    "dev": "npm run copy:zk && vite",
+    "build": "npm run copy:zk && tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test:unit": "vitest run"
@@ -53,6 +53,6 @@
     "vite-plugin-node-polyfills": "^0.24.0",
     "vite-plugin-top-level-await": "^1.6.0",
     "vite-plugin-wasm": "^3.6.0",
-    "vitest": "^4.1.0"
+    "vitest": "^5.0.4"
   }
 }

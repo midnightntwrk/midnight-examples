@@ -32,7 +32,7 @@ import {
 } from '../../contract/index.js';
 import { createPartyPrivateState } from '../../contract/witnesses.js'
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { resolveWallet, waitForNightThenDust } from '@midnight-ntwrk/example-fast-sync';
+import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import type { FinalizedCallTxData, UnsubmittedDeployTxData } from '@midnight-ntwrk/midnight-js-contracts';
 import type { UnshieldedAddress } from '@midnight-ntwrk/wallet-sdk';
 
