@@ -24,7 +24,6 @@ once every item is ticked.
 | battleship | ✅ 1 | — | — | — | ◐ 2 |
 | calculator | ✅ 3 | — | — | — | ◐ 4 |
 | hello-world | ✅ 5 | ◐ 6 | — | — | ✅ 7 |
-| lottery | — | — | — | — | — |
 | private-party | ✅ 8 | — | — | — | ◐ 9 |
 | shielded-chips | ◐ 10 | — | — | — | — |
 | token-transfers | ✅ 11 | — | — | — | ◐ 12 |
