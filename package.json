@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "bn.js": "5.2.5",
-    "vite": "6.4.4",
+    "vite": "6.4.5",
     "vitest": "^5.0.4"
   },
   "overrides": {
