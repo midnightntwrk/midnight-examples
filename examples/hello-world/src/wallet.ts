@@ -14,6 +14,7 @@ import {
   type EnvironmentConfiguration,
   FluentWalletBuilder,
   MidnightWalletProvider,
+  logger as testkitLogger,
   syncWallet as testkitSyncWallet,
 } from '@midnight-ntwrk/testkit-js';
 import type { FacadeState, UnshieldedKeystore, WalletFacade } from '@midnight-ntwrk/wallet-sdk';
@@ -21,6 +22,11 @@ import type { Logger } from 'pino';
 import * as Rx from 'rxjs';
 
 export { MidnightWalletProvider };
+
+// testkit logs through its own module-level logger. At info it prints the
+// wallet's indexer and relay URLs, which carry the Blockfrost project_id, and
+// two lines per sync update. Keep only its warnings and errors.
+testkitLogger.level = 'warn';
 
 /** The secret a wallet is built from: a hex seed or a BIP-39 mnemonic. */
 export type WalletSecret = { kind: 'seed'; value: string } | { kind: 'mnemonic'; value: string };
