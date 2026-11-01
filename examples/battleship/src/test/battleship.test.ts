@@ -26,9 +26,8 @@ import { submitCallTx, deployContract } from '@midnight-ntwrk/midnight-js-contra
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import { getConfig } from '../config.js';
-import { MidnightWalletProvider, syncWallet, type WalletSecret } from '../wallet.js';
+import { MidnightWalletProvider, syncWallet, type WalletSecret, resolveWallet, waitForNightThenDust } from '../wallet.js';
 import { buildProviders, type BattleshipProviders } from '../providers.js';
 import {
     CompiledBattleshipContract,
@@ -106,15 +105,11 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
             proofServer: config.proofServer,
         };
 
-        aliceWallet = await MidnightWalletProvider.build(logger, envConfig, aliceSetup.secret, {
-            fastSync: aliceSetup.fastSync,
-        });
+        aliceWallet = await MidnightWalletProvider.build(logger, envConfig, aliceSetup.secret);
         await aliceWallet.start();
         await syncWallet(logger, aliceWallet.wallet, syncTimeoutMs);
 
-        bobWallet = await MidnightWalletProvider.build(logger, envConfig, bobSetup.secret, {
-            fastSync: bobSetup.fastSync,
-        });
+        bobWallet = await MidnightWalletProvider.build(logger, envConfig, bobSetup.secret);
         await bobWallet.start();
         await syncWallet(logger, bobWallet.wallet, syncTimeoutMs);
 

@@ -23,11 +23,10 @@ import {
 } from '@midnight-ntwrk/midnight-js-contracts';
 import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
-import { MidnightWalletProvider, syncWallet } from '../wallet.js';
+import { MidnightWalletProvider, syncWallet, resolveWallet, waitForNightThenDust } from '../wallet.js';
 import { buildProviders, type PrivateBidProviders } from '../providers.js';
 import { createPrivateBidPrivateState } from '../../contract/witnesses.js';
 import {
@@ -88,9 +87,7 @@ describe(`Private Bid Contract (${network})`, () => {
     // from the reference bundle when a birthday is recorded. Pass a role name
     // (e.g. resolveWallet(network, 'BOB')) if your suite needs more than one.
     const setup = resolveWallet(network);
-    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret, {
-      fastSync: setup.fastSync,
-    });
+    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
     await wallet.start();
     await syncWallet(logger, wallet.wallet, syncTimeoutMs);
 

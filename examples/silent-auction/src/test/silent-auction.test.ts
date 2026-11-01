@@ -56,8 +56,9 @@ import {
   MidnightWalletProvider,
   syncWallet,
   type WalletSecret,
+  resolveWallet,
+  waitForNightThenDust,
 } from '../wallet.js';
-import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import { buildProviders, type SilentAuctionProviders } from '../providers.js';
 import {
   CompiledSilentAuctionContract,
@@ -207,9 +208,7 @@ describe(`Silent Auction Contract (${network})`, () => {
       // ORGANIZER/BIDDER_ONE/BIDDER_TWO alias onto the shared Alice/Bob/Charlie
       // wallets, so one funded set in the repo-root .env serves every example.
       const setup = resolveWallet(network, role);
-      const w = await MidnightWalletProvider.build(logger, envConfig, setup.secret, {
-        fastSync: setup.fastSync,
-      });
+      const w = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
       await w.start();
       await syncWallet(logger, w.wallet, syncTimeoutMs);
       if (isRemote) {
