@@ -20,7 +20,7 @@ export default defineConfig({
     testTimeout: 15 * 60_000,
     // A remote wallet build plus the faucet funding gate needs far longer than
     // a local devnet's beforeAll.
-    hookTimeout: isRemote ? 90 * 60_000 : 15 * 60_000,
+    hookTimeout: isRemote ? 150 * 60_000 : 15 * 60_000,
     include: ['src/**/*.test.ts'],
     // roulette.test.ts and privacy.test.ts share the same Alice/Bob wallets.
     // Vitest runs test files in parallel by default, and concurrent spends of

@@ -413,9 +413,9 @@ export async function placeBet(
 /**
  * The Zswap Merkle-tree index of the coin a bet escrowed.
  *
- * The Node tests use the same logic from `@midnightntwrk/mnkit-coins`
- * (`contractCoinMtIndex`). This copy stays because that package is Node-only
- * (it imports `node:crypto`), and the UI's package.json is template-owned.
+ * The Node tests use the same logic from `src/test/coins.ts`
+ * (`contractCoinMtIndex`). This copy stays because that file is Node-only
+ * (it imports `node:crypto`).
  *
  * Every output of a transaction is appended to the tree in order, starting at
  * the transaction's `zswapStartIndex` (the indexer has it). So the escrow's

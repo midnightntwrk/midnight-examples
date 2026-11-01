@@ -28,11 +28,11 @@ import {
   encodeRawTokenType,
 } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/ledger';
-import { contractCoinMtIndex, freshCoin, type TxWithOutputs } from '@midnightntwrk/mnkit-coins';
+import { contractCoinMtIndex, freshCoin, type TxWithOutputs } from './coins.js';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
-import { MidnightWalletProvider, syncWallet } from '../wallet.js';
+import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust } from '../wallet.js';
 import { buildProviders, type ShieldedChipsProviders } from '../providers.js';
 import {
   CompiledRouletteContract,
@@ -53,7 +53,6 @@ import {
   type RoulettePrivateState,
 } from '../../contract/witnesses.js';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import { WebSocket } from 'ws';
 
 // Required for GraphQL subscriptions in Node.js
@@ -84,9 +83,7 @@ async function buildWallet(
   faucet: string,
 ): Promise<MidnightWalletProvider> {
   const setup = resolveWallet(network, role);
-  const w = await MidnightWalletProvider.build(logger, env, setup.secret, {
-    fastSync: setup.fastSync,
-  });
+  const w = await MidnightWalletProvider.build(logger, env, setup.secret);
   await w.start();
   await syncWallet(logger, w.wallet, syncTimeoutMs);
   if (isRemote) {

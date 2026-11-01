@@ -5,8 +5,8 @@
 
 import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { simCoin } from '@midnightntwrk/mnkit-coins';
-import { Sim, assertNotInPublicState, expectRejects, findInPublicState } from '@midnightntwrk/mnkit-sim';
+import { simCoin } from './coins.js';
+import { Sim, assertNotInPublicState, expectRejects, findInPublicState } from './sim.js';
 import { Contract, ledger, pureCircuits } from '../../contract/managed/private-tip-jar/contract/index.js';
 import { createPrivateTipJarPrivateState, witnesses } from '../../contract/witnesses.js';
 
