@@ -52,4 +52,4 @@ npm run env:down
 This repository is currently only set up to support a local devnet running via
 Docker. Configurations for other networks are stubbed in `src/config.ts` and can
 be enabled by supplying a funded wallet seed in the repo-root `.env.<network>` —
-see [FAST-SYNC.md](../../FAST-SYNC.md).
+see the repo-root [README](../../README.md#running-against-a-remote-network-preprod--preview).

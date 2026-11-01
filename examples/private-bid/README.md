@@ -57,9 +57,8 @@ npm run env:down
 
 This example is set up for a local devnet running via Docker.
 
-To run it against **preprod** or **preview** instead, see
-[FAST-SYNC.md](../../FAST-SYNC.md) at the repo root. In short: start a local proof
-server (`npm run proof:up`), then from the repo root run `npm run preseed:cut` followed
-by `npm run wallets:new`, fund the printed addresses at the faucet, and run
-`npm run test:preprod`. The wallet seeds live in one repo-root `.env.<network>` that
-every example shares.
+To run it against **preprod** or **preview** instead, start a local proof server
+(`npm run proof:up`), then from the repo root run `npm run wallets:new`, fund the
+printed addresses at the faucet, and run `npm run test:preprod`. The wallet seeds
+live in one repo-root `.env.<network>` that every example shares. Each wallet
+syncs from genesis, which takes over an hour on preprod.

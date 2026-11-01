@@ -115,8 +115,8 @@ describe(`Secret Message Contract (${network})`, () => {
       proofServer: config.proofServer,
     };
 
-    // Alice, fast-syncing from the shipped reference bundle when the root
-    // .env.<network> records a birthday for her. See FAST-SYNC.md.
+    // Alice: the genesis-funded seed locally, otherwise the shared wallet in the
+    // root .env.<network>, which syncs from genesis.
     const setup = resolveWallet(network);
     wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
     await wallet.start();

@@ -68,8 +68,8 @@ const syncTimeoutMs = Number(
  * Build, start, sync, and (on a remote network) fund-gate one wallet.
  *
  * Locally, ALICE and BOB are the genesis-funded seeds 01 and 02. Remotely they
- * are the shared wallets in the repo-root .env.<network>, fast-syncing from the
- * reference bundle when a birthday is recorded. See FAST-SYNC.md.
+ * are the shared wallets in the repo-root .env.<network>, which sync from
+ * genesis (over an hour on preprod).
  */
 async function buildWallet(
   role: 'ALICE' | 'BOB',

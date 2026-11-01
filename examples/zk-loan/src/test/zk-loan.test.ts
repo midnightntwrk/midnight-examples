@@ -114,8 +114,8 @@ describe(`Zk Loan Contract (${network})`, () => {
     };
 
     // Locally this is the genesis-funded Alice seed. On a remote network it is
-    // the shared Alice wallet from the repo-root .env.<network>, fast-syncing
-    // from the reference bundle when a birthday is recorded. Pass a role name
+    // the shared Alice wallet from the repo-root .env.<network>, which syncs
+    // from genesis (over an hour on preprod). Pass a role name
     // (e.g. resolveWallet(network, 'BOB')) if your suite needs more than one.
     const setup = resolveWallet(network);
     wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
