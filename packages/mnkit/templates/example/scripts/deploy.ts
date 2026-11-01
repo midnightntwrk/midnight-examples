@@ -54,7 +54,12 @@ import {
   syncWallet,
   waitForDust,
   waitForNightThenDust,
+// @if monorepo
+} from '../src/wallet.js';
+// @endif
+// @if standalone
 } from '@midnightntwrk/mnkit-wallet';
+// @endif
 import { buildProviders, type __Name__Providers } from '../src/providers.js';
 import {
   DEPLOY_NETWORKS,
@@ -205,7 +210,12 @@ if (replaced) {
 }
 
 const setup = resolveWallet(network);
+// @if monorepo
+const wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
+// @endif
+// @if standalone
 const wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret, { fastSync: setup.fastSync });
+// @endif
 await wallet.start();
 try {
   await syncWallet(logger, wallet.wallet, syncTimeoutMs);

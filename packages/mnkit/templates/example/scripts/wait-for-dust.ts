@@ -24,7 +24,12 @@ import pino from 'pino';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import { getConfig } from '../src/config.js';
+// @if monorepo
+import { MidnightWalletProvider, syncWallet, waitForDust } from '../src/wallet.js';
+// @endif
+// @if standalone
 import { MidnightWalletProvider, syncWallet, waitForDust } from '@midnightntwrk/mnkit-wallet';
+// @endif
 
 // Must match src/test/__name__.test.ts.
 const ALICE_SEED = '0000000000000000000000000000000000000000000000000000000000000001';

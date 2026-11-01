@@ -103,6 +103,8 @@ if (args.includes('--derive')) {
   if (!fs.existsSync(targetDir)) fail(`examples/${name} does not exist. Scaffold it first: npm run new:example ${name}`);
   runDerive(targetDir, name, {
     label: `examples/${name}`,
+    // The example's own copy (src/test/coins.ts), not @midnightntwrk/mnkit-coins.
+    coinsPackage: './coins.js',
     next: `npm run typecheck && npm run test:sim   (in examples/${name})`,
   });
   process.exit(0);

@@ -265,7 +265,7 @@ jobs:
           npm run new:example -- ci-derive --derive
           grep -q 'CompiledTipTokenContract = CompiledContract.make' examples/ci-derive/contract/index.ts
           grep -q "it('deploys tip-token'" examples/ci-derive/src/test/ci-derive.test.ts
-          grep -q "from '@midnightntwrk/mnkit-coins'" examples/ci-derive/src/test/ci-derive.sim.test.ts
+          grep -q "from './coins.js'" examples/ci-derive/src/test/ci-derive.sim.test.ts
           cp -r examples/ci-derive "$RUNNER_TEMP/first"
           npm run new:example -- ci-derive --derive
           diff -r --exclude=node_modules --exclude=managed "$RUNNER_TEMP/first" examples/ci-derive
