@@ -14,7 +14,7 @@ services:
       start_period: 10s
 
   indexer:
-    image: 'midnightntwrk/indexer-standalone:4.3.5'
+    image: 'midnightntwrk/indexer-standalone:4.3.7@sha256:2e2646d03c448dc4611c1117c2395539de6ce11ab9b4e8e3ad56a8779c4b9a19'
     # Backstop for the node healthcheck below: retry a startup crash instead of
     # failing `docker compose up --wait`.
     restart: on-failure

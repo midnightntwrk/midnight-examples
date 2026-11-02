@@ -30,8 +30,8 @@
     "report:md": "npm run report:md -w @q3/harness --"
   },
   "overrides": {
-    "@midnightntwrk/ledger-v9": "1.0.0-rc.5",
-    "@midnightntwrk/onchain-runtime-v4": "4.0.0-rc.4",
+    "@midnightntwrk/ledger-v9": "1.0.0-rc.6",
+    "@midnightntwrk/onchain-runtime-v4": "4.0.0-rc.5",
     "@midnight-ntwrk/platform-js": "3.0.0"
   }
 }
