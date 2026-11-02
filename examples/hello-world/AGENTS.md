@@ -7,15 +7,16 @@
 
 The minimal end-to-end Midnight loop and an **environment smoke test**: compile a
 trivial contract, stand up a local Midnight network, and run a test that deploys
-and calls it. Also demonstrates the **fast-sync preseed** approach for quick
-wallet sync (`src/fast-sync/`, `preseed/`).
+and calls it. On a remote network with no shared wallet set up, it generates
+and saves a throwaway wallet (`.test-wallets/`, gitignored) and asks you to
+fund it.
 
 ## Layout
 
 - `contract/hello-world.compact` — the contract source (committed).
 - `contract/index.ts` — re-exports the generated contract + `zkConfigPath`.
-- `src/` — TypeScript harness: `wallet.ts`, `providers.ts`, `config.ts`,
-  `fast-sync/`, and `test/hw.test.ts`.
+- `src/` — TypeScript harness: `wallet.ts` (on `@midnight-ntwrk/testkit-js`),
+  `providers.ts`, `config.ts`, and `test/hw.test.ts`.
 - `scripts/wait-for-dust.ts` — waits for DUST to accrue before tests.
 - Funding the browser wallet on the local devnet is the repo-wide
   `npm run fund:wallet <mn_dust_…> [mn_addr_…]`, run from the repo root (`packages/fast-sync/scripts/fund-wallet.ts`),

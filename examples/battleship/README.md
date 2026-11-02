@@ -103,4 +103,4 @@ npm run env:down
 ```
 
 To run the suite against **preprod** or **preview** instead (`npm run test:preprod`,
-`npm run test:preview`), see [FAST-SYNC.md](../../FAST-SYNC.md) at the repo root.
+`npm run test:preview`), see the repo-root [README](../../README.md#running-against-a-remote-network-preprod--preview).

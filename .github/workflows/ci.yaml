@@ -215,6 +215,17 @@ jobs:
         with:
           persist-credentials: false
 
+      # Examples are copied out of the repo and into the docs, so they may only
+      # use published @midnight-ntwrk packages. mnkit's runtime packages are
+      # for standalone projects; an example carries its own copies instead
+      # (src/wallet.ts, src/test/sim.ts, src/test/coins.ts).
+      - name: Examples don't use mnkit's runtime packages
+        run: |
+          if git grep -n '@midnightntwrk/mnkit-' -- examples; then
+            echo "::error::examples/ must not name @midnightntwrk/mnkit-* (see AGENTS.md)."
+            exit 1
+          fi
+
       - name: Setup Compact Compiler
         uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
         with:
@@ -265,7 +276,7 @@ jobs:
           npm run new:example -- ci-derive --derive
           grep -q 'CompiledTipTokenContract = CompiledContract.make' examples/ci-derive/contract/index.ts
           grep -q "it('deploys tip-token'" examples/ci-derive/src/test/ci-derive.test.ts
-          grep -q "from '@midnightntwrk/mnkit-coins'" examples/ci-derive/src/test/ci-derive.sim.test.ts
+          grep -q "from './coins.js'" examples/ci-derive/src/test/ci-derive.sim.test.ts
           cp -r examples/ci-derive "$RUNNER_TEMP/first"
           npm run new:example -- ci-derive --derive
           diff -r --exclude=node_modules --exclude=managed "$RUNNER_TEMP/first" examples/ci-derive

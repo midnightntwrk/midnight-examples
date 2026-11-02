@@ -191,6 +191,13 @@ describe('derive', () => {
     expect(tipToken).not.toContain('args:');
   });
 
+  it("imports the coin helpers from coinsPackage (a monorepo example's own src/test/coins.ts)", () => {
+    const dir = scaffoldFixture('private-tip-jar', { witnesses: true });
+    derive(dir, 'private-tip-jar', deriveNames('private-tip-jar'), { coinsPackage: './coins.js' });
+    expect(region(read(dir, 'src/test/private-tip-jar.test.ts'), 'coin-imports')).toContain("from './coins.js';");
+    expect(region(read(dir, 'src/test/private-tip-jar.sim.test.ts'), 'coin-imports')).toBe("import { simCoin } from './coins.js';");
+  });
+
   it('skips a missing contract/deploy-args.ts and says where to get it', () => {
     const dir = scaffoldFixture('hello-world');
     fs.rmSync(path.join(dir, 'contract', 'deploy-args.ts'));

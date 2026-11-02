@@ -21,7 +21,7 @@ import { type ContractAddress, encodeUserAddress } from '@midnight-ntwrk/midnigh
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
-import { MidnightWalletProvider, syncWallet, type WalletSecret } from '../wallet.js';
+import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust, type WalletSecret } from '../wallet.js';
 import { buildProviders, type PartyProviders } from '../providers.js';
 import {
     CompiledPartyContract,
@@ -32,7 +32,6 @@ import {
 } from '../../contract/index.js';
 import { createPartyPrivateState } from '../../contract/witnesses.js'
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import type { FinalizedCallTxData, UnsubmittedDeployTxData } from '@midnight-ntwrk/midnight-js-contracts';
 import type { UnshieldedAddress } from '@midnight-ntwrk/wallet-sdk';
 
@@ -97,21 +96,15 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
         proofServer: config.proofServer,
         };
 
-        aliceWallet = await MidnightWalletProvider.build(logger, envConfig, aliceSetup.secret, {
-            fastSync: aliceSetup.fastSync,
-        });
+        aliceWallet = await MidnightWalletProvider.build(logger, envConfig, aliceSetup.secret);
         await aliceWallet.start();
         await syncWallet(logger, aliceWallet.wallet, syncTimeoutMs);
 
-        bobWallet = await MidnightWalletProvider.build(logger, envConfig, bobSetup.secret, {
-            fastSync: bobSetup.fastSync,
-        });
+        bobWallet = await MidnightWalletProvider.build(logger, envConfig, bobSetup.secret);
         await bobWallet.start();
         await syncWallet(logger, bobWallet.wallet, syncTimeoutMs);
 
-        charlieWallet = await MidnightWalletProvider.build(logger, envConfig, charlieSetup.secret, {
-            fastSync: charlieSetup.fastSync,
-        });
+        charlieWallet = await MidnightWalletProvider.build(logger, envConfig, charlieSetup.secret);
         await charlieWallet.start();
         await syncWallet(logger, charlieWallet.wallet, syncTimeoutMs);
 

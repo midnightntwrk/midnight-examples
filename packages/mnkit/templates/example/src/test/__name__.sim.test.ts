@@ -26,7 +26,12 @@
 // regions from the compiled contract; once you edit a region it is left alone.
 
 import { describe, expect, it } from 'vitest';
+// @if monorepo
+import { Sim, assertNotInPublicState, expectRejects } from './sim.js';
+// @endif
+// @if standalone
 import { Sim, assertNotInPublicState, expectRejects } from '@midnightntwrk/mnkit-sim';
+// @endif
 import { Contract, ledger } from '../../contract/managed/__name__/contract/index.js';
 // @generated-stub begin coin-imports sha=0
 // @generated-stub end coin-imports

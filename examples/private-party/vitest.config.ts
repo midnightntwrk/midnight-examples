@@ -16,7 +16,7 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     testTimeout: 15 * 60_000,
-    hookTimeout: isRemote ? 90 * 60_000 : 15 * 60_000,
+    hookTimeout: isRemote ? 150 * 60_000 : 15 * 60_000,
     env: envFromFile,
     include: ['src/**/*.test.ts'],
     // Two suites share one devnet and one Alice wallet. Vitest runs test files in

@@ -19,7 +19,7 @@ published on [docs.midnight.network](https://docs.midnight.network/tutorials)
 
 | # | Example | Teaches |
 |---|---|---|
-| 1 | [`hello-world`](./examples/hello-world) | Environment smoke test: a minimal contract, the test harness, devnet and fast-sync wallets |
+| 1 | [`hello-world`](./examples/hello-world) | Environment smoke test: a minimal contract, the test harness, devnet and a zero-setup test wallet |
 | 2 | [`private-party`](./examples/private-party/tutorials/index.mdx) | First real contract: the privacy boundary. Guests RSVP privately with a salted commitment, then become public when they pay the unshielded NIGHT entry fee; a DApp-specific key gates the organizer's actions |
 | 3 | [`battleship`](./examples/battleship/tutorials/index.mdx) | Defensive programming: a state machine, role checks, and on-chain verification of off-chain data that catches cheating |
 | 4 | [`private-tip-jar`](./examples/private-tip-jar/tutorials/index.mdx) | Two contracts (jar and tip token), still simple; a first shielded token: anonymous tips into a contract-held pot |
@@ -121,25 +121,20 @@ npm run test:local       # npm run test:local --workspaces --if-present
 The examples also run against the public **preprod** and **preview** networks. A
 local proof server is still required; everything else is remote.
 
-The obstacle is wallet sync: a brand-new wallet on preprod takes **~78 minutes** to
-reach chain tip, almost all of it building the chain-wide DUST generation tree. The
-repo ships **pre-seed reference bundles** under `preseed/` that a fresh wallet
-restores from instead, bringing that down to about **75 seconds**. See
-[FAST-SYNC.md](./FAST-SYNC.md).
+The examples' wallets are built with `@midnight-ntwrk/testkit-js` and sync from
+genesis. On preprod that takes **well over an hour** per wallet (one run took 88
+minutes), almost all of it building the chain-wide DUST generation tree. The
+pre-seed fast sync in `packages/fast-sync` ([FAST-SYNC.md](./FAST-SYNC.md)) is
+for mnkit's standalone projects; the examples don't use it.
 
 ```bash
 cd examples/hello-world && npm run proof:up   # local proof server on :6300
 cd ../..
 
-npm run preseed:cut  # 1. re-cut the reference bundle       (~10 min)
-npm run wallets:new  # 2. mint 4 wallets, print 4 addresses
-#                      3. fund those addresses at the faucet (manual)
-npm run test:preprod    # 4. run every suite, sequentially
+npm run wallets:new  # 1. mint 4 wallets, print 4 addresses
+#                      2. fund those addresses at the faucet (manual)
+npm run test:preprod    # 3. run every suite, sequentially
 ```
-
-**Step 1 must come before step 2** — a bundle cut after the wallets exist cannot
-be used to seed them, and every run silently falls back to the 78-minute sync.
-FAST-SYNC.md explains why.
 
 `npm run wallets:new` writes a repo-root `.env.preprod` (gitignored) holding four
 seeds — **Alice, Bob, Charlie and Dave** — and prints their addresses for the
@@ -183,7 +178,11 @@ npm CLI (`npx mnkit init my-app`) that scaffolds a standalone project around a
 developer's own contract. `npm run new:example` is its monorepo mode; `mnkit init`
 renders the same template as a plain npm project. Its runtime libraries are
 `packages/fast-sync` (`@midnightntwrk/mnkit-wallet`), `packages/sim` and
-`packages/coins`, all versioned with mnkit.
+`packages/coins`, all versioned with mnkit. Standalone projects depend on them.
+The examples in this repo, and examples scaffolded by `npm run new:example`,
+carry their own copies instead (`src/wallet.ts`, `src/test/sim.ts`,
+`src/test/coins.ts`), so their code imports only published `@midnight-ntwrk/*`
+packages. CI fails if anything under `examples/` names a runtime package.
 
 - `npm run test:engine`: the engine's unit tests, over committed compiler output
   (`npm run fixtures:regen -- --check` keeps it current).

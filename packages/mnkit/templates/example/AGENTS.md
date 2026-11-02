@@ -77,7 +77,12 @@ indexer's lag, the proof server's version and, on preprod, the Blockfrost key.
   regions nobody has edited (new circuits, constructor parameters, witnesses,
   the initial private state in both tests and in `contract/deploy-args.ts`)
   and leaves the rest alone.
+<!-- @if monorepo -->
+- Shielded coins in tests come from `src/test/coins.ts`. A
+<!-- @endif -->
+<!-- @if standalone -->
 - Shielded coins in tests come from `@midnightntwrk/mnkit-coins`. A
+<!-- @endif -->
   `ShieldedCoinInfo` argument (a tip, a bet, a deposit: anything the circuit
   `receiveShielded`s) is a new coin the
   transaction creates, not one of the wallet's coins. Pass
@@ -103,15 +108,24 @@ indexer's lag, the proof server's version and, on preprod, the Blockfrost key.
 - The circuit-id union in `src/providers.ts` is derived from the compiled
   contract (`keyof ImpureCircuits`), so it never needs editing when circuits
   change.
+<!-- @if monorepo -->
+- The example imports only published `@midnight-ntwrk/*` packages, so its code
+  can be copied out of the repo and installed. Its wallet harness is
+  `src/wallet.ts`, built on `@midnight-ntwrk/testkit-js`:
+  `MidnightWalletProvider`, `syncWallet`, the funding gate
+  (`waitForDust`, `waitForNightThenDust`) and `resolveWallet(network, role)`,
+  which reads `MIDNIGHT_<NETWORK>_<ROLE>_SEED` (or `_MNEMONIC`) from the
+  repo-root `.env.<network>`. Add a suite-specific role name to its
+  `ROLE_ALIASES`. The in-memory harness is `src/test/sim.ts`. Don't depend on
+  the repo's mnkit runtime packages here: CI rejects it. A remote wallet syncs
+  from genesis, which takes over an hour on preprod.
+<!-- @endif -->
+<!-- @if standalone -->
 - Remote-network wiring is shared, not copied. `MidnightWalletProvider` (with
   `syncWallet`) comes from `@midnightntwrk/mnkit-wallet`; its `build` takes an
   optional `{ fastSync }`, and the test resolves its wallet with
   `resolveWallet(network, role)` from the same package. Do not
   write a per-example seed resolver; the shared one knows every suite's role
-<!-- @if monorepo -->
-  names and reads the repo-root `.env.<network>`. See `FAST-SYNC.md`.
-<!-- @endif -->
-<!-- @if standalone -->
   names (ALICE, BOB, CHARLIE, DAVE and aliases) and reads
   `MIDNIGHT_<NETWORK>_<ROLE>_SEED` from `.env.<network>`.
 <!-- @endif -->

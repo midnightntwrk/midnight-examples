@@ -19,11 +19,10 @@ import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { createUnprovenCallTx, deployContract, submitCallTx, type DeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { type ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
-import { MidnightWalletProvider, syncWallet, type WalletSecret } from '../wallet.js';
+import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust, type WalletSecret } from '../wallet.js';
 import { buildProviders, type PartyProviders } from '../providers.js';
 import { prepareSponsoredCall, sponsorAndSubmit } from '../sponsor.js';
 import {
@@ -120,15 +119,11 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
             proofServer: config.proofServer,
         };
 
-        aliceWallet = await MidnightWalletProvider.build(logger, envConfig, aliceSetup.secret, {
-            fastSync: aliceSetup.fastSync,
-        });
+        aliceWallet = await MidnightWalletProvider.build(logger, envConfig, aliceSetup.secret);
         await aliceWallet.start();
         await syncWallet(logger, aliceWallet.wallet, syncTimeoutMs);
 
-        daveWallet = await MidnightWalletProvider.build(logger, envConfig, daveSetup.secret, {
-            fastSync: daveSetup.fastSync,
-        });
+        daveWallet = await MidnightWalletProvider.build(logger, envConfig, daveSetup.secret);
         await daveWallet.start();
         await syncWallet(logger, daveWallet.wallet, syncTimeoutMs);
 

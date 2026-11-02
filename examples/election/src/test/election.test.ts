@@ -47,8 +47,9 @@ import { getConfig } from '../config.js';
 import {
   MidnightWalletProvider,
   syncWallet,
+  resolveWallet,
+  waitForNightThenDust,
 } from '../wallet.js';
-import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import { buildProviders, type ElectionProviders } from '../providers.js';
 import {
   createElectionPrivateState,
@@ -163,12 +164,10 @@ describe(`Election Contract (${network})`, () => {
       proofServer: config.proofServer,
     };
 
-    // Alice, fast-syncing from the shipped reference bundle when the root
-    // .env.<network> records a birthday for her. See FAST-SYNC.md.
+    // Alice: the genesis-funded seed locally, otherwise the shared wallet in the
+    // root .env.<network>, which syncs from genesis.
     const setup = resolveWallet(network);
-    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret, {
-      fastSync: setup.fastSync,
-    });
+    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
     await wallet.start();
     await syncWallet(logger, wallet.wallet, syncTimeoutMs);
 

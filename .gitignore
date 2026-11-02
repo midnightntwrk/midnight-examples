@@ -20,6 +20,7 @@ packages/*/LICENSE
 **/.env.preprod
 **/.env.preview
 **/.fast-sync-wallets/
+**/.test-wallets/
 # Deploy state from scripts/deploy.ts: private state and signing keys, and the
 # local devnet's deploy records
 **/.mnkit/

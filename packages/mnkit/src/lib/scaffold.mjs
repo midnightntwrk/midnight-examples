@@ -72,8 +72,18 @@ export const RENAMED_PACKAGES = {
 const MODE_FILES = {
   // The repo has one root `npm run fund:wallet` for every example.
   monorepo: { skip: ['gitignore', 'tsconfig.standalone.json', path.join('scripts', 'fund-wallet.ts')] },
+  // A monorepo example carries its own wallet, sim and coin helpers, so it
+  // imports only published @midnight-ntwrk packages. A standalone project gets
+  // them from the mnkit runtime packages instead.
   standalone: {
-    skip: ['.envrc', 'tsconfig.json', `tutorials${path.sep}`],
+    skip: [
+      '.envrc',
+      'tsconfig.json',
+      `tutorials${path.sep}`,
+      path.join('src', 'wallet.ts'),
+      path.join('src', 'test', 'sim.ts'),
+      path.join('src', 'test', 'coins.ts'),
+    ],
     rename: { gitignore: '.gitignore', 'tsconfig.standalone.json': 'tsconfig.json' },
   },
 };
@@ -214,12 +224,14 @@ export function standalonePackageJson(templatePkg, { name, specs, tc }) {
     'doctor:preview': 'mnkit doctor --network preview',
     'doctor:preprod': 'mnkit doctor --network preprod',
   };
+  // The template's package.json is the monorepo one, which has no runtime
+  // packages: a standalone project depends on them instead of carrying copies.
+  const runtime = RUNTIME_PACKAGES.map((pkg) => {
+    if (!specs[pkg]) fail(`no version for runtime package ${pkg}`);
+    return [pkg, specs[pkg]];
+  });
   const dependencies = Object.fromEntries(
-    Object.entries(p.dependencies).map(([pkg, spec]) => {
-      if (!RUNTIME_PACKAGES.includes(pkg)) return [pkg, spec];
-      if (!specs[pkg]) fail(`template package.json: no version for runtime package ${pkg}`);
-      return [pkg, specs[pkg]];
-    }),
+    [...Object.entries(p.dependencies), ...runtime].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
   );
   const devDependencies = Object.fromEntries(
     Object.entries({ ...p.devDependencies, mnkit: specs.mnkit }).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
