@@ -79,7 +79,7 @@ three cross-contract suites were re-run, and their results are the ones below.
 Every deploy succeeds. Every contract call the node rejects fails with
 `1010: Invalid Transaction: Custom error: 104` (out of gas budget). This is the known
 mismatch between the final client libraries and the pre-release node: re-run on the
-Ledger 9 node release once it is public, before reading these failures as regressions.
+Ledger 9 node release once it is published, before reading these failures as regressions.
 
 Not exercised locally: DUST registration (`src/dust.ts`), which runs only on remote
 networks.
