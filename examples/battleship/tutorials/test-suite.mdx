@@ -115,7 +115,7 @@ const BOB_PRIVATE_ID = 'bobPrivateState';
 ```
 
 `beforeAll` builds and syncs both wallets, then builds each player's providers. On a remote network
-it also waits until both wallets have NIGHT and at least 0.1 DUST (set `MIDNIGHT_MIN_DUST` to
+it also waits until both wallets have NIGHT and at least 60 DUST (set `MIDNIGHT_MIN_DUST` to
 change that), and caches the synced wallet state in the repo-root `.wallet-state/` folder, so later
 runs only sync new blocks. A small helper reads the contract's public ledger through a player's
 providers, and the tests use it after every call. `ledgerState`, from `src/providers.ts`,

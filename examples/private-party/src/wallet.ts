@@ -550,10 +550,10 @@ const SPECKS_PER_DUST = 10n ** 15n;
 
 /**
  * The DUST a wallet must hold before a suite transacts: enough to pay for a
- * deploy. MIDNIGHT_MIN_DUST overrides it, in DUST (default 0.1).
+ * deploy. MIDNIGHT_MIN_DUST overrides it, in DUST (default 60).
  */
 const MIN_DUST_SPECKS = BigInt(
-  Math.round(Number(process.env['MIDNIGHT_MIN_DUST'] ?? '0.1') * 1e6),
+  Math.round(Number(process.env['MIDNIGHT_MIN_DUST'] ?? '60') * 1e6),
 ) * (SPECKS_PER_DUST / 10n ** 6n);
 
 function formatDust(specks: bigint): string {

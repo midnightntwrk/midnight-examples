@@ -118,7 +118,7 @@ Each person also has an ID for their entry in their private state provider:
 ```
 
 `beforeAll` builds and syncs the three wallets, then builds each person's providers. On a remote
-network it also waits until every wallet has NIGHT and at least 0.1 DUST (set `MIDNIGHT_MIN_DUST`
+network it also waits until every wallet has NIGHT and at least 60 DUST (set `MIDNIGHT_MIN_DUST`
 to change that), and caches the synced wallet state in the repo-root `.wallet-state/` folder, so
 later runs only sync new blocks. Two small helpers do the rest. One reads the contract's public
 ledger, the other reads a wallet's NIGHT balance. `ledgerState`, from `src/providers.ts`,
