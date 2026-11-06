@@ -35,7 +35,7 @@ const PROVIDER_ID = parseInt(process.env['PROVIDER_ID'] || '1', 10);
 let providerSk: bigint;
 const secretHex = process.env['PROVIDER_SECRET_KEY'];
 if (secretHex) {
-  // Reduce so any 32-byte hex value is a valid Jubjub scalar.
+  // Reduce so any 32-byte hex value is a canonical Jubjub scalar.
   providerSk = BigInt('0x' + secretHex) % JUBJUB_ORDER;
   console.log('Loaded provider secret key from environment');
 } else {

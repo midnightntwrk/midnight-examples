@@ -40,7 +40,7 @@ They need no Docker and no proving keys, so they are the quickest way to check a
 contract. All six pass:
 
 ```
- ✓ src/test/private-tip-jar.sim.test.ts (6 tests) 91ms
+ ✓ src/test/private-tip-jar.sim.test.ts (6 tests)
 
  Test Files  1 passed (1)
       Tests  6 passed (6)
@@ -48,7 +48,9 @@ contract. All six pass:
 
 The tests use `src/test/sim.ts`, a small helper in the example that runs a compiled contract
 in memory. `Sim.deploy` runs the constructor with an owner secret, a made-up
-token color, and a made-up coin public key for the deployer:
+token color, and a made-up coin public key for the deployer. Since compact-runtime 0.20 the
+constructor and circuits are async, so `deploy()`, `sim.call()` and `expectRejects()` all return
+promises, and the tests `await` them:
 
 ```typescript title="src/test/private-tip-jar.sim.test.ts"
 const deploy = () =>
@@ -72,8 +74,8 @@ tipper's client does on a real network, as you'll see in the devnet suite:
 const coin = (value: bigint, color = TIP_COLOR) => simCoin(value, color);
 ```
 
-`expectRejects` checks that a call fails with the `assert` message you expect. Swapping the private
-state for a random secret makes the caller a non-owner:
+`await expectRejects(...)` checks that a call fails with the `assert` message you expect. Swapping
+the private state for a random secret makes the caller a non-owner:
 
 ```typescript title="src/test/private-tip-jar.sim.test.ts"
     sim.privateState = createPrivateTipJarPrivateState(bytes32());
@@ -144,11 +146,11 @@ take a few minutes.
 When it finishes, all 10 tests pass, including the ones that expect a rejection:
 
 ```
- ✓ src/test/private-tip-jar.test.ts (10 tests) 160668ms
-     ✓ deploys the demo token and mints Bob one coin to tip with  41757ms
-     ✓ Alice deploys the jar for that token; only a hash of her key is stored  18922ms
-     ✓ Bob tips twice from his one coin; the pot holds exactly the coins he made  49260ms
-     ✓ the owner withdraws every tip into her own shielded wallet  49034ms
+ ✓ src/test/private-tip-jar.test.ts (10 tests)
+     ✓ deploys the demo token and mints Bob one coin to tip with
+     ✓ Alice deploys the jar for that token; only a hash of her key is stored
+     ✓ Bob tips twice from his one coin; the pot holds exactly the coins he made
+     ✓ the owner withdraws every tip into her own shielded wallet
 
  Test Files  1 passed (1)
       Tests  10 passed (10)
@@ -157,7 +159,7 @@ When it finishes, all 10 tests pass, including the ones that expect a rejection:
 Vitest lists only tests that take longer than 300 ms, so six tests pass without a line of their
 own: the privacy test, which only reads the ledger, and the five rejection tests. A rejected call
 takes milliseconds. A failing `assert` stops the circuit on the caller's own machine, so no proof
-is generated and nothing is submitted. Successful transactions take 20 to 25 seconds each, mostly
+is generated and nothing is submitted. Successful transactions take many seconds each, mostly
 proving time. The first test deploys a contract and mints, and the tip and withdrawal tests each
 submit two transactions, so they take longer.
 
@@ -172,8 +174,10 @@ npm run env:down
 Everything above the comment that begins `Everything above is generated boilerplate` in the test
 file is the shared harness, the same in every example in
 midnight-examples. `src/config.ts` holds each network's endpoints, `src/wallet.ts` builds and syncs
-the wallets, and `src/providers.ts` bundles the MidnightJS providers. On `local`, Alice and Bob are
-the devnet's pre-funded wallets, so there is nothing to set up.
+the wallets, and `src/providers.ts` bundles the MidnightJS providers. MidnightJS 5 takes the wallet
+through `createWalletProvider` and `createMidnightProvider`, and the bundle carries a `config` with
+the network ID and the transaction time-to-live. On `local`, Alice and Bob are the devnet's
+pre-funded wallets, so there is nothing to set up.
 
 Two contracts change one thing: the providers. A provider set includes the ZK configuration, the
 proving keys for one contract, so the suite builds one provider set for each wallet and contract

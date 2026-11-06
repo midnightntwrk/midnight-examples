@@ -41,24 +41,24 @@ transactions, so expect it to take several minutes.
 When it finishes, all 12 tests pass, including the ones that expect a rejection:
 
 ```
- ✓ src/test/battleship.test.ts (12 tests) 179167ms
-     ✓ deploys the contract  18225ms
-     ✓ Allows Bob to acceptGame  17155ms
-     ✓ Allows Alice to take the first shot(MISS)  17340ms
-     ✓ Allows Bob to check the board (MISS)  18665ms
-     ✓ Allows Bob to shoot(HIT)  17348ms
-     ✓ Allows Alice to check the board and report a hit  18670ms
-     ✓ Allows Alice to shoot again (HIT)  17319ms
-     ✓ Allows Bob to check the board for a HIT  17062ms
-     ✓ Allows Bob to shoot the winning shot  18644ms
-     ✓ Stops Alice from cheating  357ms
-     ✓ Allows Alice to check the board and lose  16979ms
+ ✓ src/test/battleship.test.ts (12 tests)
+     ✓ deploys the contract
+     ✓ Allows Bob to acceptGame
+     ✓ Allows Alice to take the first shot(MISS)
+     ✓ Allows Bob to check the board (MISS)
+     ✓ Allows Bob to shoot(HIT)
+     ✓ Allows Alice to check the board and report a hit
+     ✓ Allows Alice to shoot again (HIT)
+     ✓ Allows Bob to check the board for a HIT
+     ✓ Allows Bob to shoot the winning shot
+     ✓ Stops Alice from cheating
+     ✓ Allows Alice to check the board and lose
 
  Test Files  1 passed (1)
       Tests  12 passed (12)
 ```
 
-Vitest lists only tests that take longer than 300 ms, so "Stops Bob from being a cheater" passes without a line of its own. The timings tell you something: each honest move takes about 17 seconds, most of it generating a proof, while a cheat fails in well under a second. A failing `assert` stops the circuit on the cheater's own machine, so no proof is ever generated and nothing is submitted.
+Vitest lists only tests that take longer than 300 ms, so "Stops Bob from being a cheater" passes without a line of its own. Run it and the timings tell you something: each honest move takes many seconds, most of it generating a proof, while a cheat fails in well under a second. A failing `assert` stops the circuit on the cheater's own machine, so no proof is ever generated and nothing is submitted.
 
 Tear the network down when you're done:
 
@@ -80,7 +80,9 @@ test file is shared harness. It is the same in every example in midnight-example
   `.env.<network>` file.
 - **`src/wallet.ts`** builds, starts and syncs each wallet. **`src/providers.ts`** bundles the
   MidnightJS providers a player needs: public data from the indexer, private state, ZK artifacts
-  and proving, and the wallet itself.
+  and proving, and the wallet itself. MidnightJS 5 takes the wallet through
+  `createWalletProvider` and `createMidnightProvider`, and the bundle carries a `config` with the
+  network ID and the transaction time-to-live.
 
 The suite declares a wallet and a provider set for each player, and fixes their ship locations:
 
@@ -113,8 +115,12 @@ const BOB_PRIVATE_ID = 'bobPrivateState';
 ```
 
 `beforeAll` builds and syncs both wallets, then builds each player's providers. On a remote network
-it also waits until both wallets are funded. A small helper reads the contract's public ledger
-through a player's providers, and the tests use it after every call:
+it also waits until both wallets have NIGHT and at least 0.1 DUST (set `MIDNIGHT_MIN_DUST` to
+change that), and caches the synced wallet state in the repo-root `.wallet-state/` folder, so later
+runs only sync new blocks. A small helper reads the contract's public ledger through a player's
+providers, and the tests use it after every call. `ledgerState`, from `src/providers.ts`,
+unwraps the version-tagged state that MidnightJS 5 returns (`{ version: 'v9', state }`) into the
+data the compiled `ledger()` decodes:
 
 ```typescript title="src/test/battleship.test.ts"
     async function queryLedger(providers: BattleshipProviders) {

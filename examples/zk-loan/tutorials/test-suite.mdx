@@ -43,17 +43,17 @@ When it finishes, all 20 tests pass: the 10 on-chain tests, including the ones t
 rejection, and the attestation API's 10 unit tests:
 
 ```
- ✓ src/test/attestation-api/server.test.ts (4 tests) 57ms
- ✓ src/test/attestation-api/signing.test.ts (6 tests) 71ms
- ✓ src/test/zk-loan.test.ts (10 tests) 221489ms
-     ✓ deploys the contract with the deployer as admin  16742ms
-     ✓ lets the admin register the attestation API's public key  17248ms
-     ✓ approves a Tier 1 loan within the limit  18459ms
-     ✓ proposes a capped amount when the request exceeds the tier, and the borrower accepts  35989ms
-     ✓ records a Tier 2 loan for a second borrower under a separate identity  35820ms
-     ✓ blocks a blacklisted borrower until the admin removes them  35997ms
-     ✓ migrates all loans to the identity derived from a new PIN  24001ms
-     ✓ rotates the admin role to a new admin public key  35993ms
+ ✓ src/test/attestation-api/server.test.ts (4 tests)
+ ✓ src/test/attestation-api/signing.test.ts (6 tests)
+ ✓ src/test/zk-loan.test.ts (10 tests)
+     ✓ deploys the contract with the deployer as admin
+     ✓ lets the admin register the attestation API's public key
+     ✓ approves a Tier 1 loan within the limit
+     ✓ proposes a capped amount when the request exceeds the tier, and the borrower accepts
+     ✓ records a Tier 2 loan for a second borrower under a separate identity
+     ✓ blocks a blacklisted borrower until the admin removes them
+     ✓ migrates all loans to the identity derived from a new PIN
+     ✓ rotates the admin role to a new admin public key
 
  Test Files  3 passed (3)
       Tests  20 passed (20)
@@ -61,10 +61,10 @@ rejection, and the attestation API's 10 unit tests:
 
 Vitest lists only tests that take longer than 300 ms, so the two tests that expect nothing but a
 rejection, a non-admin registering a provider and tampered credit data, pass without a line of their
-own. The timings tell you something: each successful call takes about 17 seconds, most of it
-generating a proof, so the tests with two successful calls take about 36. Exact times vary from
-machine to machine. A rejected call fails in well under a second. A failing `assert` stops the
-circuit on the caller's own machine, so no proof is generated and nothing is submitted.
+own. Run it and the timings tell you something: each successful call takes many seconds, most of it
+generating a proof, so the tests with two successful calls take about twice as long. Exact times
+vary from machine to machine. A rejected call fails in well under a second. A failing `assert` stops
+the circuit on the caller's own machine, so no proof is generated and nothing is submitted.
 
 Tear the network down when you're done:
 
@@ -85,7 +85,9 @@ midnight-examples:
   set up. On a remote network it comes from a repo-root `.env.<network>` file.
 - **`src/wallet.ts`** builds, starts, and syncs the wallet. **`src/providers.ts`** bundles the
   MidnightJS providers a party needs: public data from the indexer, private state, ZK artifacts
-  and proving, and the wallet itself.
+  and proving, and the wallet itself. MidnightJS 5 takes the wallet through
+  `createWalletProvider` and `createMidnightProvider`, and the bundle carries a `config` with the
+  network ID and the transaction time-to-live.
 
 ### One wallet, two identities
 
@@ -210,7 +212,10 @@ a deployed contract:
   }
 ```
 
-A helper also reads the contract's public ledger, and the tests use it after every call:
+A helper also reads the contract's public ledger, and the tests use it after every call.
+`ledgerState`, from `src/providers.ts`, unwraps the
+version-tagged state that MidnightJS 5 returns (`{ version: 'v9', state }`) into the data the
+compiled `ledger()` decodes:
 
 ```typescript title="src/test/zk-loan.test.ts"
   async function queryLedger() {
@@ -504,8 +509,7 @@ This tutorial covered private computation over data you can't trust by itself:
 
 The full example is
 [`examples/zk-loan`](https://github.com/midnightntwrk/midnight-examples/tree/main/examples/zk-loan)
-in midnight-examples. It also has a browser UI in `ui/`, which defaults to Preprod and the Lace
-wallet. See its README.
+in midnight-examples.
 
 ## Next
 

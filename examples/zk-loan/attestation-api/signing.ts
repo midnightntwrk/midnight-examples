@@ -28,8 +28,9 @@ import * as crypto from 'node:crypto';
 import { ecMulGenerator, type JubjubPoint } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
 import { pureCircuits, type Schnorr_SchnorrSignature } from '../contract/index.js';
 
-// Order of the Jubjub prime-order subgroup. Scalars passed to ecMulGenerator
-// must be below this or it throws "out of bounds for prime field".
+// Order of the Jubjub prime-order subgroup. ecMulGenerator reduces its scalar
+// modulo this order, but throws "out of bounds for prime field" for values at
+// or above the BLS12-381 scalar modulus, so keys and responses are reduced first.
 export const JUBJUB_ORDER = 6554484396890773809930967563523245729705921265872317281365359162392183254199n;
 // The circuit truncates the BLS12-381 challenge hash to 248 bits so it is a
 // valid Jubjub scalar; the signer must truncate the same way.
@@ -63,8 +64,9 @@ export function sign(sk: bigint, msg: bigint[]): Schnorr_SchnorrSignature {
   // pureCircuits.schnorrChallenge returns the full transientHash output; the
   // circuit reduces it mod 2^248 before the EC ops, so do the same here.
   const c = pureCircuits.schnorrChallenge(R.x, R.y, pk.x, pk.y, msg) % TWO_248;
-  // s must be reduced mod the Jubjub order (not the BLS12-381 field), because
-  // the circuit feeds it to ecMulGenerator.
+  // s must be reduced mod the Jubjub order, not left to wrap modulo the
+  // BLS12-381 field: k + c*sk can exceed the field, and the wrapped value is a
+  // different scalar.
   const s = reduce(k + c * sk);
   return { announcement: R, response: s };
 }

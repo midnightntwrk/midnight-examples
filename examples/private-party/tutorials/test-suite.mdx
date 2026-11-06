@@ -46,15 +46,15 @@ take a few minutes.
 When it finishes, all 11 tests pass, including the ones that expect a rejection:
 
 ```
- ✓ src/test/party.test.ts (11 tests) 168210ms
-     ✓ Deploys a contract (the easy way)  17109ms
-     ✓ Allows Bob to rsvp (privately)  18570ms
-     ✓ Allows Charlie to rsvp(privately)  17170ms
-     ✓ starts the party  18504ms
-     ✓ Allows Bob to check in  17351ms
-     ✓ Closes the doors to the party  18522ms
-     ✓ Allows Alice to claimFees  40580ms
-     ✓ Deploys the contract(the hard way)  18086ms
+ ✓ src/test/party.test.ts (11 tests)
+     ✓ Deploys a contract (the easy way)
+     ✓ Allows Bob to rsvp (privately)
+     ✓ Allows Charlie to rsvp(privately)
+     ✓ starts the party
+     ✓ Allows Bob to check in
+     ✓ Closes the doors to the party
+     ✓ Allows Alice to claimFees
+     ✓ Deploys the contract(the hard way)
 
  Test Files  1 passed (1)
       Tests  11 passed (11)
@@ -62,7 +62,7 @@ When it finishes, all 11 tests pass, including the ones that expect a rejection:
 
 Vitest lists only tests that take longer than 300 ms, so the three rejection tests ("Blocks
 organizers from rsvp" and the two "Blocks non-organizers" tests) pass without a line of their own.
-The timings tell you something. Each successful call takes 15–20 seconds, most of it spent
+Run it and the timings tell you something. Each successful call takes many seconds, most of it spent
 generating a proof. (`claimFees` takes longer because the test also waits for Alice's wallet to
 sync before and after, to read her balance.) A rejected call takes milliseconds. A failing
 `assert` stops the circuit on the caller's own machine, so no proof is generated and nothing is
@@ -92,7 +92,9 @@ test file is shared harness. It is the same in every example in midnight-example
   `.env.<network>` file.
 - **`src/wallet.ts`** builds, starts, and syncs each wallet. **`src/providers.ts`** bundles the
   MidnightJS providers a user needs: public data from the indexer, private state, ZK artifacts
-  and proving, and the wallet itself.
+  and proving, and the wallet itself. MidnightJS 5 takes the wallet through
+  `createWalletProvider` and `createMidnightProvider`, and the bundle carries a `config` with the
+  network ID and the transaction time-to-live.
 
 The suite declares a wallet and a provider set for each person:
 
@@ -116,8 +118,12 @@ Each person also has an ID for their entry in their private state provider:
 ```
 
 `beforeAll` builds and syncs the three wallets, then builds each person's providers. On a remote
-network it also waits until every wallet has NIGHT and DUST. Two small helpers do the rest. One
-reads the contract's public ledger, the other reads a wallet's NIGHT balance:
+network it also waits until every wallet has NIGHT and at least 0.1 DUST (set `MIDNIGHT_MIN_DUST`
+to change that), and caches the synced wallet state in the repo-root `.wallet-state/` folder, so
+later runs only sync new blocks. Two small helpers do the rest. One reads the contract's public
+ledger, the other reads a wallet's NIGHT balance. `ledgerState`, from `src/providers.ts`,
+unwraps the version-tagged state that MidnightJS 5 returns (`{ version: 'v9', state }`) into the
+data the compiled `ledger()` decodes:
 
 ```typescript title="src/test/party.test.ts"
     async function queryLedger(providers: PartyProviders) {
@@ -349,7 +355,9 @@ party with those steps spelled out, so you can see what happens in between:
 1. **Run locally.** `createUnprovenDeployTx` runs the constructor on Alice's machine and builds
    an unproven transaction. The contract address is already known at this point.
 2. **Prove.** The proof provider has the proof server generate a zero-knowledge proof for each
-   circuit call in the transaction, and returns the proven transaction.
+   circuit call in the transaction, and returns the proven transaction. In MidnightJS 5 the
+   transaction goes in and comes out tagged with its ledger era (`{ version: 'v9', tx }`), and the
+   wallet provider takes it in that form.
 3. **Balance.** The wallet adds the inputs that pay for the transaction: DUST for the fee, and
    any tokens the transaction needs.
 4. **Submit.** The wallet sends the transaction to the node.
