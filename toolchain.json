@@ -83,7 +83,7 @@
       "@midnightntwrk/zkir-v3": "3.2.0",
       "@midnight-ntwrk/midnight-js-protocol@5.0.0-rc.5": {
         "@midnight-ntwrk/compact-runtime": "0.21.0",
-        "@midnight-ntwrk/compact-js": "3.0.0-rc.6"
+        "@midnight-ntwrk/compact-js": "3.0.0"
       }
     }
   }
