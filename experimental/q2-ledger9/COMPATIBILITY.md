@@ -38,8 +38,14 @@ final client libraries (see the result below).
 
 ## Moving from Ledger 8
 
-- Ledger 8 artifacts and transactions don't work on Ledger 9. Recompile contracts with
-  Compact 0.36.0 and rebuild against the packages above.
+- Contracts deployed under Ledger 8 carry over the fork with their state, and Midnight.js 5
+  can still call them through its
+  [keep-state path](https://github.com/midnightntwrk/midnight-js/blob/main/packages/contracts/docs/keep-state-pipeline.md),
+  running the original Ledger 8 artifacts. Midnight.js refuses a new deploy or a
+  maintenance update of a Ledger 8 artifact after the fork, so for those (and for new
+  work) recompile with Compact 0.36.0 and rebuild against the packages above.
+- Ledger 8-format transactions are rejected after the fork, including ones built and
+  proved before it but not yet submitted. Rebuild them with the Ledger 9 stack.
 - The on-chain runtime moves from `onchain-runtime-v3` to `onchain-runtime-v4`. The major
   version is in the package name, so change the dependency name, not just the range.
 - Midnight.js 5 providers are tagged with the ledger eras they serve. Contract state
