@@ -30,13 +30,13 @@
   "dependencies": {
     "@midnight-ntwrk/compact-js": "3.0.0",
     "@midnight-ntwrk/compact-runtime": "0.21.0",
-    "@midnight-ntwrk/midnight-js-contracts": "5.0.0-rc.6",
-    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "5.0.0-rc.6",
-    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "5.0.0-rc.6",
-    "@midnight-ntwrk/midnight-js-level-private-state-provider": "5.0.0-rc.6",
+    "@midnight-ntwrk/midnight-js-contracts": "5.0.0",
+    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "5.0.0",
+    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "5.0.0",
+    "@midnight-ntwrk/midnight-js-level-private-state-provider": "5.0.0",
     "@midnight-ntwrk/midnight-js-network-id": "5.0.0-rc.5",
-    "@midnight-ntwrk/midnight-js-node-zk-config-provider": "5.0.0-rc.6",
-    "@midnight-ntwrk/midnight-js-types": "5.0.0-rc.6",
+    "@midnight-ntwrk/midnight-js-node-zk-config-provider": "5.0.0",
+    "@midnight-ntwrk/midnight-js-types": "5.0.0",
     "@midnightntwrk/ledger-v9": "1.0.0",
     "@midnightntwrk/wallet-sdk-abstractions": "3.0.0",
     "@midnightntwrk/wallet-sdk-address-format": "4.0.0",
@@ -58,10 +58,5 @@
     "@types/ws": "^8.5.9",
     "typescript": "^5.7.0",
     "vitest": "^4.1.11"
-  },
-  "overrides": {
-    "@midnightntwrk/ledger-v9": "1.0.0",
-    "@midnight-ntwrk/compact-js": "3.0.0",
-    "@midnightntwrk/onchain-runtime-v4": "4.0.0"
   }
 }

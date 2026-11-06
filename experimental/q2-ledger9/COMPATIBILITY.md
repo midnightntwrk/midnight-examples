@@ -1,11 +1,12 @@
 # Ledger 9 compatibility matrix
 
 The component versions these suites build and run against: the expected Ledger 9
-release stack, as far as it is installable today. Where a final release isn't on npm or
-Docker Hub yet, the table pins the newest pre-release and says so. Node and indexer are
-listed as TBA until their Ledger 9 releases are published.
+release stack, as far as it is installable today. Every builder component is a final
+release except `midnight-js-network-id`, which has no 5.0.0 yet, so the table pins its
+newest pre-release and says so. Node and indexer are listed as TBA until their Ledger 9
+releases are published.
 
-Checked against npm and Docker Hub on 2026-11-05.
+Checked against npm and Docker Hub on 2026-11-06.
 
 ## Builder components
 
@@ -17,12 +18,15 @@ Checked against npm and Docker Hub on 2026-11-05.
 | Ledger | 1.0.0 | `@midnightntwrk/ledger-v9` | final |
 | On-chain runtime | 4.0.0 | `@midnightntwrk/onchain-runtime-v4` | final |
 | ZKIR | 3.2.0 | `@midnight-ntwrk/zkir-v3` | final |
-| Midnight.js | 5.0.0-rc.6 | `@midnight-ntwrk/midnight-js-*` (`midnight-js-network-id` 5.0.0-rc.5, the newest published) | **pre-release**, no 5.0.0 yet |
-| Wallet SDK | facade 5.0.0, dust-wallet 5.0.0, shielded 4.0.0, unshielded-wallet 4.0.0, hd 4.0.0, address-format 4.0.0, abstractions 3.0.0 | `@midnightntwrk/wallet-sdk-*` | final |
+| Midnight.js | 5.0.0 | `@midnight-ntwrk/midnight-js-*` | final |
+| Midnight.js network ID | 5.0.0-rc.5 | `@midnight-ntwrk/midnight-js-network-id` | **pre-release**, the newest published; no 5.0.0 yet |
+| Wallet SDK (umbrella) | 2.0.0 | `@midnightntwrk/wallet-sdk` | final |
+| Wallet SDK packages | facade 5.0.0, dust-wallet 5.0.0, shielded 4.0.0, unshielded-wallet 4.0.0, hd 4.0.0, address-format 4.0.0, abstractions 3.0.0 | `@midnightntwrk/wallet-sdk-*` | final |
 | Proof server | 9.0.0 | `midnightntwrk/proof-server:9.0.0` | final |
 
-`package.json` overrides Midnight.js 5.0.0-rc.6's exact pins (`ledger-v9` 1.0.0-rc.7,
-`compact-js` 3.0.0-rc.6) up to the finals above, so the tree holds one copy of each.
+The suites import the wallet SDK packages directly, at the versions the 2.0.0 umbrella
+package pins. Midnight.js 5.0.0 pins the Compact.js, Ledger and on-chain runtime finals
+above itself, so `package.json` needs no overrides and the tree holds one copy of each.
 
 ## Network components
 
@@ -60,7 +64,7 @@ final client libraries (see the result below).
 ## Local devnet result (2026-11-05)
 
 Run with `npm run env:up && npm run test:local` on node 2.1.0-rc.4, indexer 4.4.0-rc.6
-and proof server 9.0.0, with the stack above.
+and proof server 9.0.0, with Midnight.js 5.0.0-rc.6 and the rest of the stack above.
 
 **Compile:** 12 of 15 contracts compile. `caller/Caller` used to be a gap and now
 compiles. The remaining gaps are self-recursion (`cycle involving type
