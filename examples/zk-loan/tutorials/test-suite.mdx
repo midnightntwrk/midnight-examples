@@ -200,7 +200,7 @@ a deployed contract:
     circuitId: K,
     ...args: CircuitArgs<K>
   ) {
-    return (submitCallTx<Contract, K>)(providers, {
+    return submitCallTx(providers, {
       compiledContract: CompiledZkLoanContract,
       contractAddress,
       privateStateId,
@@ -216,7 +216,7 @@ A helper also reads the contract's public ledger, and the tests use it after eve
   async function queryLedger() {
     const state = await providers.publicDataProvider.queryContractState(contractAddress);
     expect(state).not.toBeNull();
-    return ledger(state!.data);
+    return ledger(ledgerState(state));
   }
 ```
 
@@ -228,7 +228,7 @@ Alice deploys with a private state that holds only her secret. That is all the c
 
 ```typescript title="src/test/zk-loan.test.ts"
   it('deploys the contract with the deployer as admin', async () => {
-    const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {
+    const deployed: DeployedContract<Contract> = await deployContract(providers, {
       compiledContract: CompiledZkLoanContract,
       privateStateId: ALICE_STATE_ID,
       initialPrivateState: createZkLoanPrivateState(aliceSecret),

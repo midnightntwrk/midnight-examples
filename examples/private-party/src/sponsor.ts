@@ -48,6 +48,7 @@ import {
   type SignatureEnabled,
   Transaction,
 } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+import { unwrapLedger9 } from '@midnight-ntwrk/midnight-js-types';
 import { fromHex, toHex } from '@midnight-ntwrk/midnight-js-utils';
 import type { Logger } from 'pino';
 import type { PartyProviders } from './providers.js';
@@ -77,7 +78,11 @@ export async function prepareSponsoredCall<
   // Proving happens here, on the user's side — which is why the secret that
   // authenticates the caller never reaches the sponsor.
   logger.info(`[user] proving ${String(call.circuitId)}()...`);
-  const unboundTx = await providers.proofProvider.proveTx(unsubmitted.private.unprovenTx);
+  // Midnight.js 5 proof providers take and return era-tagged transactions.
+  const unboundTx = unwrapLedger9(
+    await providers.proofProvider.proveTx({ version: 'v9', tx: unsubmitted.private.unprovenTx }),
+    'proveTx',
+  );
 
   // Where a circuit moves user value — checkIn's entry fee — that value is paid
   // from the user's own balance, here.
@@ -109,7 +114,7 @@ export async function sponsorAndSubmit(
   logger.info('[sponsor] attaching DUST fee offer...');
   const sponsored = await sponsor.addDustFeesAndFinalize(userTx);
 
-  const txId = await sponsor.wallet.submitTransaction(sponsored);
+  const txId = await sponsor.submitTx(sponsored);
   logger.info(`[sponsor] submitted sponsored tx: ${txId}`);
   return txId;
 }

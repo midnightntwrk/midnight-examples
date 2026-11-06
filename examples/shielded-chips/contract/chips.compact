@@ -27,7 +27,7 @@
 // `totalBurned`, `totalSupply` — matches the standard exactly, as do the mint
 // and burn semantics.
 
-pragma language_version 0.23;
+pragma language_version 0.28;
 import CompactStandardLibrary;
 
 // --- MIP-0011 required state (Fungible profile) ----------------------------

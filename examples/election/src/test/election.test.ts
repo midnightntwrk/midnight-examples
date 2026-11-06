@@ -50,7 +50,7 @@ import {
   resolveWallet,
   waitForNightThenDust,
 } from '../wallet.js';
-import { buildProviders, type ElectionProviders } from '../providers.js';
+import { buildProviders, ledgerState, type ElectionProviders } from '../providers.js';
 import {
   createElectionPrivateState,
   type ElectionPrivateState,
@@ -140,7 +140,7 @@ describe(`Election Contract (${network})`, () => {
   async function queryLedger() {
     const state = await providers.publicDataProvider.queryContractState(contractAddress);
     expect(state).not.toBeNull();
-    return ledger(state!.data);
+    return ledger(ledgerState(state));
   }
 
   // Store a participant's private state so the witnesses can present it, keyed to
@@ -202,7 +202,7 @@ describe(`Election Contract (${network})`, () => {
   // ---------------------------------------------------------------------------
 
   it('deploys the contract with voting closed (organizer)', async () => {
-    const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {
+    const deployed: DeployedContract<Contract> = await deployContract(providers, {
       compiledContract: CompiledElectionContract,
       privateStateId: PRIVATE_STATE_IDS.ORGANIZER,
       // The constructor invokes localSk(): deploy as the organizer.
@@ -245,7 +245,7 @@ describe(`Election Contract (${network})`, () => {
       PRIVATE_STATE_IDS.VOTER_TWO,
       PRIVATE_STATE_IDS.VOTER_THREE,
     ]) {
-      const res = await (submitCallTx<Contract, 'registerToVote'>)(providers, {
+      const res = await submitCallTx(providers, {
         compiledContract: CompiledElectionContract,
         contractAddress,
         privateStateId: id,
@@ -260,7 +260,7 @@ describe(`Election Contract (${network})`, () => {
 
   it('rejects a duplicate registration', async () => {
     await expect(
-      (submitCallTx<Contract, 'registerToVote'>)(providers, {
+      submitCallTx(providers, {
         compiledContract: CompiledElectionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.VOTER_ONE,
@@ -277,7 +277,7 @@ describe(`Election Contract (${network})`, () => {
 
   it('rejects openVoting from a non-organizer', async () => {
     await expect(
-      (submitCallTx<Contract, 'openVoting'>)(providers, {
+      submitCallTx(providers, {
         compiledContract: CompiledElectionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.VOTER_ONE,
@@ -290,7 +290,7 @@ describe(`Election Contract (${network})`, () => {
 
   it('rejects committing a vote before voting opens', async () => {
     await expect(
-      (submitCallTx<Contract, 'commitVote'>)(providers, {
+      submitCallTx(providers, {
         compiledContract: CompiledElectionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.VOTER_ONE,
@@ -302,7 +302,7 @@ describe(`Election Contract (${network})`, () => {
   });
 
   it('lets the organizer open voting (CLOSED -> OPEN)', async () => {
-    const res = await (submitCallTx<Contract, 'openVoting'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledElectionContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_IDS.ORGANIZER,
@@ -315,7 +315,7 @@ describe(`Election Contract (${network})`, () => {
 
   it('rejects registering once voting has opened', async () => {
     await expect(
-      (submitCallTx<Contract, 'registerToVote'>)(providers, {
+      submitCallTx(providers, {
         compiledContract: CompiledElectionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.VOTER_UNREGISTERED,
@@ -336,7 +336,7 @@ describe(`Election Contract (${network})`, () => {
     await setPrivateState(tieId, createElectionPrivateState(voterOneState.sk, VoteChoice.TIE));
 
     await expect(
-      (submitCallTx<Contract, 'commitVote'>)(providers, {
+      submitCallTx(providers, {
         compiledContract: CompiledElectionContract,
         contractAddress,
         privateStateId: tieId,
@@ -348,7 +348,7 @@ describe(`Election Contract (${network})`, () => {
   });
 
   it('records a vote from voter one (BAD)', async () => {
-    const res = await (submitCallTx<Contract, 'commitVote'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledElectionContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_IDS.VOTER_ONE,
@@ -366,7 +366,7 @@ describe(`Election Contract (${network})`, () => {
 
   it('records votes from voter two and voter three (both WORSE)', async () => {
     for (const id of [PRIVATE_STATE_IDS.VOTER_TWO, PRIVATE_STATE_IDS.VOTER_THREE]) {
-      const res = await (submitCallTx<Contract, 'commitVote'>)(providers, {
+      const res = await submitCallTx(providers, {
         compiledContract: CompiledElectionContract,
         contractAddress,
         privateStateId: id,
@@ -382,7 +382,7 @@ describe(`Election Contract (${network})`, () => {
 
   it('rejects a double vote', async () => {
     await expect(
-      (submitCallTx<Contract, 'commitVote'>)(providers, {
+      submitCallTx(providers, {
         compiledContract: CompiledElectionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.VOTER_ONE,
@@ -400,7 +400,7 @@ describe(`Election Contract (${network})`, () => {
 
   it('rejects revealing a vote while voting is still open', async () => {
     await expect(
-      (submitCallTx<Contract, 'revealVote'>)(providers, {
+      submitCallTx(providers, {
         compiledContract: CompiledElectionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.VOTER_ONE,
@@ -413,7 +413,7 @@ describe(`Election Contract (${network})`, () => {
 
   it('rejects closeVoting from a non-organizer', async () => {
     await expect(
-      (submitCallTx<Contract, 'closeVoting'>)(providers, {
+      submitCallTx(providers, {
         compiledContract: CompiledElectionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.VOTER_ONE,
@@ -425,7 +425,7 @@ describe(`Election Contract (${network})`, () => {
   });
 
   it('lets the organizer close voting (OPEN -> CLOSED)', async () => {
-    const res = await (submitCallTx<Contract, 'closeVoting'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledElectionContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_IDS.ORGANIZER,
@@ -439,7 +439,7 @@ describe(`Election Contract (${network})`, () => {
   it('rejects revealing a vote that differs from the commitment', async () => {
     // Voter one committed BAD; presenting WORSE fails the commitment check.
     await expect(
-      (submitCallTx<Contract, 'revealVote'>)(providers, {
+      submitCallTx(providers, {
         compiledContract: CompiledElectionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.VOTER_ONE_TAMPERED,
@@ -459,7 +459,7 @@ describe(`Election Contract (${network})`, () => {
       PRIVATE_STATE_IDS.VOTER_TWO,
       PRIVATE_STATE_IDS.VOTER_THREE,
     ]) {
-      const res = await (submitCallTx<Contract, 'revealVote'>)(providers, {
+      const res = await submitCallTx(providers, {
         compiledContract: CompiledElectionContract,
         contractAddress,
         privateStateId: id,
@@ -477,7 +477,7 @@ describe(`Election Contract (${network})`, () => {
     // Voter one already revealed above; the revealedVoters guard must refuse a
     // repeat so the tally cannot be inflated.
     await expect(
-      (submitCallTx<Contract, 'revealVote'>)(providers, {
+      submitCallTx(providers, {
         compiledContract: CompiledElectionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.VOTER_ONE,
@@ -496,7 +496,7 @@ describe(`Election Contract (${network})`, () => {
 
   it('rejects checkWinner from a non-organizer', async () => {
     await expect(
-      (submitCallTx<Contract, 'checkWinner'>)(providers, {
+      submitCallTx(providers, {
         compiledContract: CompiledElectionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.VOTER_ONE,
@@ -510,7 +510,7 @@ describe(`Election Contract (${network})`, () => {
   });
 
   it('lets the organizer declare the winner (candidate 1 / WORSE)', async () => {
-    const res = await (submitCallTx<Contract, 'checkWinner'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledElectionContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_IDS.ORGANIZER,

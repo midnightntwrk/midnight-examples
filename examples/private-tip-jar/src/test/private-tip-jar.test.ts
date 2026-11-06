@@ -34,7 +34,7 @@ import pino from 'pino';
 
 import { getConfig } from '../config.js';
 import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust } from '../wallet.js';
-import { buildProviders, type PrivateTipJarProviders } from '../providers.js';
+import { buildProviders, ledgerState, type PrivateTipJarProviders } from '../providers.js';
 import { createPrivateTipJarPrivateState } from '../../contract/witnesses.js';
 import {
   CompiledPrivateTipJarContract,
@@ -174,7 +174,7 @@ describe(`Private Tip Jar Contract (${network})`, () => {
   async function queryLedger(): Promise<Ledger> {
     const state = await aliceJarProv.publicDataProvider.queryContractState(jarAddress);
     expect(state).not.toBeNull();
-    return ledger(state!.data);
+    return ledger(ledgerState(state));
   }
 
   /** Shielded coins of the jar's token currently in `w`. */
@@ -209,7 +209,7 @@ describe(`Private Tip Jar Contract (${network})`, () => {
   }
 
   async function bobTips(coin: ShieldedCoinArg): Promise<void> {
-    await (submitCallTx<Contract, 'tip'>)(bobJarProv, {
+    await submitCallTx(bobJarProv, {
       compiledContract: CompiledPrivateTipJarContract,
       contractAddress: jarAddress,
       privateStateId: BOB_JAR_STATE_ID,
@@ -219,7 +219,7 @@ describe(`Private Tip Jar Contract (${network})`, () => {
   }
 
   async function aliceWithdraws(key: Uint8Array): Promise<void> {
-    await (submitCallTx<Contract, 'withdraw'>)(aliceJarProv, {
+    await submitCallTx(aliceJarProv, {
       compiledContract: CompiledPrivateTipJarContract,
       contractAddress: jarAddress,
       privateStateId: ALICE_JAR_STATE_ID,
@@ -263,7 +263,7 @@ describe(`Private Tip Jar Contract (${network})`, () => {
 
   it('deploys the demo token and mints Bob one coin to tip with', async () => {
     // A fresh devnet has no shielded tokens, so the tests bring their own.
-    const deployed: DeployedContract<TipTokenContract> = await (deployContract<TipTokenContract>)(
+    const deployed: DeployedContract<TipTokenContract> = await deployContract(
       aliceTokenProv,
       { compiledContract: CompiledTipTokenContract },
     );
@@ -273,7 +273,8 @@ describe(`Private Tip Jar Contract (${network})`, () => {
     logger.info(`Demo token at ${tokenAddress}, color ${tipColorHex}`);
 
     const bobCoinPk = bobWallet.getCoinPublicKey();
-    await (submitCallTx<TipTokenContract, 'mint'>)(aliceTokenProv, {
+    // The token contract keeps no private state, so the call names no privateStateId.
+    await submitCallTx<TipTokenContract<undefined>, 'mint'>(aliceTokenProv, {
       compiledContract: CompiledTipTokenContract,
       contractAddress: tokenAddress,
       circuitId: 'mint',
@@ -283,7 +284,7 @@ describe(`Private Tip Jar Contract (${network})`, () => {
     });
 
     const state = await aliceTokenProv.publicDataProvider.queryContractState(tokenAddress);
-    expect(tipTokenLedger(state!.data).mintCount).toEqual(1n);
+    expect(tipTokenLedger(ledgerState(state)).mintCount).toEqual(1n);
 
     await syncWallet(logger, bobWallet.wallet, syncTimeoutMs);
     expect(await tokenBalance(bobWallet)).toEqual(MINTED);
@@ -293,7 +294,7 @@ describe(`Private Tip Jar Contract (${network})`, () => {
   });
 
   it('Alice deploys the jar for that token; only a hash of her key is stored', async () => {
-    const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(aliceJarProv, {
+    const deployed: DeployedContract<Contract> = await deployContract(aliceJarProv, {
       compiledContract: CompiledPrivateTipJarContract,
       privateStateId: ALICE_JAR_STATE_ID,
       initialPrivateState: createPrivateTipJarPrivateState(aliceOwnerSk),
@@ -399,7 +400,7 @@ describe(`Private Tip Jar Contract (${network})`, () => {
   it('rejects a withdrawal by anyone but the owner', async () => {
     const [key] = [...(await queryLedger()).pot][0]!;
     await expect(
-      (submitCallTx<Contract, 'withdraw'>)(bobJarProv, {
+      submitCallTx(bobJarProv, {
         compiledContract: CompiledPrivateTipJarContract,
         contractAddress: jarAddress,
         privateStateId: BOB_JAR_STATE_ID,

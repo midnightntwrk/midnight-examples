@@ -23,7 +23,8 @@ import pino from 'pino';
 
 import { getConfig } from '../config.js';
 import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust, type WalletSecret } from '../wallet.js';
-import { buildProviders, type PartyProviders } from '../providers.js';
+import { unwrapLedger9 } from '@midnight-ntwrk/midnight-js-types';
+import { buildProviders, ledgerState, type PartyProviders } from '../providers.js';
 import { prepareSponsoredCall, sponsorAndSubmit } from '../sponsor.js';
 import {
     CompiledPartyContract,
@@ -75,7 +76,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
         const state =
             await providers.publicDataProvider.queryContractState(contractAddress);
         expect(state).not.toBeNull();
-        return ledger(state!.data);
+        return ledger(ledgerState(state));
     }
 
     async function getNightBalance(walletProvider: MidnightWalletProvider): Promise<bigint> {
@@ -194,7 +195,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
         const alicePrivateState = createPartyPrivateState(randomBytes(32));
         logger.info('Alice is deploying a party contract for the sponsorship demo...');
         const deployed: DeployedContract<Contract> =
-            await (deployContract<Contract>)(aliceProviders, {
+            await deployContract(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 privateStateId: ALICE_PRIVATE_ID,
                 initialPrivateState: alicePrivateState,
@@ -254,7 +255,10 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
             circuitId: 'rsvp',
             args: [daveAddressArg, davePrivateState.secret],
         });
-        const unboundTx = await daveProviders.proofProvider.proveTx(unsubmitted.private.unprovenTx);
+        const unboundTx = unwrapLedger9(
+            await daveProviders.proofProvider.proveTx({ version: 'v9', tx: unsubmitted.private.unprovenTx }),
+            'proveTx',
+        );
 
         // The ordinary path balances everything, DUST included. Dave has none, so
         // there is no fee he can offer and balancing cannot succeed.
@@ -295,7 +299,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
 
         // Alice has DUST of her own, so she needs no sponsor here — this is the
         // ordinary self-paying path, exactly as in party.test.ts.
-        await (submitCallTx<Contract, 'startParty'>)(aliceProviders, {
+        await submitCallTx(aliceProviders, {
             compiledContract: CompiledPartyContract,
             contractAddress,
             privateStateId: ALICE_PRIVATE_ID,

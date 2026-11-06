@@ -41,7 +41,7 @@
 //   received the payout. The owner is a public role here; this design does
 //   not try to hide where the owner's money goes.
 
-pragma language_version 0.23;
+pragma language_version 0.28;
 import CompactStandardLibrary;
 
 // Hash of the owner's secret key, written once at deployment. `sealed` means

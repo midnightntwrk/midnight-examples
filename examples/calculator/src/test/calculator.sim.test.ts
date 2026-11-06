@@ -14,32 +14,32 @@ const deploy = () =>
 // Everything above is generated boilerplate. Your tests begin here.
 
 describe('calculator (in memory)', () => {
-  it('starts at zero', () => {
-    expect(deploy().ledger().result).toBe(0n);
+  it('starts at zero', async () => {
+    expect((await deploy()).ledger().result).toBe(0n);
   });
 
-  it('adds, subtracts, multiplies and squares', () => {
-    const sim = deploy();
-    expect(sim.call('add', 2n, 3n).ledger.result).toBe(5n);
-    expect(sim.call('subtract', 10n, 4n).ledger.result).toBe(6n);
-    expect(sim.call('multiply', 6n, 7n).ledger.result).toBe(42n);
-    expect(sim.call('square', 12n).ledger.result).toBe(144n);
+  it('adds, subtracts, multiplies and squares', async () => {
+    const sim = await deploy();
+    expect((await sim.call('add', 2n, 3n)).ledger.result).toBe(5n);
+    expect((await sim.call('subtract', 10n, 4n)).ledger.result).toBe(6n);
+    expect((await sim.call('multiply', 6n, 7n)).ledger.result).toBe(42n);
+    expect((await sim.call('square', 12n)).ledger.result).toBe(144n);
   });
 
-  it('divides through the divMod witness', () => {
-    expect(deploy().call('divide', 17n, 5n).ledger.result).toBe(3n);
+  it('divides through the divMod witness', async () => {
+    expect((await (await deploy()).call('divide', 17n, 5n)).ledger.result).toBe(3n);
   });
 
-  it('rejects a witness that lies about the division', () => {
+  it('rejects a witness that lies about the division', async () => {
     const lying = new Contract({ ...witnesses, divMod: ({ privateState }) => [privateState, [4n, 0n]] });
-    const sim = Sim.deploy({ contract: lying, ledger, privateState: createCalculatorPrivateState() });
-    expectRejects(() => sim.call('divide', 17n, 5n), 'incorrect division');
+    const sim = await Sim.deploy({ contract: lying, ledger, privateState: createCalculatorPrivateState() });
+    await expectRejects(() => sim.call('divide', 17n, 5n), 'incorrect division');
     expect(sim.ledger().result).toBe(0n);
   });
 
-  it('rejects results that overflow Uint<16>', () => {
-    const sim = deploy();
-    expectRejects(() => sim.call('multiply', 1000n, 1000n));
-    expectRejects(() => sim.call('subtract', 1n, 2n));
+  it('rejects results that overflow Uint<16>', async () => {
+    const sim = await deploy();
+    await expectRejects(() => sim.call('multiply', 1000n, 1000n));
+    await expectRejects(() => sim.call('subtract', 1n, 2n));
   });
 });

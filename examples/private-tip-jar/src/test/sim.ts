@@ -28,6 +28,10 @@
 // current public state, the current private state and the caller's coin
 // public key, the way examples/calculator/ui/src/__tests__/
 // calculator-circuits.test.ts does it.
+//
+// From compact-runtime 0.20 (Compact 0.35) the constructor and circuits are
+// async, and createCircuitContext takes one options object; so deploy(),
+// call() and expectRejects() here are async too.
 
 import {
   type ChargedState,
@@ -45,7 +49,7 @@ export const SIM_COIN_PUBLIC_KEY = '00'.repeat(32);
 
 /** The parts of a compiler-generated `Contract<PS>` the harness uses. */
 export interface SimContract<PS> {
-  initialState(context: ConstructorContext<PS>, ...args: never[]): ConstructorResult<PS>;
+  initialState(context: ConstructorContext<PS>, ...args: never[]): Promise<ConstructorResult<PS>>;
   impureCircuits: object;
 }
 
@@ -59,7 +63,7 @@ export type CircuitArgs<C, K extends CircuitName<C>> =
   Parameters<CircuitFn<C, K>> extends [unknown, ...infer Rest] ? Rest : never;
 /** What a circuit returns in Compact. */
 export type CircuitResult<C, K extends CircuitName<C>> =
-  ReturnType<CircuitFn<C, K>> extends CircuitResults<unknown, infer R> ? R : never;
+  Awaited<ReturnType<CircuitFn<C, K>>> extends CircuitResults<unknown, infer R> ? R : never;
 /** The constructor's arguments, without the leading context. */
 export type ConstructorArgs<C> = C extends {
   initialState(context: never, ...args: infer A): unknown;
@@ -104,10 +108,10 @@ export class Sim<C extends SimContract<PS>, PS, L> {
   }
 
   /** Runs the constructor and returns a simulation of the deployed contract. */
-  static deploy<C extends SimContract<PS>, PS, L>(opts: DeployOptions<C, PS, L>): Sim<C, PS, L> {
+  static async deploy<C extends SimContract<PS>, PS, L>(opts: DeployOptions<C, PS, L>): Promise<Sim<C, PS, L>> {
     const coinPublicKey = opts.coinPublicKey ?? SIM_COIN_PUBLIC_KEY;
     const args = (opts.args ?? []) as never[];
-    const result = opts.contract.initialState(createConstructorContext(opts.privateState, coinPublicKey), ...args);
+    const result = await opts.contract.initialState(createConstructorContext(opts.privateState, coinPublicKey), ...args);
     return new Sim(opts.contract, opts.ledger, result.currentContractState.data, result.currentPrivateState, coinPublicKey);
   }
 
@@ -122,17 +126,24 @@ export class Sim<C extends SimContract<PS>, PS, L> {
    * private state move forward; if the circuit throws (a failed assert), the
    * error propagates and neither changes.
    */
-  call<K extends CircuitName<C>>(circuit: K, ...args: CircuitArgs<C, K>): { result: CircuitResult<C, K>; ledger: L } {
+  async call<K extends CircuitName<C>>(
+    circuit: K,
+    ...args: CircuitArgs<C, K>
+  ): Promise<{ result: CircuitResult<C, K>; ledger: L }> {
     const fn = (this.contract.impureCircuits as Record<string, unknown>)[circuit];
     if (typeof fn !== 'function') throw new Error(`${circuit} is not an impure circuit of this contract`);
-    const context = createCircuitContext(this.address, this.coinPublicKey, this.state, this.privateState);
-    const out = (fn as (ctx: CircuitContext<PS>, ...a: unknown[]) => CircuitResults<PS, CircuitResult<C, K>>).call(
-      this.contract.impureCircuits,
-      context,
-      ...args,
-    );
-    this.state = out.context.currentQueryContext.state;
-    this.privateState = out.context.currentPrivateState;
+    const context = createCircuitContext<PS>({
+      circuitId: circuit,
+      contractAddress: this.address,
+      coinPublicKeyOrZswapState: this.coinPublicKey,
+      contractState: this.state,
+      privateState: this.privateState,
+    });
+    const out = await (
+      fn as (ctx: CircuitContext<PS>, ...a: unknown[]) => Promise<CircuitResults<PS, CircuitResult<C, K>>>
+    ).call(this.contract.impureCircuits, context, ...args);
+    this.state = out.context.callContext.currentQueryContext.state;
+    this.privateState = out.context.callContext.currentPrivateState as PS;
     this.lastContext = out.context;
     return { result: out.result, ledger: this.decode(this.state) };
   }
@@ -146,12 +157,12 @@ export class Sim<C extends SimContract<PS>, PS, L> {
 /**
  * Runs `fn` and returns the error it throws. Fails if it doesn't throw, or if
  * `message` is given and the error message doesn't contain it. Use it for
- * every guard: `expectRejects(() => sim.call('withdraw', ...), 'not the owner')`.
+ * every guard: `await expectRejects(() => sim.call('withdraw', ...), 'not the owner')`.
  */
-export function expectRejects(fn: () => unknown, message?: string): Error {
+export async function expectRejects(fn: () => unknown, message?: string): Promise<Error> {
   let thrown: unknown;
   try {
-    fn();
+    await fn();
   } catch (e) {
     thrown = e;
   }

@@ -77,12 +77,12 @@ state for a random secret makes the caller a non-owner:
 
 ```typescript title="src/test/private-tip-jar.sim.test.ts"
     sim.privateState = createPrivateTipJarPrivateState(bytes32());
-    expectRejects(() => sim.call('withdraw', key), 'Only the owner can withdraw');
+    await expectRejects(() => sim.call('withdraw', key), 'Only the owner can withdraw');
 
     sim.privateState = createPrivateTipJarPrivateState(OWNER_SK);
-    expectRejects(() => sim.call('withdraw', bytes32()), 'No such tip in the jar');
+    await expectRejects(() => sim.call('withdraw', bytes32()), 'No such tip in the jar');
 
-    expect(sim.as(OWNER_COIN_PK).call('withdraw', key).ledger.pot.isEmpty()).toBe(true);
+    expect((await sim.as(OWNER_COIN_PK).call('withdraw', key)).ledger.pot.isEmpty()).toBe(true);
 ```
 
 The tipper chooses a tip's nonce, and the pot is keyed by it, so one test checks the guard that
@@ -90,9 +90,9 @@ stops a tip from reusing a pot key and overwriting that entry:
 
 ```typescript title="src/test/private-tip-jar.sim.test.ts"
     const first = coin(5n);
-    sim.call('tip', first);
+    await sim.call('tip', first);
     // Same nonce, different value: a different coin, but the same pot key.
-    expectRejects(() => sim.call('tip', { ...first, value: 1n }), 'A tip with that nonce is already in the jar');
+    await expectRejects(() => sim.call('tip', { ...first, value: 1n }), 'A tip with that nonce is already in the jar');
     const [[, held]] = [...sim.ledger().pot];
     expect(held.value).toBe(5n);
 ```
@@ -210,7 +210,8 @@ Then Alice mints Bob one coin of 100:
 
 ```typescript title="src/test/private-tip-jar.test.ts"
     const bobCoinPk = bobWallet.getCoinPublicKey();
-    await (submitCallTx<TipTokenContract, 'mint'>)(aliceTokenProv, {
+    // The token contract keeps no private state, so the call names no privateStateId.
+    await submitCallTx<TipTokenContract<undefined>, 'mint'>(aliceTokenProv, {
       compiledContract: CompiledTipTokenContract,
       contractAddress: tokenAddress,
       circuitId: 'mint',
@@ -234,7 +235,7 @@ so the privacy test can check later that it never reaches the pot.
 Alice deploys the jar for that color, with a fresh random owner secret in her private state:
 
 ```typescript title="src/test/private-tip-jar.test.ts"
-    const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(aliceJarProv, {
+    const deployed: DeployedContract<Contract> = await deployContract(aliceJarProv, {
       compiledContract: CompiledPrivateTipJarContract,
       privateStateId: ALICE_JAR_STATE_ID,
       initialPrivateState: createPrivateTipJarPrivateState(aliceOwnerSk),
@@ -268,7 +269,7 @@ Each tip is a plain call:
 
 ```typescript title="src/test/private-tip-jar.test.ts"
   async function bobTips(coin: ShieldedCoinArg): Promise<void> {
-    await (submitCallTx<Contract, 'tip'>)(bobJarProv, {
+    await submitCallTx(bobJarProv, {
       compiledContract: CompiledPrivateTipJarContract,
       contractAddress: jarAddress,
       privateStateId: BOB_JAR_STATE_ID,

@@ -53,7 +53,7 @@ export type TokenColor = { hex: string; bytes: Uint8Array };
 
 /**
  * The slice of the wallet facade's state these helpers read. `FacadeState`
- * from @midnight-ntwrk/wallet-sdk fits it, and so does a hand-built object in
+ * from @midnightntwrk/wallet-sdk fits it, and so does a hand-built object in
  * a unit test.
  */
 export interface ShieldedStateView {

@@ -56,7 +56,7 @@
 // the bet value or color as well would mean committing those too and
 // re-proving them on claim.
 
-pragma language_version 0.23;
+pragma language_version 0.28;
 import CompactStandardLibrary;
 
 export enum BetState {

@@ -88,9 +88,10 @@ module schnorr {
            "Invalid challenge reduction"
            );
     const c: Field = disclose(cTruncated) as Field;
-    // s*G == R + c*pk
-    const lhs: JubjubPoint = ecMulGenerator(response);
-    const rhs: JubjubPoint = ecAdd(announcement, ecMul(pk, c));
+    // s*G == R + c*pk. ecMul and ecMulGenerator take a JubjubScalar; the cast
+    // reduces modulo the Jubjub group order, which leaves the points unchanged.
+    const lhs: JubjubPoint = ecMulGenerator(response as JubjubScalar);
+    const rhs: JubjubPoint = ecAdd(announcement, ecMul(pk, c as JubjubScalar));
     // Compare coordinates, not the points: `==` on the opaque JubjubPoint
     // compiles to JS reference equality.
     assert(jubjubPointX(lhs) == jubjubPointX(rhs) && jubjubPointY(lhs) == jubjubPointY(rhs),

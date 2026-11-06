@@ -124,7 +124,7 @@ reads the contract's public ledger, the other reads a wallet's NIGHT balance:
         const state =
             await providers.publicDataProvider.queryContractState(contractAddress);
         expect(state).not.toBeNull();
-        return ledger(state!.data);
+        return ledger(ledgerState(state));
     }
 
     // NIGHT token type is the all-zero raw token type
@@ -150,8 +150,8 @@ with an entry fee of 5 STAR:
         const alicePrivateState = createPartyPrivateState(randomBytes(32));
 
         logger.info(`Deploying a contract the easy way...`);
-        const deployed: DeployedContract<Contract> = 
-            await (deployContract<Contract>)(aliceProviders, {
+        const deployed: DeployedContract<Contract> =
+            await deployContract(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 privateStateId: ALICE_PRIVATE_ID,
                 initialPrivateState: alicePrivateState,
@@ -196,8 +196,8 @@ from the address's hex string with `encodeUserAddress`. Both give the same 32 by
 Then Bob calls `rsvp`:
 
 ```typescript title="src/test/party.test.ts"
-        const txData: FinalizedCallTxData<Contract, 'rsvp'> = 
-            await (submitCallTx<Contract, 'rsvp'>)(bobProviders, {
+        const txData: FinalizedCallTxData<Contract, 'rsvp'> =
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -225,7 +225,7 @@ rejected. Alice tries to RSVP to her own party:
 
 ```typescript title="src/test/party.test.ts"
         await expect(async () => {
-            await (submitCallTx<Contract, 'rsvp'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -241,7 +241,7 @@ and the test confirms the party state didn't change:
 
 ```typescript title="src/test/party.test.ts"
         await expect(async () => {
-            await (submitCallTx<Contract, 'startParty'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -262,8 +262,8 @@ Between the two, Alice starts the party with her secret, and the state moves to 
 Bob checks in with the same address and secret he used to RSVP:
 
 ```typescript title="src/test/party.test.ts"
-        const txData: FinalizedCallTxData<Contract, 'checkIn'> = 
-            await (submitCallTx<Contract, 'checkIn'>)(bobProviders, {
+        const txData: FinalizedCallTxData<Contract, 'checkIn'> =
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -293,7 +293,7 @@ her NIGHT balance before and after:
 
         logger.info(`Alice is claiming fees...`);
         const txData: FinalizedCallTxData<Contract, 'claimFees'> =
-            await (submitCallTx<Contract, 'claimFees'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -317,19 +317,20 @@ party with those steps spelled out, so you can see what happens in between:
 
 ```typescript title="src/test/party.test.ts"
         // Step 1: Local circuit execution
-        const unprovenData: UnsubmittedDeployTxData<Contract> = 
+        const unprovenData: UnsubmittedDeployTxData<Contract> =
             await (createUnprovenDeployTx as any)(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 privateStateId: ALICE_PRIVATE_ID,
                 initialPrivateState: alicePrivateState,
                 args: [PARTY_SIZE, FEE, alicePrivateState.secret]
             });
-        
+
         const pendingAddress = unprovenData.public?.contractAddress;
         logger.info(`Unproven tx created. Pending contract address: ${pendingAddress}`);
 
         // Step 2: Prove (send to proof server, get ZK proof back)
-        const provenTx = await aliceProviders.proofProvider.proveTx(unprovenData.private.unprovenTx);
+        // Midnight.js 5 providers pass transactions tagged with their ledger era.
+        const provenTx = await aliceProviders.proofProvider.proveTx({ version: 'v9', tx: unprovenData.private.unprovenTx });
         logger.info('proven tx received from proof server');
 
         // Step 3: Balance wallet

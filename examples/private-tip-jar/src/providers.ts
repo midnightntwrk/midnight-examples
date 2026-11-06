@@ -14,7 +14,12 @@
 // limitations under the License.
 
 // Returns the providers in an object which can be created for each user's individual tests
-import { type MidnightProviders } from '@midnight-ntwrk/midnight-js-types';
+import {
+  createMidnightProvider,
+  createWalletProvider,
+  type MidnightProviders,
+  type VersionedContractState,
+} from '@midnight-ntwrk/midnight-js-types';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
@@ -29,6 +34,10 @@ import { type ImpureCircuits } from '../contract/index.js';
 export type PrivateTipJarCircuits = keyof ImpureCircuits<unknown>;
 
 export type PrivateTipJarProviders = MidnightProviders<any>;
+
+// How long a built transaction stays valid, in seconds (Midnight.js 5's
+// `config.ttlSeconds`).
+const TX_TTL_SECONDS = Number(process.env['MIDNIGHT_TX_TTL_SECONDS'] ?? 3600);
 
 // Build one provider set per (wallet, contract). This example has two
 // contracts (the tip jar and a demo token), so zkConfigPath picks which
@@ -57,7 +66,20 @@ export function buildProviders(
       config.proofServer,
       zkConfigProvider,
     ),
-    walletProvider: wallet,
-    midnightProvider: wallet,
+    // Midnight.js 5 providers are tagged with the ledger eras they serve. The
+    // wallet is ledger 9 only; these lift it into the tagged interfaces.
+    walletProvider: createWalletProvider(wallet),
+    midnightProvider: createMidnightProvider((tx) => wallet.submitTx(tx)),
+    config: { networkId: config.networkId, ttlSeconds: TX_TTL_SECONDS },
   };
+}
+
+/**
+ * The public ledger state of a contract read with queryContractState, for the
+ * compiled `ledger()` to decode. Midnight.js 5 tags a contract state with the
+ * ledger era that wrote it; every contract here is deployed on ledger 9.
+ */
+export function ledgerState(state: VersionedContractState | null) {
+  if (state?.version !== 'v9') throw new Error('expected a ledger 9 contract state');
+  return state.state.data;
 }

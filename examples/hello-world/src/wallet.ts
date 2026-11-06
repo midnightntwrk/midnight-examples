@@ -1,6 +1,6 @@
 // The test wallet, built from the published Midnight SDK packages only:
 // @midnight-ntwrk/testkit-js supplies the wallet provider and sync helper, and
-// @midnight-ntwrk/wallet-sdk the wallet itself.
+// @midnightntwrk/wallet-sdk the wallet itself.
 //
 // A wallet syncs from genesis. On a local devnet that takes seconds; on preprod
 // it can take over an hour the first time, so remote runs set a long
@@ -9,7 +9,7 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { DustSecretKey, unshieldedToken, ZswapSecretKeys } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+import { unshieldedToken } from '@midnight-ntwrk/midnight-js-protocol/ledger';
 import {
   type EnvironmentConfiguration,
   FluentWalletBuilder,
@@ -17,7 +17,7 @@ import {
   logger as testkitLogger,
   syncWallet as testkitSyncWallet,
 } from '@midnight-ntwrk/testkit-js';
-import type { FacadeState, UnshieldedKeystore, WalletFacade } from '@midnight-ntwrk/wallet-sdk';
+import type { FacadeState, UnshieldedKeystore, WalletFacade } from '@midnightntwrk/wallet-sdk';
 import type { Logger } from 'pino';
 import * as Rx from 'rxjs';
 
@@ -47,14 +47,7 @@ export async function buildWallet(
     : builder.withSeed(secret.value)
   ).buildWithoutStarting();
   logger.info(`Wallet built from ${secret.kind}.`);
-  return MidnightWalletProvider.withWallet(
-    logger,
-    env,
-    wallet,
-    ZswapSecretKeys.fromSeed(seeds.shielded),
-    DustSecretKey.fromSeed(seeds.dust),
-    keystore,
-  );
+  return MidnightWalletProvider.withWallet(logger, env, wallet, seeds, keystore);
 }
 
 /** Wait until the wallet has caught up with the chain. `timeout` caps the gap between updates. */
@@ -249,7 +242,7 @@ export async function waitForFunding(
     const recipe = await wallet.registerNightUtxosForDustGeneration(
       unregistered,
       keystore.getPublicKey(),
-      (payload) => keystore.signData(payload),
+      async (payload) => keystore.signData(payload),
     );
     const txId = await wallet.submitTransaction(await wallet.finalizeRecipe(recipe));
     logger.info(`${label}: DUST registration submitted (${txId}).`);

@@ -30,7 +30,7 @@
 // never used: it returns a prover-claimed value with no cryptographic binding
 // to the transaction signer, so any assertion that depends on it is bypassable.
 
-pragma language_version 0.23;
+pragma language_version 0.28;
 import CompactStandardLibrary;
 
 // schnorr.compact sits next to this file; `prefix Schnorr_` namespaces every

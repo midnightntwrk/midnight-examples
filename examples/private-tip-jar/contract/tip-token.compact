@@ -7,7 +7,7 @@
 // currency. For a proper shielded token with an issuer and burn paths, see
 // examples/shielded-chips/contract/chips.compact (MIP-0011).
 
-pragma language_version 0.23;
+pragma language_version 0.28;
 import CompactStandardLibrary;
 
 // How many mints have happened. The first devnet test reads it back to

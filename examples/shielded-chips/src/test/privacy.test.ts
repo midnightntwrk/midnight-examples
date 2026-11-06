@@ -62,7 +62,7 @@ import pino from 'pino';
 
 import { getConfig } from '../config.js';
 import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust } from '../wallet.js';
-import { buildProviders, type ShieldedChipsProviders } from '../providers.js';
+import { buildProviders, ledgerState, type ShieldedChipsProviders } from '../providers.js';
 import {
   CompiledRouletteContract,
   CompiledChipsContract,
@@ -222,12 +222,12 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
   async function queryRoulette(): Promise<RouletteLedger> {
     const s = await aliceRouletteProv.publicDataProvider.queryContractState(rouletteAddress);
     expect(s).not.toBeNull();
-    return rouletteLedger(s!.data);
+    return rouletteLedger(ledgerState(s));
   }
   async function queryChips(): Promise<ChipsLedger> {
     const s = await aliceChipsProv.publicDataProvider.queryContractState(chipsAddress);
     expect(s).not.toBeNull();
-    return chipsLedger(s!.data);
+    return chipsLedger(ledgerState(s));
   }
 
   // A coin passed to houseDeposit or betColor is `freshCoin(chipColorHex, v)`:
@@ -283,7 +283,7 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
 
   it('sets up: deploy chips, mint to Alice+Bob, deploy roulette, house deposit', async () => {
     // chips
-    const deployedChips: DeployedContract<ChipsContract> = await deployContract<ChipsContract>(aliceChipsProv, {
+    const deployedChips: DeployedContract<ChipsContract> = await deployContract(aliceChipsProv, {
       compiledContract: CompiledChipsContract,
       privateStateId: ALICE_CHIPS,
       initialPrivateState: createRoulettePrivateState(aliceSk),
@@ -303,7 +303,7 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
       [bobCoinPkHex, bobWallet.getEncryptionPublicKey()],
     ]);
     const mintTo = async (recipient: { bytes: Uint8Array }) => {
-      await submitCallTx<ChipsContract, 'mint'>(aliceChipsProv, {
+      await submitCallTx(aliceChipsProv, {
         compiledContract: CompiledChipsContract,
         contractAddress: chipsAddress,
         privateStateId: ALICE_CHIPS,
@@ -322,7 +322,7 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
     logger.info(`Bob minted-coin nonce: ${hex(bobMintedNonce)}`);
 
     // roulette
-    const deployedRoul: DeployedContract<RouletteContract> = await deployContract<RouletteContract>(aliceRouletteProv, {
+    const deployedRoul: DeployedContract<RouletteContract> = await deployContract(aliceRouletteProv, {
       compiledContract: CompiledRouletteContract,
       privateStateId: ALICE_ROULETTE,
       initialPrivateState: createRoulettePrivateState(aliceSk),
@@ -332,7 +332,7 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
 
     // house deposit one match coin (fresh, paid from the coin Alice minted herself)
     const match = freshCoin(chipColorHex, BET);
-    await submitCallTx<RouletteContract, 'houseDeposit'>(aliceRouletteProv, {
+    await submitCallTx(aliceRouletteProv, {
       compiledContract: CompiledRouletteContract,
       contractAddress: rouletteAddress,
       privateStateId: ALICE_ROULETTE,
@@ -368,7 +368,7 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
     bobBetNonce = chip.nonce; // SECRET: escrowed coin nonce
     logger.info(`Bob bet-coin nonce (secret): ${hex(bobBetNonce)}`);
 
-    const tx = await submitCallTx<RouletteContract, 'betColor'>(bobRouletteProv, {
+    const tx = await submitCallTx(bobRouletteProv, {
       compiledContract: CompiledRouletteContract,
       contractAddress: rouletteAddress,
       privateStateId: BOB_ROULETTE,
@@ -416,7 +416,7 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
   });
 
   it('Alice reveals; Bob claims his 2x', async () => {
-    await submitCallTx<RouletteContract, 'revealWinningNumber'>(aliceRouletteProv, {
+    await submitCallTx(aliceRouletteProv, {
       compiledContract: CompiledRouletteContract,
       contractAddress: rouletteAddress,
       privateStateId: ALICE_ROULETTE,
@@ -428,7 +428,7 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
     expect(rl.winningColor).toEqual(Color.RED);
 
     const matchKey = [...rl.houseCoins].find(([, c]) => c.value === BET)![0];
-    await submitCallTx<RouletteContract, 'claimWinnings'>(bobRouletteProv, {
+    await submitCallTx(bobRouletteProv, {
       compiledContract: CompiledRouletteContract,
       contractAddress: rouletteAddress,
       privateStateId: BOB_ROULETTE,

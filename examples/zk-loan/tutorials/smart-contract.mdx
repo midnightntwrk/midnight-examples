@@ -164,9 +164,10 @@ an unconstrained challenge quotient" builds exactly that forgery and checks the 
 With the challenge `c` in hand, the circuit checks the Schnorr equation `s*G == R + c*pk`:
 
 ```compact title="contract/schnorr.compact"
-    // s*G == R + c*pk
-    const lhs: JubjubPoint = ecMulGenerator(response);
-    const rhs: JubjubPoint = ecAdd(announcement, ecMul(pk, c));
+    // s*G == R + c*pk. ecMul and ecMulGenerator take a JubjubScalar; the cast
+    // reduces modulo the Jubjub group order, which leaves the points unchanged.
+    const lhs: JubjubPoint = ecMulGenerator(response as JubjubScalar);
+    const rhs: JubjubPoint = ecAdd(announcement, ecMul(pk, c as JubjubScalar));
     // Compare coordinates, not the points: `==` on the opaque JubjubPoint
     // compiles to JS reference equality.
     assert(jubjubPointX(lhs) == jubjubPointX(rhs) && jubjubPointY(lhs) == jubjubPointY(rhs),
@@ -210,7 +211,7 @@ module. `prefix Schnorr_` namespaces every name the module exports, so `schnorrV
 `Schnorr_schnorrVerify`:
 
 ```compact title="contract/zk-loan.compact"
-pragma language_version 0.23;
+pragma language_version 0.28;
 import CompactStandardLibrary;
 
 // schnorr.compact sits next to this file; `prefix Schnorr_` namespaces every

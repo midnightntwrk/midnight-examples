@@ -172,7 +172,7 @@ describe(`Token Transfers Contract (${network})`, () => {
   // ---------------------------------------------------------------------------
 
   it('deploys the contract', async () => {
-    const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {
+    const deployed: DeployedContract<Contract> = await deployContract(providers, {
       compiledContract: CompiledTokenTransfersContract,
       privateStateId: PRIVATE_STATE_ID,
       initialPrivateState: {},
@@ -201,7 +201,7 @@ describe(`Token Transfers Contract (${network})`, () => {
 
   it('mintAndReceive mints a custom unshielded token into the contract', async () => {
     const amount = 1_000n;
-    const res = await (submitCallTx<Contract, 'mintAndReceive'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -225,7 +225,7 @@ describe(`Token Transfers Contract (${network})`, () => {
     const sendAmount = 400n;
     const before = await aliceUnshielded(customColor);
 
-    const res = await (submitCallTx<Contract, 'sendToUser'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -244,7 +244,7 @@ describe(`Token Transfers Contract (${network})`, () => {
     const before = await aliceUnshielded(customColor);
     expect(before).toEqual(receiveAmount); // Alice holds what sendToUser gave her.
 
-    const res = await (submitCallTx<Contract, 'receiveTokens'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -268,7 +268,7 @@ describe(`Token Transfers Contract (${network})`, () => {
     const amount = 5_000n;
     const before = await aliceUnshielded(NIGHT);
 
-    const res = await (submitCallTx<Contract, 'receiveNightTokens'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -286,7 +286,7 @@ describe(`Token Transfers Contract (${network})`, () => {
     const sendAmount = 2_000n;
     const before = await aliceUnshielded(NIGHT);
 
-    const res = await (submitCallTx<Contract, 'sendNightTokensToUser'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -310,7 +310,7 @@ describe(`Token Transfers Contract (${network})`, () => {
     const nonce = new Uint8Array(32).fill(9);
     const value = 250n;
 
-    const res = await (submitCallTx<Contract, 'mintShieldedToSelf'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -337,7 +337,7 @@ describe(`Token Transfers Contract (${network})`, () => {
     const mintValue = 500n;
     const sendValue = 300n;
 
-    const res = await (submitCallTx<Contract, 'mintAndSendShielded'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -358,7 +358,7 @@ describe(`Token Transfers Contract (${network})`, () => {
 
   it('receiveShieldedTokens pulls the shielded coin back from Alice', async () => {
     // Feed back the exact coin Alice received above; the contract receives it.
-    const res = await (submitCallTx<Contract, 'receiveShieldedTokens'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,

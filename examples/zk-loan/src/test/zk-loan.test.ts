@@ -32,7 +32,7 @@ import pino from 'pino';
 
 import { getConfig } from '../config.js';
 import { MidnightWalletProvider, syncWallet, resolveWallet, waitForNightThenDust } from '../wallet.js';
-import { buildProviders, type ZkLoanCircuits, type ZkLoanProviders } from '../providers.js';
+import { buildProviders, ledgerState, type ZkLoanCircuits, type ZkLoanProviders } from '../providers.js';
 import { createZkLoanPrivateState, type ZkLoanPrivateState } from '../../contract/witnesses.js';
 import {
   CompiledZkLoanContract,
@@ -96,7 +96,7 @@ describe(`Zk Loan Contract (${network})`, () => {
   async function queryLedger() {
     const state = await providers.publicDataProvider.queryContractState(contractAddress);
     expect(state).not.toBeNull();
-    return ledger(state!.data);
+    return ledger(ledgerState(state));
   }
 
   beforeAll(async () => {
@@ -226,7 +226,7 @@ describe(`Zk Loan Contract (${network})`, () => {
     circuitId: K,
     ...args: CircuitArgs<K>
   ) {
-    return (submitCallTx<Contract, K>)(providers, {
+    return submitCallTx(providers, {
       compiledContract: CompiledZkLoanContract,
       contractAddress,
       privateStateId,
@@ -240,7 +240,7 @@ describe(`Zk Loan Contract (${network})`, () => {
   // ---------------------------------------------------------------------------
 
   it('deploys the contract with the deployer as admin', async () => {
-    const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {
+    const deployed: DeployedContract<Contract> = await deployContract(providers, {
       compiledContract: CompiledZkLoanContract,
       privateStateId: ALICE_STATE_ID,
       initialPrivateState: createZkLoanPrivateState(aliceSecret),

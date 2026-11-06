@@ -51,7 +51,7 @@ import {
 } from "@midnight-ntwrk/midnight-js-protocol/ledger";
 import type { FinalizedTxData } from "@midnight-ntwrk/midnight-js-types";
 import { toHex } from "@midnight-ntwrk/midnight-js-utils";
-import { MidnightBech32m, ShieldedAddress } from "@midnight-ntwrk/wallet-sdk-address-format";
+import { MidnightBech32m, ShieldedAddress } from "@midnightntwrk/wallet-sdk-address-format";
 import { map, type Observable } from "rxjs";
 import {
   Contract as ChipsContractClass,

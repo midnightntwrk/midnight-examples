@@ -46,6 +46,14 @@
     "vitest": "^5.0.4"
   },
   "overrides": {
+    "@midnightntwrk/wallet-sdk": "2.0.0-rc.1",
+    "@midnightntwrk/ledger-v9": "1.0.0",
+    "@midnightntwrk/onchain-runtime-v4": "4.0.0",
+    "@midnightntwrk/zkir-v3": "3.2.0",
+    "@midnight-ntwrk/midnight-js-protocol@5.0.0-rc.5": {
+      "@midnight-ntwrk/compact-runtime": "0.21.0",
+      "@midnight-ntwrk/compact-js": "3.0.0-rc.6"
+    },
     "@midnight-ntwrk/wallet-sdk": "1.2.0",
     "@midnight-ntwrk/ledger-v8": "8.1.2",
     "@midnight-ntwrk/onchain-runtime-v3": "3.1.1",

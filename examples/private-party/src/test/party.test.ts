@@ -22,7 +22,7 @@ import pino from 'pino';
 
 import { getConfig } from '../config.js';
 import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust, type WalletSecret } from '../wallet.js';
-import { buildProviders, type PartyProviders } from '../providers.js';
+import { buildProviders, ledgerState, type PartyProviders } from '../providers.js';
 import {
     CompiledPartyContract,
     Contract,
@@ -33,7 +33,7 @@ import {
 import { createPartyPrivateState } from '../../contract/witnesses.js'
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import type { FinalizedCallTxData, UnsubmittedDeployTxData } from '@midnight-ntwrk/midnight-js-contracts';
-import type { UnshieldedAddress } from '@midnight-ntwrk/wallet-sdk';
+import type { UnshieldedAddress } from '@midnightntwrk/wallet-sdk';
 
 const logger = pino({
     level: process.env['LOG_LEVEL'] ?? 'info',
@@ -69,7 +69,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
         const state =
             await providers.publicDataProvider.queryContractState(contractAddress);
         expect(state).not.toBeNull();
-        return ledger(state!.data);
+        return ledger(ledgerState(state));
     }
 
     // NIGHT token type is the all-zero raw token type
@@ -161,7 +161,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
 
         logger.info(`Deploying a contract the easy way...`);
         const deployed: DeployedContract<Contract> = 
-            await (deployContract<Contract>)(aliceProviders, {
+            await deployContract(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 privateStateId: ALICE_PRIVATE_ID,
                 initialPrivateState: alicePrivateState,
@@ -192,7 +192,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
 
         logger.info(`Bob is sending an RSVP...`);
         const txData: FinalizedCallTxData<Contract, 'rsvp'> = 
-            await (submitCallTx<Contract, 'rsvp'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -214,7 +214,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
 
         logger.info(`Alice tries to rsvp...`);
         await expect(async () => {
-            await (submitCallTx<Contract, 'rsvp'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -236,7 +236,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
 
         logger.info(`Charlie is attempting to rsvp...`);
         const txData: FinalizedCallTxData<Contract, 'rsvp'> = 
-            await (submitCallTx<Contract, 'rsvp'>)(charlieProviders, {
+            await submitCallTx(charlieProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: CHARLIE_PRIVATE_ID,
@@ -255,7 +255,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
 
         logger.info(`Bob tries to start the party...`);
         await expect(async () => {
-            await (submitCallTx<Contract, 'startParty'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -274,7 +274,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
 
         logger.info(`Alice starts the party...`);
         const txData: FinalizedCallTxData<Contract, 'startParty'> =
-            await (submitCallTx<Contract, 'startParty'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -294,7 +294,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
         
         logger.info(`Bob is checking in...`);
         const txData: FinalizedCallTxData<Contract, 'checkIn'> = 
-            await (submitCallTx<Contract, 'checkIn'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -314,7 +314,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
 
         logger.info(`Bob is attempting to close the doors...`);
         await expect(async () => {
-            await (submitCallTx<Contract, 'closeEntry'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -333,7 +333,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
 
         logger.info(`Alice is closing the doors...`);
         const txData: FinalizedCallTxData<Contract, 'closeEntry'> =
-            await (submitCallTx<Contract, 'closeEntry'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -356,7 +356,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
 
         logger.info(`Alice is claiming fees...`);
         const txData: FinalizedCallTxData<Contract, 'claimFees'> =
-            await (submitCallTx<Contract, 'claimFees'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -390,7 +390,8 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
         logger.info(`Unproven tx created. Pending contract address: ${pendingAddress}`);
 
         // Step 2: Prove (send to proof server, get ZK proof back)
-        const provenTx = await aliceProviders.proofProvider.proveTx(unprovenData.private.unprovenTx);
+        // Midnight.js 5 providers pass transactions tagged with their ledger era.
+        const provenTx = await aliceProviders.proofProvider.proveTx({ version: 'v9', tx: unprovenData.private.unprovenTx });
         logger.info('proven tx received from proof server');
 
         // Step 3: Balance wallet

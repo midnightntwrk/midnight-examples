@@ -69,11 +69,11 @@ version changes happen in a coordinated pass. The pins live in
 
 | Component | Version |
 |---|---|
-| Compact language (`pragma`) | `0.23` |
-| Compact compiler (`setup-compact-action`) | `0.31.1` |
-| `@midnight-ntwrk/midnight-js-*` | `4.1.1` |
-| `@midnight-ntwrk/testkit-js` | `4.1.1` |
-| wallet SDK | `1.2.0` |
+| Compact language (`pragma`) | `0.28` |
+| Compact compiler (`setup-compact-action`) | `0.36.0` |
+| `@midnight-ntwrk/midnight-js-*` | `5.0.0-rc.5` |
+| `@midnight-ntwrk/testkit-js` | `5.0.0-rc.5` |
+| wallet SDK | `2.0.0-rc.1` |
 | Node.js | `22` (see `.nvmrc`) |
 | npm | `11.21.0` (CI; `11.10.0` or newer locally) |
 | Vitest | `5.0.4` |

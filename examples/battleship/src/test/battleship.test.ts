@@ -28,7 +28,7 @@ import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/compa
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import { getConfig } from '../config.js';
 import { MidnightWalletProvider, syncWallet, type WalletSecret, resolveWallet, waitForNightThenDust } from '../wallet.js';
-import { buildProviders, type BattleshipProviders } from '../providers.js';
+import { buildProviders, ledgerState, type BattleshipProviders } from '../providers.js';
 import {
     CompiledBattleshipContract,
     ledger,
@@ -87,7 +87,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
     async function queryLedger(providers: BattleshipProviders) {
         const state = await providers.publicDataProvider.queryContractState(contractAddress);
         expect(state).not.toBeNull();
-        return ledger(state!.data);
+        return ledger(ledgerState(state));
     }
 
     // setup before tests
@@ -163,7 +163,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
             aliceSk,
         );
 
-        const deployed: any = await (deployContract<Contract>)(aliceProviders, {
+        const deployed: any = await deployContract(aliceProviders, {
             compiledContract: CompiledBattleshipContract,
             privateStateId: ALICE_PRIVATE_ID,
             initialPrivateState: alicePrivateState,
@@ -200,7 +200,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Bob is accepting the game...`);
         const txData: FinalizedCallTxData<Contract, 'acceptGame'> = 
-            await (submitCallTx<Contract, 'acceptGame'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -219,7 +219,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Bob tries to shoot out of turn...`);
         await expect(async () => {
-            await (submitCallTx<Contract, 'player2Shoot'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -231,7 +231,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Alice shoots (MISS) at Bobs board...`);
         const txData: FinalizedCallTxData<Contract, 'player1Shoot'> = 
-            await (submitCallTx<Contract, 'player1Shoot'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -250,7 +250,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Bob checks his board...`);
         const txData: FinalizedCallTxData<Contract, 'checkBoard2'> = 
-            await (submitCallTx<Contract, 'checkBoard2'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -267,7 +267,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Bob shoots at Alice's board (HIT)`);
         const txData: FinalizedCallTxData<Contract, 'player2Shoot'> = 
-            await (submitCallTx<Contract, 'player2Shoot'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -286,7 +286,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Alice is checking the board...`);
         const txData: FinalizedCallTxData<Contract, 'checkBoard1'> = 
-            await (submitCallTx<Contract, 'checkBoard1'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -305,7 +305,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
         
         logger.info(`Alice shoots (HIT) at Bobs board...`);
         const txData: FinalizedCallTxData<Contract, 'player1Shoot'> = 
-            await (submitCallTx<Contract, 'player1Shoot'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -333,7 +333,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
         );
         await bobProviders.privateStateProvider.set(BOB_PRIVATE_ID, cheatBobPrivateState);
         await expect(async () => {
-            await (submitCallTx<Contract, 'checkBoard2'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -356,7 +356,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Bob checks his board...`);
         const txData: FinalizedCallTxData<Contract, 'checkBoard2'> = 
-            await (submitCallTx<Contract, 'checkBoard2'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -374,7 +374,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Bob shoots his second shot(HIT)...`);
         const txData: FinalizedCallTxData<Contract, 'player2Shoot'> = 
-            await (submitCallTx<Contract, 'player2Shoot'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -406,7 +406,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
         await aliceProviders.privateStateProvider.set(ALICE_PRIVATE_ID, newAlicePrivateState);
 
         await expect(async () => {
-            await (submitCallTx<Contract, 'checkBoard1'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -424,7 +424,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
         
         logger.info(`Alice is checking the board...`);
         const txData: FinalizedCallTxData<Contract, 'checkBoard1'> = 
-            await (submitCallTx<Contract, 'checkBoard1'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,

@@ -32,7 +32,7 @@ import {
   resolveWallet,
   waitForNightThenDust,
 } from '../wallet.js';
-import { buildProviders, type CalculatorProviders } from '../providers.js';
+import { buildProviders, ledgerState, type CalculatorProviders } from '../providers.js';
 import { createCalculatorPrivateState } from '../../contract/witnesses.js';
 import {
   CompiledCalculatorContract,
@@ -69,7 +69,7 @@ describe(`Calculator Contract (${network})`, () => {
   async function queryResult(): Promise<bigint> {
     const state = await providers.publicDataProvider.queryContractState(contractAddress);
     expect(state).not.toBeNull();
-    return ledger(state!.data).result;
+    return ledger(ledgerState(state)).result;
   }
 
   beforeAll(async () => {
@@ -119,7 +119,7 @@ describe(`Calculator Contract (${network})`, () => {
   // Everything above is harness setup. Your tests begin here.
 
   it('deploys the contract', async () => {
-    const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {
+    const deployed: DeployedContract<Contract> = await deployContract(providers, {
       compiledContract: CompiledCalculatorContract,
       privateStateId: PRIVATE_STATE_ID,
       initialPrivateState: createCalculatorPrivateState(),
@@ -135,7 +135,7 @@ describe(`Calculator Contract (${network})`, () => {
   });
 
   it('adds two numbers', async () => {
-    await (submitCallTx<Contract, 'add'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledCalculatorContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -146,7 +146,7 @@ describe(`Calculator Contract (${network})`, () => {
   });
 
   it('subtracts two numbers', async () => {
-    await (submitCallTx<Contract, 'subtract'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledCalculatorContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -157,7 +157,7 @@ describe(`Calculator Contract (${network})`, () => {
   });
 
   it('multiplies two numbers', async () => {
-    await (submitCallTx<Contract, 'multiply'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledCalculatorContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -168,7 +168,7 @@ describe(`Calculator Contract (${network})`, () => {
   });
 
   it('squares a number', async () => {
-    await (submitCallTx<Contract, 'square'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledCalculatorContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -181,7 +181,7 @@ describe(`Calculator Contract (${network})`, () => {
   // `divide` verifies the off-chain `divMod` witness on-chain and stores the
   // quotient. 20 / 6 = 3 remainder 2, so `result` becomes 3.
   it('divides two numbers (verifying the divMod witness)', async () => {
-    await (submitCallTx<Contract, 'divide'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledCalculatorContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,

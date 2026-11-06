@@ -46,7 +46,7 @@ describe('ZkLoan contract (simulator)', () => {
     pin: bigint = 1234n,
   ) {
     const userPubKeyHash = simulator.computeUserPubKeyHash(simulator.userSecretKey, pin);
-    simulator.circuitContext.currentPrivateState = createCustomSignedProfile(
+    simulator.privateState = createCustomSignedProfile(
       creditScore,
       monthlyIncome,
       monthsAsCustomer,
@@ -57,9 +57,9 @@ describe('ZkLoan contract (simulator)', () => {
     );
   }
 
-  it('generates initial ledger state deterministically', () => {
-    const simulator0 = new ZkLoanSimulator();
-    const simulator1 = new ZkLoanSimulator();
+  it('generates initial ledger state deterministically', async () => {
+    const simulator0 = await ZkLoanSimulator.create();
+    const simulator1 = await ZkLoanSimulator.create();
 
     const ledger0 = simulator0.getLedger();
     const ledger1 = simulator1.getLedger();
@@ -69,14 +69,14 @@ describe('ZkLoan contract (simulator)', () => {
     expect(ledger1.providers.member(1n)).toBeTruthy();
   });
 
-  it('approves a Tier 1 loan and caps at the max amount', () => {
-    const simulator = new ZkLoanSimulator();
+  it('approves a Tier 1 loan and caps at the max amount', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
 
     // Request an amount higher than the tier's max
-    simulator.requestLoan(1500n, userPin);
+    await simulator.requestLoan(1500n, userPin);
     const ledger = simulator.getLedger();
     const userLoans = ledger.loans.lookup(userPubKey);
     const loan = userLoans.lookup(1n); // First loan
@@ -84,8 +84,8 @@ describe('ZkLoan contract (simulator)', () => {
     expect(loan.authorizedAmount).toEqual(1500n);
   });
 
-  it('approves a Tier 2 loan and gives the requested amount', () => {
-    const simulator = new ZkLoanSimulator();
+  it('approves a Tier 2 loan and gives the requested amount', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 650n, 1600n, 10n, userPin);
@@ -93,7 +93,7 @@ describe('ZkLoan contract (simulator)', () => {
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
 
     // Request an amount lower than the tier's max
-    simulator.requestLoan(5000n, userPin);
+    await simulator.requestLoan(5000n, userPin);
 
     const ledger = simulator.getLedger();
     const userLoans = ledger.loans.lookup(userPubKey);
@@ -103,45 +103,45 @@ describe('ZkLoan contract (simulator)', () => {
     expect(loan.authorizedAmount).toEqual(5000n); // Gets the requested amount
   });
 
-  it('proposes a Tier 3 loan when amount exceeds limit', () => {
-    const simulator = new ZkLoanSimulator();
+  it('proposes a Tier 3 loan when amount exceeds limit', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 590n, 1000n, 1n, userPin);
 
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
-    simulator.requestLoan(10000n, userPin);
+    await simulator.requestLoan(10000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(2); // Proposed (amount exceeds tier limit)
     expect(loan.authorizedAmount).toEqual(3000n); // Capped at Tier 3 max
   });
 
-  it('rejects a loan for a non-eligible applicant', () => {
-    const simulator = new ZkLoanSimulator();
+  it('rejects a loan for a non-eligible applicant', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 500n, 1000n, 1n, userPin);
 
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
-    simulator.requestLoan(1000n, userPin);
+    await simulator.requestLoan(1000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(1); // Rejected
     expect(loan.authorizedAmount).toEqual(0n);
   });
 
-  it('creates multiple loans for the same user with incrementing IDs', () => {
-    const simulator = new ZkLoanSimulator();
+  it('creates multiple loans for the same user with incrementing IDs', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 800n, 3000n, 30n, userPin);
 
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
 
-    simulator.requestLoan(100n, userPin);
-    simulator.requestLoan(200n, userPin);
-    simulator.requestLoan(300n, userPin);
+    await simulator.requestLoan(100n, userPin);
+    await simulator.requestLoan(200n, userPin);
+    await simulator.requestLoan(300n, userPin);
 
     const userLoans = simulator.getLedger().loans.lookup(userPubKey);
     expect(userLoans.size()).toEqual(3n);
@@ -150,23 +150,23 @@ describe('ZkLoan contract (simulator)', () => {
     expect(userLoans.lookup(3n).authorizedAmount).toEqual(300n);
   });
 
-  it('throws an error if the user is blacklisted', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws an error if the user is blacklisted', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     // Blacklist the caller's *derived* user pubkey at this PIN. The contract
     // checks `assert(!blacklist.member(deriveUserPublicKey(getUserSecret(), pin)))`
     // inside the proof, so the blacklist key must match the witness-derived value.
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
-    simulator.blacklistUser(userPubKey);
+    await simulator.blacklistUser(userPubKey);
 
-    expect(() => {
-      simulator.requestLoan(1000n, userPin);
-    }).toThrow('Requester is blacklisted');
+    await expect(async () => {
+      await simulator.requestLoan(1000n, userPin);
+    }).rejects.toThrow('Requester is blacklisted');
   });
 
-  it('allows admin to blacklist and remove a user', () => {
-    const simulator = new ZkLoanSimulator();
+  it('allows admin to blacklist and remove a user', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const bobZwapKey = simulator.createTestUser('Bob').left.bytes;
     let ledger = simulator.getLedger();
 
@@ -174,18 +174,18 @@ describe('ZkLoan contract (simulator)', () => {
     expect(ledger.blacklist.member(bobZwapKey)).toBeFalsy();
 
     // Blacklist Bob
-    simulator.blacklistUser(bobZwapKey);
+    await simulator.blacklistUser(bobZwapKey);
     ledger = simulator.getLedger();
     expect(ledger.blacklist.member(bobZwapKey)).toBeTruthy();
 
     // Remove Bob from blacklist
-    simulator.removeBlacklistUser(bobZwapKey);
+    await simulator.removeBlacklistUser(bobZwapKey);
     ledger = simulator.getLedger();
     expect(ledger.blacklist.member(bobZwapKey)).toBeFalsy();
   });
 
-  it('migrates a small number of loans (1 batch) and cleans up', () => {
-    const simulator = new ZkLoanSimulator();
+  it('migrates a small number of loans (1 batch) and cleans up', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const oldPin = 1234n;
     const newPin = 9876n;
 
@@ -195,15 +195,15 @@ describe('ZkLoan contract (simulator)', () => {
     const newPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, newPin);
 
     // Create 3 loans
-    simulator.requestLoan(100n, oldPin); // Loan 1
-    simulator.requestLoan(200n, oldPin); // Loan 2
-    simulator.requestLoan(300n, oldPin); // Loan 3
+    await simulator.requestLoan(100n, oldPin); // Loan 1
+    await simulator.requestLoan(200n, oldPin); // Loan 2
+    await simulator.requestLoan(300n, oldPin); // Loan 3
 
     let ledger = simulator.getLedger();
     expect(ledger.loans.lookup(oldPubKey).size()).toEqual(3n);
 
     // Call changePin. This should migrate 1, 2, 3 and find that 4, 5 are empty.
-    simulator.changePin(oldPin, newPin);
+    await simulator.changePin(oldPin, newPin);
 
     ledger = simulator.getLedger();
 
@@ -217,8 +217,8 @@ describe('ZkLoan contract (simulator)', () => {
     expect(ledger.loans.lookup(newPubKey).lookup(2n).authorizedAmount).toEqual(200n);
   });
 
-  it('migrates multiple batches of loans (7 loans) correctly', () => {
-    const simulator = new ZkLoanSimulator();
+  it('migrates multiple batches of loans (7 loans) correctly', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const oldPin = 1234n;
     const newPin = 9876n;
 
@@ -229,7 +229,7 @@ describe('ZkLoan contract (simulator)', () => {
 
     // Create 7 loans
     for (let i = 1; i <= 7; i++) {
-      simulator.requestLoan(BigInt(i * 100), oldPin); // Loans 1-7
+      await simulator.requestLoan(BigInt(i * 100), oldPin); // Loans 1-7
     }
 
     let ledger = simulator.getLedger();
@@ -237,7 +237,7 @@ describe('ZkLoan contract (simulator)', () => {
     expect(ledger.loans.member(newPubKey)).toBeFalsy();
 
     // --- BATCH 1 (Migrates 1-5) ---
-    simulator.changePin(oldPin, newPin);
+    await simulator.changePin(oldPin, newPin);
 
     ledger = simulator.getLedger();
     expect(ledger.loans.member(newPubKey)).toBeTruthy(); // New user map created
@@ -249,7 +249,7 @@ describe('ZkLoan contract (simulator)', () => {
     expect(ledger.loans.lookup(oldPubKey).member(6n)).toBeTruthy(); // Check loan 6 still with old key
 
     // --- BATCH 2 (Migrates 6-7, finds 8-10 empty, finishes) ---
-    simulator.changePin(oldPin, newPin);
+    await simulator.changePin(oldPin, newPin);
 
     ledger = simulator.getLedger();
 
@@ -264,8 +264,8 @@ describe('ZkLoan contract (simulator)', () => {
     expect(ledger.loans.member(oldPubKey)).toBeFalsy();
   });
 
-  it('throws an error if user tries to requestLoan during migration', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws an error if user tries to requestLoan during migration', async () => {
+    const simulator = await ZkLoanSimulator.create();
 
     const oldPin = 1234n;
     const newPin = 9876n;
@@ -275,11 +275,11 @@ describe('ZkLoan contract (simulator)', () => {
 
     // Create 7 loans to ensure migration will be in progress
     for (let i = 1; i <= 7; i++) {
-      simulator.requestLoan(100n, oldPin);
+      await simulator.requestLoan(100n, oldPin);
     }
 
     // Start the migration (run batch 1)
-    simulator.changePin(oldPin, newPin);
+    await simulator.changePin(oldPin, newPin);
 
     let ledger = simulator.getLedger();
 
@@ -287,13 +287,13 @@ describe('ZkLoan contract (simulator)', () => {
     expect(ledger.onGoingPinMigration.member(oldPubKey)).toBeTruthy(); // Migration is active
 
     // Try to request a new loan with the old PIN
-    expect(() => {
-      simulator.requestLoan(100n, oldPin);
-    }).toThrow('PIN migration is in progress for this user');
+    await expect(async () => {
+      await simulator.requestLoan(100n, oldPin);
+    }).rejects.toThrow('PIN migration is in progress for this user');
   });
 
-  it('migrates loans to a new PIN that already has loans', () => {
-    const simulator = new ZkLoanSimulator();
+  it('migrates loans to a new PIN that already has loans', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const oldPin = 1234n;
     const newPin = 9876n;
 
@@ -304,12 +304,12 @@ describe('ZkLoan contract (simulator)', () => {
 
     // Create 6 loans for the old PIN
     for (let i = 1; i <= 6; i++) {
-      simulator.requestLoan(BigInt(i * 10), oldPin);
+      await simulator.requestLoan(BigInt(i * 10), oldPin);
     }
 
     // Create 3 loans for the new PIN - need attestation for new pin
     const newPinPubKeyHash = simulator.computeUserPubKeyHash(simulator.userSecretKey, newPin);
-    simulator.circuitContext.currentPrivateState = createCustomSignedProfile(
+    simulator.privateState = createCustomSignedProfile(
       800n,
       3000n,
       30n,
@@ -319,7 +319,7 @@ describe('ZkLoan contract (simulator)', () => {
       simulator.userSecretKey,
     );
     for (let i = 1; i <= 3; i++) {
-      simulator.requestLoan(BigInt(i * 100), newPin);
+      await simulator.requestLoan(BigInt(i * 100), newPin);
     }
 
     let ledger = simulator.getLedger();
@@ -327,14 +327,14 @@ describe('ZkLoan contract (simulator)', () => {
     expect(ledger.loans.lookup(newPubKey).size()).toEqual(3n);
 
     // --- BATCH 1 (Migrates loans 1-5 from old to new) ---
-    simulator.changePin(oldPin, newPin);
+    await simulator.changePin(oldPin, newPin);
 
     ledger = simulator.getLedger();
     expect(ledger.onGoingPinMigration.lookup(oldPubKey)).toEqual(5n); // Progress updated
     expect(ledger.loans.lookup(newPubKey).size()).toEqual(3n + 5n); // 3 existing + 5 migrated
 
     // --- BATCH 2 (Migrates loan 6, finds 7-10 empty, finishes) ---
-    simulator.changePin(oldPin, newPin);
+    await simulator.changePin(oldPin, newPin);
 
     ledger = simulator.getLedger();
 
@@ -351,61 +351,61 @@ describe('ZkLoan contract (simulator)', () => {
   // Input Validation
   // ============================================================
 
-  it('throws when requesting loan with zero amount', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws when requesting loan with zero amount', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
-    expect(() => {
-      simulator.requestLoan(0n, userPin);
-    }).toThrow('Loan amount must be greater than zero');
+    await expect(async () => {
+      await simulator.requestLoan(0n, userPin);
+    }).rejects.toThrow('Loan amount must be greater than zero');
   });
 
   // ============================================================
   // changePin Validation
   // ============================================================
 
-  it('throws when blacklisted user tries to change PIN', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws when blacklisted user tries to change PIN', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const oldPin = 1234n;
     const newPin = 5678n;
 
     // Create a loan first so the user exists
-    simulator.requestLoan(100n, oldPin);
+    await simulator.requestLoan(100n, oldPin);
 
     // Blacklist the caller's derived pubkey at the OLD pin — that's the value
     // `changePin` will compute internally and pass to `blacklist.member`.
     const userOldPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, oldPin);
-    simulator.blacklistUser(userOldPubKey);
+    await simulator.blacklistUser(userOldPubKey);
 
     // Try to change PIN - should fail
-    expect(() => {
-      simulator.changePin(oldPin, newPin);
-    }).toThrow('User is blacklisted');
+    await expect(async () => {
+      await simulator.changePin(oldPin, newPin);
+    }).rejects.toThrow('User is blacklisted');
   });
 
-  it('throws when changing PIN to the same value', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws when changing PIN to the same value', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     // Create a loan first so the user exists
-    simulator.requestLoan(100n, userPin);
+    await simulator.requestLoan(100n, userPin);
 
     // Try to change PIN to the same value - should fail
-    expect(() => {
-      simulator.changePin(userPin, userPin);
-    }).toThrow('New PIN must be different from old PIN');
+    await expect(async () => {
+      await simulator.changePin(userPin, userPin);
+    }).rejects.toThrow('New PIN must be different from old PIN');
   });
 
   // ============================================================
   // Admin Rotation
   // ============================================================
 
-  it('allows admin to rotate admin role to a new derived public key', () => {
-    const simulator = new ZkLoanSimulator();
+  it('allows admin to rotate admin role to a new derived public key', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const newAdminSecret = simulator.generateUserSecret();
     const newAdminPublicKey = simulator.deriveAdminPublicKey(newAdminSecret);
 
-    simulator.rotateAdmin(newAdminPublicKey);
+    await simulator.rotateAdmin(newAdminPublicKey);
 
     const ledger = simulator.getLedger();
     expect(ledger.contractAdmin).toEqual(newAdminPublicKey);
@@ -415,112 +415,112 @@ describe('ZkLoan contract (simulator)', () => {
   // Tier Boundary Edge Cases
   // ============================================================
 
-  it('approves exactly at Tier 1 boundary when amount within limit (score=700, income=2000, tenure=24)', () => {
-    const simulator = new ZkLoanSimulator();
+  it('approves exactly at Tier 1 boundary when amount within limit (score=700, income=2000, tenure=24)', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 700n, 2000n, 24n, userPin);
 
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
-    simulator.requestLoan(10000n, userPin); // Request exactly at limit
+    await simulator.requestLoan(10000n, userPin); // Request exactly at limit
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(0); // Approved (amount within limit)
     expect(loan.authorizedAmount).toEqual(10000n); // Tier 1 max
   });
 
-  it('proposes Tier 2 when just below Tier 1 threshold (score=699)', () => {
-    const simulator = new ZkLoanSimulator();
+  it('proposes Tier 2 when just below Tier 1 threshold (score=699)', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 699n, 2000n, 24n, userPin);
 
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
-    simulator.requestLoan(15000n, userPin);
+    await simulator.requestLoan(15000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(2); // Proposed (amount exceeds tier limit)
     expect(loan.authorizedAmount).toEqual(7000n); // Falls to Tier 2 max
   });
 
-  it('proposes at Tier 2 boundary when amount exceeds limit (score=600, income=1500)', () => {
-    const simulator = new ZkLoanSimulator();
+  it('proposes at Tier 2 boundary when amount exceeds limit (score=600, income=1500)', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 600n, 1500n, 1n, userPin);
 
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
-    simulator.requestLoan(10000n, userPin);
+    await simulator.requestLoan(10000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(2); // Proposed (amount exceeds tier limit)
     expect(loan.authorizedAmount).toEqual(7000n); // Tier 2 max
   });
 
-  it('proposes Tier 3 when just below Tier 2 threshold (score=599)', () => {
-    const simulator = new ZkLoanSimulator();
+  it('proposes Tier 3 when just below Tier 2 threshold (score=599)', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 599n, 1500n, 1n, userPin);
 
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
-    simulator.requestLoan(10000n, userPin);
+    await simulator.requestLoan(10000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(2); // Proposed (amount exceeds tier limit)
     expect(loan.authorizedAmount).toEqual(3000n); // Falls to Tier 3 max
   });
 
-  it('proposes at Tier 3 boundary when amount exceeds limit (score=580)', () => {
-    const simulator = new ZkLoanSimulator();
+  it('proposes at Tier 3 boundary when amount exceeds limit (score=580)', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 580n, 500n, 1n, userPin);
 
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
-    simulator.requestLoan(5000n, userPin);
+    await simulator.requestLoan(5000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(2); // Proposed (amount exceeds tier limit)
     expect(loan.authorizedAmount).toEqual(3000n); // Tier 3 max
   });
 
-  it('rejects when just below Tier 3 threshold (score=579)', () => {
-    const simulator = new ZkLoanSimulator();
+  it('rejects when just below Tier 3 threshold (score=579)', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 579n, 5000n, 100n, userPin);
 
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
-    simulator.requestLoan(1000n, userPin);
+    await simulator.requestLoan(1000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(1); // Rejected
     expect(loan.authorizedAmount).toEqual(0n);
   });
 
-  it('proposes Tier 2 when Tier 1 income requirement not met', () => {
-    const simulator = new ZkLoanSimulator();
+  it('proposes Tier 2 when Tier 1 income requirement not met', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 750n, 1999n, 30n, userPin);
 
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
-    simulator.requestLoan(15000n, userPin);
+    await simulator.requestLoan(15000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(2); // Proposed (amount exceeds tier limit)
     expect(loan.authorizedAmount).toEqual(7000n); // Falls to Tier 2
   });
 
-  it('proposes Tier 2 when Tier 1 tenure requirement not met', () => {
-    const simulator = new ZkLoanSimulator();
+  it('proposes Tier 2 when Tier 1 tenure requirement not met', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 750n, 2500n, 23n, userPin);
 
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
-    simulator.requestLoan(15000n, userPin);
+    await simulator.requestLoan(15000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(2); // Proposed (amount exceeds tier limit)
@@ -531,57 +531,57 @@ describe('ZkLoan contract (simulator)', () => {
   // Admin Authorization
   // ============================================================
 
-  it('throws when non-admin tries to blacklist a user', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws when non-admin tries to blacklist a user', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const charlieZwapKey = simulator.createTestUser('Charlie').left.bytes;
 
     // Rotate admin to a fresh secret the simulator does not hold. The
     // simulator's private state still carries the original admin secret,
     // so the in-circuit equality check fails on the next admin call.
     const bobAdminSecret = simulator.generateUserSecret();
-    simulator.rotateAdmin(simulator.deriveAdminPublicKey(bobAdminSecret));
+    await simulator.rotateAdmin(simulator.deriveAdminPublicKey(bobAdminSecret));
 
-    expect(() => {
-      simulator.blacklistUser(charlieZwapKey);
-    }).toThrow('Only admin can blacklist users');
+    await expect(async () => {
+      await simulator.blacklistUser(charlieZwapKey);
+    }).rejects.toThrow('Only admin can blacklist users');
   });
 
-  it('throws when non-admin tries to remove from blacklist', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws when non-admin tries to remove from blacklist', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const charlieZwapKey = simulator.createTestUser('Charlie').left.bytes;
 
     // First blacklist Charlie while the simulator still holds the admin secret
-    simulator.blacklistUser(charlieZwapKey);
+    await simulator.blacklistUser(charlieZwapKey);
 
     // Rotate admin to a fresh secret the simulator does not hold
     const bobAdminSecret = simulator.generateUserSecret();
-    simulator.rotateAdmin(simulator.deriveAdminPublicKey(bobAdminSecret));
+    await simulator.rotateAdmin(simulator.deriveAdminPublicKey(bobAdminSecret));
 
-    expect(() => {
-      simulator.removeBlacklistUser(charlieZwapKey);
-    }).toThrow('Only admin can remove from blacklist');
+    await expect(async () => {
+      await simulator.removeBlacklistUser(charlieZwapKey);
+    }).rejects.toThrow('Only admin can remove from blacklist');
   });
 
-  it('throws when non-admin tries to rotate admin', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws when non-admin tries to rotate admin', async () => {
+    const simulator = await ZkLoanSimulator.create();
 
     // Rotate admin to a fresh secret the simulator does not hold
     const bobAdminSecret = simulator.generateUserSecret();
-    simulator.rotateAdmin(simulator.deriveAdminPublicKey(bobAdminSecret));
+    await simulator.rotateAdmin(simulator.deriveAdminPublicKey(bobAdminSecret));
 
     // Original holder tries to rotate again — should fail
     const charlieAdminSecret = simulator.generateUserSecret();
-    expect(() => {
-      simulator.rotateAdmin(simulator.deriveAdminPublicKey(charlieAdminSecret));
-    }).toThrow('Only admin can rotate admin role');
+    await expect(async () => {
+      await simulator.rotateAdmin(simulator.deriveAdminPublicKey(charlieAdminSecret));
+    }).rejects.toThrow('Only admin can rotate admin role');
   });
 
   // ============================================================
   // Public Key Determinism
   // ============================================================
 
-  it('generates same public key for same user and PIN (determinism)', () => {
-    const simulator = new ZkLoanSimulator();
+  it('generates same public key for same user and PIN (determinism)', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     const pubKey1 = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
@@ -590,8 +590,8 @@ describe('ZkLoan contract (simulator)', () => {
     expect(pubKey1).toEqual(pubKey2);
   });
 
-  it('generates different public key for same user with different PIN', () => {
-    const simulator = new ZkLoanSimulator();
+  it('generates different public key for same user with different PIN', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const pin1 = 1234n;
     const pin2 = 5678n;
 
@@ -601,8 +601,8 @@ describe('ZkLoan contract (simulator)', () => {
     expect(pubKey1).not.toEqual(pubKey2);
   });
 
-  it('generates different public key for different users with same PIN', () => {
-    const simulator = new ZkLoanSimulator();
+  it('generates different public key for different users with same PIN', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const samePin = 1234n;
 
     // Two distinct users = two distinct secrets. With the witness-derived
@@ -619,23 +619,23 @@ describe('ZkLoan contract (simulator)', () => {
   // Blacklist Edge Cases
   // ============================================================
 
-  it('blacklisting an already blacklisted user is idempotent', () => {
-    const simulator = new ZkLoanSimulator();
+  it('blacklisting an already blacklisted user is idempotent', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const bobZwapKey = simulator.createTestUser('Bob').left.bytes;
 
     // Blacklist Bob
-    simulator.blacklistUser(bobZwapKey);
+    await simulator.blacklistUser(bobZwapKey);
     let ledger = simulator.getLedger();
     expect(ledger.blacklist.member(bobZwapKey)).toBeTruthy();
 
     // Blacklist Bob again - should not throw
-    simulator.blacklistUser(bobZwapKey);
+    await simulator.blacklistUser(bobZwapKey);
     ledger = simulator.getLedger();
     expect(ledger.blacklist.member(bobZwapKey)).toBeTruthy();
   });
 
-  it('removing a non-blacklisted user from blacklist does not throw', () => {
-    const simulator = new ZkLoanSimulator();
+  it('removing a non-blacklisted user from blacklist does not throw', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const bobZwapKey = simulator.createTestUser('Bob').left.bytes;
 
     // Bob is not blacklisted
@@ -643,7 +643,7 @@ describe('ZkLoan contract (simulator)', () => {
     expect(ledger.blacklist.member(bobZwapKey)).toBeFalsy();
 
     // Remove Bob from blacklist - should not throw (idempotent)
-    simulator.removeBlacklistUser(bobZwapKey);
+    await simulator.removeBlacklistUser(bobZwapKey);
     ledger = simulator.getLedger();
     expect(ledger.blacklist.member(bobZwapKey)).toBeFalsy();
   });
@@ -652,14 +652,14 @@ describe('ZkLoan contract (simulator)', () => {
   // Multi-User Isolation
   // ============================================================
 
-  it('same user with different PINs has separate loan records', () => {
-    const simulator = new ZkLoanSimulator();
+  it('same user with different PINs has separate loan records', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const pin1 = 1111n;
     const pin2 = 2222n;
 
     // Sign for pin1
     const pubKeyHash1 = simulator.computeUserPubKeyHash(simulator.userSecretKey, pin1);
-    simulator.circuitContext.currentPrivateState = createCustomSignedProfile(
+    simulator.privateState = createCustomSignedProfile(
       750n,
       2500n,
       30n,
@@ -673,11 +673,11 @@ describe('ZkLoan contract (simulator)', () => {
     const pubKey2 = simulator.deriveUserPublicKey(simulator.userSecretKey, pin2);
 
     // Request loan with pin1
-    simulator.requestLoan(5000n, pin1);
+    await simulator.requestLoan(5000n, pin1);
 
     // Sign for pin2
     const pubKeyHash2 = simulator.computeUserPubKeyHash(simulator.userSecretKey, pin2);
-    simulator.circuitContext.currentPrivateState = createCustomSignedProfile(
+    simulator.privateState = createCustomSignedProfile(
       750n,
       2500n,
       30n,
@@ -688,7 +688,7 @@ describe('ZkLoan contract (simulator)', () => {
     );
 
     // Request loan with pin2
-    simulator.requestLoan(3000n, pin2);
+    await simulator.requestLoan(3000n, pin2);
 
     const ledger = simulator.getLedger();
 
@@ -699,18 +699,18 @@ describe('ZkLoan contract (simulator)', () => {
     expect(ledger.loans.lookup(pubKey2).lookup(1n).authorizedAmount).toEqual(3000n);
   });
 
-  it('blacklisting a different Zswap key does not affect the caller', () => {
-    const simulator = new ZkLoanSimulator();
+  it('blacklisting a different Zswap key does not affect the caller', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const bobZwapKey = simulator.createTestUser('Bob').left.bytes;
     const alicePin = 1234n;
 
     const alicePubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, alicePin);
 
     // Blacklist Bob's Zswap key (not Alice's)
-    simulator.blacklistUser(bobZwapKey);
+    await simulator.blacklistUser(bobZwapKey);
 
     // Alice should still be able to request a loan (already has valid attestation from constructor)
-    simulator.requestLoan(5000n, alicePin);
+    await simulator.requestLoan(5000n, alicePin);
 
     const ledger = simulator.getLedger();
     expect(ledger.loans.member(alicePubKey)).toBeTruthy();
@@ -721,40 +721,40 @@ describe('ZkLoan contract (simulator)', () => {
   // Admin Transfer Edge Cases
   // ============================================================
 
-  it('new admin can perform admin operations after rotation', () => {
-    const simulator = new ZkLoanSimulator();
+  it('new admin can perform admin operations after rotation', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const charlieZwapKey = simulator.createTestUser('Charlie').left.bytes;
 
     // Rotate to a new admin secret, then swap the simulator's local secret
     // to that of the new admin. The new admin now passes the auth check.
     const newAdminSecret = simulator.generateUserSecret();
     const newAdminPublicKey = simulator.deriveAdminPublicKey(newAdminSecret);
-    simulator.rotateAdmin(newAdminPublicKey);
+    await simulator.rotateAdmin(newAdminPublicKey);
     simulator.setUserSecret(newAdminSecret);
 
-    simulator.blacklistUser(charlieZwapKey);
+    await simulator.blacklistUser(charlieZwapKey);
 
     const ledger = simulator.getLedger();
     expect(ledger.contractAdmin).toEqual(newAdminPublicKey);
     expect(ledger.blacklist.member(charlieZwapKey)).toBeTruthy();
   });
 
-  it('old admin cannot perform admin operations after rotation', () => {
-    const simulator = new ZkLoanSimulator();
+  it('old admin cannot perform admin operations after rotation', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const charlieZwapKey = simulator.createTestUser('Charlie').left.bytes;
 
     // Rotate to a fresh secret the simulator does not hold
     const bobAdminSecret = simulator.generateUserSecret();
-    simulator.rotateAdmin(simulator.deriveAdminPublicKey(bobAdminSecret));
+    await simulator.rotateAdmin(simulator.deriveAdminPublicKey(bobAdminSecret));
 
     // Original holder tries to blacklist Charlie - should fail
-    expect(() => {
-      simulator.blacklistUser(charlieZwapKey);
-    }).toThrow('Only admin can blacklist users');
+    await expect(async () => {
+      await simulator.blacklistUser(charlieZwapKey);
+    }).rejects.toThrow('Only admin can blacklist users');
   });
 
-  it('can chain multiple admin rotations', () => {
-    const simulator = new ZkLoanSimulator();
+  it('can chain multiple admin rotations', async () => {
+    const simulator = await ZkLoanSimulator.create();
 
     let ledger = simulator.getLedger();
     expect(ledger.contractAdmin).toEqual(simulator.deriveAdminPublicKey(simulator.userSecretKey));
@@ -762,7 +762,7 @@ describe('ZkLoan contract (simulator)', () => {
     // Rotate to Bob
     const bobAdminSecret = simulator.generateUserSecret();
     const bobAdminPublicKey = simulator.deriveAdminPublicKey(bobAdminSecret);
-    simulator.rotateAdmin(bobAdminPublicKey);
+    await simulator.rotateAdmin(bobAdminPublicKey);
     ledger = simulator.getLedger();
     expect(ledger.contractAdmin).toEqual(bobAdminPublicKey);
   });
@@ -771,8 +771,8 @@ describe('ZkLoan contract (simulator)', () => {
   // Proposed/NotAccepted Loan Flow
   // ============================================================
 
-  it('creates Proposed loan when requested amount exceeds tier limit', () => {
-    const simulator = new ZkLoanSimulator();
+  it('creates Proposed loan when requested amount exceeds tier limit', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 750n, 2500n, 30n, userPin);
@@ -780,15 +780,15 @@ describe('ZkLoan contract (simulator)', () => {
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
 
     // Request more than Tier 1 max
-    simulator.requestLoan(15000n, userPin);
+    await simulator.requestLoan(15000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(2); // Proposed (index 2 in enum)
     expect(loan.authorizedAmount).toEqual(10000n); // Capped at Tier 1 max
   });
 
-  it('creates Approved loan when requested amount is within tier limit', () => {
-    const simulator = new ZkLoanSimulator();
+  it('creates Approved loan when requested amount is within tier limit', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 750n, 2500n, 30n, userPin);
@@ -796,15 +796,15 @@ describe('ZkLoan contract (simulator)', () => {
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
 
     // Request exactly at Tier 1 max
-    simulator.requestLoan(10000n, userPin);
+    await simulator.requestLoan(10000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(0); // Approved
     expect(loan.authorizedAmount).toEqual(10000n);
   });
 
-  it('creates Approved loan when requested amount is less than tier limit', () => {
-    const simulator = new ZkLoanSimulator();
+  it('creates Approved loan when requested amount is less than tier limit', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 750n, 2500n, 30n, userPin);
@@ -812,15 +812,15 @@ describe('ZkLoan contract (simulator)', () => {
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
 
     // Request less than Tier 1 max
-    simulator.requestLoan(5000n, userPin);
+    await simulator.requestLoan(5000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(0); // Approved
     expect(loan.authorizedAmount).toEqual(5000n);
   });
 
-  it('respondToLoan with accept=true changes Proposed to Approved', () => {
-    const simulator = new ZkLoanSimulator();
+  it('respondToLoan with accept=true changes Proposed to Approved', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 750n, 2500n, 30n, userPin);
@@ -828,20 +828,20 @@ describe('ZkLoan contract (simulator)', () => {
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
 
     // Create a Proposed loan
-    simulator.requestLoan(15000n, userPin);
+    await simulator.requestLoan(15000n, userPin);
     let loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(2); // Proposed
 
     // Accept the proposal
-    simulator.respondToLoan(1n, userPin, true);
+    await simulator.respondToLoan(1n, userPin, true);
 
     loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(0); // Approved
     expect(loan.authorizedAmount).toEqual(10000n); // Amount preserved
   });
 
-  it('respondToLoan with accept=false changes Proposed to NotAccepted with zero amount', () => {
-    const simulator = new ZkLoanSimulator();
+  it('respondToLoan with accept=false changes Proposed to NotAccepted with zero amount', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 750n, 2500n, 30n, userPin);
@@ -849,20 +849,20 @@ describe('ZkLoan contract (simulator)', () => {
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
 
     // Create a Proposed loan
-    simulator.requestLoan(15000n, userPin);
+    await simulator.requestLoan(15000n, userPin);
     let loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(2); // Proposed
 
     // Reject the proposal
-    simulator.respondToLoan(1n, userPin, false);
+    await simulator.respondToLoan(1n, userPin, false);
 
     loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(3); // NotAccepted (index 3 in enum)
     expect(loan.authorizedAmount).toEqual(0n); // Amount set to zero
   });
 
-  it('throws when respondToLoan is called on non-Proposed loan', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws when respondToLoan is called on non-Proposed loan', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 750n, 2500n, 30n, userPin);
@@ -870,79 +870,79 @@ describe('ZkLoan contract (simulator)', () => {
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
 
     // Create an Approved loan (amount within limit)
-    simulator.requestLoan(5000n, userPin);
+    await simulator.requestLoan(5000n, userPin);
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(0); // Approved
 
     // Try to respond to an Approved loan - should fail
-    expect(() => {
-      simulator.respondToLoan(1n, userPin, true);
-    }).toThrow('Loan is not in Proposed status');
+    await expect(async () => {
+      await simulator.respondToLoan(1n, userPin, true);
+    }).rejects.toThrow('Loan is not in Proposed status');
   });
 
-  it('throws when respondToLoan is called on already accepted loan', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws when respondToLoan is called on already accepted loan', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 750n, 2500n, 30n, userPin);
 
     // Create and accept a Proposed loan
-    simulator.requestLoan(15000n, userPin);
-    simulator.respondToLoan(1n, userPin, true);
+    await simulator.requestLoan(15000n, userPin);
+    await simulator.respondToLoan(1n, userPin, true);
 
     // Try to respond again - should fail
-    expect(() => {
-      simulator.respondToLoan(1n, userPin, false);
-    }).toThrow('Loan is not in Proposed status');
+    await expect(async () => {
+      await simulator.respondToLoan(1n, userPin, false);
+    }).rejects.toThrow('Loan is not in Proposed status');
   });
 
-  it('throws when respondToLoan is called with non-existent loan ID', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws when respondToLoan is called with non-existent loan ID', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 750n, 2500n, 30n, userPin);
 
     // Create a loan first so user exists in the system
-    simulator.requestLoan(15000n, userPin);
+    await simulator.requestLoan(15000n, userPin);
 
     // Try to respond to non-existent loan
-    expect(() => {
-      simulator.respondToLoan(999n, userPin, true);
-    }).toThrow('Loan not found');
+    await expect(async () => {
+      await simulator.respondToLoan(999n, userPin, true);
+    }).rejects.toThrow('Loan not found');
   });
 
-  it('throws when respondToLoan is called by user with no loans', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws when respondToLoan is called by user with no loans', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     // Don't create any loans - user doesn't exist in loans map
 
-    expect(() => {
-      simulator.respondToLoan(1n, userPin, true);
-    }).toThrow('No loans found for this user');
+    await expect(async () => {
+      await simulator.respondToLoan(1n, userPin, true);
+    }).rejects.toThrow('No loans found for this user');
   });
 
-  it('throws when blacklisted user tries to respondToLoan', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws when blacklisted user tries to respondToLoan', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 750n, 2500n, 30n, userPin);
 
     // Create a Proposed loan
-    simulator.requestLoan(15000n, userPin);
+    await simulator.requestLoan(15000n, userPin);
 
     // Blacklist the caller's derived pubkey at this PIN.
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
-    simulator.blacklistUser(userPubKey);
+    await simulator.blacklistUser(userPubKey);
 
     // Try to respond - should fail
-    expect(() => {
-      simulator.respondToLoan(1n, userPin, true);
-    }).toThrow('User is blacklisted');
+    await expect(async () => {
+      await simulator.respondToLoan(1n, userPin, true);
+    }).rejects.toThrow('User is blacklisted');
   });
 
-  it('creates Proposed loan for Tier 2 user exceeding limit', () => {
-    const simulator = new ZkLoanSimulator();
+  it('creates Proposed loan for Tier 2 user exceeding limit', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 650n, 1600n, 10n, userPin);
@@ -950,15 +950,15 @@ describe('ZkLoan contract (simulator)', () => {
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
 
     // Request more than Tier 2 max
-    simulator.requestLoan(10000n, userPin);
+    await simulator.requestLoan(10000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(2); // Proposed
     expect(loan.authorizedAmount).toEqual(7000n); // Capped at Tier 2 max
   });
 
-  it('creates Proposed loan for Tier 3 user exceeding limit', () => {
-    const simulator = new ZkLoanSimulator();
+  it('creates Proposed loan for Tier 3 user exceeding limit', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 590n, 1000n, 1n, userPin);
@@ -966,29 +966,29 @@ describe('ZkLoan contract (simulator)', () => {
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
 
     // Request more than Tier 3 max
-    simulator.requestLoan(5000n, userPin);
+    await simulator.requestLoan(5000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(2); // Proposed
     expect(loan.authorizedAmount).toEqual(3000n); // Capped at Tier 3 max
   });
 
-  it('rejected applicant still gets Rejected status (not Proposed)', () => {
-    const simulator = new ZkLoanSimulator();
+  it('rejected applicant still gets Rejected status (not Proposed)', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 500n, 1000n, 1n, userPin);
 
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
-    simulator.requestLoan(1000n, userPin);
+    await simulator.requestLoan(1000n, userPin);
 
     const loan = simulator.getLedger().loans.lookup(userPubKey).lookup(1n);
     expect(loan.status).toEqual(1); // Rejected (not Proposed)
     expect(loan.authorizedAmount).toEqual(0n);
   });
 
-  it('can have multiple Proposed loans and respond to each independently', () => {
-    const simulator = new ZkLoanSimulator();
+  it('can have multiple Proposed loans and respond to each independently', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     setAttestedPrivateState(simulator, 750n, 2500n, 30n, userPin);
@@ -996,9 +996,9 @@ describe('ZkLoan contract (simulator)', () => {
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
 
     // Create multiple Proposed loans
-    simulator.requestLoan(15000n, userPin); // Loan 1 - Proposed
-    simulator.requestLoan(12000n, userPin); // Loan 2 - Proposed
-    simulator.requestLoan(5000n, userPin); // Loan 3 - Approved (within limit)
+    await simulator.requestLoan(15000n, userPin); // Loan 1 - Proposed
+    await simulator.requestLoan(12000n, userPin); // Loan 2 - Proposed
+    await simulator.requestLoan(5000n, userPin); // Loan 3 - Approved (within limit)
 
     let ledger = simulator.getLedger();
     expect(ledger.loans.lookup(userPubKey).lookup(1n).status).toEqual(2); // Proposed
@@ -1006,9 +1006,9 @@ describe('ZkLoan contract (simulator)', () => {
     expect(ledger.loans.lookup(userPubKey).lookup(3n).status).toEqual(0); // Approved
 
     // Accept loan 1
-    simulator.respondToLoan(1n, userPin, true);
+    await simulator.respondToLoan(1n, userPin, true);
     // Reject loan 2
-    simulator.respondToLoan(2n, userPin, false);
+    await simulator.respondToLoan(2n, userPin, false);
 
     ledger = simulator.getLedger();
     expect(ledger.loans.lookup(userPubKey).lookup(1n).status).toEqual(0); // Approved
@@ -1022,8 +1022,8 @@ describe('ZkLoan contract (simulator)', () => {
   // NEW TESTS: Attestation & Provider Management
   // ============================================================
 
-  it('rejects loan with invalid attestation signature', () => {
-    const simulator = new ZkLoanSimulator();
+  it('rejects loan with invalid attestation signature', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     // Create a state with a tampered signature (wrong response)
@@ -1037,7 +1037,7 @@ describe('ZkLoan contract (simulator)', () => {
       simulator.providerId,
       simulator.userSecretKey,
     );
-    simulator.circuitContext.currentPrivateState = {
+    simulator.privateState = {
       ...validState,
       attestationSignature: {
         ...validState.attestationSignature,
@@ -1045,19 +1045,19 @@ describe('ZkLoan contract (simulator)', () => {
       },
     };
 
-    expect(() => {
-      simulator.requestLoan(5000n, userPin);
-    }).toThrow('Invalid attestation signature');
+    await expect(async () => {
+      await simulator.requestLoan(5000n, userPin);
+    }).rejects.toThrow('Invalid attestation signature');
   });
 
-  it('rejects loan with unregistered provider', () => {
-    const simulator = new ZkLoanSimulator();
+  it('rejects loan with unregistered provider', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     // Generate a different provider key pair (not registered)
     const otherProvider = generateProviderKeyPair();
     const pubKeyHash = simulator.computeUserPubKeyHash(simulator.userSecretKey, userPin);
-    simulator.circuitContext.currentPrivateState = createCustomSignedProfile(
+    simulator.privateState = createCustomSignedProfile(
       750n,
       2500n,
       30n,
@@ -1067,29 +1067,29 @@ describe('ZkLoan contract (simulator)', () => {
       simulator.userSecretKey,
     );
 
-    expect(() => {
-      simulator.requestLoan(5000n, userPin);
-    }).toThrow('Attestation provider not registered');
+    await expect(async () => {
+      await simulator.requestLoan(5000n, userPin);
+    }).rejects.toThrow('Attestation provider not registered');
   });
 
-  it('rejects loan after provider is removed', () => {
-    const simulator = new ZkLoanSimulator();
+  it('rejects loan after provider is removed', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     // First verify the provider is registered and a loan works
-    simulator.requestLoan(100n, userPin);
+    await simulator.requestLoan(100n, userPin);
 
     // Now remove the provider
-    simulator.removeProvider(simulator.providerId);
+    await simulator.removeProvider(simulator.providerId);
 
     // Try to request another loan - should fail
-    expect(() => {
-      simulator.requestLoan(200n, userPin);
-    }).toThrow('Attestation provider not registered');
+    await expect(async () => {
+      await simulator.requestLoan(200n, userPin);
+    }).rejects.toThrow('Attestation provider not registered');
   });
 
-  it('user binding prevents replay (signature for user A cannot be used by user B)', () => {
-    const simulator = new ZkLoanSimulator();
+  it('user binding prevents replay (signature for user A cannot be used by user B)', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     // Create an attestation signed for a DIFFERENT user's derived pubkey
@@ -1099,7 +1099,7 @@ describe('ZkLoan contract (simulator)', () => {
     // pubkey hash, which won't match.
     const otherUserSecret = simulator.generateUserSecret();
     const otherPubKeyHash = simulator.computeUserPubKeyHash(otherUserSecret, userPin);
-    simulator.circuitContext.currentPrivateState = createCustomSignedProfile(
+    simulator.privateState = createCustomSignedProfile(
       750n,
       2500n,
       30n,
@@ -1109,12 +1109,12 @@ describe('ZkLoan contract (simulator)', () => {
       simulator.userSecretKey,
     );
 
-    expect(() => {
-      simulator.requestLoan(5000n, userPin);
-    }).toThrow('Invalid attestation signature');
+    await expect(async () => {
+      await simulator.requestLoan(5000n, userPin);
+    }).rejects.toThrow('Invalid attestation signature');
   });
 
-  it('rejects a forged attestation that exploits an unconstrained challenge quotient', () => {
+  it('rejects a forged attestation that exploits an unconstrained challenge quotient', async () => {
     // Regression test for the Schnorr challenge-reduction soundness fix.
     //
     // schnorrVerify truncates the BLS12-381 challenge hash to a 248-bit Jubjub
@@ -1154,7 +1154,7 @@ describe('ZkLoan contract (simulator)', () => {
       return [privateState, [q, forgedChallenge]];
     };
 
-    const attacker = new ZkLoanSimulator({ getSchnorrReduction: forgedReduction });
+    const attacker = await ZkLoanSimulator.create({ getSchnorrReduction: forgedReduction });
     const pin = 1234n;
     const pk = attacker.providerPk;
 
@@ -1172,7 +1172,7 @@ describe('ZkLoan contract (simulator)', () => {
     expect(lhs.y).toEqual(rhs.y);
 
     // Fabricated Tier-1 credit data the attacker was never attested for.
-    attacker.circuitContext.currentPrivateState = {
+    attacker.privateState = {
       creditScore: 800n,
       monthlyIncome: 5000n,
       monthsAsCustomer: 60n,
@@ -1183,60 +1183,60 @@ describe('ZkLoan contract (simulator)', () => {
 
     // Pre-fix this forgery was accepted; the Uint<7> quotient + `q < 116` range
     // check now rejects it before any loan is recorded.
-    expect(() => attacker.requestLoan(5000n, pin)).toThrow();
+    await expect(attacker.requestLoan(5000n, pin)).rejects.toThrow();
   });
 
-  it('throws when non-admin tries to register provider', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws when non-admin tries to register provider', async () => {
+    const simulator = await ZkLoanSimulator.create();
 
     // Rotate admin to a fresh secret the simulator does not hold
     const bobAdminSecret = simulator.generateUserSecret();
-    simulator.rotateAdmin(simulator.deriveAdminPublicKey(bobAdminSecret));
+    await simulator.rotateAdmin(simulator.deriveAdminPublicKey(bobAdminSecret));
 
     const newProvider = generateProviderKeyPair();
 
-    expect(() => {
-      simulator.registerProvider(2n, newProvider.pk);
-    }).toThrow('Only admin can register providers');
+    await expect(async () => {
+      await simulator.registerProvider(2n, newProvider.pk);
+    }).rejects.toThrow('Only admin can register providers');
   });
 
-  it('throws when non-admin tries to remove provider', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws when non-admin tries to remove provider', async () => {
+    const simulator = await ZkLoanSimulator.create();
 
     // Rotate admin to a fresh secret the simulator does not hold
     const bobAdminSecret = simulator.generateUserSecret();
-    simulator.rotateAdmin(simulator.deriveAdminPublicKey(bobAdminSecret));
+    await simulator.rotateAdmin(simulator.deriveAdminPublicKey(bobAdminSecret));
 
-    expect(() => {
-      simulator.removeProvider(simulator.providerId);
-    }).toThrow('Only admin can remove providers');
+    await expect(async () => {
+      await simulator.removeProvider(simulator.providerId);
+    }).rejects.toThrow('Only admin can remove providers');
   });
 
-  it('throws when removing a non-existent provider', () => {
-    const simulator = new ZkLoanSimulator();
+  it('throws when removing a non-existent provider', async () => {
+    const simulator = await ZkLoanSimulator.create();
 
-    expect(() => {
-      simulator.removeProvider(999n);
-    }).toThrow('Provider not found');
+    await expect(async () => {
+      await simulator.removeProvider(999n);
+    }).rejects.toThrow('Provider not found');
   });
 
-  it('multiple providers can both be used for attestation', () => {
-    const simulator = new ZkLoanSimulator();
+  it('multiple providers can both be used for attestation', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     // Register a second provider
     const provider2 = generateProviderKeyPair();
     const provider2Id = 2n;
-    simulator.registerProvider(provider2Id, provider2.pk);
+    await simulator.registerProvider(provider2Id, provider2.pk);
 
     const userPubKey = simulator.deriveUserPublicKey(simulator.userSecretKey, userPin);
     const pubKeyHash = simulator.computeUserPubKeyHash(simulator.userSecretKey, userPin);
 
     // Use provider 1 for first loan (already set up by constructor)
-    simulator.requestLoan(5000n, userPin);
+    await simulator.requestLoan(5000n, userPin);
 
     // Use provider 2 for second loan
-    simulator.circuitContext.currentPrivateState = createCustomSignedProfile(
+    simulator.privateState = createCustomSignedProfile(
       750n,
       2500n,
       30n,
@@ -1245,7 +1245,7 @@ describe('ZkLoan contract (simulator)', () => {
       provider2Id,
       simulator.userSecretKey,
     );
-    simulator.requestLoan(3000n, userPin);
+    await simulator.requestLoan(3000n, userPin);
 
     const userLoans = simulator.getLedger().loans.lookup(userPubKey);
     expect(userLoans.size()).toEqual(2n);
@@ -1253,8 +1253,8 @@ describe('ZkLoan contract (simulator)', () => {
     expect(userLoans.lookup(2n).authorizedAmount).toEqual(3000n);
   });
 
-  it('provider registry shows up in ledger state', () => {
-    const simulator = new ZkLoanSimulator();
+  it('provider registry shows up in ledger state', async () => {
+    const simulator = await ZkLoanSimulator.create();
 
     // Default provider should be registered
     const ledger = simulator.getLedger();
@@ -1264,8 +1264,8 @@ describe('ZkLoan contract (simulator)', () => {
     expect(providerPk.y).toEqual(simulator.providerPk.y);
   });
 
-  it('attestation with tampered credit data fails signature verification', () => {
-    const simulator = new ZkLoanSimulator();
+  it('attestation with tampered credit data fails signature verification', async () => {
+    const simulator = await ZkLoanSimulator.create();
     const userPin = 1234n;
 
     // Create valid attestation
@@ -1281,13 +1281,13 @@ describe('ZkLoan contract (simulator)', () => {
     );
 
     // Tamper with credit score (signature was for 650, we change to 750)
-    simulator.circuitContext.currentPrivateState = {
+    simulator.privateState = {
       ...validState,
       creditScore: 750n,
     };
 
-    expect(() => {
-      simulator.requestLoan(5000n, userPin);
-    }).toThrow('Invalid attestation signature');
+    await expect(async () => {
+      await simulator.requestLoan(5000n, userPin);
+    }).rejects.toThrow('Invalid attestation signature');
   });
 });

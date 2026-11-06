@@ -15,24 +15,23 @@
 
 import {
   type CoinPublicKey,
-  DustSecretKey,
   type EncPublicKey,
   type FinalizedTransaction,
   LedgerParameters,
   unshieldedToken,
   ZswapSecretKeys,
 } from '@midnight-ntwrk/midnight-js-protocol/ledger';
-import type {
-  MidnightProvider,
-  UnboundTransaction,
-  WalletProvider,
-} from '@midnight-ntwrk/midnight-js-types';
+import type { Ledger9WalletProvider, UnboundTransaction } from '@midnight-ntwrk/midnight-js-types';
 import { ttlOneHour } from '@midnight-ntwrk/midnight-js-utils';
-import type {
-  WalletFacade,
-  FacadeState,
-  UnshieldedKeystore,
-} from '@midnight-ntwrk/wallet-sdk';
+import {
+  DefaultForkSchedule,
+  ProtocolVersion,
+  WalletTransaction,
+  type WalletFacade,
+  type FacadeState,
+  type UnshieldedKeystore,
+  type WalletSeeds,
+} from '@midnightntwrk/wallet-sdk';
 import {
   type DustWalletOptions,
   type EnvironmentConfiguration,
@@ -50,19 +49,21 @@ export type WalletSecret = { kind: 'seed'; value: string } | { kind: 'mnemonic';
 // two lines per sync update. Keep only its warnings and errors.
 testkitLogger.level = 'warn';
 
-export class MidnightWalletProvider implements MidnightProvider, WalletProvider {
+export class MidnightWalletProvider implements Ledger9WalletProvider {
   readonly wallet: WalletFacade;
   readonly unshieldedKeystore: UnshieldedKeystore;
+
+  private readonly zswapSecretKeys: ZswapSecretKeys;
 
   private constructor(
     private readonly logger: Logger,
     wallet: WalletFacade,
-    private readonly zswapSecretKeys: ZswapSecretKeys,
-    private readonly dustSecretKey: DustSecretKey,
+    private readonly seeds: WalletSeeds,
     unshieldedKeystore: UnshieldedKeystore,
   ) {
     this.wallet = wallet;
     this.unshieldedKeystore = unshieldedKeystore;
+    this.zswapSecretKeys = ZswapSecretKeys.fromSeed(seeds.shielded);
   }
 
   getCoinPublicKey(): CoinPublicKey {
@@ -73,28 +74,44 @@ export class MidnightWalletProvider implements MidnightProvider, WalletProvider 
     return this.zswapSecretKeys.encryptionPublicKey;
   }
 
+  // Wallet SDK 2 balances and submits handles adopted at the chain's current
+  // protocol version, and hands back a handle to unwrap. The keys come from the
+  // seeds the wallet was started with, so balancing no longer takes them.
   async balanceTx(
     tx: UnboundTransaction,
     ttl: Date = ttlOneHour(),
   ): Promise<FinalizedTransaction> {
+    const active = await this.activeProtocolVersion();
     const recipe = await this.wallet.balanceUnboundTransaction(
-      tx,
-      {
-        shieldedSecretKeys: this.zswapSecretKeys,
-        dustSecretKey: this.dustSecretKey,
-      },
+      WalletTransaction.adopt('Unbound', tx, active),
       { ttl },
     );
-    return await this.wallet.finalizeRecipe(recipe);
+    // Balancing may add unshielded inputs (e.g. NIGHT spent to fund a
+    // contract's receiveUnshielded). Those inputs need signatures from the
+    // unshielded keystore; without this step the node rejects the transaction
+    // with InputsSignaturesLengthMismatch (Custom error 192).
+    const signed = await this.wallet.signRecipe(recipe, (payload) =>
+      this.unshieldedKeystore.signDataAsync(payload),
+    );
+    const finalized = await this.wallet.finalizeRecipe(signed);
+    const accepted = ProtocolVersion.epochOf(active, DefaultForkSchedule.v9);
+    const unwrapped = WalletTransaction.unwrapWithin<FinalizedTransaction>(finalized, accepted);
+    if (unwrapped._tag === 'Left') throw unwrapped.left;
+    return unwrapped.right;
   }
 
-  submitTx(tx: FinalizedTransaction): Promise<string> {
-    return this.wallet.submitTransaction(tx);
+  async submitTx(tx: FinalizedTransaction): Promise<string> {
+    const active = await this.activeProtocolVersion();
+    return this.wallet.submitTransaction(WalletTransaction.adopt('Finalized', tx, active));
+  }
+
+  private async activeProtocolVersion(): Promise<ProtocolVersion.ProtocolVersion> {
+    return (await Rx.firstValueFrom(this.wallet.state())).activeProtocolVersion;
   }
 
   async start(): Promise<void> {
     this.logger.info('Starting wallet...');
-    await this.wallet.start(this.zswapSecretKeys, this.dustSecretKey);
+    await this.wallet.start(this.seeds);
   }
 
   async stop(): Promise<void> {
@@ -123,28 +140,13 @@ export class MidnightWalletProvider implements MidnightProvider, WalletProvider 
         ? base.withMnemonic(secret.value)
         : base.withSeed(secret.value);
 
-    const buildResult = await builder.buildWithoutStarting();
-    const { wallet, seeds, keystore } = buildResult as {
-      wallet: WalletFacade;
-      seeds: {
-        masterSeed: string;
-        shielded: Uint8Array;
-        dust: Uint8Array;
-      };
-      keystore: UnshieldedKeystore;
-    };
+    const { wallet, seeds, keystore } = await builder.buildWithoutStarting();
 
     logger.info(
       `Wallet built from ${secret.kind}; master seed: ${seeds.masterSeed.slice(0, 8)}...`,
     );
 
-    return new MidnightWalletProvider(
-      logger,
-      wallet,
-      ZswapSecretKeys.fromSeed(seeds.shielded),
-      DustSecretKey.fromSeed(seeds.dust),
-      keystore,
-    );
+    return new MidnightWalletProvider(logger, wallet, seeds, keystore);
   }
 }
 
@@ -417,7 +419,7 @@ export async function waitForNightThenDust(
     const recipe = await wallet.registerNightUtxosForDustGeneration(
       unregistered,
       keystore.getPublicKey(),
-      (payload) => keystore.signData(payload),
+      (payload) => keystore.signDataAsync(payload),
     );
     const txId = await wallet.submitTransaction(await wallet.finalizeRecipe(recipe));
     logger.info(`${label}: DUST registration submitted (${txId}).`);
