@@ -18,7 +18,7 @@ import { config, logger, syncTimeoutMs } from '../test-support.js';
 import { startFundedWallet } from '../harness.js';
 import { stopWallet, type WalletCtx } from '../wallet.js';
 import { createProviders, type Providers } from '../providers.js';
-import { loadContract, type LoadedContract } from '../contracts.js';
+import { decodeContractState, loadContract, type LoadedContract } from '../contracts.js';
 import {
   BRIDGED_USDC_MINT_DIR,
   bridgedUsdcMintArtifactExists,
@@ -144,8 +144,9 @@ describe.skipIf(!artifactPresent)(`usdcx bridge (${config.networkId})`, () => {
 
     // The relayer deployed nothing; seed its private-state store (scoped by
     // address). This contract keeps no meaningful private state.
-    relayerProviders.privateStateProvider.setContractAddress(contractAddress);
-    await relayerProviders.privateStateProvider.set(PRIVATE_STATE_ID, {});
+    await relayerProviders.privateStateProvider
+      .forContract(contractAddress)
+      .set(PRIVATE_STATE_ID, {});
 
     const submit = submitCallTx as unknown as (p: Providers, o: Record<string, unknown>) => Promise<unknown>;
     await submit(relayerProviders, {
@@ -183,6 +184,6 @@ describe.skipIf(!artifactPresent)(`usdcx bridge (${config.networkId})`, () => {
   async function queryLedger(providers: Providers, address: string): Promise<any> {
     const state = await providers.publicDataProvider.queryContractState(address);
     if (!state) throw new Error(`no contract state at ${address}`);
-    return loaded.module.ledger(state.data);
+    return loaded.module.ledger(decodeContractState(state.contractState));
   }
 });

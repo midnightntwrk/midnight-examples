@@ -19,3 +19,6 @@ midnight-level-db-*/
 .idea/
 *.swp
 dist/
+
+# Test reports (npm run test:local -- --reporter=json ...)
+logs/

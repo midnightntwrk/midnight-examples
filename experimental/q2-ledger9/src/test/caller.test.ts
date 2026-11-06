@@ -93,7 +93,7 @@ describe.skipIf(!present)(`caller (${config.networkId})`, () => {
     const callerInst = await deployFresh(callerProviders, caller.compiledContract, 'caller/proxy-caller', []);
     const proxyProviders = await createProviders(deployer, proxy.zkConfigPath, 'caller/proxy', config);
     const proxyInst = await deployFresh(proxyProviders, proxy.compiledContract, 'caller/proxy', [
-      callerInst.contractAddress,
+      { bytes: contractAddressBytes(callerInst.contractAddress) },
     ]);
     await callCircuit(proxyInst.deployed, 'forward', []);
     const led = await readLedger<CallerLedger>(callerProviders, callerInst.contractAddress, caller.module);
