@@ -79,6 +79,38 @@ export function preprodConfig(): NetworkConfig {
   };
 }
 
+// A network that exists only in env: e.g. a private or short-lived network whose
+// endpoints arrive late. Set these in the gitignored repo-root .env.custom (see
+// .env.custom.example), or in the file named by MIDNIGHT_ENV_FILE, which is
+// layered on top of it (vitest.config.ts). Built on demand so it sees that env.
+export function customConfig(): NetworkConfig {
+  const required = [
+    'MIDNIGHT_NETWORK_ID',
+    'MIDNIGHT_NODE',
+    'MIDNIGHT_NODE_WS',
+    'MIDNIGHT_INDEXER',
+    'MIDNIGHT_INDEXER_WS',
+  ] as const;
+  const value = (name: string): string | undefined => process.env[name]?.trim() || undefined;
+  const missing = required.filter((name) => value(name) === undefined);
+  if (missing.length > 0) {
+    throw new Error(
+      `MIDNIGHT_NETWORK=custom needs ${missing.join(', ')}. Set them in the repo-root ` +
+        '.env.custom (see .env.custom.example), in the file named by MIDNIGHT_ENV_FILE, ' +
+        'or in your shell.',
+    );
+  }
+  return {
+    networkId: value('MIDNIGHT_NETWORK_ID')!,
+    indexer: value('MIDNIGHT_INDEXER')!,
+    indexerWS: value('MIDNIGHT_INDEXER_WS')!,
+    node: value('MIDNIGHT_NODE')!,
+    nodeWS: value('MIDNIGHT_NODE_WS')!,
+    proofServer: value('MIDNIGHT_PROOF_SERVER') ?? 'http://127.0.0.1:6300',
+    faucet: value('MIDNIGHT_FAUCET') ?? '',
+  };
+}
+
 export function getConfig(): NetworkConfig {
   const network = process.env['MIDNIGHT_NETWORK'] ?? 'local';
   switch (network) {
@@ -88,9 +120,11 @@ export function getConfig(): NetworkConfig {
       return PREVIEW_CONFIG;
     case 'preprod':
       return preprodConfig();
+    case 'custom':
+      return customConfig();
     default:
       throw new Error(
-        `Unknown network: ${network}. Supported: 'local', 'preview', 'preprod'.`,
+        `Unknown network: ${network}. Supported: 'local', 'preview', 'preprod', 'custom'.`,
       );
   }
 }

@@ -19,6 +19,12 @@ packages/*/LICENSE
 **/midnight-level-db/
 **/.env.preprod
 **/.env.preview
+**/.env
+**/.env*.local
+# Custom-network endpoints and seeds (MIDNIGHT_NETWORK=custom); keep the examples
+**/.env.custom
+**/.env.custom.*
+!**/.env.custom*.example
 **/.fast-sync-wallets/
 **/.test-wallets/
 # Deploy state from scripts/deploy.ts: private state and signing keys, and the

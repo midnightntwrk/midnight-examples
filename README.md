@@ -152,6 +152,26 @@ and asserts that he has no DUST of his own.
 > and concurrent spends of the same UTxOs produce nondeterministic balancing
 > failures. The root `test:preprod` script is sequential by design.
 
+### Custom network
+
+To run against a network that isn't built in, such as a private test network,
+copy `.env.custom.example` to `.env.custom` (gitignored). Fill in the network ID,
+the node and indexer URLs (HTTP and WebSocket), and four wallet seeds, then run
+`npm run test:custom`. The run stops with one error that lists any missing
+endpoint. A custom network has no pre-seed bundle, so wallets sync from genesis.
+The suites print any address that still needs funding.
+
+If the endpoints change partway through, such as at a hard fork, keep the seeds in
+`.env.custom` and put each endpoint set in its own file. Pick one per run with
+`MIDNIGHT_ENV_FILE`:
+
+```bash
+MIDNIGHT_ENV_FILE=.env.custom.prefork  npm run test:custom
+MIDNIGHT_ENV_FILE=.env.custom.postfork npm run test:custom
+```
+
+The same rule applies here: run one suite at a time.
+
 ## Adding / working with examples
 
 - **Scaffold a new example with `npm run new:example -- <name> [--witnesses]`.** It
