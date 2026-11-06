@@ -95,6 +95,13 @@ the devnet in the background once the in-memory gate passes, and never
 compiles while that run holds `.gates/devnet.lock`. Only one devnet runs at a
 time (every example binds the same ports).
 
+**The local devnet isn't on Ledger 9 yet.** `compose.yml` pulls the newest public
+node (`2.1.0-rc.4`) and indexer (`4.4.0-rc.6`), which predate Ledger 9 and reject
+contract calls with `Custom error: 104`. So `test:local`, `validate` and the
+pipeline's devnet step fail no matter what the code does. Don't debug those
+failures. Verify with typecheck and `test:sim`, and run network tests on preview
+(`npm run test:preview`) only. See the README's "Local devnet: not on Ledger 9 yet".
+
 Against a remote network (preprod/preview). Each wallet syncs from genesis,
 over an hour on preprod; the examples don't use fast sync:
 
