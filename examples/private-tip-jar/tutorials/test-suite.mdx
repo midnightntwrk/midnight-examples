@@ -175,7 +175,7 @@ Everything above the comment that begins `Everything above is generated boilerpl
 file is the shared harness, the same in every example in
 midnight-examples. `src/config.ts` holds each network's endpoints, `src/wallet.ts` builds and syncs
 the wallets, and `src/providers.ts` bundles the MidnightJS providers. MidnightJS 5 takes the wallet
-through `createWalletProvider` and `createMidnightProvider`, and the bundle carries a `config` with
+through `createLedger9WalletProvider` and `createLedger9MidnightProvider`, and the bundle carries a `config` with
 the network ID and the transaction time-to-live. On `local`, Alice and Bob are the devnet's
 pre-funded wallets, so there is nothing to set up.
 

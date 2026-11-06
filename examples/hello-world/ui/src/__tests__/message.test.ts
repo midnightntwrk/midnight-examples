@@ -9,7 +9,7 @@ import {
   createCircuitContext,
   createConstructorContext,
   dummyContractAddress,
-} from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+} from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import { Contract } from "../midnight/contract";
 import { message$ } from "../midnight/hello-world-api";
 import type { HelloWorldProviders } from "../midnight/providers";
@@ -30,14 +30,17 @@ describe("message$", () => {
     });
     const { context } = await contract.impureCircuits.storeMessage(ctx, "Hello World!");
 
-    // Minimal stand-in for the indexer: emit the two states in order, tagged
-    // with the ledger era the way Midnight.js 5 serves them.
+    // Minimal stand-in for the indexer: emit the two states in order, as
+    // Midnight.js 5 serves them (an era-tagged state that decodes on demand).
+    const read = (state: { data: unknown }) => ({
+      contractState: { era: "v9", deserialize: () => state },
+    });
     const providers = {
       publicDataProvider: {
         contractStateObservable: () =>
           of(
-            { value: { version: "v9", state: currentContractState } },
-            { value: { version: "v9", state: { data: context.callContext.currentQueryContext.state } } },
+            { value: read(currentContractState) },
+            { value: read({ data: context.callContext.currentQueryContext.state }) },
           ),
       },
     } as unknown as HelloWorldProviders;

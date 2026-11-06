@@ -21,7 +21,7 @@ import {
   encodeCoinPublicKey,
   rawTokenType,
   type ContractAddress,
-} from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+} from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import {
   CompiledTokenTransfersContract,
   createInitialPrivateState,
@@ -64,8 +64,7 @@ export async function joinTokenTransfers(
   providers: TokenTransfersProviders,
   address: ContractAddress,
 ): Promise<TokenTransfersContract> {
-  providers.privateStateProvider.setContractAddress(address);
-  const stored = await providers.privateStateProvider.get(PRIVATE_STATE_ID);
+  const stored = await providers.privateStateProvider.forContract(address).get(PRIVATE_STATE_ID);
   if (stored !== null) {
     return findDeployedContract(providers, {
       compiledContract: CompiledTokenTransfersContract,

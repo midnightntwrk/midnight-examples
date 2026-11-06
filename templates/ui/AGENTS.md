@@ -27,7 +27,7 @@ This file is template-owned: `mnkit upgrade` replaces it unless you have
 edited it.
 
 <!-- @endif -->
-**Verified against:** `midnight-js-*` 5.0.0-rc.5 (Ledger 9),
+**Verified against:** `midnight-js-*` 5.0.0 (Ledger 9),
 `@midnight-ntwrk/dapp-connector-api` 4.0.1, Vite 6.4.4, vitest 5, React 19,
 Node 22: typecheck, unit tests and build. The Ledger 9 template has not yet
 been run in a browser with a wallet extension on a Ledger 9 network.
@@ -427,8 +427,9 @@ battleship's `ShipForm`.
 
 ### 4. Pins (already set by the template; keep them)
 
-- **Exact versions:** `midnight-js-*` `5.0.0-rc.5`,
-  `@midnightntwrk/wallet-sdk-address-format` `4.0.0-rc.0` and
+- **Exact versions:** `midnight-js-*` `5.0.0` (`midnight-js-network-id`
+  `5.0.0-rc.5`: it has no 5.0.0),
+  `@midnightntwrk/wallet-sdk-address-format` `4.0.0` and
   `@midnight-ntwrk/dapp-connector-api` `4.0.1`.
 - **`@swc/core` `1.15.47` under `vite-plugin-top-level-await`** (an override
   in `toolchain.json`): the plugin's 1.6.0, the latest, fails the production
@@ -659,9 +660,10 @@ that same receiver. Amounts on chain are in STAR (1 NIGHT = 1,000,000 STAR).
   privateState }`). The query context and private state sit under
   `context.callContext`. Await every call (`await expect(p).rejects.toThrow()`
   for a rejection); the seed circuits tests show the pattern.
-- **Versioned contract state:** Midnight.js 5 serves each contract state as
-  `{ version: 'v9', state }`. Decode it with `contractStateData()` from
-  `src/midnight/providers.ts`, never `state.data`.
+- **Era-tagged contract state:** Midnight.js 5 serves each contract state as
+  a `ContractStateRead`, whose `contractState` is serialized and tagged with
+  the ledger era that wrote it. Decode it with `contractStateData()` from
+  `src/midnight/providers.ts`.
 - **In-memory contract balance is empty:** `createCircuitContext` starts
   `block.balance` empty, and a `receiveUnshielded` in one in-memory call
   doesn't credit the next. So an `unshieldedBalanceGte` assert always fails
@@ -734,7 +736,7 @@ Run the checks in order, and report which ones you actually ran.
    - In the page console, run a circuit in memory (this proves WASM loads).
      The runtime isn't pre-bundled, so import it by its `/@id/` path:
      ```js
-     const rt = await import('/@id/@midnight-ntwrk/midnight-js-protocol/compact-runtime');
+     const rt = await import('/@id/@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime');
      const m = await import('/src/midnight/contract.ts');
      const c = new m.Contract({});  // or the witnesses, via '/@fs/<abs path>/contract/witnesses.ts'
      const pk = '00'.repeat(32);
@@ -748,8 +750,8 @@ Run the checks in order, and report which ones you actually ran.
      Check that the byte length matches the file.)
    - With `persistent` private state: in the console,
      `persistentPrivateStateProvider({ accountId, passphrase })` from
-     `/src/midnight/private-state.ts`, `setContractAddress`, `set` a state,
-     reload, open it again and `get` it back. Then check that a wrong
+     `/src/midnight/private-state.ts`, `forContract(<address>)`, `set` a
+     state, reload, open it again and `get` it back. Then check that a wrong
      passphrase throws `WrongPassphraseError`. Delete the test database
      afterwards (`indexedDB.deleteDatabase("level-js-<name>-ui-private-state")`).
 <!-- @if monorepo -->

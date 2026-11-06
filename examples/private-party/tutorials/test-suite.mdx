@@ -93,7 +93,7 @@ test file is shared harness. It is the same in every example in midnight-example
 - **`src/wallet.ts`** builds, starts, and syncs each wallet. **`src/providers.ts`** bundles the
   MidnightJS providers a user needs: public data from the indexer, private state, ZK artifacts
   and proving, and the wallet itself. MidnightJS 5 takes the wallet through
-  `createWalletProvider` and `createMidnightProvider`, and the bundle carries a `config` with the
+  `createLedger9WalletProvider` and `createLedger9MidnightProvider`, and the bundle carries a `config` with the
   network ID and the transaction time-to-live.
 
 The suite declares a wallet and a provider set for each person:
@@ -122,7 +122,7 @@ network it also waits until every wallet has NIGHT and at least 0.1 DUST (set `M
 to change that), and caches the synced wallet state in the repo-root `.wallet-state/` folder, so
 later runs only sync new blocks. Two small helpers do the rest. One reads the contract's public
 ledger, the other reads a wallet's NIGHT balance. `ledgerState`, from `src/providers.ts`,
-unwraps the version-tagged state that MidnightJS 5 returns (`{ version: 'v9', state }`) into the
+decodes the era-tagged state that MidnightJS 5 returns (`read.contractState`, ledger 9 here) into the
 data the compiled `ledger()` decodes:
 
 ```typescript title="src/test/party.test.ts"
@@ -187,9 +187,8 @@ he points his provider at the contract first:
 
 ```typescript title="src/test/party.test.ts"
         const bobInitialPrivateState = createPartyPrivateState(randomBytes(32));
-        bobProviders.privateStateProvider.setContractAddress(contractAddress);
-        await bobProviders.privateStateProvider.set(BOB_PRIVATE_ID, bobInitialPrivateState);
-        const bobPrivateState = await bobProviders.privateStateProvider.get(BOB_PRIVATE_ID);
+        await bobProviders.privateStateProvider.forContract(contractAddress).set(BOB_PRIVATE_ID, bobInitialPrivateState);
+        const bobPrivateState = await bobProviders.privateStateProvider.forContract(contractAddress).get(BOB_PRIVATE_ID);
 
         const bobUnshielded = await bobWallet.wallet.unshielded.getAddress();
         const bobAddress = { bytes: new Uint8Array(bobUnshielded.data) };
@@ -323,7 +322,7 @@ party with those steps spelled out, so you can see what happens in between:
 
 ```typescript title="src/test/party.test.ts"
         // Step 1: Local circuit execution
-        const unprovenData: UnsubmittedDeployTxData<Contract> =
+        const unprovenData: Ledger9UnsubmittedDeployTxData<Contract> =
             await (createUnprovenDeployTx as any)(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -335,8 +334,8 @@ party with those steps spelled out, so you can see what happens in between:
         logger.info(`Unproven tx created. Pending contract address: ${pendingAddress}`);
 
         // Step 2: Prove (send to proof server, get ZK proof back)
-        // Midnight.js 5 providers pass transactions tagged with their ledger era.
-        const provenTx = await aliceProviders.proofProvider.proveTx({ version: 'v9', tx: unprovenData.private.unprovenTx });
+        // Midnight.js 5 providers pass transactions as era-tagged handles.
+        const provenTx = await aliceProviders.proofProvider.proveTx(unprovenData.private.unprovenTx);
         logger.info('proven tx received from proof server');
 
         // Step 3: Balance wallet
@@ -356,8 +355,8 @@ party with those steps spelled out, so you can see what happens in between:
    an unproven transaction. The contract address is already known at this point.
 2. **Prove.** The proof provider has the proof server generate a zero-knowledge proof for each
    circuit call in the transaction, and returns the proven transaction. In MidnightJS 5 the
-   transaction goes in and comes out tagged with its ledger era (`{ version: 'v9', tx }`), and the
-   wallet provider takes it in that form.
+   transaction goes in and comes out as a handle tagged with its ledger era (`LedgerTransaction`),
+   and the wallet provider takes it in that form.
 3. **Balance.** The wallet adds the inputs that pay for the transaction: DUST for the fee, and
    any tokens the transaction needs.
 4. **Submit.** The wallet sends the transaction to the node.
@@ -372,8 +371,7 @@ local proof server.
 
 ```typescript title="src/test/party.test.ts"
         // Store private state (normally done inside deployContract)
-        aliceProviders.privateStateProvider.setContractAddress(pendingAddress);
-        await aliceProviders.privateStateProvider.set(ALICE_PRIVATE_ID, alicePrivateState);
+        await aliceProviders.privateStateProvider.forContract(pendingAddress).set(ALICE_PRIVATE_ID, alicePrivateState);
 ```
 
 ## Test yourself

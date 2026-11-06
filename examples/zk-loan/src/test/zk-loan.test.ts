@@ -26,7 +26,7 @@ import {
   type ContractAddress,
   CompactTypeBytes,
   transientHash,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import pino from 'pino';
 
@@ -216,8 +216,7 @@ describe(`Zk Loan Contract (${network})`, () => {
   // Store a party's private state so the witnesses can present it, keyed to the
   // deployed contract.
   async function setPrivateState(id: string, state: ZkLoanPrivateState): Promise<void> {
-    providers.privateStateProvider.setContractAddress(contractAddress);
-    await providers.privateStateProvider.set(id, state);
+    await providers.privateStateProvider.forContract(contractAddress).set(id, state);
   }
 
   // Thin wrapper over submitCallTx so each step reads as the circuit call it is.

@@ -17,7 +17,7 @@ import {
   createConstructorContext,
   dummyContractAddress,
   type ChargedState,
-} from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+} from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import type { UserAddressValue } from "../lib/addresses";
 import { withUnshieldedBalance } from "./contract-balance";
 import { Contract, createInitialPrivateState, ledger, type Ledger } from "../midnight/contract";

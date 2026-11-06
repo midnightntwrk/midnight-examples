@@ -38,7 +38,7 @@ import {
   submitCallTx,
   type DeployedContract,
 } from '@midnight-ntwrk/midnight-js-contracts';
-import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { SucceedEntirely } from '@midnight-ntwrk/midnight-js-types';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import pino from 'pino';
@@ -146,8 +146,7 @@ describe(`Election Contract (${network})`, () => {
   // Store a participant's private state so the witnesses can present it, keyed to
   // the deployed contract.
   async function setPrivateState(id: string, state: ElectionPrivateState): Promise<void> {
-    providers.privateStateProvider.setContractAddress(contractAddress);
-    await providers.privateStateProvider.set(id, state);
+    await providers.privateStateProvider.forContract(contractAddress).set(id, state);
   }
 
   beforeAll(async () => {

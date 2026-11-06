@@ -21,7 +21,7 @@ import {
   dummyContractAddress,
   rawTokenType,
   type Effects,
-} from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+} from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import { toHex } from "@midnight-ntwrk/midnight-js-utils";
 import { Contract, createInitialPrivateState, ledger } from "../midnight/contract";
 import {

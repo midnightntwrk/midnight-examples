@@ -26,8 +26,8 @@ import {
   type ContractAddress,
   encodeCoinPublicKey,
   encodeRawTokenType,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
-import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
+import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/v9';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import { freshCoin } from './coins.js';
 import pino from 'pino';
@@ -310,8 +310,7 @@ describe(`Private Tip Jar Contract (${network})`, () => {
 
     // Bob's private state for the jar. `tip` never reads it; `withdraw` does,
     // and with his key it must fail.
-    bobJarProv.privateStateProvider.setContractAddress(jarAddress);
-    await bobJarProv.privateStateProvider.set(BOB_JAR_STATE_ID, createPrivateTipJarPrivateState(bobSk));
+    await bobJarProv.privateStateProvider.forContract(jarAddress).set(BOB_JAR_STATE_ID, createPrivateTipJarPrivateState(bobSk));
   });
 
   it('Bob tips twice from his one coin; the pot holds exactly the coins he made', async () => {

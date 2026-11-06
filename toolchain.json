@@ -63,10 +63,11 @@
       "language": "0.28"
     },
     "npm": {
-      "midnight-js": "5.0.0-rc.5",
-      "testkit-js": "5.0.0-rc.5",
-      "wallet-sdk": "2.0.0-rc.1",
-      "wallet-sdk-address-format": "4.0.0-rc.0",
+      "midnight-js": "5.0.0",
+      "midnight-js-network-id": "5.0.0-rc.5",
+      "testkit-js": "5.0.0",
+      "wallet-sdk": "2.0.0",
+      "wallet-sdk-address-format": "4.0.0",
       "dapp-connector-api": "4.0.1",
       "vitest": "5.0.4",
       "vite": "6.4.4"
@@ -77,14 +78,10 @@
       "midnightntwrk/midnight-node": "2.1.0-rc.4"
     },
     "overrides": {
-      "@midnightntwrk/wallet-sdk": "2.0.0-rc.1",
+      "@midnightntwrk/wallet-sdk": "2.0.0",
       "@midnightntwrk/ledger-v9": "1.0.0",
       "@midnightntwrk/onchain-runtime-v4": "4.0.0",
-      "@midnightntwrk/zkir-v3": "3.2.0",
-      "@midnight-ntwrk/midnight-js-protocol@5.0.0-rc.5": {
-        "@midnight-ntwrk/compact-runtime": "0.21.0",
-        "@midnight-ntwrk/compact-js": "3.0.0"
-      }
+      "@midnightntwrk/zkir-v3": "3.2.0"
     }
   }
 }

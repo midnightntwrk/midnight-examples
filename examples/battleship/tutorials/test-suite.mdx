@@ -81,7 +81,7 @@ test file is shared harness. It is the same in every example in midnight-example
 - **`src/wallet.ts`** builds, starts and syncs each wallet. **`src/providers.ts`** bundles the
   MidnightJS providers a player needs: public data from the indexer, private state, ZK artifacts
   and proving, and the wallet itself. MidnightJS 5 takes the wallet through
-  `createWalletProvider` and `createMidnightProvider`, and the bundle carries a `config` with the
+  `createLedger9WalletProvider` and `createLedger9MidnightProvider`, and the bundle carries a `config` with the
   network ID and the transaction time-to-live.
 
 The suite declares a wallet and a provider set for each player, and fixes their ship locations:
@@ -119,7 +119,7 @@ it also waits until both wallets have NIGHT and at least 0.1 DUST (set `MIDNIGHT
 change that), and caches the synced wallet state in the repo-root `.wallet-state/` folder, so later
 runs only sync new blocks. A small helper reads the contract's public ledger through a player's
 providers, and the tests use it after every call. `ledgerState`, from `src/providers.ts`,
-unwraps the version-tagged state that MidnightJS 5 returns (`{ version: 'v9', state }`) into the
+decodes the era-tagged state that MidnightJS 5 returns (`read.contractState`, ledger 9 here) into the
 data the compiled `ledger()` decodes:
 
 ```typescript title="src/test/battleship.test.ts"
@@ -251,7 +251,7 @@ rewriting his private state so that his ships are on 15 and 16:
     it('Stops Bob from being a cheater', async () => {
 
         logger.info(`Bob realizes it is going to be a HIT and tries to cheat...`);
-        const bobPrivateState = await bobProviders.privateStateProvider.get(BOB_PRIVATE_ID);
+        const bobPrivateState = await bobProviders.privateStateProvider.forContract(contractAddress).get(BOB_PRIVATE_ID);
         const cheatBobPrivateState = createBattlePrivateState(
             BigInt(15),
             BigInt(16),
@@ -259,7 +259,7 @@ rewriting his private state so that his ships are on 15 and 16:
             ShotState.MISS,
             bobPrivateState.sk,
         );
-        await bobProviders.privateStateProvider.set(BOB_PRIVATE_ID, cheatBobPrivateState);
+        await bobProviders.privateStateProvider.forContract(contractAddress).set(BOB_PRIVATE_ID, cheatBobPrivateState);
         await expect(async () => {
             await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
@@ -281,7 +281,7 @@ no hits recorded, and still Bob's turn to check.
 
 ```typescript title="src/test/battleship.test.ts"
         logger.info(`Bob is resetting his board to the original private state...`);
-        await bobProviders.privateStateProvider.set(BOB_PRIVATE_ID, bobPrivateState);
+        await bobProviders.privateStateProvider.forContract(contractAddress).set(BOB_PRIVATE_ID, bobPrivateState);
         logger.info(`Bob successfully reverted his private state to the original!`);
 
         const state = await queryLedger(aliceProviders);
@@ -307,7 +307,7 @@ her the game. Alice tries to move that ship to square 10 before she checks:
             ShotState.MISS,
             newAlicePrivateState.sk,
         );
-        await aliceProviders.privateStateProvider.set(ALICE_PRIVATE_ID, newAlicePrivateState);
+        await aliceProviders.privateStateProvider.forContract(contractAddress).set(ALICE_PRIVATE_ID, newAlicePrivateState);
 
         await expect(async () => {
             await submitCallTx(aliceProviders, {

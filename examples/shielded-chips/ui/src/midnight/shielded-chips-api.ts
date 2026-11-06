@@ -33,7 +33,7 @@ import {
   submitCallTx,
   type FoundContract,
 } from "@midnight-ntwrk/midnight-js-contracts";
-import { CompiledContract } from "@midnight-ntwrk/midnight-js-protocol/compact-js";
+import { CompiledContract } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-js";
 import {
   CompactTypeBytes,
   CompactTypeVector,
@@ -43,13 +43,14 @@ import {
   persistentHash,
   rawTokenType,
   type ContractAddress,
-} from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+} from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import {
   createShieldedCoinInfo,
+  Transaction,
   ZswapOutput,
   type ShieldedCoinInfo,
-} from "@midnight-ntwrk/midnight-js-protocol/ledger";
-import type { FinalizedTxData } from "@midnight-ntwrk/midnight-js-types";
+} from "@midnight-ntwrk/midnight-js-protocol/v9";
+import type { Ledger9FinalizedTxData } from "@midnight-ntwrk/midnight-js-types";
 import { toHex } from "@midnight-ntwrk/midnight-js-utils";
 import { MidnightBech32m, ShieldedAddress } from "@midnightntwrk/wallet-sdk-address-format";
 import { map, type Observable } from "rxjs";
@@ -137,8 +138,7 @@ export async function readHouseSecret(
   providers: ChipsProviders,
   chipsAddress: ContractAddress,
 ): Promise<Uint8Array | null> {
-  providers.privateStateProvider.setContractAddress(chipsAddress);
-  return (await providers.privateStateProvider.get(PRIVATE_STATE_ID))?.sk ?? null;
+  return (await providers.privateStateProvider.forContract(chipsAddress).get(PRIVATE_STATE_ID))?.sk ?? null;
 }
 
 /**
@@ -331,8 +331,7 @@ export async function joinShieldedChips(
   providers: ShieldedChipsProviders,
   address: ContractAddress,
 ): Promise<ShieldedChipsContract> {
-  providers.privateStateProvider.setContractAddress(address);
-  const stored = await providers.privateStateProvider.get(PRIVATE_STATE_ID);
+  const stored = await providers.privateStateProvider.forContract(address).get(PRIVATE_STATE_ID);
   if (stored !== null) {
     return findDeployedContract(providers, {
       compiledContract: CompiledShieldedChipsContract,
@@ -353,8 +352,7 @@ export async function readPrivateState(
   providers: ShieldedChipsProviders,
   address: ContractAddress,
 ): Promise<ShieldedChipsPrivateState | null> {
-  providers.privateStateProvider.setContractAddress(address);
-  return providers.privateStateProvider.get(PRIVATE_STATE_ID);
+  return providers.privateStateProvider.forContract(address).get(PRIVATE_STATE_ID);
 }
 
 /**
@@ -397,17 +395,31 @@ export async function placeBet(
   if (!base) throw new Error("No private state for this table: rejoin it first.");
   const { coin, arg } = freshChip(colorHex, value);
   const pending = rememberEscrow(base, { ...arg, mt_index: 0n });
-  await providers.privateStateProvider.set(PRIVATE_STATE_ID, pending);
+  await providers.privateStateProvider.forContract(address).set(PRIVATE_STATE_ID, pending);
 
   const tx = await contract.callTx.betColor(arg, color);
 
-  const mtIndex = await escrowMtIndex(indexerUri, tx.public, coin, address);
-  providers.privateStateProvider.setContractAddress(address);
-  await providers.privateStateProvider.set(
+  const mtIndex = await escrowMtIndex(indexerUri, txOutputs(tx.public), coin, address);
+  await providers.privateStateProvider.forContract(address).set(
     PRIVATE_STATE_ID,
     rememberEscrow(base, { ...arg, mt_index: mtIndex }),
   );
   return tx;
+}
+
+/** A finalized transaction's id and its guaranteed Zswap output commitments. */
+export interface TxOutputs {
+  txId: string;
+  outputs: readonly { commitment: string }[];
+}
+
+/**
+ * Reads the outputs `escrowMtIndex` needs from a finalized call. Midnight.js 5
+ * returns the transaction as an era-tagged handle, so decode it first.
+ */
+export function txOutputs(data: Ledger9FinalizedTxData): TxOutputs {
+  const tx = Transaction.deserialize("signature", "proof", "binding", data.tx.serialize());
+  return { txId: data.txId, outputs: tx.guaranteedOffer?.outputs ?? [] };
 }
 
 /**
@@ -427,12 +439,12 @@ export async function placeBet(
  */
 export async function escrowMtIndex(
   indexerUri: string,
-  tx: FinalizedTxData,
+  tx: TxOutputs,
   coin: ShieldedCoinInfo,
   address: ContractAddress,
 ): Promise<bigint> {
   const expected = ZswapOutput.newContractOwned(coin, 0, address).commitment;
-  const position = (tx.tx.guaranteedOffer?.outputs ?? []).findIndex((o) => o.commitment === expected);
+  const position = tx.outputs.findIndex((o) => o.commitment === expected);
   if (position < 0) {
     throw new Error("The bet transaction has no output for the escrowed coin.");
   }

@@ -4,8 +4,8 @@ import {
   createCircuitContext,
   dummyContractAddress,
   StateValue,
-} from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
-import { nativeToken } from "@midnight-ntwrk/midnight-js-protocol/ledger";
+} from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
+import { nativeToken } from "@midnight-ntwrk/midnight-js-protocol/v9";
 import { withUnshieldedBalance } from "./contract-balance";
 
 describe("withUnshieldedBalance", () => {

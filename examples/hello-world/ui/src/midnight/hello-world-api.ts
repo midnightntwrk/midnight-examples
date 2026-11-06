@@ -6,7 +6,7 @@ import {
   findDeployedContract,
   type FoundContract,
 } from "@midnight-ntwrk/midnight-js-contracts";
-import type { ContractAddress } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+import type { ContractAddress } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import { map, type Observable } from "rxjs";
 import {
   CompiledHelloWorldContract,

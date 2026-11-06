@@ -25,7 +25,7 @@
 // identically, so this uses the contract's own exported pure circuit
 // `schnorrChallenge` rather than re-implementing the hash.
 import * as crypto from 'node:crypto';
-import { ecMulGenerator, type JubjubPoint } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import { ecMulGenerator, type JubjubPoint } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { pureCircuits, type Schnorr_SchnorrSignature } from '../contract/index.js';
 
 // Order of the Jubjub prime-order subgroup. ecMulGenerator reduces its scalar

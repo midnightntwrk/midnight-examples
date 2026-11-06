@@ -16,7 +16,7 @@ import {
   createConstructorContext,
   dummyContractAddress,
   type ChargedState,
-} from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+} from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import { Contract, ledger, type BattleshipPrivateState } from "../midnight/contract";
 import {
   acceptGame,

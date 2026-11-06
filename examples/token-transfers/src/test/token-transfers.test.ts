@@ -25,7 +25,7 @@ import {
   type ContractAddress,
   encodeUserAddress,
   encodeCoinPublicKey,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { SucceedEntirely } from '@midnight-ntwrk/midnight-js-types';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import { firstValueFrom } from 'rxjs';

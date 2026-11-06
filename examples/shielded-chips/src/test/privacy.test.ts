@@ -55,8 +55,8 @@ import {
   type ContractAddress,
   encodeCoinPublicKey,
   encodeRawTokenType,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
-import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
+import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/v9';
 import { contractCoinMtIndex, freshCoin } from './coins.js';
 import pino from 'pino';
 
@@ -293,8 +293,7 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
     chipColorHex = rawTokenType(CHIP_DOMAIN, chipsAddress);
     chipColorBytes = encodeRawTokenType(chipColorHex);
 
-    bobChipsProv.privateStateProvider.setContractAddress(chipsAddress);
-    await bobChipsProv.privateStateProvider.set(BOB_CHIPS, createRoulettePrivateState(bobSk));
+    await bobChipsProv.privateStateProvider.forContract(chipsAddress).set(BOB_CHIPS, createRoulettePrivateState(bobSk));
 
     const aliceCoinPk = aliceWallet.getCoinPublicKey();
     const bobCoinPkHex = bobWallet.getCoinPublicKey();
@@ -361,8 +360,7 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
 
   it('Bob bets RED; the escrowed coin nonce is captured as a secret', async () => {
     const bobPS = createRoulettePrivateState(bobSk, bobSalt);
-    bobRouletteProv.privateStateProvider.setContractAddress(rouletteAddress);
-    await bobRouletteProv.privateStateProvider.set(BOB_ROULETTE, bobPS);
+    await bobRouletteProv.privateStateProvider.forContract(rouletteAddress).set(BOB_ROULETTE, bobPS);
 
     const chip = freshCoin(chipColorHex, BET);
     bobBetNonce = chip.nonce; // SECRET: escrowed coin nonce
@@ -379,7 +377,7 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
     // persist escrow so claim can reopen it
     const mtIndex = await contractCoinMtIndex(config.indexer, tx.public, chip, rouletteAddress);
     const escrowed: QualifiedCoin = { ...chip, mt_index: mtIndex };
-    await bobRouletteProv.privateStateProvider.set(BOB_ROULETTE, rememberEscrow(bobPS, escrowed));
+    await bobRouletteProv.privateStateProvider.forContract(rouletteAddress).set(BOB_ROULETTE, rememberEscrow(bobPS, escrowed));
 
     const rl = await queryRoulette();
     expect(rl.betCommits.size()).toEqual(1n);

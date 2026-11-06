@@ -43,7 +43,7 @@ import {
 import {
   type ContractAddress,
   encodeUserAddress,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { SucceedEntirely } from '@midnight-ntwrk/midnight-js-types';
 import {
   type EnvironmentConfiguration,
@@ -184,8 +184,7 @@ describe(`Silent Auction Contract (${network})`, () => {
     role: Role,
     state: SilentAuctionPrivateState,
   ): Promise<void> {
-    providers.privateStateProvider.setContractAddress(contractAddress);
-    await providers.privateStateProvider.set(PRIVATE_STATE_IDS[role], state);
+    await providers.privateStateProvider.forContract(contractAddress).set(PRIVATE_STATE_IDS[role], state);
   }
 
   beforeAll(async () => {

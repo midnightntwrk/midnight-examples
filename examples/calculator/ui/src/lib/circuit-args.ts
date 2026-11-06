@@ -33,7 +33,7 @@
 //
 // Template-owned: edit templates/ui/src/lib/circuit-args.ts, then
 // `npm run new:ui -- <name> --sync`.
-import { MAX_FIELD } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+import { MAX_FIELD } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import { coinPublicKeyFromBech32, userAddressFromBech32 } from "@/lib/addresses";
 import type { BookedCoin } from "@/lib/coin-book";
 

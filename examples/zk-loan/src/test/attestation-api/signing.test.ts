@@ -20,7 +20,7 @@
 import { describe, it, expect } from 'vitest';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { sign, generateKeyPair, signCreditData } from '../../../attestation-api/signing.js';
-import { ecMulGenerator, ecMul, ecAdd } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import { ecMulGenerator, ecMul, ecAdd } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { pureCircuits } from '../../../contract/index.js';
 
 setNetworkId('undeployed');

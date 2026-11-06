@@ -83,6 +83,8 @@ const imagesFor = (dir) => (isExample(dir) ? ex : tc).images;
  */
 function examplePin(pkg, { peer = false } = {}) {
   const pin = (() => {
+    // network-id has no 5.0.0 final yet, so it has its own pin.
+    if (pkg === '@midnight-ntwrk/midnight-js-network-id') return ex.npm['midnight-js-network-id'] ?? ex.npm['midnight-js'];
     if (pkg.startsWith('@midnight-ntwrk/midnight-js-')) return ex.npm['midnight-js'];
     if (pkg === '@midnight-ntwrk/testkit-js') return ex.npm['testkit-js'];
     if (pkg === '@midnightntwrk/wallet-sdk') return ex.npm['wallet-sdk'];

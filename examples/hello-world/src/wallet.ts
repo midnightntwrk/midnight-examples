@@ -10,7 +10,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { unshieldedToken } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+import { unshieldedToken } from '@midnight-ntwrk/midnight-js-protocol/v9';
 import {
   DEFAULT_DUST_OPTIONS,
   type EnvironmentConfiguration,

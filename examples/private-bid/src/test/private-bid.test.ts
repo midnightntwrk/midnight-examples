@@ -21,7 +21,7 @@ import {
   submitCallTx,
   type DeployedContract,
 } from '@midnight-ntwrk/midnight-js-contracts';
-import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import pino from 'pino';
 

@@ -86,7 +86,7 @@ two constants: the order of the Jubjub subgroup, and 2^248 for the challenge tru
 
 ```typescript title="attestation-api/signing.ts"
 import * as crypto from 'node:crypto';
-import { ecMulGenerator, type JubjubPoint } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import { ecMulGenerator, type JubjubPoint } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { pureCircuits, type Schnorr_SchnorrSignature } from '../contract/index.js';
 
 // Order of the Jubjub prime-order subgroup. ecMulGenerator reduces its scalar

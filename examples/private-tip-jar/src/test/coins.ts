@@ -42,8 +42,8 @@ import {
   encodeCoinPublicKey,
   encodeRawTokenType,
   encodeShieldedCoinInfo,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
-import { createShieldedCoinInfo, rawTokenType, ZswapOutput } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
+import { createShieldedCoinInfo, rawTokenType, ZswapOutput } from '@midnight-ntwrk/midnight-js-protocol/v9';
 
 /** A coin as a circuit takes it: Compact's `ShieldedCoinInfo`. */
 export type ShieldedCoinArg = { nonce: Uint8Array; color: Uint8Array; value: bigint };

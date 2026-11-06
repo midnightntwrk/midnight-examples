@@ -17,13 +17,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { createUnprovenCallTx, deployContract, submitCallTx, type DeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
-import { type ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import { type ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
 import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust, type WalletSecret } from '../wallet.js';
-import { unwrapLedger9 } from '@midnight-ntwrk/midnight-js-types';
 import { buildProviders, ledgerState, type PartyProviders } from '../providers.js';
 import { prepareSponsoredCall, sponsorAndSubmit } from '../sponsor.js';
 import {
@@ -206,8 +205,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
 
         // Dave's own private state — Alice never sees this secret.
         const davePrivateState = createPartyPrivateState(randomBytes(32));
-        daveProviders.privateStateProvider.setContractAddress(contractAddress);
-        await daveProviders.privateStateProvider.set(DAVE_PRIVATE_ID, davePrivateState);
+        await daveProviders.privateStateProvider.forContract(contractAddress).set(DAVE_PRIVATE_ID, davePrivateState);
     });
 
     afterAll(async () => {
@@ -246,7 +244,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
     });
 
     it("Dave cannot pay for his own RSVP", async () => {
-        const davePrivateState = await daveProviders.privateStateProvider.get(DAVE_PRIVATE_ID);
+        const davePrivateState = await daveProviders.privateStateProvider.forContract(contractAddress).get(DAVE_PRIVATE_ID);
 
         const unsubmitted = await createUnprovenCallTx<Contract, 'rsvp'>(daveProviders, {
             compiledContract: CompiledPartyContract,
@@ -255,10 +253,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
             circuitId: 'rsvp',
             args: [daveAddressArg, davePrivateState.secret],
         });
-        const unboundTx = unwrapLedger9(
-            await daveProviders.proofProvider.proveTx({ version: 'v9', tx: unsubmitted.private.unprovenTx }),
-            'proveTx',
-        );
+        const unboundTx = await daveProviders.proofProvider.proveTx(unsubmitted.private.unprovenTx);
 
         // The ordinary path balances everything, DUST included. Dave has none, so
         // there is no fee he can offer and balancing cannot succeed.
@@ -270,7 +265,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
     });
 
     it("Alice sponsors Dave's RSVP", async () => {
-        const davePrivateState = await daveProviders.privateStateProvider.get(DAVE_PRIVATE_ID);
+        const davePrivateState = await daveProviders.privateStateProvider.forContract(contractAddress).get(DAVE_PRIVATE_ID);
         const before = await queryLedger(aliceProviders);
 
         // USER SIDE — runs with Dave's keys. No DUST anywhere in this call.
@@ -295,7 +290,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
     });
 
     it('Alice starts the party', async () => {
-        const alicePrivateState = await aliceProviders.privateStateProvider.get(ALICE_PRIVATE_ID);
+        const alicePrivateState = await aliceProviders.privateStateProvider.forContract(contractAddress).get(ALICE_PRIVATE_ID);
 
         // Alice has DUST of her own, so she needs no sponsor here — this is the
         // ordinary self-paying path, exactly as in party.test.ts.
@@ -315,7 +310,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
         // `checkIn` requires commitAddress(_secret, address.bytes) to be on the RSVP
         // list. That commitment binds Dave's secret, which Alice does not have — so
         // paying every one of his fees still confers no authority to act as him.
-        const alicePrivateState = await aliceProviders.privateStateProvider.get(ALICE_PRIVATE_ID);
+        const alicePrivateState = await aliceProviders.privateStateProvider.forContract(contractAddress).get(ALICE_PRIVATE_ID);
 
         logger.info("Alice tries to check in as Dave, using her own secret...");
         await expect(
@@ -331,7 +326,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
     });
 
     it("Alice sponsors Dave's check-in — Dave pays the entry fee, Alice pays the DUST", async () => {
-        const davePrivateState = await daveProviders.privateStateProvider.get(DAVE_PRIVATE_ID);
+        const davePrivateState = await daveProviders.privateStateProvider.forContract(contractAddress).get(DAVE_PRIVATE_ID);
 
         const daveNightBefore = await waitForStableNightBalance(daveWallet);
         const daveDustBefore = await daveWallet.getDustBalance();

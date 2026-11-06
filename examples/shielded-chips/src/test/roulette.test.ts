@@ -26,8 +26,8 @@ import {
   type ContractAddress,
   encodeCoinPublicKey,
   encodeRawTokenType,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
-import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
+import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/v9';
 import { contractCoinMtIndex, freshCoin, type TxWithOutputs } from './coins.js';
 import pino from 'pino';
 
@@ -184,7 +184,7 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
   ): Promise<QualifiedCoin> {
     const mtIndex = await contractCoinMtIndex(config.indexer, tx, chip, rouletteAddress);
     const escrowed: QualifiedCoin = { ...chip, mt_index: mtIndex };
-    await providers.privateStateProvider.set(privateStateId, rememberEscrow(base, escrowed));
+    await providers.privateStateProvider.forContract(rouletteAddress).set(privateStateId, rememberEscrow(base, escrowed));
     logger.info(`Escrow recorded at mt_index=${mtIndex}`);
     return escrowed;
   }
@@ -283,10 +283,8 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
   it('Alice mints chips to herself (2 for matches), Bob, and Charlie', async () => {
     const bobPS = createRoulettePrivateState(bobSk);
     const charliePS = createRoulettePrivateState(charlieSk);
-    bobChipsProv.privateStateProvider.setContractAddress(chipsAddress);
-    await bobChipsProv.privateStateProvider.set(BOB_CHIPS_PRIVATE_ID, bobPS);
-    charlieChipsProv.privateStateProvider.setContractAddress(chipsAddress);
-    await charlieChipsProv.privateStateProvider.set(CHARLIE_CHIPS_PRIVATE_ID, charliePS);
+    await bobChipsProv.privateStateProvider.forContract(chipsAddress).set(BOB_CHIPS_PRIVATE_ID, bobPS);
+    await charlieChipsProv.privateStateProvider.forContract(chipsAddress).set(CHARLIE_CHIPS_PRIVATE_ID, charliePS);
 
     const aliceCoinPk = aliceWallet.getCoinPublicKey();
     const bobCoinPk = bobWallet.getCoinPublicKey();
@@ -410,8 +408,7 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
 
   it('Bob bets RED with a 100-chip coin', async () => {
     const bobPS = createRoulettePrivateState(bobSk, bobSalt);
-    bobRouletteProv.privateStateProvider.setContractAddress(rouletteAddress);
-    await bobRouletteProv.privateStateProvider.set(BOB_ROULETTE_PRIVATE_ID, bobPS);
+    await bobRouletteProv.privateStateProvider.forContract(rouletteAddress).set(BOB_ROULETTE_PRIVATE_ID, bobPS);
 
     // A fresh coin, paid for from the chip coin Alice minted him. No
     // self-transfer first: the escrowed coin's nonce is new, so the issuer
@@ -438,8 +435,7 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
 
   it('Charlie bets BLACK with a 100-chip coin', async () => {
     const charliePS = createRoulettePrivateState(charlieSk, charlieSalt);
-    charlieRouletteProv.privateStateProvider.setContractAddress(rouletteAddress);
-    await charlieRouletteProv.privateStateProvider.set(CHARLIE_ROULETTE_PRIVATE_ID, charliePS);
+    await charlieRouletteProv.privateStateProvider.forContract(rouletteAddress).set(CHARLIE_ROULETTE_PRIVATE_ID, charliePS);
 
     const chip = freshCoin(chipColorHex, BET_SIZE);
     logger.info(`Charlie is betting a fresh chip coin (value=${chip.value}) on BLACK`);
@@ -605,7 +601,6 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
     const supplyBefore = await chipsLedgerState();
 
     const coin = freshCoin(chipColorHex, BET_SIZE);
-    bobChipsProv.privateStateProvider.setContractAddress(chipsAddress);
 
     await expect(async () => {
       await submitCallTx(bobChipsProv, {

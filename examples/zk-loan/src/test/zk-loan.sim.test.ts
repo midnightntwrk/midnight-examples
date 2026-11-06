@@ -26,7 +26,7 @@ import {
   ecAdd,
   ecMulGenerator,
   type WitnessContext,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type Ledger } from '../../contract/managed/zk-loan/contract/index.js';
 import { type ZkLoanPrivateState } from '../../contract/witnesses.js';
 import { describe, it, expect } from 'vitest';

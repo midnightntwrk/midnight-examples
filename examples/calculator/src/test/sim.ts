@@ -40,7 +40,7 @@ import {
   createCircuitContext,
   createConstructorContext,
   sampleContractAddress,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 
 /** Coin public key used when the test doesn't pick one (hex, 32 bytes). */
 export const SIM_COIN_PUBLIC_KEY = '00'.repeat(32);

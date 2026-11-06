@@ -35,7 +35,7 @@ import {
   type JubjubPoint,
   transientHash,
   CompactTypeBytes,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { Contract, type Ledger, ledger, pureCircuits } from '../../contract/managed/zk-loan/contract/index.js';
 import { type ZkLoanPrivateState, witnesses } from '../../contract/witnesses.js';
 import { createEitherTestUser } from './utils/address.js';

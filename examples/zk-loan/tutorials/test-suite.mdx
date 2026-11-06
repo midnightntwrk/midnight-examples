@@ -86,7 +86,7 @@ midnight-examples:
 - **`src/wallet.ts`** builds, starts, and syncs the wallet. **`src/providers.ts`** bundles the
   MidnightJS providers a party needs: public data from the indexer, private state, ZK artifacts
   and proving, and the wallet itself. MidnightJS 5 takes the wallet through
-  `createWalletProvider` and `createMidnightProvider`, and the bundle carries a `config` with the
+  `createLedger9WalletProvider` and `createLedger9MidnightProvider`, and the bundle carries a `config` with the
   network ID and the transaction time-to-live.
 
 ### One wallet, two identities
@@ -192,8 +192,7 @@ a deployed contract:
 
 ```typescript title="src/test/zk-loan.test.ts"
   async function setPrivateState(id: string, state: ZkLoanPrivateState): Promise<void> {
-    providers.privateStateProvider.setContractAddress(contractAddress);
-    await providers.privateStateProvider.set(id, state);
+    await providers.privateStateProvider.forContract(contractAddress).set(id, state);
   }
 
   // Thin wrapper over submitCallTx so each step reads as the circuit call it is.
@@ -213,8 +212,8 @@ a deployed contract:
 ```
 
 A helper also reads the contract's public ledger, and the tests use it after every call.
-`ledgerState`, from `src/providers.ts`, unwraps the
-version-tagged state that MidnightJS 5 returns (`{ version: 'v9', state }`) into the data the
+`ledgerState`, from `src/providers.ts`, decodes the
+era-tagged state that MidnightJS 5 returns (`read.contractState`, ledger 9 here) into the data the
 compiled `ledger()` decodes:
 
 ```typescript title="src/test/zk-loan.test.ts"

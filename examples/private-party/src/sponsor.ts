@@ -39,16 +39,15 @@
 
 import {
   createUnprovenCallTx,
-  type CallTxOptionsWithPrivateStateId,
+  type Ledger9CallTxOptionsWithPrivateStateId,
 } from '@midnight-ntwrk/midnight-js-contracts';
-import type { Contract } from '@midnight-ntwrk/midnight-js-protocol/compact-js/effect/Contract';
+import type { Contract } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-js/effect/Contract';
 import {
   type Binding,
   type Proof,
   type SignatureEnabled,
   Transaction,
-} from '@midnight-ntwrk/midnight-js-protocol/ledger';
-import { unwrapLedger9 } from '@midnight-ntwrk/midnight-js-types';
+} from '@midnight-ntwrk/midnight-js-protocol/v9';
 import { fromHex, toHex } from '@midnight-ntwrk/midnight-js-utils';
 import type { Logger } from 'pino';
 import type { PartyProviders } from './providers.js';
@@ -70,7 +69,7 @@ export async function prepareSponsoredCall<
   logger: Logger,
   user: MidnightWalletProvider,
   providers: PartyProviders,
-  call: CallTxOptionsWithPrivateStateId<C, PCK>,
+  call: Ledger9CallTxOptionsWithPrivateStateId<C, PCK>,
 ): Promise<string> {
   logger.info(`[user] building ${String(call.circuitId)}()...`);
   const unsubmitted = await createUnprovenCallTx<C, PCK>(providers, call);
@@ -78,11 +77,8 @@ export async function prepareSponsoredCall<
   // Proving happens here, on the user's side — which is why the secret that
   // authenticates the caller never reaches the sponsor.
   logger.info(`[user] proving ${String(call.circuitId)}()...`);
-  // Midnight.js 5 proof providers take and return era-tagged transactions.
-  const unboundTx = unwrapLedger9(
-    await providers.proofProvider.proveTx({ version: 'v9', tx: unsubmitted.private.unprovenTx }),
-    'proveTx',
-  );
+  // Midnight.js 5 proof providers take and return era-tagged transaction handles.
+  const unboundTx = await providers.proofProvider.proveTx(unsubmitted.private.unprovenTx);
 
   // Where a circuit moves user value — checkIn's entry fee — that value is paid
   // from the user's own balance, here.

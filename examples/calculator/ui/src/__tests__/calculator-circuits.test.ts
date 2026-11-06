@@ -12,7 +12,7 @@ import {
   createConstructorContext,
   dummyContractAddress,
   type ChargedState,
-} from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+} from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import { Contract, createInitialPrivateState, ledger } from "../midnight/contract";
 import {
   add,
@@ -78,11 +78,12 @@ describe("calculator contract (in memory)", () => {
       datas.push(next);
     }
 
-    // Minimal stand-in for the indexer: emit the states in order, tagged with
-    // the ledger era the way Midnight.js 5 serves them.
+    // Minimal stand-in for the indexer: emit the states in order, as
+    // Midnight.js 5 serves them (an era-tagged state that decodes on demand).
     const providers = {
       publicDataProvider: {
-        contractStateObservable: () => from(datas.map((data) => ({ value: { version: "v9", state: { data } } }))),
+        contractStateObservable: () =>
+          from(datas.map((data) => ({ value: { contractState: { era: "v9", deserialize: () => ({ data }) } } }))),
       },
     } as unknown as CalculatorProviders;
     const seen = await firstValueFrom(result$(providers, "addr").pipe(toArray()));

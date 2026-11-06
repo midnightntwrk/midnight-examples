@@ -19,7 +19,7 @@
 // re-checks with `assert(rem < num2 && quo * num2 + rem == num1)`. That is the
 // core pattern — do the work off-chain, verify it cheaply on-chain.
 import { type Ledger } from './managed/calculator/contract/index.js';
-import { type WitnessContext } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import { type WitnessContext } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 
 // The calculator keeps no private state — every input and the running `result`
 // are public — so the private-state type is empty.

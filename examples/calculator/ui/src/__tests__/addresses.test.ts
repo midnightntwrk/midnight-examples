@@ -5,7 +5,7 @@
 // The browser build has a single realm, so this only matters in tests.
 import { describe, expect, it } from "vitest";
 import { MidnightBech32m, ShieldedCoinPublicKey, UnshieldedAddress } from "@midnightntwrk/wallet-sdk-address-format";
-import { encodeCoinPublicKey } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+import { encodeCoinPublicKey } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import type { ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
 import {
   coinPublicKeyFromBech32,

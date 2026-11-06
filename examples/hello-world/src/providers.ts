@@ -1,4 +1,5 @@
-import { type MidnightProviders, type VersionedContractState } from '@midnight-ntwrk/midnight-js-types';
+import { type MidnightProviders, type ContractStateRead } from '@midnight-ntwrk/midnight-js-types';
+import { ContractState } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
@@ -44,10 +45,12 @@ export function buildProviders(
 
 /**
  * The public ledger state of a contract read with queryContractState, for the
- * compiled `ledger()` to decode. Midnight.js 5 tags a contract state with the
- * ledger era that wrote it; every contract here is deployed on ledger 9.
+ * compiled `ledger()` to decode. Midnight.js 5 hands back the serialized state
+ * tagged with the ledger era that wrote it; every contract here is deployed on
+ * ledger 9, so only a ledger 9 decoder is given.
  */
-export function ledgerState(state: VersionedContractState | null) {
-  if (state?.version !== 'v9') throw new Error('expected a ledger 9 contract state');
-  return state.state.data;
+export function ledgerState(read: ContractStateRead | null) {
+  if (read === null) throw new Error('contract state not found');
+  if (read.contractState.era !== 'v9') throw new Error('expected a ledger 9 contract state');
+  return read.contractState.deserialize({ v9: ContractState }).data;
 }

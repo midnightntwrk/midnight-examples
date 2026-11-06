@@ -42,8 +42,9 @@ import {
   encodeCoinPublicKey,
   encodeRawTokenType,
   encodeShieldedCoinInfo,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
-import { createShieldedCoinInfo, rawTokenType, ZswapOutput } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
+import { createShieldedCoinInfo, rawTokenType, Transaction, ZswapOutput } from '@midnight-ntwrk/midnight-js-protocol/v9';
+import type { LedgerTransaction } from '@midnight-ntwrk/midnight-js-types';
 
 /** A coin as a circuit takes it: Compact's `ShieldedCoinInfo`. */
 export type ShieldedCoinArg = { nonce: Uint8Array; color: Uint8Array; value: bigint };
@@ -135,12 +136,12 @@ export function freshCoin(color: TokenColor | string, value: bigint): ShieldedCo
 
 /**
  * The slice of a finalized transaction `contractCoinMtIndex` reads: its id and
- * its guaranteed Zswap outputs. `FinalizedTxData` from submitCallTx's
- * `.public` fits it.
+ * the transaction itself, as the era-tagged handle Midnight.js 5 returns.
+ * `FinalizedTxData` from submitCallTx's `.public` fits it.
  */
 export interface TxWithOutputs {
   txId: string;
-  tx: { guaranteedOffer?: { outputs: readonly { commitment: string }[] } };
+  tx: LedgerTransaction<'Finalized'>;
 }
 
 /**
@@ -163,7 +164,9 @@ export async function contractCoinMtIndex(
   contractAddress: ContractAddress,
 ): Promise<bigint> {
   const expected = ZswapOutput.newContractOwned(decodeShieldedCoinInfo(coin), 0, contractAddress).commitment;
-  const position = (tx.tx.guaranteedOffer?.outputs ?? []).findIndex((o) => o.commitment === expected);
+  if (tx.tx.era !== 'v9') throw new Error(`expected a ledger 9 transaction, got ${tx.tx.era}`);
+  const ledgerTx = Transaction.deserialize('signature', 'proof', 'binding', tx.tx.serialize());
+  const position = (ledgerTx.guaranteedOffer?.outputs ?? []).findIndex((o) => o.commitment === expected);
   if (position < 0) throw new Error(`Transaction ${tx.txId} has no output for that coin to ${contractAddress}`);
   const query = `query ($id: HexEncoded!) { transactions(offset: { identifier: $id }) {
     ... on RegularTransaction { zswapStartIndex } } }`;

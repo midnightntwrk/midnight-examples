@@ -16,7 +16,7 @@ import {
   findDeployedContract,
   type FoundContract,
 } from "@midnight-ntwrk/midnight-js-contracts";
-import type { ContractAddress } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+import type { ContractAddress } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import { map, type Observable } from "rxjs";
 import {
   CompiledBattleshipContract,
@@ -101,8 +101,7 @@ export async function joinBattleship(
   address: ContractAddress,
   initialPrivateState: () => BattleshipPrivateState = newPrivateState,
 ): Promise<BattleshipContract> {
-  providers.privateStateProvider.setContractAddress(address);
-  const stored = await providers.privateStateProvider.get(PRIVATE_STATE_ID);
+  const stored = await providers.privateStateProvider.forContract(address).get(PRIVATE_STATE_ID);
   if (stored !== null) {
     return findDeployedContract(providers, {
       compiledContract: CompiledBattleshipContract,
@@ -189,8 +188,7 @@ export async function readPrivateState(
   providers: BattleshipProviders,
   address: ContractAddress,
 ): Promise<BattleshipPrivateState | null> {
-  providers.privateStateProvider.setContractAddress(address);
-  return providers.privateStateProvider.get(PRIVATE_STATE_ID);
+  return providers.privateStateProvider.forContract(address).get(PRIVATE_STATE_ID);
 }
 
 // --- game rules (pure: ledger + private state in, answer out) ---------------

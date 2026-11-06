@@ -25,7 +25,7 @@
 // than trusting the request body — the contract only proves that THIS provider
 // vouched for the data, so the provider is the trust anchor.
 import restify from 'restify';
-import type { JubjubPoint } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import type { JubjubPoint } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { signCreditData, getPublicKey } from './signing.js';
 import type { AttestationRequest, AttestationResponse, ProviderInfoResponse, HealthResponse } from './types.js';
 

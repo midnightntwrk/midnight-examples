@@ -23,9 +23,8 @@ import {
   type CircuitContext,
   type ChargedState,
   type CircuitResults,
-} from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
-import { ZswapOutput } from "@midnight-ntwrk/midnight-js-protocol/ledger";
-import type { FinalizedTxData } from "@midnight-ntwrk/midnight-js-types";
+} from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
+import { ZswapOutput } from "@midnight-ntwrk/midnight-js-protocol/v9";
 import { toHex } from "@midnight-ntwrk/midnight-js-utils";
 import { Contract as ChipsContract, ledger as chipsLedger } from "../../../contract/managed/chips/contract/index.js";
 import { chipsWitnesses, rememberEscrow, rouletteWitnesses } from "../../../contract/witnesses.js";
@@ -353,10 +352,7 @@ describe("escrowMtIndex", () => {
     vi.stubGlobal("fetch", fetchMock);
     // A change output first, then the escrow: what the devnet showed for a
     // 100-chip bet paid from a 150-chip coin.
-    const tx = {
-      txId: "00ab",
-      tx: { guaranteedOffer: { outputs: [{ commitment: "change" }, { commitment: escrow }] } },
-    } as unknown as FinalizedTxData;
+    const tx = { txId: "00ab", outputs: [{ commitment: "change" }, { commitment: escrow }] };
 
     await expect(escrowMtIndex("http://indexer/graphql", tx, coin, ADDRESS)).resolves.toBe(37n);
     const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
@@ -365,7 +361,7 @@ describe("escrowMtIndex", () => {
 
   it("refuses a tx without the escrow output", async () => {
     const { coin } = freshChip(COLOR.hex, 100n);
-    const tx = { txId: "00", tx: { guaranteedOffer: { outputs: [] } } } as unknown as FinalizedTxData;
+    const tx = { txId: "00", outputs: [] };
     await expect(escrowMtIndex("http://indexer/graphql", tx, coin, ADDRESS)).rejects.toThrow(/no output/);
   });
 });

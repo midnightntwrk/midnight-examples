@@ -21,13 +21,14 @@ import {
   CostModel,
   Transaction,
   type FinalizedTransaction,
-} from "@midnight-ntwrk/midnight-js-protocol/ledger";
+} from "@midnight-ntwrk/midnight-js-protocol/v9";
+import { ContractState } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import {
-  createMidnightProvider,
-  createWalletProvider,
+  createLedger9MidnightProvider,
+  createLedger9WalletProvider,
+  type ContractStateRead,
   type MidnightProviders,
   type ProofProvider,
-  type VersionedContractState,
 } from "@midnight-ntwrk/midnight-js-types";
 import {
   fromHex,
@@ -83,13 +84,13 @@ export const DEFAULT_PROOF_SERVER_URL = "http://127.0.0.1:6300";
 
 /**
  * The state data the compiler-generated `ledger()` decodes, from a contract
- * state as the public-data provider serves it. Midnight.js 5 tags each state
- * with the ledger era that wrote it (`{ version: 'v9', state }`); a contract
- * deployed from this UI is always ledger 9.
+ * state as the public-data provider serves it. Midnight.js 5 serves the
+ * serialized state tagged with the ledger era that wrote it; a contract
+ * deployed from this UI is always ledger 9, so only a ledger 9 decoder is given.
  */
-export function contractStateData(state: VersionedContractState) {
-  if (state.version !== "v9") throw new Error("Expected a ledger 9 contract state");
-  return state.state.data;
+export function contractStateData(read: ContractStateRead) {
+  if (read.contractState.era !== "v9") throw new Error("Expected a ledger 9 contract state");
+  return read.contractState.deserialize({ v9: ContractState }).data;
 }
 
 /**
@@ -119,11 +120,8 @@ export async function createProviders(
  * every compiled contract). An example with several contracts calls this once
  * per extra contract, from its seed files (via useMidnightProviders().providersFor).
  *
- * Every call gets its own private-state provider. The store's contract address
- * is one mutable field: midnight-js sets it when a call starts and writes the
- * next private state when the call finalizes, minutes later. A store shared by
- * two contracts' bundles could switch address in between and file one
- * contract's state under the other's address.
+ * Every call gets its own private-state provider; midnight-js scopes every
+ * read and write by contract address (`forContract`).
  */
 export async function createContractProviders<C extends string>(
   api: ConnectedAPI,
@@ -168,19 +166,19 @@ export async function createContractProviders<C extends string>(
     config.networkId,
   );
 
-  // createWalletProvider / createMidnightProvider lift these Ledger 9-only
-  // implementations into midnight-js's era-tagged interfaces: they unwrap the
-  // `{ version: 'v9', tx }` payloads, tag what we return, and declare
-  // supportedEras = ['v9'].
-  const walletProvider = createWalletProvider({
+  // createLedger9WalletProvider / createLedger9MidnightProvider lift these
+  // Ledger 9-only implementations into midnight-js's era-tagged interfaces:
+  // they hand us ledger 9 transaction handles (bytes plus era), seal what we
+  // return, and declare supportedEras = ['v9'].
+  const walletProvider = createLedger9WalletProvider({
     getCoinPublicKey: () => coinPublicKey,
     getEncryptionPublicKey: () => encryptionPublicKey,
     // midnight-js hands us a proven but *unbound* transaction
     // (Transaction<SignatureEnabled, Proof, PreBinding>). The Node harness
     // balances it with WalletFacade.balanceUnboundTransaction. In the browser
     // the connected wallet does the same job: it adds DUST fee inputs, signs,
-    // and binds. The connector speaks hex strings, so we serialize, hand it
-    // over, and deserialize the result as a FinalizedTransaction
+    // and binds. The connector speaks hex strings, so we send the handle's
+    // bytes, and deserialize the result as a FinalizedTransaction
     // (Transaction<SignatureEnabled, Proof, Binding>). The TTL is up to the
     // wallet; the connector has no ttl parameter.
     balanceTx: async (tx, _ttl) => {
@@ -198,8 +196,10 @@ export async function createContractProviders<C extends string>(
 
   // submitTransaction resolves to void, so read the tx id off the
   // transaction itself (the same id the indexer reports).
-  const midnightProvider = createMidnightProvider(async (tx) => {
-    await api.submitTransaction(toHex(tx.serialize()));
+  const midnightProvider = createLedger9MidnightProvider(async (handle) => {
+    const bytes = handle.serialize();
+    await api.submitTransaction(toHex(bytes));
+    const tx = Transaction.deserialize("signature", "proof", "binding", bytes);
     const [txId] = tx.identifiers();
     if (!txId) throw new Error("Submitted transaction has no identifier");
     return txId;

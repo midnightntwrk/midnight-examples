@@ -21,12 +21,20 @@ import {
   type CoinPublicKey,
   type EncPublicKey,
   type FinalizedTransaction,
+  type PreBinding,
+  type Proof,
+  type SignatureEnabled,
+  Transaction,
   LedgerParameters,
   nativeToken,
   unshieldedToken,
   ZswapSecretKeys,
-} from '@midnight-ntwrk/midnight-js-protocol/ledger';
-import type { Ledger9WalletProvider, UnboundTransaction } from '@midnight-ntwrk/midnight-js-types';
+} from '@midnight-ntwrk/midnight-js-protocol/v9';
+import {
+  LedgerTransaction,
+  type Ledger9WalletProvider,
+  type TransactionAnswer,
+} from '@midnight-ntwrk/midnight-js-types';
 import { ttlOneHour } from '@midnight-ntwrk/midnight-js-utils';
 import {
   DefaultForkSchedule,
@@ -52,6 +60,19 @@ import {
 } from '@midnight-ntwrk/testkit-js';
 import * as Rx from 'rxjs';
 import type { Logger } from 'pino';
+
+// A proven, not yet bound ledger 9 transaction: what a contract call or deploy
+// hands the wallet to balance.
+type UnboundTransaction = Transaction<SignatureEnabled, Proof, PreBinding>;
+
+/**
+ * Midnight.js 5 passes transactions as era-tagged byte handles. Decode a proven
+ * one into the ledger 9 transaction the wallet SDK balances.
+ */
+export function unboundFromHandle(handle: LedgerTransaction<'Unbound'>): UnboundTransaction {
+  if (handle.era !== 'v9') throw new Error(`expected a ledger 9 transaction, got ${handle.era}`);
+  return Transaction.deserialize('signature', 'proof', 'pre-binding', handle.serialize());
+}
 
 /** The secret a wallet is built from: a hex seed or a BIP-39 mnemonic. */
 export type WalletSecret = { kind: 'seed'; value: string } | { kind: 'mnemonic'; value: string };
@@ -91,9 +112,10 @@ export class MidnightWalletProvider implements Ledger9WalletProvider {
   // protocol version, and hands back a handle to unwrap. The keys come from the
   // seeds the wallet was started with, so balancing no longer takes them.
   async balanceTx(
-    tx: UnboundTransaction,
+    handle: LedgerTransaction<'Unbound'>,
     ttl: Date = ttlOneHour(),
-  ): Promise<FinalizedTransaction> {
+  ): Promise<TransactionAnswer> {
+    const tx = unboundFromHandle(handle);
     const active = await this.activeProtocolVersion();
     const recipe = await this.wallet.balanceUnboundTransaction(
       WalletTransaction.adopt('Unbound', tx, active),
@@ -102,9 +124,12 @@ export class MidnightWalletProvider implements Ledger9WalletProvider {
     return this.signAndFinalize(recipe, active);
   }
 
-  async submitTx(tx: FinalizedTransaction): Promise<string> {
+  async submitTx(tx: LedgerTransaction<'Finalized', 'v9'> | FinalizedTransaction): Promise<string> {
+    const finalized: FinalizedTransaction = LedgerTransaction.isLedgerTransaction(tx)
+      ? Transaction.deserialize('signature', 'proof', 'binding', tx.serialize())
+      : tx;
     const active = await this.activeProtocolVersion();
-    return this.wallet.submitTransaction(WalletTransaction.adopt('Finalized', tx, active));
+    return this.wallet.submitTransaction(WalletTransaction.adopt('Finalized', finalized, active));
   }
 
   /**
@@ -118,9 +143,10 @@ export class MidnightWalletProvider implements Ledger9WalletProvider {
    * DUST fee offer. It cannot change what the transaction does.
    */
   async balanceOwnValueAndFinalize(
-    tx: UnboundTransaction,
+    handle: LedgerTransaction<'Unbound'>,
     ttl: Date = ttlOneHour(),
   ): Promise<FinalizedTransaction> {
+    const tx = unboundFromHandle(handle);
     const active = await this.activeProtocolVersion();
     const recipe = await this.wallet.balanceUnboundTransaction(
       WalletTransaction.adopt('Unbound', tx, active),
@@ -279,26 +305,26 @@ export async function syncWallet(
     wallet.state().pipe(
       Rx.tap((state: FacadeState) => {
         emissionCount++;
-        const shielded = isProgressStrictlyComplete(state.shielded.state.progress);
+        const shielded = isProgressStrictlyComplete(state.shielded.progress);
         const unshielded = isProgressStrictlyComplete(state.unshielded.progress);
-        const dust = isProgressStrictlyComplete(state.dust.state.progress);
+        const dust = isProgressStrictlyComplete(state.dust.progress);
         logger.info(
           `Wallet sync [${emissionCount}]: shielded=${shielded}, unshielded=${unshielded}, dust=${dust}`,
         );
         if (!shielded) {
-          logger.debug(`  shielded.progress: ${JSON.stringify(state.shielded.state.progress)}`);
+          logger.debug(`  shielded.progress: ${JSON.stringify(state.shielded.progress)}`);
         }
         if (!unshielded) {
           logger.debug(`  unshielded.progress: ${JSON.stringify(state.unshielded.progress)}`);
         }
         if (!dust) {
-          logger.debug(`  dust.progress: ${JSON.stringify(state.dust.state.progress)}`);
+          logger.debug(`  dust.progress: ${JSON.stringify(state.dust.progress)}`);
         }
       }),
       Rx.filter(
         (state: FacadeState) =>
-          isProgressStrictlyComplete(state.shielded.state.progress) &&
-          isProgressStrictlyComplete(state.dust.state.progress) &&
+          isProgressStrictlyComplete(state.shielded.progress) &&
+          isProgressStrictlyComplete(state.dust.progress) &&
           isProgressStrictlyComplete(state.unshielded.progress),
       ),
       Rx.tap(() => logger.info(`Wallet sync complete after ${emissionCount} emissions`)),
