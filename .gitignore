@@ -27,6 +27,8 @@ packages/*/LICENSE
 !**/.env.custom*.example
 **/.fast-sync-wallets/
 **/.test-wallets/
+# Saved wallet sync state for remote networks (examples/*/src/wallet.ts)
+**/.wallet-state/
 # Deploy state from scripts/deploy.ts: private state and signing keys, and the
 # local devnet's deploy records
 **/.mnkit/

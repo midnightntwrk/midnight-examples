@@ -335,7 +335,12 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
 
         const daveNightBefore = await waitForStableNightBalance(daveWallet);
         const daveDustBefore = await daveWallet.getDustBalance();
-        const aliceDustBefore = await aliceWallet.getDustBalance();
+        // Alice's DUST keeps generating while the call runs. On a network
+        // where her DUST is still below its cap, that growth can outweigh the
+        // fee, so a plain before/after comparison proves nothing. Keep the
+        // whole state instead and value both states at the same instant below:
+        // the generation then cancels out and only the fee is left.
+        const aliceStateBefore = await aliceWallet.wallet.waitForSyncedState();
 
         const txHex = await prepareSponsoredCall<Contract, 'checkIn'>(logger, daveWallet, daveProviders, {
             compiledContract: CompiledPartyContract,
@@ -349,7 +354,10 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
 
         const daveNightAfter = await waitForStableNightBalance(daveWallet);
         const daveDustAfter = await daveWallet.getDustBalance();
-        const aliceDustAfter = await aliceWallet.getDustBalance();
+        const aliceStateAfter = await aliceWallet.wallet.waitForSyncedState();
+        const valuedAt = new Date();
+        const aliceDustBefore = aliceStateBefore.dust.balance(valuedAt);
+        const aliceDustAfter = aliceStateAfter.dust.balance(valuedAt);
 
         // console.log, not logger.info: pino's pino-pretty transport runs in a worker
         // that vitest tears down at end-of-file, so logs from the last test are lost.
@@ -359,7 +367,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
                 '=================== fee sponsorship ===================',
                 `  Dave  NIGHT (STAR) : ${daveNightBefore} -> ${daveNightAfter}  (delta ${daveNightAfter - daveNightBefore})`,
                 `  Dave  DUST (SPECK) : ${daveDustBefore} -> ${daveDustAfter}`,
-                `  Alice DUST (SPECK) : ${aliceDustBefore} -> ${aliceDustAfter}  (delta ${aliceDustAfter - aliceDustBefore})`,
+                `  Alice DUST (SPECK) : ${aliceDustBefore} -> ${aliceDustAfter}  (delta ${aliceDustAfter - aliceDustBefore}, both valued at ${valuedAt.toISOString()})`,
                 '  Dave paid the entry fee; Alice paid the transaction fee.',
                 '=======================================================',
                 '',
