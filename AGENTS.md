@@ -79,8 +79,8 @@ npm run spec:lint -- <name> [--design]  # SPEC.md alone, then against the compil
 npm run pipeline -- <name> [--json]     # run the next scripts and gates; prints what to do next
 npm run pipeline -- <name> --wait-devnet  # block until the background devnet run finishes
 npm run new:ui <name>                   # phase 2: scaffold its browser UI (after the in-memory gate passes)
-npm run new:ui -- <name> --check        # template-owned UI files still match packages/mnkit/templates/ui
-npm run new:ui -- --sync-all            # after editing packages/mnkit/templates/ui: sync every UI (+ npm install)
+npm run new:ui -- <name> --check        # template-owned UI files still match templates/ui
+npm run new:ui -- --sync-all            # after editing templates/ui: sync every UI (+ npm install)
 npm run new:ui -- --check-all           # CI's drift check for every UI, plus the lockfile check
 npm run fund:wallet <mn_dust_…> [mn_addr_…]  # local devnet: DUST (and NIGHT) for a browser wallet
 ```
@@ -196,11 +196,13 @@ for a newcomer is the [Learning path](README.md#learning-path) in the root READM
   files: `src/midnight/<name>-api.ts`, `src/components/<name>-panel.tsx` and
   `src/__tests__/<name>-circuits.test.ts`. Record the checks CI can't run
   (browser, wallet, preprod) in `ui/verification.json`; `--check` keeps
-  `packages/mnkit/templates/ui/VERIFIED.md` in step with it, and it is the only place that
+  `templates/ui/VERIFIED.md` in step with it, and it is the only place that
   says what a UI has been verified to do. Generic UI changes go in
-  `packages/mnkit/templates/ui/`, followed by `npm run new:ui -- <name> --sync`; CI runs `--check` on
+  `templates/ui/`, followed by `npm run new:ui -- <name> --sync`; CI runs `--check` on
   every generated UI. Details, pins and the verification checklist are in
-  `packages/mnkit/templates/ui/AGENTS.md`, which every generated UI carries as `ui/AGENTS.md`.
+  `templates/ui/AGENTS.md`, which every generated UI carries as `ui/AGENTS.md`.
+  `templates/ui/` is an interim Ledger 9 copy of mnkit's template (mnkit's own
+  `packages/mnkit/templates/ui/` stays on Ledger 8 for `mnkit add ui` until mnkit moves).
 - The scripted generation pipeline (prompt → SPEC → scaffold → contract →
   derive → witnesses and tests → `new:ui` and UI code, with the devnet in the
   background → serve), with each step's gate and fix loop, is in

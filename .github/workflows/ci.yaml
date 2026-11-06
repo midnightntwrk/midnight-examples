@@ -109,7 +109,7 @@ jobs:
 
   # Every UI scaffolded by `npm run new:ui` (marked by its ui/new-ui.json, the same
   # marker `npm run new:ui -- --check-all` uses):
-  # its template-owned files must match packages/mnkit/templates/ui, and it must typecheck,
+  # its template-owned files must match templates/ui, and it must typecheck,
   # pass its unit tests and build (Vite/Rollup bundling problems only show up
   # there). No local network needed. The wallet flow needs a
   # human (Lace approvals), so there is no E2E step.

@@ -68,7 +68,10 @@ const projects = [
 // The examples' Ledger 9 pins (toolchain.json `examples`). Everything else
 // (mnkit, its template and runtime packages) keeps the top-level pins.
 const ex = tc.examples;
-const isExample = (dir) => exampleProjects.includes(dir);
+// templates/ui is the interim Ledger 9 copy of mnkit's UI template that the
+// examples' UIs render from (scripts/new-ui.mjs), so it follows the examples.
+const isExample = (dir) =>
+  exampleProjects.includes(dir) || dir === path.join(REPO_ROOT, 'templates', 'ui');
 const compilerFor = (dir) => (isExample(dir) ? ex : tc).compact;
 const imagesFor = (dir) => (isExample(dir) ? ex : tc).images;
 

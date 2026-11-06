@@ -15,7 +15,7 @@ import {
   PRIVATE_STATE_ID,
   type Contract,
 } from "./contract";
-import type { HelloWorldProviders } from "./providers";
+import { contractStateData, type HelloWorldProviders } from "./providers";
 
 export type HelloWorldContract = FoundContract<Contract>;
 
@@ -78,5 +78,5 @@ export function message$(
 ): Observable<string> {
   return providers.publicDataProvider
     .contractStateObservable(address, { type: "latest" })
-    .pipe(map((state) => ledger(state.data).message));
+    .pipe(map(({ value }) => ledger(contractStateData(value)).message));
 }

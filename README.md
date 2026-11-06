@@ -180,10 +180,10 @@ The same rule applies here: run one suite at a time.
   then only write the `.compact` contract and the test bodies. See
   `packages/mnkit/templates/example/`.
 - **Add a browser UI with `npm run new:ui <name>`** once the contract compiles and
-  its tests pass. It renders `packages/mnkit/templates/ui/` into `examples/<name>/ui`, deriving
+  its tests pass. It renders `templates/ui/` into `examples/<name>/ui`, deriving
   circuits, witnesses and ledger fields from the compiled contract, so the UI
   typechecks, tests and builds before any use-case code is written. See
-  `packages/mnkit/templates/ui/AGENTS.md` (copied into every generated UI).
+  `templates/ui/AGENTS.md` (copied into every generated UI).
 - The scripted generation pipeline (prompt, scaffold, generate, devnet test, UI
   generator, UI code, serve) is drawn in [`docs/generation-flow.md`](./docs/generation-flow.md).
 - The `.compact` **source is committed** (only generated `contract/managed/` output is

@@ -37,7 +37,7 @@
 // ui/.template-files manifest, --check and --sync, and VERIFIED.md.
 //
 //   template-owned  identical for every example up to name substitution. Change
-//                   them in packages/mnkit/templates/ui/, never in an example;
+//                   them in templates/ui/, never in an example;
 //                   --check fails when an example's copy diverges, --sync
 //                   rewrites it.
 //   seed            generated once, then owned by the example author. --check
@@ -49,7 +49,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NAME_RE, assertNodeVersion, exitOnError, fail, writeFiles } from '../packages/mnkit/src/lib/template.mjs';
 import { gatePath, readJson, sourceHash } from '../packages/mnkit/src/lib/gates.mjs';
-import { SEED_FILES, UI_TEMPLATE_DIR, planUi, uiDetails, uiWarnings } from '../packages/mnkit/src/lib/ui.mjs';
+import { SEED_FILES, planUi, uiDetails, uiWarnings } from '../packages/mnkit/src/lib/ui.mjs';
 import { assertLockfileNpm, npmCommand } from './lib/npm.mjs';
 import { readAll, renderBlock, skeleton, VERIFICATION_FILE, withBlock } from './lib/verification.mjs';
 
@@ -57,6 +57,10 @@ exitOnError();
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
+// Interim: the examples' UIs render from the root Ledger 9 copy of the template.
+// mnkit's own copy (packages/mnkit/templates/ui) stays on Ledger 8 for
+// `mnkit add ui` until mnkit moves; then this goes back to mnkit's UI_TEMPLATE_DIR.
+const UI_TEMPLATE_DIR = path.join(REPO_ROOT, 'templates', 'ui');
 /** Every UI's hand-run verification status, one generated table (lib/verification.mjs). */
 const VERIFIED_DOC = path.join(UI_TEMPLATE_DIR, 'VERIFIED.md');
 const EXAMPLES_DIR = path.join(REPO_ROOT, 'examples');
@@ -247,12 +251,13 @@ const plan = planUi(exampleDir, {
   privateState: privateStateFlag,
   networks: savedConfig?.networks ?? [],
   skipSeeds: mode !== 'create',
+  templateDir: UI_TEMPLATE_DIR,
 });
 const { managed, configContent, files } = plan;
 
 // --- manifest ----------------------------------------------------------------
 // ui/.template-files lists the template-owned files as of the last create or
-// sync. Without it, a file removed from packages/mnkit/templates/ui would
+// sync. Without it, a file removed from templates/ui would
 // linger in every generated UI and --check couldn't tell it from a file the
 // author added.
 const MANIFEST = '.template-files';
@@ -287,23 +292,23 @@ if (mode === 'check') {
   else if (manifestOnDisk !== manifestContent) problems.push(`  ${MANIFEST}  (out of date)`);
   if (savedConfig === null) problems.push(`  ${CONFIG}  (missing)`);
   else if (fs.readFileSync(configPath, 'utf8') !== configContent) problems.push(`  ${CONFIG}  (not canonical)`);
-  for (const f of stale) problems.push(`  ${f}  (no longer in packages/mnkit/templates/ui)`);
+  for (const f of stale) problems.push(`  ${f}  (no longer in templates/ui)`);
   const verified = verifiedDoc();
   for (const e of verified.errors) problems.push(`  ${e}`);
-  if (verified.stale) problems.push(`  packages/mnkit/templates/ui/VERIFIED.md  (its table is out of date with the verification.json files)`);
+  if (verified.stale) problems.push(`  templates/ui/VERIFIED.md  (its table is out of date with the verification.json files)`);
   if (drift.length === 0 && problems.length === 0) {
-    console.log(`✔ examples/${name}/ui matches packages/mnkit/templates/ui (${files.length} template-owned files)`);
+    console.log(`✔ examples/${name}/ui matches templates/ui (${files.length} template-owned files)`);
     process.exit(0);
   }
-  console.error(`✖ examples/${name}/ui has drifted from packages/mnkit/templates/ui in ${drift.length + problems.length} file(s):\n`);
+  console.error(`✖ examples/${name}/ui has drifted from templates/ui in ${drift.length + problems.length} file(s):\n`);
   for (const p of problems) console.error(p);
   for (const d of drift) {
-    console.error(`  ${d.rel}${d.actual === null ? '  (missing)' : ''}  ← packages/mnkit/templates/ui/${d.templateRel}`);
+    console.error(`  ${d.rel}${d.actual === null ? '  (missing)' : ''}  ← templates/ui/${d.templateRel}`);
     if (d.actual !== null) console.error(firstDifference(d.content, d.actual));
   }
   console.error(
     '\n  Template-owned files must stay identical across examples. Either move the change into\n' +
-      `  packages/mnkit/templates/ui/ (then \`npm run new:ui -- ${name} --sync\` here and in any other UI), or, if it is\n` +
+      `  templates/ui/ (then \`npm run new:ui -- ${name} --sync\` here and in any other UI), or, if it is\n` +
       '  example-specific, move it into a seed file (the api, panel, or circuits test).',
   );
   if (problems.length) {
@@ -316,7 +321,7 @@ if (mode === 'check') {
 }
 
 /**
- * packages/mnkit/templates/ui/VERIFIED.md as it should be, from every generated UI's
+ * templates/ui/VERIFIED.md as it should be, from every generated UI's
  * verification.json (this one included, even mid-create).
  */
 function verifiedDoc() {
@@ -324,7 +329,7 @@ function verifiedDoc() {
   const { entries, errors } = readAll(EXAMPLES_DIR, names);
   const doc = fs.readFileSync(VERIFIED_DOC, 'utf8');
   const content = withBlock(doc, renderBlock(entries));
-  if (content === null) return { errors: [...errors, 'packages/mnkit/templates/ui/VERIFIED.md: lost its BEGIN/END markers'], stale: false };
+  if (content === null) return { errors: [...errors, 'templates/ui/VERIFIED.md: lost its BEGIN/END markers'], stale: false };
   return { errors, stale: content !== doc, content };
 }
 
@@ -348,14 +353,14 @@ if (!dryRun) {
   const verificationPath = path.join(uiDir, VERIFICATION_FILE);
   if (!fs.existsSync(verificationPath)) fs.writeFileSync(verificationPath, skeleton());
   const verified = verifiedDoc();
-  if (verified.errors.length) fail(`can't update packages/mnkit/templates/ui/VERIFIED.md:\n  ${verified.errors.join('\n  ')}`);
+  if (verified.errors.length) fail(`can't update templates/ui/VERIFIED.md:\n  ${verified.errors.join('\n  ')}`);
   if (verified.stale) fs.writeFileSync(VERIFIED_DOC, verified.content);
 }
 
 if (mode === 'sync') {
   for (const f of stale) fs.rmSync(path.join(uiDir, ...f.split('/')));
   console.log(`✔ Rewrote ${written.length} template-owned files in examples/${name}/ui (seed files untouched).`);
-  if (stale.length) console.log(`  Removed ${stale.length} file(s) no longer in packages/mnkit/templates/ui: ${stale.join(', ')}`);
+  if (stale.length) console.log(`  Removed ${stale.length} file(s) no longer in templates/ui: ${stale.join(', ')}`);
   console.log('  Review with `git diff`, then typecheck and test:unit.');
   process.exit(0);
 }

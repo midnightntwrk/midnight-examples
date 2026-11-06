@@ -5,13 +5,18 @@ this repo. Every generated UI runs its example's existing contract and
 test-suite calls in the browser behind a Midnight wallet. For how to run this
 one (`examples/calculator/ui`), see `README.md` next to this file.
 
-This file is template-owned. Its source is `packages/mnkit/templates/ui/AGENTS.md`, and
+This file is template-owned. Its source is `templates/ui/AGENTS.md`, and
 every generated UI gets an identical copy. Edit the template, then run
 `npm run new:ui -- --sync-all`.
 
-**Verified against:** `midnight-js-*` 4.1.1, `@midnight-ntwrk/dapp-connector-api`
-4.0.1, Vite 6.4.4, vitest 5, React 19, Node 22, a Midnight wallet extension
-on the local devnet.
+`templates/ui/` is the interim Ledger 9 copy of mnkit's UI template
+(`packages/mnkit/templates/ui/`, still on Ledger 8 for `mnkit add ui`). It goes
+away when mnkit moves to Ledger 9; until then, change this copy, not mnkit's.
+
+**Verified against:** `midnight-js-*` 5.0.0-rc.5 (Ledger 9),
+`@midnight-ntwrk/dapp-connector-api` 4.0.1, Vite 6.4.4, vitest 5, React 19,
+Node 22: typecheck, unit tests and build. The Ledger 9 template has not yet
+been run in a browser with a wallet extension on a Ledger 9 network.
 
 ## Quick recipe
 
@@ -30,7 +35,7 @@ npm run build -w @midnight-ntwrk/example-<name>-ui
   `src/__tests__/<name>-circuits.test.ts`, `README.md`, and
   `verification.json`. Everything else is template-owned (§2), and CI fails
   if an example's copy drifts.
-- **Generic changes go in `packages/mnkit/templates/ui/`**, then `npm run new:ui -- --sync-all`.
+- **Generic changes go in `templates/ui/`**, then `npm run new:ui -- --sync-all`.
 - **Don't** scaffold with `/midnight-dapp-dev:init`, copy another UI, or use
   `examples/zk-loan/ui` as a reference (it's hand-built and not
   authoritative). Check what you reuse against the installed types in
@@ -38,7 +43,7 @@ npm run build -w @midnight-ntwrk/example-<name>-ui
 - **Before you claim it works:** run the verification checklist at the end
   of this file. Record the steps CI can't run (browser, wallet, preprod) in
   `ui/verification.json`, then `--sync`. The status of every UI is in
-  `packages/mnkit/templates/ui/VERIFIED.md`; don't claim more than it says.
+  `templates/ui/VERIFIED.md`; don't claim more than it says.
 
 ## Worked examples
 
@@ -138,11 +143,11 @@ arguments (their picker needs a circuit that returns coins), balance checks
 and token movements.
 
 Create also writes `ui/verification.json` with every step `not-run`, and
-adds the UI's row to `packages/mnkit/templates/ui/VERIFIED.md`.
+adds the UI's row to `templates/ui/VERIFIED.md`.
 
 ### 2. Template-owned files: don't edit them in an example
 
-Everything except the seed files below comes from `packages/mnkit/templates/ui/`, rendered by
+Everything except the seed files below comes from `templates/ui/`, rendered by
 name substitution. This covers configs, providers, wallet context, hooks,
 `lib/` (including `circuit-args.ts`, `ledger-format.ts`, `addresses.ts`,
 `coin-book.ts` and `tokens.ts`), generic components (including
@@ -160,9 +165,9 @@ this `AGENTS.md`.
   differs from the template, when `.template-files` is missing or out of date,
   or when a file the template no longer has is still present. `--sync` fixes
   the last two, deleting the stale files. `--check` also validates every
-  `verification.json` and fails when the table in `packages/mnkit/templates/ui/VERIFIED.md`
+  `verification.json` and fails when the table in `templates/ui/VERIFIED.md`
   is stale (see the Verification checklist).
-- To change generic UI behaviour, edit `packages/mnkit/templates/ui/`. Then run
+- To change generic UI behaviour, edit `templates/ui/`. Then run
   `npm run new:ui -- --sync-all`. It syncs **every** generated UI, including one you
   created earlier in the same change. If a UI's `package.json` changed, it
   then runs `npm install`; commit the `package-lock.json` it writes. Review the
@@ -303,12 +308,13 @@ battleship's `ShipForm`.
 
 ### 4. Pins (already set by the template; keep them)
 
-- **Exact versions:** `midnight-js-*` `4.1.1` and
+- **Exact versions:** `midnight-js-*` `5.0.0-rc.5`,
+  `@midnightntwrk/wallet-sdk-address-format` `4.0.0-rc.0` and
   `@midnight-ntwrk/dapp-connector-api` `4.0.1`.
 - **`@swc/core` `1.15.47` under `vite-plugin-top-level-await`** (an override
   in `toolchain.json`): the plugin's 1.6.0, the latest, fails the production
   build with ``missing field `type` `` on `@swc/core` 1.16.
-- **No separate runtime packages:** no direct `ledger-v8`, `compact-runtime` or
+- **No separate runtime packages:** no direct `ledger-v9`, `compact-runtime` or
   `compact-js`. Import them via
   `@midnight-ntwrk/midnight-js-protocol/{ledger,compact-runtime,compact-js}`.
 - **Vite:** `"vite": "6.4.4"`, matching the hoisted root Vite (see root
@@ -433,8 +439,8 @@ suites' DUST. Don't copy it into an example; extend the shared one.
   `undefined` once bundled for the browser (named import from a default-only
   module). Pass `window.WebSocket`. The Vite build warning about it remains
   and is harmless.
-- **`optimizeDeps.exclude`:** it must be exactly `ledger-v8`,
-  `onchain-runtime-v3` and `midnight-js-protocol`.
+- **`optimizeDeps.exclude`:** it must be exactly `@midnightntwrk/ledger-v9`,
+  `@midnightntwrk/onchain-runtime-v4` and `midnight-js-protocol`.
   - Excluding `midnight-js-protocol` is required because esbuild can't
     enumerate `export *` from an excluded package.
   - Excluding `compact-runtime` breaks its CommonJS `object-inspect` import.
@@ -475,6 +481,15 @@ suites' DUST. Don't copy it into an example; extend the shared one.
   (private-party's `_secret`), the generic form offers a hex input for it.
   Replace that form. Keep the secret in private state and pass it from there,
   as the Node test does.
+- **compact-runtime 0.21 is async:** `initialState` and every circuit return
+  a Promise, and `createCircuitContext` takes one options object
+  (`{ circuitId, contractAddress, coinPublicKeyOrZswapState, contractState,
+  privateState }`). The query context and private state sit under
+  `context.callContext`. Await every call (`await expect(p).rejects.toThrow()`
+  for a rejection); the seed circuits tests show the pattern.
+- **Versioned contract state:** Midnight.js 5 serves each contract state as
+  `{ version: 'v9', state }`. Decode it with `contractStateData()` from
+  `src/midnight/providers.ts`, never `state.data`.
 - **In-memory contract balance is empty:** `createCircuitContext` starts
   `block.balance` empty, and a `receiveUnshielded` in one in-memory call
   doesn't credit the next. So an `unshieldedBalanceGte` assert always fails
@@ -483,7 +498,7 @@ suites' DUST. Don't copy it into an example; extend the shared one.
   point (see private-party's circuits test).
 - **Token movements aren't ledger state:** mints, sends and receives don't
   show up in `ledger()`. In memory, read them from
-  `context.currentQueryContext.effects` (`unshieldedMints`,
+  `context.callContext.currentQueryContext.effects` (`unshieldedMints`,
   `unshieldedInputs`, `unshieldedOutputs`, `claimedUnshieldedSpends`,
   `shieldedMints`, `claimedShieldedReceives`, ...). Those Maps are keyed by
   objects (`{ tag: "unshielded", raw }`, `{ tag: "user", address }`), so
@@ -526,9 +541,10 @@ Run the checks in order, and report which ones you actually ran.
      const m = await import('/src/midnight/contract.ts');
      const c = new m.Contract({});  // or the witnesses, via '/@fs/<abs path>/contract/witnesses.ts'
      const pk = '00'.repeat(32);
-     const { currentContractState: s } = c.initialState(rt.createConstructorContext({}, pk));
-     const ctx = rt.createCircuitContext(rt.dummyContractAddress(), pk, s.data, {});
-     m.ledger(c.impureCircuits.<circuit>(ctx, ...args).context.currentQueryContext.state);
+     const { currentContractState: s } = await c.initialState(rt.createConstructorContext({}, pk));
+     const ctx = rt.createCircuitContext({ circuitId: '<circuit>', contractAddress: rt.dummyContractAddress(),
+       coinPublicKeyOrZswapState: pk, contractState: s.data, privateState: {} });
+     m.ledger((await c.impureCircuits.<circuit>(ctx, ...args)).context.callContext.currentQueryContext.state);
      ```
    - `fetch('/managed/<name>/keys/<circuit>.verifier')` returns binary data,
      not `text/html`. (Vite may send no content-type at all; that's fine.
@@ -551,6 +567,6 @@ Run the checks in order, and report which ones you actually ran.
 8. Record what you ran. In `ui/verification.json`, set each step you ran to
    `verified` (or `partial`), with a `date` and `notes` saying exactly what
    ran. Then run `npm run new:ui -- <name> --sync`, which regenerates the table in
-   `packages/mnkit/templates/ui/VERIFIED.md`. Name the wallet you used in each wallet
+   `templates/ui/VERIFIED.md`. Name the wallet you used in each wallet
    step's `notes`. Once the wallet checklist in `ui/README.md` passes, delete
    it: `--check` refuses a `walletCalls: verified` while it's still there.

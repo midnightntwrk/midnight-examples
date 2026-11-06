@@ -36,7 +36,7 @@ import {
 } from "../../../contract/managed/battleship/contract/index.js";
 
 export { BoardState, ShotState, TurnState, WinState };
-import type { BattleshipProviders } from "./providers";
+import { contractStateData, type BattleshipProviders } from "./providers";
 
 export type BattleshipContract = FoundContract<Contract>;
 
@@ -181,7 +181,7 @@ export function ledger$(
 ): Observable<Ledger> {
   return providers.publicDataProvider
     .contractStateObservable(address, { type: "latest" })
-    .pipe(map((state) => ledger(state.data)));
+    .pipe(map(({ value }) => ledger(contractStateData(value))));
 }
 
 /** This browser's private state for a game, or null if it has none yet. */

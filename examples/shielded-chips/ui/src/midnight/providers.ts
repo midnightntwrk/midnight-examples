@@ -22,11 +22,12 @@ import {
   Transaction,
   type FinalizedTransaction,
 } from "@midnight-ntwrk/midnight-js-protocol/ledger";
-import type {
-  MidnightProvider,
-  MidnightProviders,
-  ProofProvider,
-  WalletProvider,
+import {
+  createMidnightProvider,
+  createWalletProvider,
+  type MidnightProviders,
+  type ProofProvider,
+  type VersionedContractState,
 } from "@midnight-ntwrk/midnight-js-types";
 import {
   fromHex,
@@ -73,6 +74,24 @@ export interface ProvingOptions {
 }
 
 export const DEFAULT_PROOF_SERVER_URL = "http://127.0.0.1:6300";
+
+/**
+ * The state data the compiler-generated `ledger()` decodes, from a contract
+ * state as the public-data provider serves it. Midnight.js 5 tags each state
+ * with the ledger era that wrote it (`{ version: 'v9', state }`); a contract
+ * deployed from this UI is always ledger 9.
+ */
+export function contractStateData(state: VersionedContractState) {
+  if (state.version !== "v9") throw new Error("Expected a ledger 9 contract state");
+  return state.state.data;
+}
+
+/**
+ * How long a built transaction stays valid (MidnightConfig.ttlSeconds). The
+ * wallet behind the DApp Connector picks its own TTL for what it adds; this
+ * one covers the contract call midnight-js builds.
+ */
+const TX_TTL_SECONDS = 3600;
 
 /**
  * Build the providers for one wallet connection.
@@ -124,10 +143,11 @@ export async function createContractProviders<C extends string>(
   );
 
   // Fetches keys/<circuit>.{prover,verifier} and zkir/<circuit>.bzkir for
-  // each circuit from the page's own origin. scripts/copy-zk.mjs puts them there.
+  // each circuit from the page's own origin, and checks them against
+  // compiler/contract-manifest.json. scripts/copy-zk.mjs puts them there.
   const zkConfigProvider = new FetchZkConfigProvider<C>(
     new URL(zkAssetsPath, window.location.origin).toString(),
-    fetch.bind(window),
+    { fetchFunc: fetch.bind(window) },
   );
 
   const proofProvider = await createProofProvider(api, zkConfigProvider, proving);
@@ -142,7 +162,11 @@ export async function createContractProviders<C extends string>(
     config.networkId,
   );
 
-  const walletProvider: WalletProvider = {
+  // createWalletProvider / createMidnightProvider lift these Ledger 9-only
+  // implementations into midnight-js's era-tagged interfaces: they unwrap the
+  // `{ version: 'v9', tx }` payloads, tag what we return, and declare
+  // supportedEras = ['v9'].
+  const walletProvider = createWalletProvider({
     getCoinPublicKey: () => coinPublicKey,
     getEncryptionPublicKey: () => encryptionPublicKey,
     // midnight-js hands us a proven but *unbound* transaction
@@ -164,18 +188,16 @@ export async function createContractProviders<C extends string>(
         fromHex(balancedHex),
       ) satisfies FinalizedTransaction;
     },
-  };
+  });
 
-  const midnightProvider: MidnightProvider = {
-    // submitTransaction resolves to void, so read the tx id off the
-    // transaction itself (the same id the indexer reports).
-    submitTx: async (tx) => {
-      await api.submitTransaction(toHex(tx.serialize()));
-      const [txId] = tx.identifiers();
-      if (!txId) throw new Error("Submitted transaction has no identifier");
-      return txId;
-    },
-  };
+  // submitTransaction resolves to void, so read the tx id off the
+  // transaction itself (the same id the indexer reports).
+  const midnightProvider = createMidnightProvider(async (tx) => {
+    await api.submitTransaction(toHex(tx.serialize()));
+    const [txId] = tx.identifiers();
+    if (!txId) throw new Error("Submitted transaction has no identifier");
+    return txId;
+  });
 
   const privateStateProvider = await createPrivateStateProvider(coinPublicKey, passphrase);
 
@@ -186,6 +208,7 @@ export async function createContractProviders<C extends string>(
     proofProvider,
     walletProvider,
     midnightProvider,
+    config: { networkId: config.networkId, ttlSeconds: TX_TTL_SECONDS },
   };
 }
 

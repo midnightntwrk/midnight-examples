@@ -41,7 +41,7 @@ import {
   type Ledger,
 } from "./contract";
 import { PartyState } from "../../../contract/managed/private-party/contract/index.js";
-import type { PrivatePartyProviders } from "./providers";
+import { contractStateData, type PrivatePartyProviders } from "./providers";
 
 export { PartyState };
 
@@ -213,7 +213,7 @@ export function ledger$(
 ): Observable<Ledger> {
   return providers.publicDataProvider
     .contractStateObservable(address, { type: "latest" })
-    .pipe(map((state) => ledger(state.data)));
+    .pipe(map(({ value }) => ledger(contractStateData(value))));
 }
 
 // --- party rules (pure: ledger + secret + address in, answer out) -----------

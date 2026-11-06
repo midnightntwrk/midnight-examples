@@ -33,7 +33,7 @@ import { witnesses } from "../../../contract/witnesses.js";
 const COIN_PK = "00".repeat(32);
 
 const contract = new Contract(witnesses);
-const { currentContractState: initialState } = contract.initialState(
+const { currentContractState: initialState } = await contract.initialState(
   createConstructorContext(createInitialPrivateState(), COIN_PK),
 );
 
@@ -42,14 +42,20 @@ const { currentContractState: initialState } = contract.initialState(
  * circuit rejects. The state is what the indexer serves as a contract state's
  * `data`, i.e. what ledger() and result$ decode.
  */
-function call(state: ChargedState, op: Operation, a: bigint, b: bigint): ChargedState {
-  const ctx = createCircuitContext(dummyContractAddress(), COIN_PK, state, createInitialPrivateState());
+async function call(state: ChargedState, op: Operation, a: bigint, b: bigint): Promise<ChargedState> {
+  const ctx = createCircuitContext({
+    circuitId: op,
+    contractAddress: dummyContractAddress(),
+    coinPublicKeyOrZswapState: COIN_PK,
+    contractState: state,
+    privateState: createInitialPrivateState(),
+  });
   const args = OPERATIONS[op].arity === 1 ? [a] : [a, b];
-  const circuit = contract.impureCircuits[op] as (
+  const circuit = contract.impureCircuits[op] as unknown as (
     c: typeof ctx,
     ...xs: bigint[]
-  ) => { context: typeof ctx };
-  return circuit(ctx, ...args).context.currentQueryContext.state;
+  ) => Promise<{ context: typeof ctx }>;
+  return (await circuit(ctx, ...args)).context.callContext.currentQueryContext.state;
 }
 
 describe("calculator contract (in memory)", () => {
@@ -66,23 +72,24 @@ describe("calculator contract (in memory)", () => {
     ];
     const datas = [initialState.data];
     for (const [op, a, b, expected] of steps) {
-      const next = call(datas[datas.length - 1]!, op, a, b);
+      const next = await call(datas[datas.length - 1]!, op, a, b);
       expect(ledger(next).result, `${op}(${a}, ${b})`).toBe(expected);
       expect(evaluate(op, a, b)).toEqual({ ok: true, value: expected });
       datas.push(next);
     }
 
-    // Minimal stand-in for the indexer: emit the states in order.
+    // Minimal stand-in for the indexer: emit the states in order, tagged with
+    // the ledger era the way Midnight.js 5 serves them.
     const providers = {
       publicDataProvider: {
-        contractStateObservable: () => from(datas.map((data) => ({ data }))),
+        contractStateObservable: () => from(datas.map((data) => ({ value: { version: "v9", state: { data } } }))),
       },
     } as unknown as CalculatorProviders;
     const seen = await firstValueFrom(result$(providers, "addr").pipe(toArray()));
     expect(seen).toEqual([0n, 5n, 6n, 42n, 81n, 3n]);
   });
 
-  it("evaluate() agrees with the real circuits on edge cases", () => {
+  it("evaluate() agrees with the real circuits on edge cases", async () => {
     const values = [0n, 1n, 2n, 3n, 255n, 256n, 1000n, UINT16_MAX - 1n, UINT16_MAX];
     let accepted = 0;
     let rejected = 0;
@@ -92,10 +99,10 @@ describe("calculator contract (in memory)", () => {
           const predicted = evaluate(op, a, b);
           const label = `${op}(${a}, ${b})`;
           if (predicted.ok) {
-            expect(ledger(call(initialState.data, op, a, b)).result, label).toBe(predicted.value);
+            expect(ledger(await call(initialState.data, op, a, b)).result, label).toBe(predicted.value);
             accepted++;
           } else {
-            expect(() => call(initialState.data, op, a, b), label).toThrow();
+            await expect(call(initialState.data, op, a, b), label).rejects.toThrow();
             rejected++;
           }
         }

@@ -19,16 +19,26 @@ const COIN_PK = "00".repeat(32);
 describe("message$", () => {
   it("decodes the on-chain message before and after storeMessage", async () => {
     const contract = new Contract({});
-    const { currentContractState } = contract.initialState(createConstructorContext({}, COIN_PK));
+    const { currentContractState } = await contract.initialState(createConstructorContext({}, COIN_PK));
 
-    const ctx = createCircuitContext(dummyContractAddress(), COIN_PK, currentContractState, {});
-    const { context } = contract.impureCircuits.storeMessage(ctx, "Hello World!");
+    const ctx = createCircuitContext({
+      circuitId: "storeMessage",
+      contractAddress: dummyContractAddress(),
+      coinPublicKeyOrZswapState: COIN_PK,
+      contractState: currentContractState,
+      privateState: {},
+    });
+    const { context } = await contract.impureCircuits.storeMessage(ctx, "Hello World!");
 
-    // Minimal stand-in for the indexer: emit the two states in order.
+    // Minimal stand-in for the indexer: emit the two states in order, tagged
+    // with the ledger era the way Midnight.js 5 serves them.
     const providers = {
       publicDataProvider: {
         contractStateObservable: () =>
-          of({ data: currentContractState.data }, { data: context.currentQueryContext.state }),
+          of(
+            { value: { version: "v9", state: currentContractState } },
+            { value: { version: "v9", state: { data: context.callContext.currentQueryContext.state } } },
+          ),
       },
     } as unknown as HelloWorldProviders;
 

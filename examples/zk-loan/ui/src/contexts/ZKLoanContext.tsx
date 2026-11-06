@@ -23,8 +23,9 @@ import {
   type Configuration,
 } from '@midnight-ntwrk/dapp-connector-api';
 import {
-  type MidnightProvider,
-  type WalletProvider,
+  createMidnightProvider,
+  createWalletProvider,
+  type VersionedContractState,
   type ZKConfigProvider,
 } from '@midnight-ntwrk/midnight-js-types';
 import { FetchZkConfigProvider } from '@midnight-ntwrk/midnight-js-fetch-zk-config-provider';
@@ -42,6 +43,18 @@ import { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/compact-j
 import * as ZKLoanCreditScorer from '../../../contract/managed/zk-loan/contract/index.js';
 import { witnesses, type ZkLoanPrivateState as ZKLoanCreditScorerPrivateState } from '../../../contract/witnesses';
 import { saveLoanProfile } from '../utils/loanProfiles';
+
+/** How long a built transaction stays valid (Midnight.js 5 `config.ttlSeconds`). */
+const TX_TTL_SECONDS = 3600;
+
+/**
+ * The state data `ledger()` decodes. Midnight.js 5 tags each contract state
+ * with the ledger era that wrote it; this contract is deployed on ledger 9.
+ */
+function contractStateData(state: VersionedContractState) {
+  if (state.version !== 'v9') throw new Error('Expected a ledger 9 contract state');
+  return state.state.data;
+}
 
 // Type for the ZKLoan contract
 type ZKLoanCreditScorerContract = ZKLoanCreditScorer.Contract<ZKLoanCreditScorerPrivateState>;
@@ -311,7 +324,9 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
     }
 
     // ZK config provider - fetches prover/verifier keys
-    const zkConfigProvider: ZKConfigProvider<ZKLoanCircuitKeys> = new FetchZkConfigProvider<ZKLoanCircuitKeys>(zkConfigPath, fetch.bind(window));
+    const zkConfigProvider: ZKConfigProvider<ZKLoanCircuitKeys> = new FetchZkConfigProvider<ZKLoanCircuitKeys>(zkConfigPath, {
+      fetchFunc: fetch.bind(window),
+    });
 
     // Proof provider - uses remote proof server
     const proofProvider = httpClientProofProvider(config.proverServerUri, zkConfigProvider);
@@ -337,8 +352,10 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
     }
 
     // Wallet connector returns addresses in Bech32m format (strings)
-    // CoinPublicKey and EncPublicKey types are also strings
-    const walletProvider: WalletProvider = {
+    // CoinPublicKey and EncPublicKey types are also strings.
+    // createWalletProvider / createMidnightProvider lift these ledger 9-only
+    // implementations into Midnight.js 5's era-tagged provider interfaces.
+    const walletProvider = createWalletProvider({
       getCoinPublicKey(): ledger.CoinPublicKey {
         // Return the coin public key directly as bech32 string
         return addresses.shieldedCoinPublicKey as ledger.CoinPublicKey;
@@ -386,11 +403,11 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
           throw e;
         }
       },
-    };
+    });
 
     // Midnight provider - handles transaction submission
-    const midnightProvider: MidnightProvider = {
-      async submitTx(tx: ledger.FinalizedTransaction): Promise<ledger.TransactionId> {
+    const midnightProvider = createMidnightProvider(
+      async (tx: ledger.FinalizedTransaction): Promise<ledger.TransactionId> => {
         setFlowMessage('Submitting transaction...');
         logger.info('Submitting transaction via wallet');
 
@@ -405,7 +422,7 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
         logger.info({ txId }, 'Transaction submitted successfully');
         return txId;
       },
-    };
+    );
 
     return {
       privateStateProvider,
@@ -414,6 +431,7 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
       publicDataProvider,
       walletProvider,
       midnightProvider,
+      config: { networkId: config.networkId, ttlSeconds: TX_TTL_SECONDS },
     };
   }, [connectToWallet, logger, privateStateProvider]);
 
@@ -610,7 +628,7 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
       try {
         const contractState = await publicDataProviderRef.queryContractState(contractAddressRef);
         if (contractState) {
-          const ledgerState = ZKLoanCreditScorer.ledger(contractState.data);
+          const ledgerState = ZKLoanCreditScorer.ledger(contractStateData(contractState));
           const userPublicKey = ZKLoanCreditScorer.pureCircuits.deriveUserPublicKey(privateState.userSecretKey, pin);
 
           if (ledgerState.loans.member(userPublicKey)) {
@@ -689,7 +707,7 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
       }
 
       // Parse the ledger state
-      const ledgerState = ZKLoanCreditScorer.ledger(contractState.data);
+      const ledgerState = ZKLoanCreditScorer.ledger(contractStateData(contractState));
 
       // Derive the user's public key from their wallet public key and PIN
       const userPublicKey = ZKLoanCreditScorer.pureCircuits.deriveUserPublicKey(privateState.userSecretKey, pin);

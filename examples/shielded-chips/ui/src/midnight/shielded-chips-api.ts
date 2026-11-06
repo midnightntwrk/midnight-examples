@@ -37,7 +37,7 @@ import { CompiledContract } from "@midnight-ntwrk/midnight-js-protocol/compact-j
 import {
   CompactTypeBytes,
   CompactTypeVector,
-  convertFieldToBytes,
+  convertBigintToBytes,
   encodeCoinPublicKey,
   encodeRawTokenType,
   persistentHash,
@@ -69,7 +69,7 @@ import {
   type Ledger,
   type ShieldedChipsPrivateState,
 } from "./contract";
-import type { ContractProviders, ShieldedChipsProviders } from "./providers";
+import { contractStateData, type ContractProviders, type ShieldedChipsProviders } from "./providers";
 
 export { BetState, Color, type ChipsLedger };
 
@@ -157,7 +157,7 @@ export function chipsLedger$(
 ): Observable<ChipsLedger> {
   return providers.publicDataProvider
     .contractStateObservable(address, { type: "latest" })
-    .pipe(map((state) => chipsLedger(state.data)));
+    .pipe(map(({ value }) => chipsLedger(contractStateData(value))));
 }
 
 /** A shielded recipient: hex coin public key and encryption public key. */
@@ -493,7 +493,7 @@ export function ledger$(
 ): Observable<Ledger> {
   return providers.publicDataProvider
     .contractStateObservable(address, { type: "latest" })
-    .pipe(map((state) => ledger(state.data)));
+    .pipe(map(({ value }) => ledger(contractStateData(value))));
 }
 
 // --- pure helpers: who am I, what can I do (tested against the circuits) ------
@@ -508,7 +508,7 @@ export function dappPublicKey(sk: Uint8Array): Uint8Array {
 
 /** `commitWithSk(number as Bytes<32>, sk)`, the constructor's commitment. */
 export function winningNumberCommitment(winningNumber: bigint, sk: Uint8Array): Uint8Array {
-  return persistentHash(PK_TYPE, [convertFieldToBytes(32, winningNumber, "winningNumberCommitment"), sk]);
+  return persistentHash(PK_TYPE, [convertBigintToBytes(32, winningNumber, "winningNumberCommitment"), sk]);
 }
 
 /**

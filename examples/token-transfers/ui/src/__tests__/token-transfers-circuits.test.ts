@@ -47,11 +47,21 @@ import { NIGHT_COLOR } from "../lib/tokens";
 const COIN_PK = "00".repeat(32);
 const contract = new Contract({});
 const ADDRESS = dummyContractAddress();
-const { currentContractState } = contract.initialState(
+const { currentContractState } = await contract.initialState(
   createConstructorContext(createInitialPrivateState(), COIN_PK),
 );
-/** A fresh context per call: no ledger, so no state carries between calls. */
-const ctx = () => createCircuitContext(ADDRESS, COIN_PK, currentContractState.data, createInitialPrivateState());
+/**
+ * A fresh context per call: no ledger, so no state carries between calls. The
+ * circuit id is only a label here; the circuits don't read it.
+ */
+const ctx = () =>
+  createCircuitContext({
+    circuitId: "inMemory",
+    contractAddress: ADDRESS,
+    coinPublicKeyOrZswapState: COIN_PK,
+    contractState: currentContractState.data,
+    privateState: createInitialPrivateState(),
+  });
 const c = contract.impureCircuits;
 
 // Alice, the Node test's wallet: her unshielded address and Zswap coin key.
@@ -85,10 +95,10 @@ describe("token-transfers contract (in memory)", () => {
   describe("custom unshielded token", () => {
     const color = customTokenColor(ADDRESS);
 
-    it("mintAndReceive mints into the contract and returns the color customTokenColor derives", () => {
-      const { result, context } = c.mintAndReceive(ctx(), 1_000n);
+    it("mintAndReceive mints into the contract and returns the color customTokenColor derives", async () => {
+      const { result, context } = await c.mintAndReceive(ctx(), 1_000n);
       expect(toHex(result)).toBe(color);
-      const fx = context.currentQueryContext.effects;
+      const fx = context.callContext.currentQueryContext.effects;
       // Minted under the domain separator, then received by the contract itself.
       expect(entries(fx.unshieldedMints)).toEqual({ [key(toHex(CUSTOM_DOMAIN))]: 1_000n });
       expect(entries(fx.unshieldedInputs)).toEqual({ [key(unshielded(color))]: 1_000n });
@@ -96,29 +106,29 @@ describe("token-transfers contract (in memory)", () => {
       onlyEffects(fx, ["unshieldedMints", "unshieldedInputs", "claimedUnshieldedSpends"]);
     });
 
-    it("sendToUser authorizes an output of the custom token to the address", () => {
-      const fx = c.sendToUser(ctx(), 400n, ALICE).context.currentQueryContext.effects;
+    it("sendToUser authorizes an output of the custom token to the address", async () => {
+      const fx = (await c.sendToUser(ctx(), 400n, ALICE)).context.callContext.currentQueryContext.effects;
       expect(entries(fx.unshieldedOutputs)).toEqual({ [key(unshielded(color))]: 400n });
       expect(entries(fx.claimedUnshieldedSpends)).toEqual({ [key(unshielded(color), user(ALICE.bytes))]: 400n });
       onlyEffects(fx, ["unshieldedOutputs", "claimedUnshieldedSpends"]);
     });
 
-    it("receiveTokens expects the custom token as an input (the wallet supplies it)", () => {
-      const fx = c.receiveTokens(ctx(), 400n).context.currentQueryContext.effects;
+    it("receiveTokens expects the custom token as an input (the wallet supplies it)", async () => {
+      const fx = (await c.receiveTokens(ctx(), 400n)).context.callContext.currentQueryContext.effects;
       expect(entries(fx.unshieldedInputs)).toEqual({ [key(unshielded(color))]: 400n });
       onlyEffects(fx, ["unshieldedInputs"]);
     });
   });
 
   describe("NIGHT", () => {
-    it("receiveNightTokens expects NIGHT (color all zeros) as an input", () => {
-      const fx = c.receiveNightTokens(ctx(), 5_000n).context.currentQueryContext.effects;
+    it("receiveNightTokens expects NIGHT (color all zeros) as an input", async () => {
+      const fx = (await c.receiveNightTokens(ctx(), 5_000n)).context.callContext.currentQueryContext.effects;
       expect(entries(fx.unshieldedInputs)).toEqual({ [key(unshielded(NIGHT_COLOR))]: 5_000n });
       onlyEffects(fx, ["unshieldedInputs"]);
     });
 
-    it("sendNightTokensToUser authorizes a NIGHT output to the address", () => {
-      const fx = c.sendNightTokensToUser(ctx(), 2_000n, ALICE).context.currentQueryContext.effects;
+    it("sendNightTokensToUser authorizes a NIGHT output to the address", async () => {
+      const fx = (await c.sendNightTokensToUser(ctx(), 2_000n, ALICE)).context.callContext.currentQueryContext.effects;
       expect(entries(fx.unshieldedOutputs)).toEqual({ [key(unshielded(NIGHT_COLOR))]: 2_000n });
       expect(entries(fx.claimedUnshieldedSpends)).toEqual({
         [key(unshielded(NIGHT_COLOR), user(ALICE.bytes))]: 2_000n,
@@ -131,13 +141,13 @@ describe("token-transfers contract (in memory)", () => {
     const domainSep = domainSepFromLabel("demo:shielded");
     const nonce = new Uint8Array(32).fill(9);
 
-    it("mintShieldedToSelf mints a coin to the contract and returns it", () => {
-      const { result, context } = c.mintShieldedToSelf(ctx(), domainSep, 250n, nonce);
+    it("mintShieldedToSelf mints a coin to the contract and returns it", async () => {
+      const { result, context } = await c.mintShieldedToSelf(ctx(), domainSep, 250n, nonce);
       expect(result.value).toBe(250n);
       expect(result.nonce).toEqual(nonce);
       // The same tokenType(domain, self) as the unshielded token.
       expect(toHex(result.color)).toBe(rawTokenType(domainSep, ADDRESS));
-      const fx = context.currentQueryContext.effects;
+      const fx = context.callContext.currentQueryContext.effects;
       expect(entries(fx.shieldedMints)).toEqual({ [key(toHex(domainSep))]: 250n });
       // Minted to the contract: it is both the coin's receiver and, as the
       // minter, its spender into existence.
@@ -145,27 +155,27 @@ describe("token-transfers contract (in memory)", () => {
       expect(fx.claimedShieldedSpends).toEqual(fx.claimedShieldedReceives);
     });
 
-    it("the coin follows from the nonce, so a reused nonce mints the same coin", () => {
-      const a = c.mintAndSendShielded(ctx(), domainSep, 500n, nonce, ALICE_COIN_KEY, 300n).result;
-      const b = c.mintAndSendShielded(ctx(), domainSep, 500n, nonce, ALICE_COIN_KEY, 300n).result;
+    it("the coin follows from the nonce, so a reused nonce mints the same coin", async () => {
+      const a = (await c.mintAndSendShielded(ctx(), domainSep, 500n, nonce, ALICE_COIN_KEY, 300n)).result;
+      const b = (await c.mintAndSendShielded(ctx(), domainSep, 500n, nonce, ALICE_COIN_KEY, 300n)).result;
       expect(b.sent.nonce).toEqual(a.sent.nonce);
     });
 
-    it("mintAndSendShielded sends part of a fresh coin and keeps the change", () => {
-      const { sent, change } = c.mintAndSendShielded(ctx(), domainSep, 500n, nonce, ALICE_COIN_KEY, 300n).result;
+    it("mintAndSendShielded sends part of a fresh coin and keeps the change", async () => {
+      const { sent, change } = (await c.mintAndSendShielded(ctx(), domainSep, 500n, nonce, ALICE_COIN_KEY, 300n)).result;
       expect(sent.value).toBe(300n);
       expect(change.is_some).toBe(true);
       expect(change.value.value).toBe(200n);
       expect(sent.color).toEqual(change.value.color);
     });
 
-    it("mintAndSendError predicts exactly what mintAndSendShielded accepts", () => {
+    it("mintAndSendError predicts exactly what mintAndSendShielded accepts", async () => {
       const grid: [bigint, bigint][] = [];
       for (const m of [0n, 1n, 500n, UINT64_MAX]) for (const s of [0n, 1n, m - 1n, m, m + 1n]) if (s >= 0n) grid.push([m, s]);
       for (const [m, s] of grid) {
         let accepted = true;
         try {
-          c.mintAndSendShielded(ctx(), domainSep, m, nonce, ALICE_COIN_KEY, s);
+          await c.mintAndSendShielded(ctx(), domainSep, m, nonce, ALICE_COIN_KEY, s);
         } catch {
           accepted = false;
         }
@@ -173,20 +183,20 @@ describe("token-transfers contract (in memory)", () => {
       }
     });
 
-    it("the coin book finds the coins these circuits return, labelled for the picker", () => {
+    it("the coin book finds the coins these circuits return, labelled for the picker", async () => {
       // What receiveShieldedTokens' form offers: the panel books every result.
-      expect(findCoins(c.mintShieldedToSelf(ctx(), domainSep, 250n, nonce).result).map((f) => f.path)).toEqual([[]]);
-      const sendResult = c.mintAndSendShielded(ctx(), domainSep, 500n, nonce, ALICE_COIN_KEY, 300n).result;
+      expect(findCoins((await c.mintShieldedToSelf(ctx(), domainSep, 250n, nonce)).result).map((f) => f.path)).toEqual([[]]);
+      const sendResult = (await c.mintAndSendShielded(ctx(), domainSep, 500n, nonce, ALICE_COIN_KEY, 300n)).result;
       expect(findCoins(sendResult).map((f) => f.path)).toEqual([["change"], ["sent"]]);
       // Sending everything leaves no change: an empty Maybe, not a coin.
-      const all = c.mintAndSendShielded(ctx(), domainSep, 500n, nonce, ALICE_COIN_KEY, 500n).result;
+      const all = (await c.mintAndSendShielded(ctx(), domainSep, 500n, nonce, ALICE_COIN_KEY, 500n)).result;
       expect(findCoins(all).map((f) => f.path)).toEqual([["sent"]]);
     });
 
-    it("receiveShieldedTokens claims the coin Alice received", () => {
-      const { sent } = c.mintAndSendShielded(ctx(), domainSep, 500n, nonce, ALICE_COIN_KEY, 300n).result;
+    it("receiveShieldedTokens claims the coin Alice received", async () => {
+      const { sent } = (await c.mintAndSendShielded(ctx(), domainSep, 500n, nonce, ALICE_COIN_KEY, 300n)).result;
       const [booked] = findCoins(sent);
-      const fx = c.receiveShieldedTokens(ctx(), booked!.coin).context.currentQueryContext.effects;
+      const fx = (await c.receiveShieldedTokens(ctx(), booked!.coin)).context.callContext.currentQueryContext.effects;
       expect(fx.claimedShieldedReceives).toHaveLength(1);
       onlyEffects(fx, ["claimedShieldedReceives"]);
     });
