@@ -3,7 +3,7 @@
 The component versions these suites build and run against: the expected Ledger 9
 release stack, as far as it is installable today. Where a final release isn't on npm or
 Docker Hub yet, the table pins the newest pre-release and says so. Node and indexer are
-listed as TBA until their Ledger 9 releases are public.
+listed as TBA until their Ledger 9 releases are published.
 
 Checked against npm and Docker Hub on 2026-11-05.
 
