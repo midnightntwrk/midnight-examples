@@ -1,5 +1,9 @@
 # Deliverable status report
 
+> This is the Q2 record: results on the original stagenet stack described below. The
+> suites now run on the Ledger 9 release stack; for those versions and the current
+> results, see [`COMPATIBILITY.md`](COMPATIBILITY.md).
+
 Status of seven deliverables, judged **only** by what the test suites in this
 repo demonstrate against **live stagenet** with **compactc 0.33.0-rc.2** and the
 `5.0.0-beta.4` midnight-js / `1.0.0-rc.3` ledger stack.

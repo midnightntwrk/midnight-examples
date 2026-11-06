@@ -8,6 +8,16 @@ import { setTimeout as delay } from 'node:timers/promises';
 import * as path from 'node:path';
 
 import * as Rx from 'rxjs';
+import { ProtocolVersion, WalletTransaction } from '@midnightntwrk/wallet-sdk-abstractions';
+import { DefaultForkSchedule } from '@midnightntwrk/wallet-sdk-facade';
+import * as ledger from '@midnightntwrk/ledger-v9';
+import {
+  createLedger9MidnightProvider,
+  createLedger9WalletProvider,
+  type MidnightConfig,
+  type MidnightProvider,
+  type WalletProvider,
+} from '@midnight-ntwrk/midnight-js-types';
 
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
@@ -17,6 +27,7 @@ import {
   nodeZkConfigRegistry,
 } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
 
+import { contractModuleProvider } from './contracts.js';
 import type { NetworkConfig } from './config.js';
 import type { WalletCtx } from './wallet.js';
 
@@ -32,9 +43,14 @@ export interface Providers {
   publicDataProvider: ReturnType<typeof indexerPublicDataProvider>;
   zkConfigProvider: NodeZkConfigProvider<string>;
   proofProvider: ReturnType<typeof httpClientProofProvider>;
-  walletProvider: unknown;
-  midnightProvider: unknown;
+  walletProvider: WalletProvider;
+  midnightProvider: MidnightProvider;
+  config: MidnightConfig;
+  contractModuleProvider: typeof contractModuleProvider;
 }
+
+/** How long a built transaction stays valid. */
+const TX_TTL_SECONDS = 30 * 60;
 
 /** Retry finalization when the indexer drops the connection with `Premature close`. */
 function retryOnDrop<A extends unknown[], R>(
@@ -65,27 +81,36 @@ export async function createProviders(
   const signFn = (payload: Uint8Array) =>
     ctx.unshieldedKeystore.signDataAsync(payload);
 
-  const walletProvider = {
+  // Wallet SDK 2.0 takes and returns sealed WalletTransaction handles stamped with
+  // the protocol version the wallets are on. Midnight.js 5 hands the wallet its own
+  // era-tagged handle, which we decode with the (single, shared) ledger-v9 copy.
+  const activeVersion = async () =>
+    (await Rx.firstValueFrom(ctx.wallet.state())).activeProtocolVersion;
+
+  const walletProvider = createLedger9WalletProvider({
     getCoinPublicKey: () => state.shielded.coinPublicKey.toHexString(),
-    getEncryptionPublicKey: () =>
-      state.shielded.encryptionPublicKey.toHexString(),
-    async balanceTx(tx: unknown, ttl?: Date) {
+    getEncryptionPublicKey: () => state.shielded.encryptionPublicKey.toHexString(),
+    async balanceTx(tx, ttl) {
+      const active = await activeVersion();
+      const unbound = tx.deserialize({ v9: ledger.Transaction });
       const recipe = await ctx.wallet.balanceUnboundTransaction(
-        tx as Parameters<typeof ctx.wallet.balanceUnboundTransaction>[0],
-        {
-          shieldedSecretKeys: ctx.shieldedSecretKeys,
-          dustSecretKey: ctx.dustSecretKey,
-        },
-        { ttl: ttl ?? new Date(Date.now() + 30 * 60 * 1000) },
+        WalletTransaction.adopt('Unbound', unbound, active),
+        { ttl: ttl ?? new Date(Date.now() + TX_TTL_SECONDS * 1000) },
       );
       const signed = await ctx.wallet.signRecipe(recipe, signFn);
-      return ctx.wallet.finalizeRecipe(signed);
+      const finalized = await ctx.wallet.finalizeRecipe(signed);
+      const accepted = ProtocolVersion.epochOf(active, DefaultForkSchedule.v9);
+      const unwrapped = WalletTransaction.unwrapWithin<ledger.FinalizedTransaction>(finalized, accepted);
+      if (unwrapped._tag === 'Left') throw unwrapped.left;
+      return unwrapped.right;
     },
-    submitTx: (tx: unknown) =>
-      ctx.wallet.submitTransaction(
-        tx as Parameters<typeof ctx.wallet.submitTransaction>[0],
-      ) as unknown,
-  };
+  });
+
+  const midnightProvider = createLedger9MidnightProvider(async (tx) => {
+    const active = await activeVersion();
+    const finalized = tx.deserialize({ v9: ledger.Transaction });
+    return ctx.wallet.submitTransaction(WalletTransaction.adopt('Finalized', finalized, active));
+  });
 
   const zkConfigProvider = new NodeZkConfigProvider<string>(contractDir);
   const zkConfigRegistry = await nodeZkConfigRegistry(path.dirname(contractDir));
@@ -112,6 +137,8 @@ export async function createProviders(
     zkConfigProvider,
     proofProvider: httpClientProofProvider(config.proofServer, zkConfigRegistry),
     walletProvider,
-    midnightProvider: walletProvider,
+    midnightProvider,
+    config: { networkId: config.networkId, ttlSeconds: TX_TTL_SECONDS },
+    contractModuleProvider,
   };
 }

@@ -23,24 +23,14 @@ src/test/<dapp>.test.ts         # one end-to-end suite per dapp
 
 ## Why a separate npm project
 
-This is a **frozen snapshot** of the Q2 stagenet run, ported from the standalone
-`stagenet-q2` repo. mn-examples is pinned to the ledger 8 stack, and a version move
-there has to be a coordinated, repo-wide pass (root `AGENTS.md`). This directory pins
-an early ledger 9 stack instead:
+mn-examples is pinned to the ledger 8 stack, and a version move there has to be a
+coordinated, repo-wide pass (root `AGENTS.md`). This directory runs on the Ledger 9
+release stack instead. [`COMPATIBILITY.md`](COMPATIBILITY.md) lists the versions, what
+is still pre-release, and the latest local devnet result.
 
-| Component | Version |
-|---|---|
-| compactc | 0.33.0-rc.2 (pre-release, not installable with `compact update`) |
-| Midnight.js | 5.0.0-beta.6 |
-| Ledger / on-chain runtime | `@midnightntwrk/ledger-v9` 1.0.0-rc.3 / `onchain-runtime-v4` 4.0.0-rc.3 |
-| compact-runtime / compact-js | 0.18.0-rc.1 / 2.5.5-rc.7 |
-| Wallet SDK | `@midnightntwrk/wallet-sdk-facade` 5.0.0-beta.2 |
-| Proof server image | `midnightntwrk/proof-server:9.0.0-rc.6` |
-| Target node | stagenet, midnight-node 2.0.x (specVersion 2_000_000) |
-
-So it is its own npm project, like `../q3-ledger9`: its own `package.json`,
-`package-lock.json` and `.npmrc`, outside the root workspaces. Nothing here changes the
-root install, and it is not in the CI matrix.
+So it is its own npm project: its own `package.json`, `package-lock.json` and `.npmrc`,
+outside the root workspaces. Nothing here changes the root install, and it is not in the
+CI matrix.
 
 ## Setup
 
@@ -52,28 +42,29 @@ npm install                                  # its own lockfile
 cp .env.stagenet.example .env.stagenet       # fill in funded seeds (gitignored)
 ```
 
-Download compactc 0.33.0-rc.2 for your platform from the
-[`compactc-v0.33.0-rc.2` release](https://github.com/LFDT-Minokawa/compact/releases/tag/compactc-v0.33.0-rc.2)
-and unzip it. `npm run compile` requires `COMPACTC` to point at it:
+Install Compact 0.36.0 with the Compact CLI, then compile:
 
 ```sh
-COMPACTC=/path/to/compactc-0.33.0-rc.2/compactc npm run compile  # gaps are expected
+compact update 0.36.0
+npm run compile        # runs `compact compile +0.36.0`; gaps are expected
 ```
 
-Expected result: **compiled 11, failed 4**. The failures are the four gap contracts in
-the table below. `caller/Proxy` compiles; only `caller/Caller` fails.
+Set `COMPACTC=/path/to/compactc` to compile with a specific compactc binary instead.
+
+Expected result: **compiled 12, failed 3**. The failures are the three gap contracts in
+the table below.
 
 ## Run
 
 ```sh
 npm run proof:up        # local proof server on :6300 (proof:down to stop)
 npm run test:stagenet   # remote node+indexer (shielded.tools), local proof server
-npm run test:local      # against a local devnet on :9944 / :8088
+npm run env:up          # local Ledger 9 node + indexer + proof server (env:down to stop)
+npm run test:local      # against that devnet on :9944 / :8088
 ```
 
-The proof server and the local endpoints use the same ports as the mn-examples local
-network (ledger 8). Stop that network first, or these suites will talk to the wrong
-proof server.
+The devnet uses the same ports as the mn-examples local network (ledger 8). Stop that
+network first, or these suites will talk to the wrong node and proof server.
 
 The suites source secrets from `.env.<network>` via vitest's `loadEnv`. On remote
 networks each **submitting** wallet must hold NIGHT and be DUST-registered (the
@@ -86,32 +77,28 @@ need funding. `trader` / `lp` / `caller_*` are *address-only* participants — t
 deployer pays and submits on their behalf, so their seeds only need to derive a
 distinct address (no funding). Set seeds in `.env.stagenet`.
 
-## Dapp status (compactc 0.33.0-rc.2, stagenet)
+## Dapp status (Compact 0.36.0)
 
-| Dapp | Contracts | Witnesses | Status |
-|------|-----------|-----------|--------|
-| fungible-token | 1 | — | compiles + runs |
-| events | 1 | — | compiles + runs (ledger + contract-log events) |
-| no-witness-dex | 2 | — | compiles; CCC swap asserts green-or-known-callee-state-gap |
-| uniswap | 3 | — | compiles; CCC swap asserts green-or-known-callee-state-gap |
-| usdcx | 1 | 7 | compiles from source (`--feature-zkir-v3`); deploy + mint + replay-guard |
-| eth-addr-secp | 1 | — | compiles from source (`--feature-zkir-v3`); provable secp256k1→ETH address |
-| verify-sequential-secp | 1 | 6 | compiles from source (`--feature-zkir-v3`); 2×/3× ECDSA verify + reject |
-| self-recursion | 1 | — | compile gap (self-interface) — suite SKIPS |
-| caller | 2 | — | compile gap (kernel.caller) — suite SKIPS |
-| axelar-gateway | 1 | — | compile gap (self-interface) — suite SKIPS |
-| recover-secp | 1 | — | compile gap (`secp256k1EcdsaRecover` removed since rc.1) — suite SKIPS |
+Compile status on Compact 0.36.0. For the latest run results, see
+[`COMPATIBILITY.md`](COMPATIBILITY.md#local-devnet-result-2026-11-05).
 
-### secp256k1 / `--feature-zkir-v3`
+| Dapp | Contracts | Witnesses | Compile |
+|------|-----------|-----------|---------|
+| fungible-token | 1 | — | compiles |
+| events | 1 | — | compiles |
+| no-witness-dex | 2 | — | compiles |
+| uniswap | 3 | — | compiles |
+| usdcx | 1 | 7 | compiles |
+| eth-addr-secp | 1 | — | compiles |
+| verify-sequential-secp | 1 | 6 | compiles |
+| caller | 2 | — | compiles (was a gap on 0.33.0-rc.2) |
+| self-recursion | 1 | — | compile gap (`cycle involving type SelfRecursionSelf`). Suite SKIPS |
+| axelar-gateway | 1 | — | compile gap (`another binding found for mint_token`). Suite SKIPS |
+| recover-secp | 1 | — | compile gap (`Secp256k1EcdsaSignatureWithRecovery` unbound). Suite SKIPS |
 
-The secp256k1 surface — the `Secp256k1Point` type, the `Secp256k1EcdsaSignature`
-`{r,s}` struct, and the `secp256k1Ecdsa*` / `secp256k1EthereumAddress` circuits —
-lives in the compiler's zkir-v3 library and is only bound with `--feature-zkir-v3`
-(wired per-contract in `scripts/compile.mts`). On rc.2, usdcx, eth-addr-secp, and
-verify-sequential-secp all compile **from source** to provable circuits with that
-flag — no prebuilt artifact needed.
+### secp256k1
 
-The **recover path** (`Secp256k1EcdsaSignatureWithRecovery` + `secp256k1EcdsaRecover`)
-was removed between 0.33.0-rc.0 and rc.1 and is **still absent in rc.2** (unbound even
-with the flag). The `recover-secp` suite is a compile-gap regression guard that runs
-the moment the API is restored.
+Compact 0.36.0 binds the secp256k1 and Keccak surface without a feature flag.
+`--feature-zkir-v3`, which 0.33.0-rc.2 needed, is no longer accepted. The recover path
+(`Secp256k1EcdsaSignatureWithRecovery` + `secp256k1EcdsaRecover`) is still absent, so
+`recover-secp` stays a compile-gap regression guard.

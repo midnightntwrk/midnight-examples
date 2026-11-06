@@ -10,7 +10,7 @@ import { mnemonicToSeedSync } from '@scure/bip39';
 import * as ledger from '@midnightntwrk/ledger-v9';
 import { WalletFacade } from '@midnightntwrk/wallet-sdk-facade';
 import { DustWallet } from '@midnightntwrk/wallet-sdk-dust-wallet';
-import { HDWallet, Roles } from '@midnightntwrk/wallet-sdk-hd';
+import { HDWallet, Roles, WalletSeeds } from '@midnightntwrk/wallet-sdk-hd';
 import { ShieldedWallet } from '@midnightntwrk/wallet-sdk-shielded';
 import {
   createKeystore,
@@ -32,6 +32,8 @@ export interface WalletCtx {
   readonly shieldedSecretKeys: ledger.ZswapSecretKeys;
   readonly dustSecretKey: ledger.DustSecretKey;
   readonly unshieldedKeystore: ReturnType<typeof createKeystore>;
+  /** What the facade was started from; each ledger version derives its own keys from these. */
+  readonly seeds: WalletSeeds;
 }
 
 // Same shape as the wallet facade's txHistoryStorage: no-ops so the facade
@@ -85,6 +87,8 @@ export async function createWallet(
 ): Promise<WalletCtx> {
   const seed = secretToSeed(secret);
   const keys = deriveKeys(seed);
+  // Same tree positions as deriveKeys (account 0, index 0, NightExternal for unshielded).
+  const seeds = WalletSeeds.fromMasterSeed(seed);
 
   const shieldedSecretKeys = ledger.ZswapSecretKeys.fromSeed(keys[Roles.Zswap]);
   const dustSecretKey = ledger.DustSecretKey.fromSeed(keys[Roles.Dust]);
@@ -112,22 +116,19 @@ export async function createWallet(
     WalletFacade as never as { init: (opts: unknown) => Promise<WalletFacade> }
   ).init({
     configuration,
-    shielded: (cfg: unknown) =>
-      ShieldedWallet(cfg as never).startWithSecretKeys(shieldedSecretKeys),
+    // Wallet SDK 2.0 wallets fork across the ledger 8 → 9 boundary, so they start
+    // from seeds (each ledger version derives its own keys), not from key objects.
+    shielded: (cfg: unknown) => ShieldedWallet(cfg as never).startWithSeed(seeds.shielded),
     unshielded: (cfg: unknown) =>
       UnshieldedWallet(cfg as never).startWithPublicKey(
         PublicKey.fromKeyStore(unshieldedKeystore),
       ),
-    dust: (cfg: unknown) =>
-      DustWallet(cfg as never).startWithSecretKey(
-        dustSecretKey,
-        ledger.LedgerParameters.initialParameters().dust,
-      ),
+    dust: (cfg: unknown) => DustWallet(cfg as never).startWithSeed(seeds.dust),
   });
 
-  await wallet.start(shieldedSecretKeys, dustSecretKey);
+  await wallet.start(seeds);
   logger.info(`wallet[${role}]: started (network=${config.networkId})`);
-  return { role, wallet, shieldedSecretKeys, dustSecretKey, unshieldedKeystore };
+  return { role, wallet, shieldedSecretKeys, dustSecretKey, unshieldedKeystore, seeds };
 }
 
 export async function syncWallet(

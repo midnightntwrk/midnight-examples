@@ -9,12 +9,9 @@
 // dapp compiles into its OWN managed root (DEX / FungibleToken names repeat
 // across dapps) and contracts compile in dependency order.
 //
-// Compiler: compactc 0.33.0-rc.2, passed as COMPACTC=/path/to/compactc (required).
-// It is a pre-release that `compact update` cannot install; download it from
-// https://github.com/LFDT-Minokawa/compact/releases/tag/compactc-v0.33.0-rc.2
-// Some contracts need per-contract flags (secp256k1 dapps need --feature-zkir-v3).
-// Gaps are expected — self-recursion / caller / axelar (self-interface,
-// kernel.caller) and recover-secp (removed recover API) don't compile on rc.2.
+// Compiler: Compact toolchain 0.36.0 via the Compact CLI (`compact compile +0.36.0`;
+// install it with `compact update 0.36.0`). Set COMPACTC=/path/to/compactc to use a
+// specific compactc binary instead. Some contracts need per-contract flags.
 // We compile every dapp regardless and report a summary; the vitest suites skip
 // with a GAP banner when their artifact is missing.
 
@@ -25,9 +22,10 @@ import { fileURLToPath } from 'node:url';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONTRACTS = path.join(REPO, 'contracts');
-const EXPECTED_VERSION = '0.33.0-rc.2';
-const RELEASE_URL = `https://github.com/LFDT-Minokawa/compact/releases/tag/compactc-v${EXPECTED_VERSION}`;
+const EXPECTED_VERSION = '0.36.0';
 const COMPACTC = process.env.COMPACTC;
+// [command, ...leading args]: either the given compactc binary or the Compact CLI.
+const COMPILER: string[] = COMPACTC ? [COMPACTC] : ['compact', 'compile', `+${EXPECTED_VERSION}`];
 
 type Contract = { source: string; managed: string; flags?: string[] };
 type Dapp = { dir: string; contracts: Contract[] };
@@ -53,11 +51,9 @@ const DAPPS: Dapp[] = [
   },
   {
     dir: 'usdcx',
-    // Compiles from source on rc.2 with --feature-zkir-v3 (the secp256k1 surface
-    // lives in the zkir-v3 library). Verifies ECDSA against supplied pubkeys —
-    // no recover-path primitives — so it builds cleanly.
+    // Verifies ECDSA against supplied pubkeys (no recover-path primitives).
     contracts: [
-      { source: 'bridged-usdc-mint', managed: 'BridgedUsdcMint', flags: ['--feature-zkir-v3'] },
+      { source: 'bridged-usdc-mint', managed: 'BridgedUsdcMint' },
     ],
   },
   { dir: 'self-recursion', contracts: [{ source: 'SelfRecursion', managed: 'SelfRecursion' }] },
@@ -70,50 +66,50 @@ const DAPPS: Dapp[] = [
   },
   { dir: 'axelar-gateway', contracts: [{ source: 'AxelarGateway', managed: 'AxelarGateway' }] },
   {
-    // Provable secp256k1 → Ethereum address. Needs --feature-zkir-v3 (the
-    // secp256k1 surface lives in the compiler's zkir-v3 library; without it
-    // Secp256k1Point is unbound). Provable since LFDT-Minokawa/compact#612.
+    // Provable secp256k1 → Ethereum address.
     dir: 'eth-addr-secp',
     contracts: [
-      { source: 'prove-eth-addr-secp', managed: 'ProveEthAddrSecp', flags: ['--feature-zkir-v3'] },
+      { source: 'prove-eth-addr-secp', managed: 'ProveEthAddrSecp' },
     ],
   },
   {
     // Instantiate secp256k1EcdsaVerify twice/thrice in a single circuit over one
-    // digest with independent (sig, pubkey) witness pairs. Needs --feature-zkir-v3.
+    // digest with independent (sig, pubkey) witness pairs.
     dir: 'verify-sequential-secp',
     contracts: [
       {
         source: 'verify-sequential-secp',
         managed: 'VerifySequentialSecp',
-        flags: ['--feature-zkir-v3'],
       },
     ],
   },
   {
-    // ECDSA public-key recovery. The recover API was removed between rc.0 and
-    // rc.1 and is still absent in rc.2 — this is a compile-gap regression guard
-    // that compiles (and its suite runs) once the API is restored.
+    // ECDSA public-key recovery. The recover API is absent on 0.36.0, so this is a
+    // compile-gap regression guard that compiles once the API is restored.
     dir: 'recover-secp',
     contracts: [
-      { source: 'recover-secp', managed: 'RecoverSecp', flags: ['--feature-zkir-v3'] },
+      { source: 'recover-secp', managed: 'RecoverSecp' },
     ],
   },
 ];
 
-if (!COMPACTC || !fs.existsSync(COMPACTC)) {
-  console.error(
-    `compactc ${EXPECTED_VERSION} not found${COMPACTC ? ` at ${COMPACTC}` : ''}.\n` +
-      `Download it from ${RELEASE_URL}, unzip it, and run\n` +
-      `  COMPACTC=/path/to/compactc-${EXPECTED_VERSION}/compactc npm run compile`,
-  );
+if (COMPACTC && !fs.existsSync(COMPACTC)) {
+  console.error(`COMPACTC is set but ${COMPACTC} does not exist.`);
   process.exit(1);
 }
 
-const version = spawnSync(COMPACTC, ['--version'], { encoding: 'utf8' }).stdout?.trim();
-console.log(`compactc: ${COMPACTC} (${version})\n`);
+const probe = spawnSync(COMPILER[0], [...COMPILER.slice(1), '--version'], { encoding: 'utf8' });
+if (probe.error || probe.status !== 0) {
+  console.error(
+    `could not run ${COMPILER.join(' ')} --version.\n` +
+      `Install the Compact CLI and run \`compact update ${EXPECTED_VERSION}\`, or set COMPACTC.`,
+  );
+  process.exit(1);
+}
+const version = probe.stdout?.trim();
+console.log(`compiler: ${COMPILER.join(' ')} (${version})\n`);
 if (!version?.includes(EXPECTED_VERSION)) {
-  console.warn(`WARNING: expected compactc ${EXPECTED_VERSION}; the gaps and results below are for that version.\n`);
+  console.warn(`WARNING: expected Compact ${EXPECTED_VERSION}; the results below are for that version.\n`);
 }
 
 const failed: string[] = [];
@@ -128,7 +124,9 @@ for (const dapp of DAPPS) {
     const label = `${dapp.dir}/${c.source}`;
     fs.rmSync(out, { recursive: true, force: true });
     process.stdout.write(`  compiling ${label} ... `);
-    const res = spawnSync(COMPACTC, [...(c.flags ?? []), source, out], { encoding: 'utf8' });
+    const res = spawnSync(COMPILER[0], [...COMPILER.slice(1), ...(c.flags ?? []), source, out], {
+      encoding: 'utf8',
+    });
     if (res.status === 0) {
       console.log('ok');
       compiled.push(label);
@@ -146,7 +144,7 @@ for (const dapp of DAPPS) {
 
 console.log(`\ncompiled ${compiled.length}, failed ${failed.length}`);
 if (failed.length) {
-  console.log(`  gaps (expected: self-recursion / caller / axelar / recover-secp on 0.33.0-rc.2):`);
+  console.log(`  gaps:`);
   for (const f of failed) console.log(`    - ${f}`);
 }
 // Always exit 0: gaps are expected and the suites gate on artifact presence.
