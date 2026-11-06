@@ -28,7 +28,7 @@ Checked against npm and Docker Hub on 2026-11-05.
 
 | Component | Version | Status |
 | --- | --- | --- |
-| Node | TBA | Ledger 9 release not public yet |
+| Node | TBA | Ledger 9 release not published |
 | Indexer | TBA | Ledger 9 release not public yet |
 
 For local runs, `compose.yml` uses the newest public Ledger 9 images: node
