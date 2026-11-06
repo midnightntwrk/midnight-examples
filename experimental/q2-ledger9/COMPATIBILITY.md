@@ -29,7 +29,7 @@ Checked against npm and Docker Hub on 2026-11-05.
 | Component | Version | Status |
 | --- | --- | --- |
 | Node | TBA | Ledger 9 release not published |
-| Indexer | TBA | Ledger 9 release not public yet |
+| Indexer | TBA | Ledger 9 release not published yet |
 
 For local runs, `compose.yml` uses the newest public Ledger 9 images: node
 `midnightntwrk/midnight-node:2.1.0-rc.4` and indexer
