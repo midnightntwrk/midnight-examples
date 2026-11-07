@@ -69,11 +69,12 @@ version changes happen in a coordinated pass. The pins live in
 
 | Component | Version |
 |---|---|
-| Compact language (`pragma`) | `0.23` |
-| Compact compiler (`setup-compact-action`) | `0.31.1` |
-| `@midnight-ntwrk/midnight-js-*` | `4.1.1` |
-| `@midnight-ntwrk/testkit-js` | `4.1.1` |
-| wallet SDK | `1.2.0` |
+| Compact language (`pragma`) | `0.28` |
+| Compact compiler (`setup-compact-action`) | `0.36.0` |
+| `@midnight-ntwrk/midnight-js-*` | `5.0.0` |
+| `@midnight-ntwrk/midnight-js-network-id` | `5.0.0-rc.5` (no 5.0.0 published) |
+| `@midnight-ntwrk/testkit-js` | `5.0.0` |
+| wallet SDK | `2.0.0` |
 | Node.js | `22` (see `.nvmrc`) |
 | npm | `11.21.0` (CI; `11.10.0` or newer locally) |
 | Vitest | `5.0.4` |
@@ -99,6 +100,22 @@ npm run compile  # compile every example's contract (parallel)
 
 Flags for a script go after `--`, or npm takes them as its own options:
 `npm run new:ui -- <name> --check`.
+
+### Local devnet: not on Ledger 9 yet
+
+The examples are on the Ledger 9 stack, but the local devnet (`npm run env:up`,
+from each example's `compose.yml`) still pulls the newest *public* images: node
+`2.1.0-rc.4` and indexer `4.4.0-rc.6`. That node predates the Ledger 9 release
+and rejects contract calls (`1010: Invalid Transaction: Custom error: 104`), so
+`test:local`, `validate`, the devnet step of `pipeline` and the example jobs in
+CI fail. That changes once node 2.1.100+ and indexer 4.4.100 are published and
+pinned in the `compose.yml` files.
+
+**Until then, network tests are supported on preview only**
+(`npm run test:preview`, see
+[Running against a remote network](#running-against-a-remote-network-preprod--preview)).
+Typecheck and the in-memory tests (`npm run test:sim`) don't need a network
+and are unaffected.
 
 Run a single example end-to-end (compile is already done above):
 
@@ -152,6 +169,26 @@ and asserts that he has no DUST of his own.
 > and concurrent spends of the same UTxOs produce nondeterministic balancing
 > failures. The root `test:preprod` script is sequential by design.
 
+### Custom network
+
+To run against a network that isn't built in, such as a private test network,
+copy `.env.custom.example` to `.env.custom` (gitignored). Fill in the network ID,
+the node and indexer URLs (HTTP and WebSocket), and four wallet seeds, then run
+`npm run test:custom`. The run stops with one error that lists any missing
+endpoint. A custom network has no pre-seed bundle, so wallets sync from genesis.
+The suites print any address that still needs funding.
+
+If the endpoints change partway through, such as at a hard fork, keep the seeds in
+`.env.custom` and put each endpoint set in its own file. Pick one per run with
+`MIDNIGHT_ENV_FILE`:
+
+```bash
+MIDNIGHT_ENV_FILE=.env.custom.prefork  npm run test:custom
+MIDNIGHT_ENV_FILE=.env.custom.postfork npm run test:custom
+```
+
+The same rule applies here: run one suite at a time.
+
 ## Adding / working with examples
 
 - **Scaffold a new example with `npm run new:example -- <name> [--witnesses]`.** It
@@ -160,10 +197,10 @@ and asserts that he has no DUST of his own.
   then only write the `.compact` contract and the test bodies. See
   `packages/mnkit/templates/example/`.
 - **Add a browser UI with `npm run new:ui <name>`** once the contract compiles and
-  its tests pass. It renders `packages/mnkit/templates/ui/` into `examples/<name>/ui`, deriving
+  its tests pass. It renders `templates/ui/` into `examples/<name>/ui`, deriving
   circuits, witnesses and ledger fields from the compiled contract, so the UI
   typechecks, tests and builds before any use-case code is written. See
-  `packages/mnkit/templates/ui/AGENTS.md` (copied into every generated UI).
+  `templates/ui/AGENTS.md` (copied into every generated UI).
 - The scripted generation pipeline (prompt, scaffold, generate, devnet test, UI
   generator, UI code, serve) is drawn in [`docs/generation-flow.md`](./docs/generation-flow.md).
 - The `.compact` **source is committed** (only generated `contract/managed/` output is

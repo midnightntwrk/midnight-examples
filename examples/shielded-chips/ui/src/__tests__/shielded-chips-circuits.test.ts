@@ -13,7 +13,7 @@
 //
 // Seed file: generated once by `npm run new:ui`, then yours to edit. The drift
 // check ignores it.
-import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, expectTypeOf, it, vi } from "vitest";
 import type { FinalizedCallTxData } from "@midnight-ntwrk/midnight-js-contracts";
 import {
   createCircuitContext,
@@ -21,10 +21,10 @@ import {
   dummyContractAddress,
   sampleContractAddress,
   type CircuitContext,
+  type ChargedState,
   type CircuitResults,
-} from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
-import { ZswapOutput } from "@midnight-ntwrk/midnight-js-protocol/ledger";
-import type { FinalizedTxData } from "@midnight-ntwrk/midnight-js-types";
+} from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
+import { ZswapOutput } from "@midnight-ntwrk/midnight-js-protocol/v9";
 import { toHex } from "@midnight-ntwrk/midnight-js-utils";
 import { Contract as ChipsContract, ledger as chipsLedger } from "../../../contract/managed/chips/contract/index.js";
 import { chipsWitnesses, rememberEscrow, rouletteWitnesses } from "../../../contract/witnesses.js";
@@ -80,8 +80,8 @@ function bytes(fill: number): Uint8Array {
   return new Uint8Array(32).fill(fill);
 }
 
-function deployTable(winningNumber = WINNING_NUMBER) {
-  const { currentContractState } = roulette.initialState(
+async function deployTable(winningNumber = WINNING_NUMBER) {
+  const { currentContractState } = await roulette.initialState(
     createConstructorContext(house, COIN_PK),
     winningNumber,
     COLOR.bytes,
@@ -89,22 +89,37 @@ function deployTable(winningNumber = WINNING_NUMBER) {
   return currentContractState.data;
 }
 
+/** A circuit context on `data` as `ps`. The circuit id is only a label; the circuits don't read it. */
+function contextOn<T>(address: string, coinPk: string, data: ChargedState, ps: T): CircuitContext<T> {
+  return createCircuitContext({
+    circuitId: "inMemory",
+    contractAddress: address,
+    coinPublicKeyOrZswapState: coinPk,
+    contractState: data,
+    privateState: ps,
+  });
+}
+
 /** The table between calls: its state, and a call that advances it. */
 class Table {
-  constructor(public data = deployTable()) {}
+  private constructor(public data: ChargedState) {}
+  /** Deploy a fresh table. */
+  static async open(winningNumber = WINNING_NUMBER): Promise<Table> {
+    return new Table(await deployTable(winningNumber));
+  }
   get ledger(): Ledger {
     return ledger(this.data);
   }
   /** Run a circuit as `ps`; on success the table moves to the new state. */
-  call<R>(ps: PS, fn: (ctx: CircuitContext<PS>) => CircuitResults<PS, R>): CircuitResults<PS, R> {
-    const res = fn(createCircuitContext(ADDRESS, COIN_PK, this.data, ps));
-    this.data = res.context.currentQueryContext.state;
+  async call<R>(ps: PS, fn: (ctx: CircuitContext<PS>) => Promise<CircuitResults<PS, R>>): Promise<CircuitResults<PS, R>> {
+    const res = await fn(contextOn(ADDRESS, COIN_PK, this.data, ps));
+    this.data = res.context.callContext.currentQueryContext.state;
     return res;
   }
   /** The circuit's error message, or null if it would succeed (state unchanged). */
-  errorOf(ps: PS, fn: (ctx: CircuitContext<PS>) => unknown): string | null {
+  async errorOf(ps: PS, fn: (ctx: CircuitContext<PS>) => Promise<unknown>): Promise<string | null> {
     try {
-      fn(createCircuitContext(ADDRESS, COIN_PK, this.data, ps));
+      await fn(contextOn(ADDRESS, COIN_PK, this.data, ps));
       return null;
     } catch (err) {
       return err instanceof Error ? err.message : String(err);
@@ -118,16 +133,22 @@ function afterBet(ps: PS, arg: ReturnType<typeof freshChip>["arg"], mtIndex = 7n
 }
 
 /** actionError and the circuit agree: both pass, or the circuit fails with that reason. */
-function expectMirrors(table: Table, action: Action, ps: PS, run: (ctx: CircuitContext<PS>) => unknown, opts = {}) {
+async function expectMirrors(
+  table: Table,
+  action: Action,
+  ps: PS,
+  run: (ctx: CircuitContext<PS>) => Promise<unknown>,
+  opts = {},
+) {
   const predicted = actionError(action, table.ledger, ps, opts);
-  const actual = table.errorOf(ps, run);
+  const actual = await table.errorOf(ps, run);
   if (predicted === null) expect(actual).toBeNull();
   else expect(actual).toContain(predicted);
 }
 
 describe("roulette (in memory)", () => {
-  it("deploys a table: house key, chip color, committed number, betting open", () => {
-    const t = new Table();
+  it("deploys a table: house key, chip color, committed number, betting open", async () => {
+    const t = await Table.open();
     expect(toHex(t.ledger.theHouse)).toBe(toHex(dappPublicKey(house.sk)));
     expect(toHex(t.ledger.chipColor)).toBe(COLOR.hex);
     expect(t.ledger.betState).toBe(BetState.OPEN);
@@ -136,19 +157,19 @@ describe("roulette (in memory)", () => {
     expect(roleOf(t.ledger, null)).toBeNull();
   });
 
-  it("recovers every committed number from the house key alone", () => {
+  it("recovers every committed number from the house key alone", async () => {
     for (let n = 0n; n <= 36n; n++) {
-      const l = ledger(deployTable(n));
+      const l = ledger(await deployTable(n));
       expect(recoverWinningNumber(l, house.sk)).toBe(n);
       expect(recoverWinningNumber(l, bob.sk)).toBeNull();
     }
   });
 
-  it("parseNumber accepts exactly what the constructor accepts", () => {
+  it("parseNumber accepts exactly what the constructor accepts", async () => {
     for (const n of [0n, 1n, 35n, 36n, 37n, 255n]) {
-      const ok = (() => {
+      const ok = await (async () => {
         try {
-          deployTable(n);
+          await deployTable(n);
           return true;
         } catch {
           return false;
@@ -160,40 +181,40 @@ describe("roulette (in memory)", () => {
     expect(parseNumber("x")).toBeNull();
   });
 
-  it("plays a full round with fresh coins", () => {
-    const t = new Table();
+  it("plays a full round with fresh coins", async () => {
+    const t = await Table.open();
 
     // House deposits two match coins.
     for (let i = 0; i < 2; i++) {
-      const { context } = t.call(house, (ctx) => r.houseDeposit(ctx, freshChip(COLOR.hex, 100n).arg));
+      const { context } = await t.call(house, (ctx) => r.houseDeposit(ctx, freshChip(COLOR.hex, 100n).arg));
       // Just the deposit: the fresh coin is stored as it is, no re-send.
-      expect(context.currentQueryContext.effects.claimedShieldedReceives).toHaveLength(1);
+      expect(context.callContext.currentQueryContext.effects.claimedShieldedReceives).toHaveLength(1);
     }
     expect(t.ledger.houseCoins.size()).toBe(2n);
     // A deposit can't reuse a pool key (it would overwrite that coin's entry).
     const poolKey = [...t.ledger.houseCoins][0]![0];
     expect(
-      t.errorOf(house, (ctx) => r.houseDeposit(ctx, { nonce: poolKey, color: COLOR.bytes, value: 1n })),
+      await t.errorOf(house, (ctx) => r.houseDeposit(ctx, { nonce: poolKey, color: COLOR.bytes, value: 1n })),
     ).toContain("already deposited");
-    expect(t.errorOf(bob, (ctx) => r.houseDeposit(ctx, freshChip(COLOR.hex, 1n).arg))).toContain(
+    expect(await t.errorOf(bob, (ctx) => r.houseDeposit(ctx, freshChip(COLOR.hex, 1n).arg))).toContain(
       "Only the house can deposit",
     );
-    expect(t.errorOf(house, (ctx) => r.houseDeposit(ctx, freshChip("11".repeat(32), 1n).arg))).toContain(
+    expect(await t.errorOf(house, (ctx) => r.houseDeposit(ctx, freshChip("11".repeat(32), 1n).arg))).toContain(
       "Deposit must be made with roulette chips",
     );
 
     // Bob bets RED, Charlie BLACK; the house can't bet, nobody bets twice.
     const bobChip = freshChip(COLOR.hex, 100n);
-    expectMirrors(t, "bet", bob, (ctx) => r.betColor(ctx, bobChip.arg, Color.GREEN), { betColor: Color.GREEN });
-    expectMirrors(t, "bet", house, (ctx) => r.betColor(ctx, bobChip.arg, Color.RED), { betColor: Color.RED });
-    expectMirrors(t, "bet", bob, (ctx) => r.betColor(ctx, bobChip.arg, Color.RED), { betColor: Color.RED });
-    const bet = t.call(bob, (ctx) => r.betColor(ctx, bobChip.arg, Color.RED));
-    expect(bet.context.currentQueryContext.effects.claimedShieldedReceives).toHaveLength(1);
+    await expectMirrors(t, "bet", bob, (ctx) => r.betColor(ctx, bobChip.arg, Color.GREEN), { betColor: Color.GREEN });
+    await expectMirrors(t, "bet", house, (ctx) => r.betColor(ctx, bobChip.arg, Color.RED), { betColor: Color.RED });
+    await expectMirrors(t, "bet", bob, (ctx) => r.betColor(ctx, bobChip.arg, Color.RED), { betColor: Color.RED });
+    const bet = await t.call(bob, (ctx) => r.betColor(ctx, bobChip.arg, Color.RED));
+    expect(bet.context.callContext.currentQueryContext.effects.claimedShieldedReceives).toHaveLength(1);
     const bobAfter = afterBet(bob, bobChip.arg);
-    expectMirrors(t, "bet", bobAfter, (ctx) => r.betColor(ctx, bobChip.arg, Color.BLACK), { betColor: Color.BLACK });
+    await expectMirrors(t, "bet", bobAfter, (ctx) => r.betColor(ctx, bobChip.arg, Color.BLACK), { betColor: Color.BLACK });
 
     const charlieChip = freshChip(COLOR.hex, 100n);
-    t.call(charlie, (ctx) => r.betColor(ctx, charlieChip.arg, Color.BLACK));
+    await t.call(charlie, (ctx) => r.betColor(ctx, charlieChip.arg, Color.BLACK));
     const charlieAfter = afterBet(charlie, charlieChip.arg);
 
     // The bet size is public; the coin isn't (a salted commitment).
@@ -201,66 +222,66 @@ describe("roulette (in memory)", () => {
     for (const [, commit] of t.ledger.betCommits) expect(toHex(commit)).not.toContain(toHex(bobChip.arg.nonce));
 
     // Nothing to claim or forfeit before the reveal.
-    expectMirrors(t, "claim", bobAfter, (ctx) => r.claimWinnings(ctx, matchKeyFor(t.ledger, 100n)!));
-    expectMirrors(t, "forfeit", charlieAfter, (ctx) => r.forfeit(ctx));
+    await expectMirrors(t, "claim", bobAfter, (ctx) => r.claimWinnings(ctx, matchKeyFor(t.ledger, 100n)!));
+    await expectMirrors(t, "forfeit", charlieAfter, (ctx) => r.forfeit(ctx));
 
     // Only the house reveals, and only its committed number.
-    expect(t.errorOf(bob, (ctx) => r.revealWinningNumber(ctx, WINNING_NUMBER))).toContain("Only the House");
-    expect(t.errorOf(house, (ctx) => r.revealWinningNumber(ctx, 3n))).toContain("Cheat Detected");
+    expect(await t.errorOf(bob, (ctx) => r.revealWinningNumber(ctx, WINNING_NUMBER))).toContain("Only the House");
+    expect(await t.errorOf(house, (ctx) => r.revealWinningNumber(ctx, 3n))).toContain("Cheat Detected");
     const revealed = recoverWinningNumber(t.ledger, house.sk)!;
-    t.call(house, (ctx) => r.revealWinningNumber(ctx, revealed));
+    await t.call(house, (ctx) => r.revealWinningNumber(ctx, revealed));
     expect(t.ledger.betState).toBe(BetState.CLOSED);
     expect(t.ledger.winningColor).toBe(colorOf(WINNING_NUMBER));
-    expectMirrors(t, "bet", createInitialPrivateState(bytes(9), bytes(19)), (ctx) => r.betColor(ctx, bobChip.arg, Color.RED), { betColor: Color.RED });
+    await expectMirrors(t, "bet", createInitialPrivateState(bytes(9), bytes(19)), (ctx) => r.betColor(ctx, bobChip.arg, Color.RED), { betColor: Color.RED });
 
     // Wrong side of each outcome.
-    expectMirrors(t, "forfeit", bobAfter, (ctx) => r.forfeit(ctx));
-    expectMirrors(t, "claim", charlieAfter, (ctx) => r.claimWinnings(ctx, matchKeyFor(t.ledger, 100n)!));
+    await expectMirrors(t, "forfeit", bobAfter, (ctx) => r.forfeit(ctx));
+    await expectMirrors(t, "claim", charlieAfter, (ctx) => r.claimWinnings(ctx, matchKeyFor(t.ledger, 100n)!));
     // A browser without the escrowed coin can't reopen the commitment.
     expect(actionError("claim", t.ledger, bob, { escrowRecorded: escrowRecorded(bob) })).toContain("no record");
-    expect(t.errorOf(bob, (ctx) => r.claimWinnings(ctx, matchKeyFor(t.ledger, 100n)!))).toContain(
+    expect(await t.errorOf(bob, (ctx) => r.claimWinnings(ctx, matchKeyFor(t.ledger, 100n)!))).toContain(
       "Escrowed coin does not match",
     );
 
     // Bob claims 2x: escrow merged with one match coin.
-    expectMirrors(t, "claim", bobAfter, (ctx) => r.claimWinnings(ctx, matchKeyFor(t.ledger, 100n)!));
-    t.call(bobAfter, (ctx) => r.claimWinnings(ctx, matchKeyFor(t.ledger, 100n)!));
+    await expectMirrors(t, "claim", bobAfter, (ctx) => r.claimWinnings(ctx, matchKeyFor(t.ledger, 100n)!));
+    await t.call(bobAfter, (ctx) => r.claimWinnings(ctx, matchKeyFor(t.ledger, 100n)!));
     expect(playerView(t.ledger, bobAfter)).toMatchObject({ paid: true, escrowValue: null });
     expect(t.ledger.houseCoins.size()).toBe(1n);
-    expectMirrors(t, "claim", bobAfter, (ctx) => r.claimWinnings(ctx, matchKeyFor(t.ledger, 100n) ?? bytes(0)));
+    await expectMirrors(t, "claim", bobAfter, (ctx) => r.claimWinnings(ctx, matchKeyFor(t.ledger, 100n) ?? bytes(0)));
 
     // Charlie forfeits into the pool; then there's nothing left to forfeit.
-    expectMirrors(t, "forfeit", charlieAfter, (ctx) => r.forfeit(ctx));
-    t.call(charlieAfter, (ctx) => r.forfeit(ctx));
+    await expectMirrors(t, "forfeit", charlieAfter, (ctx) => r.forfeit(ctx));
+    await t.call(charlieAfter, (ctx) => r.forfeit(ctx));
     expect(t.ledger.houseCoins.size()).toBe(2n);
-    expectMirrors(t, "forfeit", charlieAfter, (ctx) => r.forfeit(ctx));
+    await expectMirrors(t, "forfeit", charlieAfter, (ctx) => r.forfeit(ctx));
 
     // The house sweeps the pool; players can't.
     const [first] = [...t.ledger.houseCoins][0]!;
-    expect(t.errorOf(bobAfter, (ctx) => r.houseClaimMatch(ctx, first))).toContain("Only the house can sweep");
-    for (const [key] of [...t.ledger.houseCoins]) t.call(house, (ctx) => r.houseClaimMatch(ctx, key));
+    expect(await t.errorOf(bobAfter, (ctx) => r.houseClaimMatch(ctx, first))).toContain("Only the house can sweep");
+    for (const [key] of [...t.ledger.houseCoins]) await t.call(house, (ctx) => r.houseClaimMatch(ctx, key));
     expect(t.ledger.houseCoins.isEmpty()).toBe(true);
   });
 
-  it("finds no match coin for a winner when the pool has none of that value", () => {
-    const t = new Table();
-    t.call(house, (ctx) => r.houseDeposit(ctx, freshChip(COLOR.hex, 50n).arg));
+  it("finds no match coin for a winner when the pool has none of that value", async () => {
+    const t = await Table.open();
+    await t.call(house, (ctx) => r.houseDeposit(ctx, freshChip(COLOR.hex, 50n).arg));
     const chip = freshChip(COLOR.hex, 100n);
-    t.call(bob, (ctx) => r.betColor(ctx, chip.arg, Color.RED));
-    t.call(house, (ctx) => r.revealWinningNumber(ctx, WINNING_NUMBER));
+    await t.call(bob, (ctx) => r.betColor(ctx, chip.arg, Color.RED));
+    await t.call(house, (ctx) => r.revealWinningNumber(ctx, WINNING_NUMBER));
     expect(matchKeyFor(t.ledger, 100n)).toBeNull();
     expect(actionError("claim", t.ledger, afterBet(bob, chip.arg))).toBe("Match coin not available");
   });
 
-  it("GREEN (0): nobody wins, every player forfeits", () => {
-    const t = new Table(deployTable(0n));
+  it("GREEN (0): nobody wins, every player forfeits", async () => {
+    const t = await Table.open(0n);
     const chip = freshChip(COLOR.hex, 10n);
-    t.call(bob, (ctx) => r.betColor(ctx, chip.arg, Color.RED));
-    t.call(house, (ctx) => r.revealWinningNumber(ctx, 0n));
+    await t.call(bob, (ctx) => r.betColor(ctx, chip.arg, Color.RED));
+    await t.call(house, (ctx) => r.revealWinningNumber(ctx, 0n));
     expect(t.ledger.winningColor).toBe(Color.GREEN);
     const ps = afterBet(bob, chip.arg);
-    expectMirrors(t, "claim", ps, (ctx) => r.claimWinnings(ctx, bytes(0)));
-    expectMirrors(t, "forfeit", ps, (ctx) => r.forfeit(ctx));
+    await expectMirrors(t, "claim", ps, (ctx) => r.claimWinnings(ctx, bytes(0)));
+    await expectMirrors(t, "forfeit", ps, (ctx) => r.forfeit(ctx));
   });
 
   it("new players get a random key and salt, never the all-zero default", () => {
@@ -283,35 +304,39 @@ describe("chips token (in memory)", () => {
   const c = chips.impureCircuits;
   const DOMAIN = new Uint8Array(32);
   DOMAIN.set(new TextEncoder().encode("roulette:chip:"));
-  const { currentContractState } = chips.initialState(
-    createConstructorContext(house, HOUSE_PK),
-    "Roulette Chips",
-    "CHIP",
-    0n,
-    DOMAIN,
-  );
-  const ctx = (ps: PS, data = currentContractState.data) => createCircuitContext(CHIPS_ADDRESS, HOUSE_PK, data, ps);
+  let deployed: ChargedState;
+  beforeAll(async () => {
+    const { currentContractState } = await chips.initialState(
+      createConstructorContext(house, HOUSE_PK),
+      "Roulette Chips",
+      "CHIP",
+      0n,
+      DOMAIN,
+    );
+    deployed = currentContractState.data;
+  });
+  const ctx = (ps: PS, data = deployed) => contextOn(CHIPS_ADDRESS, HOUSE_PK, data, ps);
 
-  it("mints coins of the color chipColor computes, house only", () => {
-    const res = c.mint(ctx(house), { bytes: bytes(5) }, 100n, bytes(6));
+  it("mints coins of the color chipColor computes, house only", async () => {
+    const res = await c.mint(ctx(house), { bytes: bytes(5) }, 100n, bytes(6));
     expect(toHex(res.result.color)).toBe(CHIPS_COLOR.hex);
     expect(res.result.value).toBe(100n);
-    expect(chipsLedger(res.context.currentQueryContext.state)._totalMinted).toBe(100n);
-    expect(() => c.mint(ctx(bob), { bytes: bytes(5) }, 100n, bytes(6))).toThrow(/Only the house/);
+    expect(chipsLedger(res.context.callContext.currentQueryContext.state)._totalMinted).toBe(100n);
+    await expect(c.mint(ctx(bob), { bytes: bytes(5) }, 100n, bytes(6))).rejects.toThrow(/Only the house/);
   });
 
-  it("burns a fresh coin of exactly the amount, with no refund", () => {
-    const res = c.burn(ctx(house), freshChip(CHIPS_COLOR.hex, 40n).arg, 40n);
+  it("burns a fresh coin of exactly the amount, with no refund", async () => {
+    const res = await c.burn(ctx(house), freshChip(CHIPS_COLOR.hex, 40n).arg, 40n);
     expect(res.result.is_some).toBe(false);
-    expect(chipsLedger(res.context.currentQueryContext.state)._totalBurned).toBe(40n);
+    expect(chipsLedger(res.context.callContext.currentQueryContext.state)._totalBurned).toBe(40n);
   });
 
-  it("mints to and burns from the treasury", () => {
-    const minted = c.mintToTreasury(ctx(house), 60n, bytes(7));
-    const data = minted.context.currentQueryContext.state;
+  it("mints to and burns from the treasury", async () => {
+    const minted = await c.mintToTreasury(ctx(house), 60n, bytes(7));
+    const data = minted.context.callContext.currentQueryContext.state;
     const [key] = [...chipsLedger(data)._treasury][0]!;
-    const burned = c.burnFromTreasury(ctx(house, data), key, 25n);
-    const l = chipsLedger(burned.context.currentQueryContext.state);
+    const burned = await c.burnFromTreasury(ctx(house, data), key, 25n);
+    const l = chipsLedger(burned.context.callContext.currentQueryContext.state);
     expect(l._totalBurned).toBe(25n);
     expect([...l._treasury].map(([, coin]) => coin.value)).toEqual([35n]);
   });
@@ -327,10 +352,7 @@ describe("escrowMtIndex", () => {
     vi.stubGlobal("fetch", fetchMock);
     // A change output first, then the escrow: what the devnet showed for a
     // 100-chip bet paid from a 150-chip coin.
-    const tx = {
-      txId: "00ab",
-      tx: { guaranteedOffer: { outputs: [{ commitment: "change" }, { commitment: escrow }] } },
-    } as unknown as FinalizedTxData;
+    const tx = { txId: "00ab", outputs: [{ commitment: "change" }, { commitment: escrow }] };
 
     await expect(escrowMtIndex("http://indexer/graphql", tx, coin, ADDRESS)).resolves.toBe(37n);
     const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
@@ -339,7 +361,7 @@ describe("escrowMtIndex", () => {
 
   it("refuses a tx without the escrow output", async () => {
     const { coin } = freshChip(COLOR.hex, 100n);
-    const tx = { txId: "00", tx: { guaranteedOffer: { outputs: [] } } } as unknown as FinalizedTxData;
+    const tx = { txId: "00", outputs: [] };
     await expect(escrowMtIndex("http://indexer/graphql", tx, coin, ADDRESS)).rejects.toThrow(/no output/);
   });
 });

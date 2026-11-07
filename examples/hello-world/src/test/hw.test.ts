@@ -7,7 +7,7 @@ import {
   submitCallTx,
   type DeployedContract,
 } from '@midnight-ntwrk/midnight-js-contracts';
-import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import pino from 'pino';
 
@@ -21,7 +21,7 @@ import {
   type MidnightWalletProvider,
   type WalletSecret,
 } from '../wallet.js';
-import { buildProviders, type HelloWorldProviders } from '../providers.js';
+import { buildProviders, ledgerState, type HelloWorldProviders } from '../providers.js';
 
 // Where an auto-generated throwaway wallet is cached (gitignored). Only used
 // when the root .env.<network> has no wallet for this network.
@@ -96,7 +96,7 @@ describe(`Hello World Contract (${network})`, () => {
   async function queryLedger(p: HelloWorldProviders) {
     const state = await p.publicDataProvider.queryContractState(contractAddress);
     expect(state).not.toBeNull();
-    return ledger(state!.data);
+    return ledger(ledgerState(state));
   }
 
   beforeAll(async () => {
@@ -143,7 +143,7 @@ describe(`Hello World Contract (${network})`, () => {
     logger.info(`Creating private state...`);
 
     const deployed: DeployedContract<Contract> =
-      await (deployContract<Contract>)(providers, {
+      await deployContract(providers, {
         compiledContract: CompiledHelloWorldContract,
         privateStateId: PRIVATE_STATE_ID,
         initialPrivateState: {},
@@ -162,7 +162,7 @@ describe(`Hello World Contract (${network})`, () => {
   it('Stores Hello World!', async () => {
     const message = 'Hello World!';
 
-    await (submitCallTx<Contract, 'storeMessage'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledHelloWorldContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,

@@ -75,7 +75,7 @@ trust recalled APIs over it.
   `mt_index`: the index is not checked in the circuit, but the SDK uses it to
   build the Merkle path, so a wrong one fails when the transaction is built
   or applied.
-  ([stdlib 0.31.1](https://github.com/LFDT-Minokawa/compact/blob/compactc-v0.31.1/compiler/standard-library.compact#L199-L205),
+  ([stdlib 0.36.0](https://github.com/LFDT-Minokawa/compact/blob/compactc-v0.36.0/compiler/standard-library.compact#L196-L202),
   [zswap transients](https://github.com/midnightntwrk/midnight-ledger/blob/ledger-8.1.2/zswap/src/construct.rs#L386-L412),
   [TUTORIAL cheat-sheet](../examples/shielded-chips/TUTORIAL.md#shielded-token-cheat-sheet))
 - **`sendShielded` and `mergeCoin` derive the output nonce from the input

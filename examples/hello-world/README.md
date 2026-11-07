@@ -91,6 +91,12 @@ Here's what each directory contains:
 - **compiler/**: Compiler-generated JSON output that other tools can use to understand the contract structure.
 
 ## Deploy Contract to Local Devnet
+
+> **The local devnet isn't on Ledger 9 yet.** It still runs public images that predate
+> Ledger 9, so contract calls fail under `npm run test:local`. Run the network tests
+> with `npm run test:preview` for now. See
+> [Local devnet: not on Ledger 9 yet](../../README.md#local-devnet-not-on-ledger-9-yet).
+
 Now that your contract is compiled, it needs to be deployed to the blockchain so that you can interact with it.
 
 Be sure the Docker engine is running and in a *separate terminal* start the proof server from the project root:

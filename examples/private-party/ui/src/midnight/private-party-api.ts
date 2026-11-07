@@ -28,7 +28,7 @@ import {
   persistentCommit,
   persistentHash,
   type ContractAddress,
-} from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+} from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import { map, type Observable } from "rxjs";
 import type { UserAddressValue } from "@/lib/addresses";
 import {
@@ -41,7 +41,7 @@ import {
   type Ledger,
 } from "./contract";
 import { PartyState } from "../../../contract/managed/private-party/contract/index.js";
-import type { PrivatePartyProviders } from "./providers";
+import { contractStateData, type PrivatePartyProviders } from "./providers";
 
 export { PartyState };
 
@@ -120,8 +120,7 @@ export async function joinPrivateParty(
   address: ContractAddress,
   initialPrivateState: () => PrivatePartyPrivateState = newPrivateState,
 ): Promise<PrivatePartyContract> {
-  providers.privateStateProvider.setContractAddress(address);
-  const stored = await providers.privateStateProvider.get(PRIVATE_STATE_ID);
+  const stored = await providers.privateStateProvider.forContract(address).get(PRIVATE_STATE_ID);
   if (stored !== null) {
     return findDeployedContract(providers, {
       compiledContract: CompiledPrivatePartyContract,
@@ -142,8 +141,7 @@ export async function readPrivateState(
   providers: PrivatePartyProviders,
   address: ContractAddress,
 ): Promise<PrivatePartyPrivateState | null> {
-  providers.privateStateProvider.setContractAddress(address);
-  return providers.privateStateProvider.get(PRIVATE_STATE_ID);
+  return providers.privateStateProvider.forContract(address).get(PRIVATE_STATE_ID);
 }
 
 // One wrapper per provable circuit. midnight-js runs the circuit locally,
@@ -213,7 +211,7 @@ export function ledger$(
 ): Observable<Ledger> {
   return providers.publicDataProvider
     .contractStateObservable(address, { type: "latest" })
-    .pipe(map((state) => ledger(state.data)));
+    .pipe(map(({ value }) => ledger(contractStateData(value))));
 }
 
 // --- party rules (pure: ledger + secret + address in, answer out) -----------

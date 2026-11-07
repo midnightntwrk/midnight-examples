@@ -17,12 +17,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { createUnprovenDeployTx, deployContract, submitCallTx, type DeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
-import { type ContractAddress, encodeUserAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import { type ContractAddress, encodeUserAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
 import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust, type WalletSecret } from '../wallet.js';
-import { buildProviders, type PartyProviders } from '../providers.js';
+import { buildProviders, ledgerState, type PartyProviders } from '../providers.js';
 import {
     CompiledPartyContract,
     Contract,
@@ -32,8 +32,8 @@ import {
 } from '../../contract/index.js';
 import { createPartyPrivateState } from '../../contract/witnesses.js'
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import type { FinalizedCallTxData, UnsubmittedDeployTxData } from '@midnight-ntwrk/midnight-js-contracts';
-import type { UnshieldedAddress } from '@midnight-ntwrk/wallet-sdk';
+import type { FinalizedCallTxData, Ledger9UnsubmittedDeployTxData } from '@midnight-ntwrk/midnight-js-contracts';
+import type { UnshieldedAddress } from '@midnightntwrk/wallet-sdk';
 
 const logger = pino({
     level: process.env['LOG_LEVEL'] ?? 'info',
@@ -69,7 +69,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
         const state =
             await providers.publicDataProvider.queryContractState(contractAddress);
         expect(state).not.toBeNull();
-        return ledger(state!.data);
+        return ledger(ledgerState(state));
     }
 
     // NIGHT token type is the all-zero raw token type
@@ -161,7 +161,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
 
         logger.info(`Deploying a contract the easy way...`);
         const deployed: DeployedContract<Contract> = 
-            await (deployContract<Contract>)(aliceProviders, {
+            await deployContract(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 privateStateId: ALICE_PRIVATE_ID,
                 initialPrivateState: alicePrivateState,
@@ -183,16 +183,15 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
     it('Allows Bob to rsvp (privately)', async () => {
 
         const bobInitialPrivateState = createPartyPrivateState(randomBytes(32));
-        bobProviders.privateStateProvider.setContractAddress(contractAddress);
-        await bobProviders.privateStateProvider.set(BOB_PRIVATE_ID, bobInitialPrivateState);
-        const bobPrivateState = await bobProviders.privateStateProvider.get(BOB_PRIVATE_ID);
+        await bobProviders.privateStateProvider.forContract(contractAddress).set(BOB_PRIVATE_ID, bobInitialPrivateState);
+        const bobPrivateState = await bobProviders.privateStateProvider.forContract(contractAddress).get(BOB_PRIVATE_ID);
 
         const bobUnshielded = await bobWallet.wallet.unshielded.getAddress();
         const bobAddress = { bytes: new Uint8Array(bobUnshielded.data) };
 
         logger.info(`Bob is sending an RSVP...`);
         const txData: FinalizedCallTxData<Contract, 'rsvp'> = 
-            await (submitCallTx<Contract, 'rsvp'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -210,11 +209,11 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
 
         const aliceUnshielded: UnshieldedAddress = await aliceWallet.wallet.unshielded.getAddress();
         const aliceAddress: Uint8Array = encodeUserAddress(aliceUnshielded.hexString);
-        const alicePrivateState = await aliceProviders.privateStateProvider.get(ALICE_PRIVATE_ID);
+        const alicePrivateState = await aliceProviders.privateStateProvider.forContract(contractAddress).get(ALICE_PRIVATE_ID);
 
         logger.info(`Alice tries to rsvp...`);
         await expect(async () => {
-            await (submitCallTx<Contract, 'rsvp'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -227,16 +226,15 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
     it('Allows Charlie to rsvp(privately)', async () => {
 
         const charlieInitialPrivateState = createPartyPrivateState(randomBytes(32));
-        charlieProviders.privateStateProvider.setContractAddress(contractAddress);
-        await charlieProviders.privateStateProvider.set(CHARLIE_PRIVATE_ID, charlieInitialPrivateState);
-        const charliePrivateState = await charlieProviders.privateStateProvider.get(CHARLIE_PRIVATE_ID);
+        await charlieProviders.privateStateProvider.forContract(contractAddress).set(CHARLIE_PRIVATE_ID, charlieInitialPrivateState);
+        const charliePrivateState = await charlieProviders.privateStateProvider.forContract(contractAddress).get(CHARLIE_PRIVATE_ID);
 
         const charlieUnshielded: UnshieldedAddress = await charlieWallet.wallet.unshielded.getAddress();
         const charlieAddress: Uint8Array = encodeUserAddress(charlieUnshielded.hexString);
 
         logger.info(`Charlie is attempting to rsvp...`);
         const txData: FinalizedCallTxData<Contract, 'rsvp'> = 
-            await (submitCallTx<Contract, 'rsvp'>)(charlieProviders, {
+            await submitCallTx(charlieProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: CHARLIE_PRIVATE_ID,
@@ -251,11 +249,11 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
     });
     it('Blocks non-organizers from starting the party', async () => {
 
-        const bobPrivateState = await bobProviders.privateStateProvider.get(BOB_PRIVATE_ID);
+        const bobPrivateState = await bobProviders.privateStateProvider.forContract(contractAddress).get(BOB_PRIVATE_ID);
 
         logger.info(`Bob tries to start the party...`);
         await expect(async () => {
-            await (submitCallTx<Contract, 'startParty'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -270,11 +268,11 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
     });
     it('starts the party', async () => {
 
-        const alicePrivateState = await aliceProviders.privateStateProvider.get(ALICE_PRIVATE_ID);
+        const alicePrivateState = await aliceProviders.privateStateProvider.forContract(contractAddress).get(ALICE_PRIVATE_ID);
 
         logger.info(`Alice starts the party...`);
         const txData: FinalizedCallTxData<Contract, 'startParty'> =
-            await (submitCallTx<Contract, 'startParty'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -290,11 +288,11 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
 
         const bobUnshielded = await bobWallet.wallet.unshielded.getAddress();
         const bobAddress = { bytes: new Uint8Array(bobUnshielded.data) };
-        const bobPrivateState = await bobProviders.privateStateProvider.get(BOB_PRIVATE_ID);
+        const bobPrivateState = await bobProviders.privateStateProvider.forContract(contractAddress).get(BOB_PRIVATE_ID);
         
         logger.info(`Bob is checking in...`);
         const txData: FinalizedCallTxData<Contract, 'checkIn'> = 
-            await (submitCallTx<Contract, 'checkIn'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -310,11 +308,11 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
     });
     it('Blocks non-organizers from closing the doors', async () => {
 
-        const bobPrivateState = await bobProviders.privateStateProvider.get(BOB_PRIVATE_ID);
+        const bobPrivateState = await bobProviders.privateStateProvider.forContract(contractAddress).get(BOB_PRIVATE_ID);
 
         logger.info(`Bob is attempting to close the doors...`);
         await expect(async () => {
-            await (submitCallTx<Contract, 'closeEntry'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -329,11 +327,11 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
     });
     it('Closes the doors to the party', async () => {
 
-        const alicePrivateState = await aliceProviders.privateStateProvider.get(ALICE_PRIVATE_ID);
+        const alicePrivateState = await aliceProviders.privateStateProvider.forContract(contractAddress).get(ALICE_PRIVATE_ID);
 
         logger.info(`Alice is closing the doors...`);
         const txData: FinalizedCallTxData<Contract, 'closeEntry'> =
-            await (submitCallTx<Contract, 'closeEntry'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -349,14 +347,14 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
 
         const aliceUnshielded: UnshieldedAddress = await aliceWallet.wallet.unshielded.getAddress();
         const aliceAddress: Uint8Array = encodeUserAddress(aliceUnshielded.hexString);
-        const alicePrivateState = await aliceProviders.privateStateProvider.get(ALICE_PRIVATE_ID);
+        const alicePrivateState = await aliceProviders.privateStateProvider.forContract(contractAddress).get(ALICE_PRIVATE_ID);
 
         const balanceBefore = await getNightBalance(aliceWallet);
         logger.info(`Alice NIGHT balance before claimFees: ${balanceBefore}`);
 
         logger.info(`Alice is claiming fees...`);
         const txData: FinalizedCallTxData<Contract, 'claimFees'> =
-            await (submitCallTx<Contract, 'claimFees'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -378,7 +376,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
         const alicePrivateState = createPartyPrivateState(randomBytes(32));
     
         // Step 1: Local circuit execution
-        const unprovenData: UnsubmittedDeployTxData<Contract> = 
+        const unprovenData: Ledger9UnsubmittedDeployTxData<Contract> = 
             await (createUnprovenDeployTx as any)(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -390,6 +388,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
         logger.info(`Unproven tx created. Pending contract address: ${pendingAddress}`);
 
         // Step 2: Prove (send to proof server, get ZK proof back)
+        // Midnight.js 5 providers pass transactions as era-tagged handles.
         const provenTx = await aliceProviders.proofProvider.proveTx(unprovenData.private.unprovenTx);
         logger.info('proven tx received from proof server');
 
@@ -406,8 +405,7 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
         logger.info(`Finalized! Status: ${finalizedTxData.status}, block: ${finalizedTxData.blockHeight}`);
     
         // Store private state (normally done inside deployContract)
-        aliceProviders.privateStateProvider.setContractAddress(pendingAddress);
-        await aliceProviders.privateStateProvider.set(ALICE_PRIVATE_ID, alicePrivateState);
+        await aliceProviders.privateStateProvider.forContract(pendingAddress).set(ALICE_PRIVATE_ID, alicePrivateState);
 
         const contract2Address = pendingAddress;
         logger.info(`Contract2 address: ${contract2Address}`);

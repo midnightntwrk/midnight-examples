@@ -33,17 +33,17 @@ const deploy = () =>
 const coin = (value: bigint, color = TIP_COLOR) => simCoin(value, color);
 
 describe('private tip jar (in memory)', () => {
-  it('stores the owner as a hash of the secret key, and the accepted color', () => {
-    const l = deploy().ledger();
+  it('stores the owner as a hash of the secret key, and the accepted color', async () => {
+    const l = (await deploy()).ledger();
     expect(l.owner).toEqual(pureCircuits.ownerKey(OWNER_SK));
     expect(l.tipColor).toEqual(TIP_COLOR);
     expect(l.pot.isEmpty()).toBe(true);
   });
 
-  it('accepts a tip and stores that coin under its own nonce', () => {
-    const sim = deploy();
+  it('accepts a tip and stores that coin under its own nonce', async () => {
+    const sim = await deploy();
     const tip = coin(5n);
-    const { ledger: l } = sim.as(hex(bytes32())).call('tip', tip);
+    const { ledger: l } = await sim.as(hex(bytes32())).call('tip', tip);
     expect(l.pot.size()).toBe(1n);
     const [[key, held]] = [...l.pot];
     expect(held.value).toBe(5n);
@@ -52,40 +52,40 @@ describe('private tip jar (in memory)', () => {
     expect(held.nonce).toEqual(tip.nonce);
   });
 
-  it('rejects a tip in the wrong token or worth nothing', () => {
-    const sim = deploy();
-    expectRejects(() => sim.call('tip', coin(5n, bytes32())), "Tips must be paid in the jar's token");
-    expectRejects(() => sim.call('tip', coin(0n)), 'A tip must be worth something');
+  it('rejects a tip in the wrong token or worth nothing', async () => {
+    const sim = await deploy();
+    await expectRejects(() => sim.call('tip', coin(5n, bytes32())), "Tips must be paid in the jar's token");
+    await expectRejects(() => sim.call('tip', coin(0n)), 'A tip must be worth something');
     expect(sim.ledger().pot.isEmpty()).toBe(true);
   });
 
-  it('rejects a tip that reuses a pot key, so no entry can be overwritten', () => {
-    const sim = deploy();
+  it('rejects a tip that reuses a pot key, so no entry can be overwritten', async () => {
+    const sim = await deploy();
     const first = coin(5n);
-    sim.call('tip', first);
+    await sim.call('tip', first);
     // Same nonce, different value: a different coin, but the same pot key.
-    expectRejects(() => sim.call('tip', { ...first, value: 1n }), 'A tip with that nonce is already in the jar');
+    await expectRejects(() => sim.call('tip', { ...first, value: 1n }), 'A tip with that nonce is already in the jar');
     const [[, held]] = [...sim.ledger().pot];
     expect(held.value).toBe(5n);
   });
 
-  it('lets only the owner withdraw, and only an existing tip', () => {
-    const sim = deploy();
-    sim.call('tip', coin(7n));
+  it('lets only the owner withdraw, and only an existing tip', async () => {
+    const sim = await deploy();
+    await sim.call('tip', coin(7n));
     const [[key]] = [...sim.ledger().pot];
 
     sim.privateState = createPrivateTipJarPrivateState(bytes32());
-    expectRejects(() => sim.call('withdraw', key), 'Only the owner can withdraw');
+    await expectRejects(() => sim.call('withdraw', key), 'Only the owner can withdraw');
 
     sim.privateState = createPrivateTipJarPrivateState(OWNER_SK);
-    expectRejects(() => sim.call('withdraw', bytes32()), 'No such tip in the jar');
+    await expectRejects(() => sim.call('withdraw', bytes32()), 'No such tip in the jar');
 
-    expect(sim.as(OWNER_COIN_PK).call('withdraw', key).ledger.pot.isEmpty()).toBe(true);
+    expect((await sim.as(OWNER_COIN_PK).call('withdraw', key)).ledger.pot.isEmpty()).toBe(true);
   });
 
   // SPEC.md → Privacy invariants. One entry per "never on chain" line.
-  it('keeps the tippers, their coins and the owner secret out of public state', () => {
-    const sim = deploy();
+  it('keeps the tippers, their coins and the owner secret out of public state', async () => {
+    const sim = await deploy();
     const tippers = [bytes32(), bytes32()];
     // The coins in each tipper's wallet. The sim has no wallet, so these only
     // stand in for them: the client passes a fresh coin to `tip`, never one of
@@ -93,7 +93,7 @@ describe('private tip jar (in memory)', () => {
     // coins, including the one the token issuer minted.
     const walletCoinNonces = [bytes32(), bytes32()];
     const tips = [coin(3n), coin(4n)];
-    tips.forEach((t, i) => sim.as(hex(tippers[i]!)).call('tip', t));
+    for (const [i, t] of tips.entries()) await sim.as(hex(tippers[i]!)).call('tip', t);
 
     const l = sim.ledger();
     expect(Object.keys(l).sort()).toEqual(['owner', 'pot', 'tipColor']);

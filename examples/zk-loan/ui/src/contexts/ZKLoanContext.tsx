@@ -1,7 +1,13 @@
 import React, { type PropsWithChildren, createContext, useState, useCallback, useMemo } from 'react';
 import { Buffer } from 'buffer';
-import { type ContractAddress, transientHash, CompactTypeBytes } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
-import * as ledger from '@midnight-ntwrk/midnight-js-protocol/ledger';
+import {
+  type ContractAddress,
+  ContractState,
+  type SigningKey,
+  transientHash,
+  CompactTypeBytes,
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
+import * as ledger from '@midnight-ntwrk/midnight-js-protocol/v9';
 import {
   BehaviorSubject,
   type Observable,
@@ -23,18 +29,22 @@ import {
   type Configuration,
 } from '@midnight-ntwrk/dapp-connector-api';
 import {
-  type MidnightProvider,
-  type WalletProvider,
+  createLedger9MidnightProvider,
+  createLedger9WalletProvider,
+  type ContractPrivateStates,
+  type ContractStateRead,
+  type LedgerTransaction,
   type ZKConfigProvider,
 } from '@midnight-ntwrk/midnight-js-types';
+import { assertIsContractAddress } from '@midnight-ntwrk/midnight-js-utils';
 import { FetchZkConfigProvider } from '@midnight-ntwrk/midnight-js-fetch-zk-config-provider';
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
 import { getNetworkId, setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
-import { MidnightBech32m, ShieldedAddress } from '@midnight-ntwrk/wallet-sdk-address-format';
+import { MidnightBech32m, ShieldedAddress } from '@midnightntwrk/wallet-sdk-address-format';
 import { deployContract, findDeployedContract, submitCallTx } from '@midnight-ntwrk/midnight-js-contracts';
 import { type PrivateStateProvider } from '@midnight-ntwrk/midnight-js-types';
-import { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/compact-js';
+import { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-js';
 // The contract is imported straight from the example's compiler output and
 // witnesses, not via ../../contract/index.ts: that module resolves its key
 // directory with node:path, which does not exist in the browser. Here the keys
@@ -42,6 +52,19 @@ import { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/compact-j
 import * as ZKLoanCreditScorer from '../../../contract/managed/zk-loan/contract/index.js';
 import { witnesses, type ZkLoanPrivateState as ZKLoanCreditScorerPrivateState } from '../../../contract/witnesses';
 import { saveLoanProfile } from '../utils/loanProfiles';
+
+/** How long a built transaction stays valid (Midnight.js 5 `config.ttlSeconds`). */
+const TX_TTL_SECONDS = 3600;
+
+/**
+ * The state data `ledger()` decodes. Midnight.js 5 serves the serialized state
+ * tagged with the ledger era that wrote it; this contract is deployed on
+ * ledger 9, so only a ledger 9 decoder is given.
+ */
+function contractStateData(read: ContractStateRead) {
+  if (read.contractState.era !== 'v9') throw new Error('Expected a ledger 9 contract state');
+  return read.contractState.deserialize({ v9: ContractState }).data;
+}
 
 // Type for the ZKLoan contract
 type ZKLoanCreditScorerContract = ZKLoanCreditScorer.Contract<ZKLoanCreditScorerPrivateState>;
@@ -129,51 +152,66 @@ function hexToUint8Array(hex: string): Uint8Array {
   return new Uint8Array(matches.map((byte) => parseInt(byte, 16)));
 }
 
-// In-memory private state provider that implements the full PrivateStateProvider interface
-// including setContractAddress (required by findDeployedContract/submitCallTx in v3.1.0)
+// In-memory private state provider that implements the full PrivateStateProvider
+// interface: private state per contract address (`forContract`) and signing
+// keys, for the lifetime of the page. Export/import reject.
 function inMemoryPrivateStateProvider<PSI extends string, PS>(): PrivateStateProvider<PSI, PS> {
-  const states = new Map<string, PS>();
-  const signingKeys = new Map<string, unknown>();
-  let contractAddress: string | null = null;
+  const states = new Map<ContractAddress, Map<PSI, PS>>();
+  const signingKeys = new Map<ContractAddress, SigningKey>();
+  const unsupported = (method: string) => async (): Promise<never> => {
+    throw new Error(`${method} is not supported by the in-memory provider`);
+  };
 
-  const scopedKey = (key: PSI): string => contractAddress ? `${contractAddress}:${key}` : key;
+  const forContract = (address: ContractAddress): ContractPrivateStates<PSI, PS> => {
+    // The same checks the persistent provider makes: 32 bytes of hex,
+    // compared in lower case.
+    assertIsContractAddress(address);
+    const contractAddress = address.toLowerCase();
+    const scoped = (): Map<PSI, PS> => {
+      let m = states.get(contractAddress);
+      if (m === undefined) states.set(contractAddress, (m = new Map()));
+      return m;
+    };
+    return {
+      contractAddress,
+      async set(id: PSI, state: PS) {
+        scoped().set(id, state);
+      },
+      async get(id: PSI) {
+        return states.get(contractAddress)?.get(id) ?? null;
+      },
+      async remove(id: PSI) {
+        states.get(contractAddress)?.delete(id);
+      },
+      async clear() {
+        states.delete(contractAddress);
+      },
+      exportPrivateStates: unsupported('exportPrivateStates'),
+      importPrivateStates: unsupported('importPrivateStates'),
+    };
+  };
 
   return {
-    setContractAddress(address: ContractAddress): void {
-      contractAddress = address;
-    },
-    async get(key: PSI): Promise<PS | null> {
-      return states.get(scopedKey(key)) ?? null;
-    },
-    async set(key: PSI, value: PS): Promise<void> {
-      states.set(scopedKey(key), value);
-    },
-    async remove(key: PSI): Promise<void> {
-      states.delete(scopedKey(key));
-    },
-    async clear(): Promise<void> {
+    forContract,
+    // Private states only; signing keys have clearSigningKeys.
+    async clearAll() {
       states.clear();
     },
-    async setSigningKey(address: ContractAddress, signingKey: unknown): Promise<void> {
+    async setSigningKey(address: ContractAddress, signingKey: SigningKey) {
       signingKeys.set(address, signingKey);
     },
-    async getSigningKey(address: ContractAddress): Promise<unknown | null> {
+    async getSigningKey(address: ContractAddress) {
       return signingKeys.get(address) ?? null;
     },
-    async removeSigningKey(address: ContractAddress): Promise<void> {
+    async removeSigningKey(address: ContractAddress) {
       signingKeys.delete(address);
     },
-    async clearSigningKeys(): Promise<void> {
+    async clearSigningKeys() {
       signingKeys.clear();
     },
-    async exportPrivateStates() {
-      throw new Error('Export not supported in in-memory provider');
-    },
-    async importPrivateStates() {
-      throw new Error('Import not supported in in-memory provider');
-    },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any;
+    exportSigningKeys: unsupported('exportSigningKeys'),
+    importSigningKeys: unsupported('importSigningKeys'),
+  };
 }
 
 export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger, children }) => {
@@ -311,7 +349,9 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
     }
 
     // ZK config provider - fetches prover/verifier keys
-    const zkConfigProvider: ZKConfigProvider<ZKLoanCircuitKeys> = new FetchZkConfigProvider<ZKLoanCircuitKeys>(zkConfigPath, fetch.bind(window));
+    const zkConfigProvider: ZKConfigProvider<ZKLoanCircuitKeys> = new FetchZkConfigProvider<ZKLoanCircuitKeys>(zkConfigPath, {
+      fetchFunc: fetch.bind(window),
+    });
 
     // Proof provider - uses remote proof server
     const proofProvider = httpClientProofProvider(config.proverServerUri, zkConfigProvider);
@@ -337,8 +377,11 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
     }
 
     // Wallet connector returns addresses in Bech32m format (strings)
-    // CoinPublicKey and EncPublicKey types are also strings
-    const walletProvider: WalletProvider = {
+    // CoinPublicKey and EncPublicKey types are also strings.
+    // createLedger9WalletProvider / createLedger9MidnightProvider lift these
+    // ledger 9-only implementations into Midnight.js 5's era-tagged provider
+    // interfaces: they hand us ledger 9 transaction handles (bytes plus era).
+    const walletProvider = createLedger9WalletProvider({
       getCoinPublicKey(): ledger.CoinPublicKey {
         // Return the coin public key directly as bech32 string
         return addresses.shieldedCoinPublicKey as ledger.CoinPublicKey;
@@ -350,7 +393,7 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
       },
 
       async balanceTx(
-        tx: ledger.Transaction<ledger.SignatureEnabled, ledger.Proof, ledger.PreBinding>,
+        tx: LedgerTransaction<'Unbound', 'v9'>,
         _ttl?: Date,
       ): Promise<ledger.FinalizedTransaction> {
         try {
@@ -386,18 +429,19 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
           throw e;
         }
       },
-    };
+    });
 
     // Midnight provider - handles transaction submission
-    const midnightProvider: MidnightProvider = {
-      async submitTx(tx: ledger.FinalizedTransaction): Promise<ledger.TransactionId> {
+    const midnightProvider = createLedger9MidnightProvider(
+      async (handle: LedgerTransaction<'Finalized', 'v9'>): Promise<ledger.TransactionId> => {
         setFlowMessage('Submitting transaction...');
         logger.info('Submitting transaction via wallet');
 
-        const serialized = tx.serialize();
+        const serialized = handle.serialize();
         const serializedStr = uint8ArrayToHex(serialized);
         await wallet.submitTransaction(serializedStr);
 
+        const tx = ledger.Transaction.deserialize('signature', 'proof', 'binding', serialized);
         const txIdentifiers = tx.identifiers();
         const txId = txIdentifiers[0];
 
@@ -405,7 +449,7 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
         logger.info({ txId }, 'Transaction submitted successfully');
         return txId;
       },
-    };
+    );
 
     return {
       privateStateProvider,
@@ -414,6 +458,7 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
       publicDataProvider,
       walletProvider,
       midnightProvider,
+      config: { networkId: config.networkId, ttlSeconds: TX_TTL_SECONDS },
     };
   }, [connectToWallet, logger, privateStateProvider]);
 
@@ -585,7 +630,9 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
       attestationSignature,
       attestationProviderId: BigInt(providerInfo.providerId),
     };
-    await providersRef.privateStateProvider.set('zkLoanCreditScorerPrivateState', updatedState);
+    await providersRef.privateStateProvider
+      .forContract(contractAddressRef)
+      .set('zkLoanCreditScorerPrivateState', updatedState);
     setPrivateState(updatedState);
     logger.info({ providerId: providerInfo.providerId }, 'Private state updated with attestation');
 
@@ -610,7 +657,7 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
       try {
         const contractState = await publicDataProviderRef.queryContractState(contractAddressRef);
         if (contractState) {
-          const ledgerState = ZKLoanCreditScorer.ledger(contractState.data);
+          const ledgerState = ZKLoanCreditScorer.ledger(contractStateData(contractState));
           const userPublicKey = ZKLoanCreditScorer.pureCircuits.deriveUserPublicKey(privateState.userSecretKey, pin);
 
           if (ledgerState.loans.member(userPublicKey)) {
@@ -689,7 +736,7 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
       }
 
       // Parse the ledger state
-      const ledgerState = ZKLoanCreditScorer.ledger(contractState.data);
+      const ledgerState = ZKLoanCreditScorer.ledger(contractStateData(contractState));
 
       // Derive the user's public key from their wallet public key and PIN
       const userPublicKey = ZKLoanCreditScorer.pureCircuits.deriveUserPublicKey(privateState.userSecretKey, pin);

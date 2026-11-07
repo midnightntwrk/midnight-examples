@@ -38,7 +38,8 @@
     "test:sim": "npm run test:sim --workspaces --if-present",
     "test:local": "npm run test:local --workspaces --if-present",
     "test:preprod": "npm run test:preprod --workspaces --if-present",
-    "test:preview": "npm run test:preview --workspaces --if-present"
+    "test:preview": "npm run test:preview --workspaces --if-present",
+    "test:custom": "npm run test:custom --workspaces --if-present"
   },
   "devDependencies": {
     "bn.js": "5.2.5",
@@ -46,6 +47,10 @@
     "vitest": "^5.0.4"
   },
   "overrides": {
+    "@midnightntwrk/wallet-sdk": "2.0.0",
+    "@midnightntwrk/ledger-v9": "1.0.0",
+    "@midnightntwrk/onchain-runtime-v4": "4.0.0",
+    "@midnightntwrk/zkir-v3": "3.2.0",
     "@midnight-ntwrk/wallet-sdk": "1.2.0",
     "@midnight-ntwrk/ledger-v8": "8.1.2",
     "@midnight-ntwrk/onchain-runtime-v3": "3.1.1",

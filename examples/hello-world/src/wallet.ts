@@ -1,23 +1,35 @@
 // The test wallet, built from the published Midnight SDK packages only:
 // @midnight-ntwrk/testkit-js supplies the wallet provider and sync helper, and
-// @midnight-ntwrk/wallet-sdk the wallet itself.
+// @midnightntwrk/wallet-sdk the wallet itself.
 //
 // A wallet syncs from genesis. On a local devnet that takes seconds; on preprod
 // it can take over an hour the first time, so remote runs set a long
 // MIDNIGHT_SYNC_TIMEOUT_MS (see the test suite).
 
-import { randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { DustSecretKey, unshieldedToken, ZswapSecretKeys } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+import { fileURLToPath } from 'node:url';
+import { unshieldedToken } from '@midnight-ntwrk/midnight-js-protocol/v9';
 import {
+  DEFAULT_DUST_OPTIONS,
   type EnvironmentConfiguration,
   FluentWalletBuilder,
   MidnightWalletProvider,
   logger as testkitLogger,
   syncWallet as testkitSyncWallet,
 } from '@midnight-ntwrk/testkit-js';
-import type { FacadeState, UnshieldedKeystore, WalletFacade } from '@midnight-ntwrk/wallet-sdk';
+import {
+  DustWallet,
+  type FacadeState,
+  InMemoryTransactionHistoryStorage,
+  mergeWalletEntries,
+  ShieldedWallet,
+  type UnshieldedKeystore,
+  UnshieldedWallet,
+  WalletEntrySchema,
+  WalletFacade,
+} from '@midnightntwrk/wallet-sdk';
 import type { Logger } from 'pino';
 import * as Rx from 'rxjs';
 
@@ -42,19 +54,13 @@ export async function buildWallet(
   secret: WalletSecret,
 ): Promise<MidnightWalletProvider> {
   const builder = FluentWalletBuilder.forEnvironment(env);
-  const { wallet, seeds, keystore } = await (secret.kind === 'mnemonic'
-    ? builder.withMnemonic(secret.value)
-    : builder.withSeed(secret.value)
-  ).buildWithoutStarting();
-  logger.info(`Wallet built from ${secret.kind}.`);
-  return MidnightWalletProvider.withWallet(
+  const provider = await buildProvider(
     logger,
     env,
-    wallet,
-    ZswapSecretKeys.fromSeed(seeds.shielded),
-    DustSecretKey.fromSeed(seeds.dust),
-    keystore,
+    secret.kind === 'mnemonic' ? builder.withMnemonic(secret.value) : builder.withSeed(secret.value),
   );
+  logger.info(`Wallet built from ${secret.kind}.`);
+  return provider;
 }
 
 /** Wait until the wallet has caught up with the chain. `timeout` caps the gap between updates. */
@@ -62,7 +68,106 @@ export async function syncWallet(logger: Logger, wallet: WalletFacade, timeout =
   logger.info('Syncing wallet...');
   const state = await testkitSyncWallet(wallet, 0, timeout);
   logger.info('Wallet synced.');
+  await saveWalletState(logger, wallet);
   return state;
+}
+
+// ---------------------------------------------------------------------------
+// Saved wallet state (remote networks)
+// ---------------------------------------------------------------------------
+// On a long-lived network a sync from genesis takes minutes per wallet, and
+// every suite builds its wallets afresh. So after each sync the three
+// sub-wallets' state is saved to the gitignored repo-root .wallet-state/,
+// keyed by network ID and a hash of the master seed, and the next build of the
+// same wallet restores it and syncs only the gap. The local devnet is skipped:
+// it starts from a new genesis each time. MIDNIGHT_WALLET_STATE=off turns this
+// off.
+
+const STATE_DIR = fileURLToPath(new URL('../../../.wallet-state/', import.meta.url));
+const stateFiles = new WeakMap<WalletFacade, string>();
+
+type SavedWalletState = { version: 1; shielded: string; unshielded: string; dust: string };
+
+function stateFileFor(networkId: string, masterSeed: string): string | undefined {
+  if (networkId === 'undeployed' || process.env['MIDNIGHT_WALLET_STATE'] === 'off') return undefined;
+  const id = createHash('sha256').update(masterSeed).digest('hex').slice(0, 16);
+  return join(STATE_DIR, `${networkId}-${id}.json`);
+}
+
+/** The three sub-wallets restored from a snapshot, configured as testkit's WalletFactory configures new ones. */
+async function restoreFacade(builder: FluentWalletBuilder, saved: SavedWalletState): Promise<WalletFacade> {
+  // testkit keeps the builder's wallet configuration private and does not
+  // export the function that derives it; reuse it so a restored wallet is
+  // configured exactly like a new one.
+  const config = (builder as unknown as { config: Parameters<typeof ShieldedWallet>[0] }).config;
+  const shielded = ShieldedWallet(config).restore(saved.shielded);
+  const unshielded = UnshieldedWallet({
+    ...config,
+    txHistoryStorage: new InMemoryTransactionHistoryStorage(WalletEntrySchema, mergeWalletEntries),
+  } as Parameters<typeof UnshieldedWallet>[0]).restore(saved.unshielded);
+  const dust = DustWallet({
+    ...config,
+    costParameters: {
+      ledgerParams: DEFAULT_DUST_OPTIONS.ledgerParams,
+      additionalFeeOverhead: DEFAULT_DUST_OPTIONS.additionalFeeOverhead,
+      feeBlocksMargin: DEFAULT_DUST_OPTIONS.feeBlocksMargin,
+    },
+  } as Parameters<typeof DustWallet>[0]).restore(saved.dust);
+  return WalletFacade.init({
+    configuration: config as Parameters<typeof WalletFacade.init>[0]['configuration'],
+    shielded: () => shielded,
+    unshielded: () => unshielded,
+    dust: () => dust,
+  });
+}
+
+async function buildProvider(
+  logger: Logger,
+  env: EnvironmentConfiguration,
+  builder: FluentWalletBuilder,
+): Promise<MidnightWalletProvider> {
+  const { wallet: fresh, seeds, keystore } = await builder.buildWithoutStarting();
+  const file = stateFileFor(env.networkId, seeds.masterSeed);
+  let wallet = fresh;
+  if (file && existsSync(file)) {
+    try {
+      wallet = await restoreFacade(builder, JSON.parse(readFileSync(file, 'utf8')) as SavedWalletState);
+      logger.info(`Restored wallet state from ${file}.`);
+    } catch (error) {
+      logger.warn(`Could not restore ${file} (${String(error)}); syncing from genesis.`);
+    }
+  }
+  if (file) stateFiles.set(wallet, file);
+  return MidnightWalletProvider.withWallet(logger, env, wallet, seeds, keystore);
+}
+
+/**
+ * Build an un-started wallet provider from a hex master seed, restoring saved
+ * state when there is some. Use it in place of `MidnightWalletProvider.build`,
+ * which also logs the seed.
+ */
+export async function buildWalletFromSeed(
+  logger: Logger,
+  env: EnvironmentConfiguration,
+  seed: string,
+): Promise<MidnightWalletProvider> {
+  return buildProvider(logger, env, FluentWalletBuilder.forEnvironment(env).withSeed(seed));
+}
+
+/** Save the wallet's state for the next build of the same wallet (no-op on the local devnet). */
+export async function saveWalletState(logger: Logger, wallet: WalletFacade): Promise<void> {
+  const file = stateFiles.get(wallet);
+  if (!file) return;
+  const saved: SavedWalletState = {
+    version: 1,
+    shielded: await wallet.shielded.serializeState(),
+    unshielded: await wallet.unshielded.serializeState(),
+    dust: await wallet.dust.serializeState(),
+  };
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  writeFileSync(`${file}.tmp`, JSON.stringify(saved), { mode: 0o600 });
+  renameSync(`${file}.tmp`, file);
+  logger.info(`Saved wallet state to ${file}.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,13 +255,30 @@ async function latestBlockTime(indexerHttpUrl: string, timeoutMs: number): Promi
   }
 }
 
+/** 1 DUST is 10^15 Specks (SPECKS_PER_DUST in the ledger). */
+const SPECKS_PER_DUST = 10n ** 15n;
+
+/**
+ * The DUST a wallet must hold before a suite transacts: enough to pay for a
+ * deploy. MIDNIGHT_MIN_DUST overrides it, in DUST (default 60).
+ */
+const MIN_DUST_SPECKS = BigInt(
+  Math.round(Number(process.env['MIDNIGHT_MIN_DUST'] ?? '60') * 1e6),
+) * (SPECKS_PER_DUST / 10n ** 6n);
+
+function formatDust(specks: bigint): string {
+  return `${specks / SPECKS_PER_DUST}.${(specks % SPECKS_PER_DUST).toString().padStart(15, '0').slice(0, 6)}`;
+}
+
 /**
  * Wait until the wallet holds at least `minCoins` spendable DUST coin(s).
  *
- * With `indexerHttpUrl`, also wait until that DUST is worth something at the
- * latest block's time, which is when the wallet values it while balancing. On a
- * fresh local devnet the DUST exists from genesis but is worth 0 until the
- * first block after genesis.
+ * With `indexerHttpUrl`, also wait until the DUST is worth at least
+ * MIN_DUST_SPECKS at the latest block's time, which is when the wallet values
+ * it while balancing. DUST accrues after registration, so a freshly registered
+ * wallet holds a coin worth almost nothing, too little to pay for a deploy
+ * ("could not balance dust"). On a fresh local devnet the DUST exists from
+ * genesis but is worth 0 until the first block after genesis.
  */
 export async function waitForDust(
   logger: Logger,
@@ -178,13 +300,24 @@ export async function waitForDust(
     ),
   );
   if (indexerHttpUrl) {
+    logger.info(`Waiting for >=${formatDust(MIN_DUST_SPECKS)} DUST at the latest block...`);
+    let latest = state;
+    let lastLogged = 0;
     for (;;) {
       const blockTime = await latestBlockTime(indexerHttpUrl, Math.min(10_000, deadline - Date.now()));
-      if (blockTime && state.dust.balance(blockTime) > 0n) break;
+      const balance = blockTime ? latest.dust.balance(blockTime) : 0n;
+      if (balance >= MIN_DUST_SPECKS) break;
       if (Date.now() > deadline) {
-        throw new Error(`DUST still worth 0 at the latest block after ${timeoutMs}ms`);
+        throw new Error(
+          `DUST at ${formatDust(balance)}, below ${formatDust(MIN_DUST_SPECKS)}, after ${timeoutMs}ms`,
+        );
       }
-      await new Promise((r) => setTimeout(r, 2_000));
+      if (Date.now() - lastLogged >= 60_000) {
+        logger.info(`  DUST ${formatDust(balance)} / ${formatDust(MIN_DUST_SPECKS)}`);
+        lastLogged = Date.now();
+      }
+      await new Promise((r) => setTimeout(r, 5_000));
+      latest = await Rx.firstValueFrom(wallet.state());
     }
   }
   logger.info('DUST ready.');
@@ -249,7 +382,7 @@ export async function waitForFunding(
     const recipe = await wallet.registerNightUtxosForDustGeneration(
       unregistered,
       keystore.getPublicKey(),
-      (payload) => keystore.signData(payload),
+      async (payload) => keystore.signData(payload),
     );
     const txId = await wallet.submitTransaction(await wallet.finalizeRecipe(recipe));
     logger.info(`${label}: DUST registration submitted (${txId}).`);

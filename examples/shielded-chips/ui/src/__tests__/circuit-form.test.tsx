@@ -2,7 +2,7 @@
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MAX_FIELD } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+import { MAX_FIELD } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import { CircuitForm } from "../components/circuit-form";
 import { parseArg, parseArgs, type ArgSpec } from "../lib/circuit-args";
 import { bookedCoins, clearCoins, recordCoins } from "../lib/coin-book";

@@ -11,14 +11,14 @@
 // `getShieldedAddresses()` returns it in Bech32m (`mn_shield-cpk_<network>1...`);
 // the Node harness encodes the wallet SDK's hex key with `encodeCoinPublicKey`.
 //
-// Template-owned: edit packages/mnkit/templates/ui/src/lib/addresses.ts, then
+// Template-owned: edit templates/ui/src/lib/addresses.ts, then
 // `npm run new:ui -- --sync-all`.
 import type { ConnectedAPI } from "@midnight-ntwrk/dapp-connector-api";
 import {
   MidnightBech32m,
   ShieldedCoinPublicKey,
   UnshieldedAddress,
-} from "@midnight-ntwrk/wallet-sdk-address-format";
+} from "@midnightntwrk/wallet-sdk-address-format";
 
 /** The TypeScript shape of Compact's `UserAddress` struct. */
 export interface UserAddressValue {

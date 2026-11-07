@@ -17,13 +17,13 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { createUnprovenCallTx, deployContract, submitCallTx, type DeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
-import { type ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import { type ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
 import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust, type WalletSecret } from '../wallet.js';
-import { buildProviders, type PartyProviders } from '../providers.js';
+import { buildProviders, ledgerState, type PartyProviders } from '../providers.js';
 import { prepareSponsoredCall, sponsorAndSubmit } from '../sponsor.js';
 import {
     CompiledPartyContract,
@@ -75,7 +75,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
         const state =
             await providers.publicDataProvider.queryContractState(contractAddress);
         expect(state).not.toBeNull();
-        return ledger(state!.data);
+        return ledger(ledgerState(state));
     }
 
     async function getNightBalance(walletProvider: MidnightWalletProvider): Promise<bigint> {
@@ -194,7 +194,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
         const alicePrivateState = createPartyPrivateState(randomBytes(32));
         logger.info('Alice is deploying a party contract for the sponsorship demo...');
         const deployed: DeployedContract<Contract> =
-            await (deployContract<Contract>)(aliceProviders, {
+            await deployContract(aliceProviders, {
                 compiledContract: CompiledPartyContract,
                 privateStateId: ALICE_PRIVATE_ID,
                 initialPrivateState: alicePrivateState,
@@ -205,8 +205,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
 
         // Dave's own private state — Alice never sees this secret.
         const davePrivateState = createPartyPrivateState(randomBytes(32));
-        daveProviders.privateStateProvider.setContractAddress(contractAddress);
-        await daveProviders.privateStateProvider.set(DAVE_PRIVATE_ID, davePrivateState);
+        await daveProviders.privateStateProvider.forContract(contractAddress).set(DAVE_PRIVATE_ID, davePrivateState);
     });
 
     afterAll(async () => {
@@ -245,7 +244,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
     });
 
     it("Dave cannot pay for his own RSVP", async () => {
-        const davePrivateState = await daveProviders.privateStateProvider.get(DAVE_PRIVATE_ID);
+        const davePrivateState = await daveProviders.privateStateProvider.forContract(contractAddress).get(DAVE_PRIVATE_ID);
 
         const unsubmitted = await createUnprovenCallTx<Contract, 'rsvp'>(daveProviders, {
             compiledContract: CompiledPartyContract,
@@ -266,7 +265,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
     });
 
     it("Alice sponsors Dave's RSVP", async () => {
-        const davePrivateState = await daveProviders.privateStateProvider.get(DAVE_PRIVATE_ID);
+        const davePrivateState = await daveProviders.privateStateProvider.forContract(contractAddress).get(DAVE_PRIVATE_ID);
         const before = await queryLedger(aliceProviders);
 
         // USER SIDE — runs with Dave's keys. No DUST anywhere in this call.
@@ -291,11 +290,11 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
     });
 
     it('Alice starts the party', async () => {
-        const alicePrivateState = await aliceProviders.privateStateProvider.get(ALICE_PRIVATE_ID);
+        const alicePrivateState = await aliceProviders.privateStateProvider.forContract(contractAddress).get(ALICE_PRIVATE_ID);
 
         // Alice has DUST of her own, so she needs no sponsor here — this is the
         // ordinary self-paying path, exactly as in party.test.ts.
-        await (submitCallTx<Contract, 'startParty'>)(aliceProviders, {
+        await submitCallTx(aliceProviders, {
             compiledContract: CompiledPartyContract,
             contractAddress,
             privateStateId: ALICE_PRIVATE_ID,
@@ -311,7 +310,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
         // `checkIn` requires commitAddress(_secret, address.bytes) to be on the RSVP
         // list. That commitment binds Dave's secret, which Alice does not have — so
         // paying every one of his fees still confers no authority to act as him.
-        const alicePrivateState = await aliceProviders.privateStateProvider.get(ALICE_PRIVATE_ID);
+        const alicePrivateState = await aliceProviders.privateStateProvider.forContract(contractAddress).get(ALICE_PRIVATE_ID);
 
         logger.info("Alice tries to check in as Dave, using her own secret...");
         await expect(
@@ -327,11 +326,16 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
     });
 
     it("Alice sponsors Dave's check-in — Dave pays the entry fee, Alice pays the DUST", async () => {
-        const davePrivateState = await daveProviders.privateStateProvider.get(DAVE_PRIVATE_ID);
+        const davePrivateState = await daveProviders.privateStateProvider.forContract(contractAddress).get(DAVE_PRIVATE_ID);
 
         const daveNightBefore = await waitForStableNightBalance(daveWallet);
         const daveDustBefore = await daveWallet.getDustBalance();
-        const aliceDustBefore = await aliceWallet.getDustBalance();
+        // Alice's DUST keeps generating while the call runs. On a network
+        // where her DUST is still below its cap, that growth can outweigh the
+        // fee, so a plain before/after comparison proves nothing. Keep the
+        // whole state instead and value both states at the same instant below:
+        // the generation then cancels out and only the fee is left.
+        const aliceStateBefore = await aliceWallet.wallet.waitForSyncedState();
 
         const txHex = await prepareSponsoredCall<Contract, 'checkIn'>(logger, daveWallet, daveProviders, {
             compiledContract: CompiledPartyContract,
@@ -345,7 +349,10 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
 
         const daveNightAfter = await waitForStableNightBalance(daveWallet);
         const daveDustAfter = await daveWallet.getDustBalance();
-        const aliceDustAfter = await aliceWallet.getDustBalance();
+        const aliceStateAfter = await aliceWallet.wallet.waitForSyncedState();
+        const valuedAt = new Date();
+        const aliceDustBefore = aliceStateBefore.dust.balance(valuedAt);
+        const aliceDustAfter = aliceStateAfter.dust.balance(valuedAt);
 
         // console.log, not logger.info: pino's pino-pretty transport runs in a worker
         // that vitest tears down at end-of-file, so logs from the last test are lost.
@@ -355,7 +362,7 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
                 '=================== fee sponsorship ===================',
                 `  Dave  NIGHT (STAR) : ${daveNightBefore} -> ${daveNightAfter}  (delta ${daveNightAfter - daveNightBefore})`,
                 `  Dave  DUST (SPECK) : ${daveDustBefore} -> ${daveDustAfter}`,
-                `  Alice DUST (SPECK) : ${aliceDustBefore} -> ${aliceDustAfter}  (delta ${aliceDustAfter - aliceDustBefore})`,
+                `  Alice DUST (SPECK) : ${aliceDustBefore} -> ${aliceDustAfter}  (delta ${aliceDustAfter - aliceDustBefore}, both valued at ${valuedAt.toISOString()})`,
                 '  Dave paid the entry fee; Alice paid the transaction fee.',
                 '=======================================================',
                 '',

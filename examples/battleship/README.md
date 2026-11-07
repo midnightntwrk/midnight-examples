@@ -30,6 +30,11 @@ npm run compile
 
 ## Start the local Midnight network
 
+> **The local devnet isn't on Ledger 9 yet.** It still runs public images that predate
+> Ledger 9, so contract calls fail under `npm run test:local`. Run the network tests
+> with `npm run test:preview` for now. See
+> [Local devnet: not on Ledger 9 yet](../../README.md#local-devnet-not-on-ledger-9-yet).
+
 Ensure the Docker engine is running, then from `examples/battleship`:
 ```bash
 npm run env:up

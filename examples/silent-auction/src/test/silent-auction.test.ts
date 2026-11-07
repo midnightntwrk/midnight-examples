@@ -43,7 +43,7 @@ import {
 import {
   type ContractAddress,
   encodeUserAddress,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { SucceedEntirely } from '@midnight-ntwrk/midnight-js-types';
 import {
   type EnvironmentConfiguration,
@@ -59,7 +59,7 @@ import {
   resolveWallet,
   waitForNightThenDust,
 } from '../wallet.js';
-import { buildProviders, type SilentAuctionProviders } from '../providers.js';
+import { buildProviders, ledgerState, type SilentAuctionProviders } from '../providers.js';
 import {
   CompiledSilentAuctionContract,
   Contract,
@@ -140,7 +140,7 @@ describe(`Silent Auction Contract (${network})`, () => {
   async function queryLedger() {
     const state = await organizerProviders.publicDataProvider.queryContractState(contractAddress);
     expect(state).not.toBeNull();
-    return ledger(state!.data);
+    return ledger(ledgerState(state));
   }
 
   // A wallet's own unshielded address, as the { bytes } struct a UserAddress
@@ -184,8 +184,7 @@ describe(`Silent Auction Contract (${network})`, () => {
     role: Role,
     state: SilentAuctionPrivateState,
   ): Promise<void> {
-    providers.privateStateProvider.setContractAddress(contractAddress);
-    await providers.privateStateProvider.set(PRIVATE_STATE_IDS[role], state);
+    await providers.privateStateProvider.forContract(contractAddress).set(PRIVATE_STATE_IDS[role], state);
   }
 
   beforeAll(async () => {
@@ -257,7 +256,7 @@ describe(`Silent Auction Contract (${network})`, () => {
   // ---------------------------------------------------------------------------
 
   it('deploys the contract in the RECEIVE state (organizer)', async () => {
-    const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(organizerProviders, {
+    const deployed: DeployedContract<Contract> = await deployContract(organizerProviders, {
       compiledContract: CompiledSilentAuctionContract,
       privateStateId: PRIVATE_STATE_IDS.ORGANIZER,
       // The constructor invokes localSk()/localSalt(): deploy as the organizer.
@@ -292,7 +291,7 @@ describe(`Silent Auction Contract (${network})`, () => {
   it('rejects receiveTokens from a bidder (not the organizer)', async () => {
     await usePrivateState(bidderOneProviders, 'BIDDER_ONE', bidderOneState);
     await expect(
-      (submitCallTx<Contract, 'receiveTokens'>)(bidderOneProviders, {
+      submitCallTx(bidderOneProviders, {
         compiledContract: CompiledSilentAuctionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.BIDDER_ONE,
@@ -308,7 +307,7 @@ describe(`Silent Auction Contract (${network})`, () => {
   it('lets the organizer deposit NIGHT and mint the NFT (RECEIVE -> OPEN)', async () => {
     const nightBefore = await unshielded(organizerWallet, NIGHT);
 
-    const res = await (submitCallTx<Contract, 'receiveTokens'>)(organizerProviders, {
+    const res = await submitCallTx(organizerProviders, {
       compiledContract: CompiledSilentAuctionContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_IDS.ORGANIZER,
@@ -334,7 +333,7 @@ describe(`Silent Auction Contract (${network})`, () => {
 
   it('rejects a bid from the organizer', async () => {
     await expect(
-      (submitCallTx<Contract, 'bid'>)(organizerProviders, {
+      submitCallTx(organizerProviders, {
         compiledContract: CompiledSilentAuctionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.ORGANIZER,
@@ -350,7 +349,7 @@ describe(`Silent Auction Contract (${network})`, () => {
 
   it('accepts the first bid (bidder one)', async () => {
     await usePrivateState(bidderOneProviders, 'BIDDER_ONE', bidderOneState);
-    const res = await (submitCallTx<Contract, 'bid'>)(bidderOneProviders, {
+    const res = await submitCallTx(bidderOneProviders, {
       compiledContract: CompiledSilentAuctionContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_IDS.BIDDER_ONE,
@@ -367,7 +366,7 @@ describe(`Silent Auction Contract (${network})`, () => {
 
   it('accepts the second, higher bid and auto-closes at maxBids (OPEN -> CLOSED)', async () => {
     await usePrivateState(bidderTwoProviders, 'BIDDER_TWO', bidderTwoState);
-    const res = await (submitCallTx<Contract, 'bid'>)(bidderTwoProviders, {
+    const res = await submitCallTx(bidderTwoProviders, {
       compiledContract: CompiledSilentAuctionContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_IDS.BIDDER_TWO,
@@ -385,7 +384,7 @@ describe(`Silent Auction Contract (${network})`, () => {
 
   it('rejects a bid once the auction is closed', async () => {
     await expect(
-      (submitCallTx<Contract, 'bid'>)(bidderOneProviders, {
+      submitCallTx(bidderOneProviders, {
         compiledContract: CompiledSilentAuctionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.BIDDER_ONE,
@@ -406,7 +405,7 @@ describe(`Silent Auction Contract (${network})`, () => {
 
   it('rejects revealWin when the organizer changes the reserve price', async () => {
     await expect(
-      (submitCallTx<Contract, 'revealWin'>)(organizerProviders, {
+      submitCallTx(organizerProviders, {
         compiledContract: CompiledSilentAuctionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.ORGANIZER,
@@ -420,7 +419,7 @@ describe(`Silent Auction Contract (${network})`, () => {
   });
 
   it('reveals the true reserve price (highest bid clears the reserve)', async () => {
-    const res = await (submitCallTx<Contract, 'revealWin'>)(organizerProviders, {
+    const res = await submitCallTx(organizerProviders, {
       compiledContract: CompiledSilentAuctionContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_IDS.ORGANIZER,
@@ -444,7 +443,7 @@ describe(`Silent Auction Contract (${network})`, () => {
 
   it('rejects claimWin from a non-winning bidder', async () => {
     await expect(
-      (submitCallTx<Contract, 'claimWin'>)(bidderOneProviders, {
+      submitCallTx(bidderOneProviders, {
         compiledContract: CompiledSilentAuctionContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_IDS.BIDDER_ONE,
@@ -463,7 +462,7 @@ describe(`Silent Auction Contract (${network})`, () => {
     const winnerNftBefore = await unshielded(bidderTwoWallet, nftColor);
     const organizerNightBefore = await unshielded(organizerWallet, NIGHT);
 
-    const res = await (submitCallTx<Contract, 'claimWin'>)(bidderTwoProviders, {
+    const res = await submitCallTx(bidderTwoProviders, {
       compiledContract: CompiledSilentAuctionContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_IDS.BIDDER_TWO,

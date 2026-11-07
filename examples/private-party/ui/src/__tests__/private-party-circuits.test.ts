@@ -17,7 +17,7 @@ import {
   createConstructorContext,
   dummyContractAddress,
   type ChargedState,
-} from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+} from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import type { UserAddressValue } from "../lib/addresses";
 import { withUnshieldedBalance } from "./contract-balance";
 import { Contract, createInitialPrivateState, ledger, type Ledger } from "../midnight/contract";
@@ -56,9 +56,9 @@ const bob = person("bob", 2);
 const charlie = person("charlie", 3);
 const dave = person("dave", 4); // never RSVPs
 
-function deploy(partySize: bigint, fee: bigint, organizer: Person): ChargedState {
+async function deploy(partySize: bigint, fee: bigint, organizer: Person): Promise<ChargedState> {
   const ps = createInitialPrivateState(organizer.secret);
-  return contract.initialState(createConstructorContext(ps, COIN_PK), partySize, fee, organizer.secret)
+  return (await contract.initialState(createConstructorContext(ps, COIN_PK), partySize, fee, organizer.secret))
     .currentContractState.data;
 }
 
@@ -71,22 +71,28 @@ function deploy(partySize: bigint, fee: bigint, organizer: Person): ChargedState
  * wrong"). On chain, every checkIn paid `entryFee` NIGHT in, so give the
  * context that balance: checkedInParty.size() * entryFee.
  */
-function call(state: ChargedState, circuit: PartyCircuit, who: Person): ChargedState {
+async function call(state: ChargedState, circuit: PartyCircuit, who: Person): Promise<ChargedState> {
   const l = ledger(state);
   const ctx = withUnshieldedBalance(
-    createCircuitContext(dummyContractAddress(), COIN_PK, state, createInitialPrivateState(who.secret)),
+    createCircuitContext({
+      circuitId: circuit,
+      contractAddress: dummyContractAddress(),
+      coinPublicKeyOrZswapState: COIN_PK,
+      contractState: state,
+      privateState: createInitialPrivateState(who.secret),
+    }),
     l.checkedInParty.size() * l.entryFee,
   );
   const c = contract.impureCircuits;
   const { context } =
     circuit === "startParty" || circuit === "closeEntry"
-      ? c[circuit](ctx, who.secret)
-      : c[circuit](ctx, who.address, who.secret);
-  return context.currentQueryContext.state;
+      ? await c[circuit](ctx, who.secret)
+      : await c[circuit](ctx, who.address, who.secret);
+  return context.callContext.currentQueryContext.state;
 }
 
 /** For every person and circuit: actionError says "ok" exactly when the circuit runs. */
-function expectPreChecksAgree(state: ChargedState, people: Person[]) {
+async function expectPreChecksAgree(state: ChargedState, people: Person[]) {
   const l = ledger(state);
   for (const who of people) {
     const view = partyView(l, who.secret, who.address);
@@ -94,7 +100,7 @@ function expectPreChecksAgree(state: ChargedState, people: Person[]) {
       const predicted = actionError(circuit, l, view);
       let accepted: boolean;
       try {
-        call(state, circuit, who);
+        await call(state, circuit, who);
         accepted = true;
       } catch {
         accepted = false;
@@ -107,9 +113,9 @@ function expectPreChecksAgree(state: ChargedState, people: Person[]) {
 const everyone = [alice, bob, charlie, dave];
 
 describe("private-party contract (in memory)", () => {
-  it("replays the Node test's party; the panel's pre-checks agree at every step", () => {
+  it("replays the Node test's party; the panel's pre-checks agree at every step", async () => {
     // Same size and fee as the Node test's first deploy.
-    let state = deploy(10n, 5n, alice);
+    let state = await deploy(10n, 5n, alice);
     let l: Ledger = ledger(state);
     expect(l.partyState).toBe(PartyState.NOT_STARTED);
     expect(l.maxListSize).toBe(10n);
@@ -118,76 +124,76 @@ describe("private-party contract (in memory)", () => {
     expect(l.organizer).toEqual(dappPublicKey(alice.secret));
     expect(partyView(l, alice.secret, alice.address).role).toBe("organizer");
     expect(partyView(l, bob.secret, bob.address).role).toBe("guest");
-    expectPreChecksAgree(state, everyone);
+    await expectPreChecksAgree(state, everyone);
 
     // Bob RSVPs; the list holds exactly our re-derived commitment.
-    state = call(state, "rsvp", bob);
+    state = await call(state, "rsvp", bob);
     l = ledger(state);
     expect(l.hashedPartyGoers.size()).toBe(1n);
     expect([...l.hashedPartyGoers]).toEqual([guestCommitment(bob.secret, bob.address)]);
     expect(partyView(l, bob.secret, bob.address).onList).toBe(true);
     // The commitment binds both: Bob's secret with another address isn't listed.
     expect(partyView(l, bob.secret, dave.address).onList).toBe(false);
-    expectPreChecksAgree(state, everyone);
+    await expectPreChecksAgree(state, everyone);
 
     // Alice (organizer) can't RSVP: covered by the grid above. Charlie RSVPs.
-    state = call(state, "rsvp", charlie);
+    state = await call(state, "rsvp", charlie);
     expect(ledger(state).hashedPartyGoers.size()).toBe(2n);
-    expectPreChecksAgree(state, everyone);
+    await expectPreChecksAgree(state, everyone);
 
     // Bob can't start the party (grid); Alice does.
-    state = call(state, "startParty", alice);
+    state = await call(state, "startParty", alice);
     expect(ledger(state).partyState).toBe(PartyState.STARTED);
-    expectPreChecksAgree(state, everyone);
+    await expectPreChecksAgree(state, everyone);
 
     // Bob checks in and becomes public.
-    state = call(state, "checkIn", bob);
+    state = await call(state, "checkIn", bob);
     l = ledger(state);
     expect(l.checkedInParty.size()).toBe(1n);
     expect(l.checkedInParty.member(bob.address)).toBe(true);
     expect(partyView(l, bob.secret, bob.address).checkedIn).toBe(true);
-    expectPreChecksAgree(state, everyone);
+    await expectPreChecksAgree(state, everyone);
 
     // Bob can't close the doors (grid); Alice does.
-    state = call(state, "closeEntry", alice);
+    state = await call(state, "closeEntry", alice);
     expect(ledger(state).partyState).toBe(PartyState.DOORS_CLOSED);
-    expectPreChecksAgree(state, everyone);
+    await expectPreChecksAgree(state, everyone);
 
     // Alice claims the fees to her own address; nothing is left to do.
-    state = call(state, "claimFees", alice);
+    state = await call(state, "claimFees", alice);
     expect(ledger(state).partyState).toBe(PartyState.FEES_CLAIMED);
-    expectPreChecksAgree(state, everyone);
+    await expectPreChecksAgree(state, everyone);
   });
 
-  it("fills the list to READY, and closes the doors itself when everyone checks in", () => {
-    let state = deploy(2n, 1n, alice);
-    state = call(state, "rsvp", bob);
-    state = call(state, "rsvp", charlie);
+  it("fills the list to READY, and closes the doors itself when everyone checks in", async () => {
+    let state = await deploy(2n, 1n, alice);
+    state = await call(state, "rsvp", bob);
+    state = await call(state, "rsvp", charlie);
     expect(ledger(state).partyState).toBe(PartyState.READY);
-    expectPreChecksAgree(state, everyone);
+    await expectPreChecksAgree(state, everyone);
 
-    state = call(state, "startParty", alice);
-    state = call(state, "checkIn", bob);
-    state = call(state, "checkIn", charlie);
+    state = await call(state, "startParty", alice);
+    state = await call(state, "checkIn", bob);
+    state = await call(state, "checkIn", charlie);
     expect(ledger(state).partyState).toBe(PartyState.DOORS_CLOSED);
-    expectPreChecksAgree(state, everyone);
+    await expectPreChecksAgree(state, everyone);
   });
 
-  it("rejects a closed party with no check-ins at claimFees", () => {
-    let state = deploy(3n, 1n, alice);
-    state = call(state, "rsvp", bob);
-    state = call(state, "startParty", alice);
-    state = call(state, "closeEntry", alice);
+  it("rejects a closed party with no check-ins at claimFees", async () => {
+    let state = await deploy(3n, 1n, alice);
+    state = await call(state, "rsvp", bob);
+    state = await call(state, "startParty", alice);
+    state = await call(state, "closeEntry", alice);
     expect(ledger(state).partyState).toBe(PartyState.DOORS_CLOSED);
-    expectPreChecksAgree(state, everyone);
+    await expectPreChecksAgree(state, everyone);
   });
 
-  it("deployInputError matches the constructor on an edge grid", () => {
+  it("deployInputError matches the constructor on an edge grid", async () => {
     for (const partySize of [0n, 1n, 65535n]) {
       for (const fee of [0n, 1n, 65535n]) {
         let accepted = true;
         try {
-          deploy(partySize, fee, alice);
+          await deploy(partySize, fee, alice);
         } catch {
           accepted = false;
         }
