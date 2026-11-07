@@ -8,6 +8,12 @@ commitment, rejects a changed vote, and counts it. `Set`s stop double
 registration, double voting and double reveals; `Counter`s hold the tally; and
 the organizer and candidates are `sealed` at deployment.
 
+Revealing is public. A reveal increments one candidate's counter and inserts the voter's
+registration key into `revealedVoters`, so once the reveal phase is over anyone reading the
+ledger can list each registration key with its vote: the tally is hidden while voting is open,
+but the final ballot is open, not secret. A secret ballot would reveal against a commitment
+tree with a separate nullifier instead of looking the vote up by the voter's key.
+
 ## Set up
 
 Install dependencies (from the repo root — one lockfile for the whole workspace):
