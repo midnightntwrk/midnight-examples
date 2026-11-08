@@ -58,6 +58,16 @@
     "vite-plugin-top-level-await/uuid": "11.1.1"
   },
   "examples": {
+    "networks": {
+      "mainnet": {
+        "networkId": "mainnet",
+        "node": "https://rpc.midnight-mainnet.blockfrost.io",
+        "nodeWS": "wss://rpc.midnight-mainnet.blockfrost.io",
+        "indexer": "https://midnight-mainnet.blockfrost.io/api/v0",
+        "indexerWS": "wss://midnight-mainnet.blockfrost.io/api/v0/ws",
+        "faucet": ""
+      }
+    },
     "compact": {
       "compiler": "0.36.0",
       "language": "0.28"

@@ -262,9 +262,14 @@ describe(`Token Transfers Contract (${network})`, () => {
   // Unshielded NIGHT (the native token) — receive from Alice, then send back.
   // Fees are paid in DUST, so Alice's NIGHT balance moves only by the transfer
   // amounts.
+  //
+  // Skipped on mainnet: the mainnet wallet's DUST comes from cNIGHT registered
+  // on Cardano, so it holds no NIGHT on Midnight to move.
   // ===========================================================================
 
-  it('receiveNightTokens pulls NIGHT into the contract', async () => {
+  const hasNoMidnightNight = network === 'mainnet';
+
+  it.skipIf(hasNoMidnightNight)('receiveNightTokens pulls NIGHT into the contract', async () => {
     const amount = 5_000n;
     const before = await aliceUnshielded(NIGHT);
 
@@ -282,7 +287,7 @@ describe(`Token Transfers Contract (${network})`, () => {
     expect(await waitForAliceUnshielded(NIGHT, expected)).toEqual(expected);
   });
 
-  it('sendNightTokensToUser sends NIGHT from the contract to Alice', async () => {
+  it.skipIf(hasNoMidnightNight)('sendNightTokensToUser sends NIGHT from the contract to Alice', async () => {
     const sendAmount = 2_000n;
     const before = await aliceUnshielded(NIGHT);
 

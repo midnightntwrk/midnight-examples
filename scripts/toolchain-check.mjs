@@ -247,7 +247,10 @@ for (const dir of [...projects, ...dirsUnder(path.join('packages', 'mnkit', 'tes
 {
   // Every public endpoint in a network config must be one of toolchain.json's
   // `networks`, so `mnkit doctor --network` probes what the code connects to.
-  const known = new Set(Object.values(tc.networks).flatMap((n) => Object.values(n)).filter(Boolean));
+  // `examples.networks` holds the networks only the examples run on (mainnet),
+  // which mnkit doesn't know about.
+  const allNetworks = { ...tc.networks, ...(ex.networks ?? {}) };
+  const known = new Set(Object.values(allNetworks).flatMap((n) => Object.values(n)).filter(Boolean));
   const configs = projects
     .map((d) => path.join(d, 'src', 'config.ts'))
     .filter((f) => fs.existsSync(f));

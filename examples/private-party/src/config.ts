@@ -76,6 +76,38 @@ export function preprodConfig(): NetworkConfig {
   };
 }
 
+// Mainnet also goes through Blockfrost, with a token from a Midnight mainnet
+// project. It is read from BLOCKFROST_PROJECT_ID in the gitignored repo-root
+// .env.mainnet (the same variable name as preprod, in its own file). Mainnet has
+// no faucet: the wallet must already hold DUST. See .env.mainnet.example.
+//
+// MIDNIGHT_INDEXER and MIDNIGHT_INDEXER_WS (set both) swap in another mainnet
+// indexer, used as given without the Blockfrost token; the node stays on
+// Blockfrost.
+export function mainnetConfig(): NetworkConfig {
+  const projectId = process.env['BLOCKFROST_PROJECT_ID']?.trim();
+  if (!projectId) {
+    throw new Error(
+      'BLOCKFROST_PROJECT_ID is not set. Add a Midnight mainnet project token to the ' +
+        'repo-root .env.mainnet (gitignored) or export it in your shell.',
+    );
+  }
+  const indexer = process.env['MIDNIGHT_INDEXER']?.trim() || undefined;
+  const indexerWS = process.env['MIDNIGHT_INDEXER_WS']?.trim() || undefined;
+  if ((indexer === undefined) !== (indexerWS === undefined)) {
+    throw new Error('Set both MIDNIGHT_INDEXER and MIDNIGHT_INDEXER_WS, or neither, in .env.mainnet.');
+  }
+  return {
+    networkId: 'mainnet',
+    indexer: indexer ?? withBlockfrostKey('https://midnight-mainnet.blockfrost.io/api/v0', projectId),
+    indexerWS: indexerWS ?? withBlockfrostKey('wss://midnight-mainnet.blockfrost.io/api/v0/ws', projectId),
+    node: withBlockfrostKey('https://rpc.midnight-mainnet.blockfrost.io', projectId),
+    nodeWS: withBlockfrostKey('wss://rpc.midnight-mainnet.blockfrost.io', projectId),
+    proofServer: process.env['MIDNIGHT_PROOF_SERVER'] ?? 'http://127.0.0.1:6300',
+    faucet: '',
+  };
+}
+
 // A network that exists only in env: e.g. a private or short-lived network whose
 // endpoints arrive late. Set these in the gitignored repo-root .env.custom (see
 // .env.custom.example), or in the file named by MIDNIGHT_ENV_FILE, which is
@@ -119,9 +151,11 @@ export function getConfig(): NetworkConfig {
       return preprodConfig();
     case 'custom':
       return customConfig();
+    case 'mainnet':
+      return mainnetConfig();
     default:
       throw new Error(
-        `Unknown network: ${network}. Supported: 'local', 'preview', 'preprod', 'custom'.`,
+        `Unknown network: ${network}. Supported: 'local', 'preview', 'preprod', 'custom', 'mainnet'.`,
       );
   }
 }

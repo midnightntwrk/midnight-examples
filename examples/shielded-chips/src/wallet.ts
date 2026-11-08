@@ -269,6 +269,83 @@ function isProgressStrictlyComplete(progress: unknown): boolean {
   return (candidate.isStrictlyComplete as () => boolean)();
 }
 
+// ---------------------------------------------------------------------------
+// Sync progress
+// ---------------------------------------------------------------------------
+// A genesis sync on a long-lived network can take an hour or more, most of it
+// in the DUST wallet replaying the chain's DUST events. While a sync runs this
+// logs, every MIDNIGHT_SYNC_PROGRESS_MS (default 30 s; 0 turns it off), each
+// sub-wallet's applied/highest index, the DUST replay rate and a rough ETA, and
+// how long since the wallet last reported any state. Follow it with:
+//
+//   grep 'sync progress' examples/<example>/logs/<run>.log
+
+type IndexProgress = { applied: bigint; highest: bigint; connected: boolean } | undefined;
+
+function readProgress(progress: unknown): IndexProgress {
+  if (!progress || typeof progress !== 'object') return undefined;
+  const p = progress as Record<string, unknown>;
+  const applied = p['appliedIndex'] ?? p['appliedId'];
+  const highest = p['highestIndex'] ?? p['highestTransactionId'];
+  if (typeof applied !== 'bigint' || typeof highest !== 'bigint') return undefined;
+  return { applied, highest, connected: p['isConnected'] !== false };
+}
+
+function describeProgress(p: IndexProgress): string {
+  if (!p) return '?';
+  const pct = p.highest > 0n ? Number((p.applied * 10_000n) / p.highest) / 100 : 0;
+  return `${p.applied}/${p.highest} (${pct.toFixed(2)}%)${p.connected ? '' : ' DISCONNECTED'}`;
+}
+
+function formatDuration(ms: number): string {
+  const s = Math.round(ms / 1000);
+  return s >= 3600 ? `${Math.floor(s / 3600)}h${Math.floor((s % 3600) / 60)}m` : `${Math.floor(s / 60)}m${s % 60}s`;
+}
+
+/** Log sync progress until the returned function is called. */
+export function trackSyncProgress(logger: Logger, wallet: WalletFacade): () => void {
+  const everyMs = Number(process.env['MIDNIGHT_SYNC_PROGRESS_MS'] ?? 30_000);
+  if (!(everyMs > 0)) return () => {};
+  const startedAt = Date.now();
+  let latest: FacadeState | undefined;
+  let lastUpdateAt = startedAt;
+  let dustStart: { at: number; applied: bigint } | undefined;
+  const sub = wallet.state().subscribe({
+    next: (s: FacadeState) => {
+      latest = s;
+      lastUpdateAt = Date.now();
+    },
+    error: () => {},
+  });
+  const timer = setInterval(() => {
+    const now = Date.now();
+    if (!latest) {
+      logger.info(`sync progress: no wallet state yet after ${formatDuration(now - startedAt)}`);
+      return;
+    }
+    const dust = readProgress(latest.dust.progress);
+    let rate = '';
+    if (dust) {
+      dustStart ??= { at: lastUpdateAt, applied: dust.applied };
+      const secs = (now - dustStart.at) / 1000;
+      const perSec = secs > 0 ? Number(dust.applied - dustStart.applied) / secs : 0;
+      const left = Number(dust.highest - dust.applied);
+      rate = ` ${perSec.toFixed(1)} ev/s` + (perSec > 0 && left > 0 ? `, ETA ${formatDuration((left / perSec) * 1000)}` : '');
+    }
+    logger.info(
+      `sync progress [${formatDuration(now - startedAt)}]: dust ${describeProgress(dust)}${rate}; ` +
+        `shielded ${describeProgress(readProgress(latest.shielded.progress))}; ` +
+        `unshielded ${describeProgress(readProgress(latest.unshielded.progress))}; ` +
+        `last update ${formatDuration(now - lastUpdateAt)} ago`,
+    );
+  }, everyMs);
+  timer.unref();
+  return () => {
+    clearInterval(timer);
+    sub.unsubscribe();
+  };
+}
+
 export async function syncWallet(
   logger: Logger,
   wallet: WalletFacade,
@@ -276,6 +353,7 @@ export async function syncWallet(
 ): Promise<FacadeState> {
   logger.info('Syncing wallet...');
   let emissionCount = 0;
+  const stopProgress = trackSyncProgress(logger, wallet);
   const state = await Rx.firstValueFrom(
     wallet.state().pipe(
       Rx.tap((state: FacadeState) => {
@@ -310,6 +388,7 @@ export async function syncWallet(
             () => new Error(`Wallet sync timeout after ${timeout}ms (${emissionCount} emissions received)`),
           ),
       }),
+      Rx.finalize(stopProgress),
       Rx.catchError((err) => {
         logger.error(`Wallet sync error: ${err}`);
         return Rx.throwError(() => err);
@@ -599,6 +678,41 @@ export interface FundingGateOptions {
 }
 
 /**
+ * On mainnet the wallet holds real funds, so before anything is signed the
+ * address derived from the mnemonic must equal MIDNIGHT_MAINNET_ALICE_ADDRESS
+ * (copy it from Lace). This catches the wrong mnemonic, or a key derivation
+ * that differs from the wallet the funds live in.
+ */
+export function assertExpectedMainnetAddress(address: string): void {
+  const expected = process.env['MIDNIGHT_MAINNET_ALICE_ADDRESS']?.trim();
+  if (!expected) {
+    throw new Error(
+      'MIDNIGHT_MAINNET_ALICE_ADDRESS is not set. Copy the unshielded address from Lace into the ' +
+        `repo-root .env.mainnet. The mnemonic derives ${address}.`,
+    );
+  }
+  if (address !== expected) {
+    throw new Error(
+      `The mnemonic derives ${address}, not MIDNIGHT_MAINNET_ALICE_ADDRESS (${expected}). ` +
+        'Stopping before any transaction.',
+    );
+  }
+}
+
+/** The wallet's DUST, valued at the latest block's time (or now if unreadable). */
+async function dustAtLatestBlock(wallet: WalletFacade, indexerHttpUrl: string): Promise<bigint> {
+  const state = await Rx.firstValueFrom(
+    wallet.state().pipe(
+      Rx.timeout({ each: 30_000, with: () => Rx.of(null) }),
+      Rx.catchError(() => Rx.of(null)),
+    ),
+  );
+  if (state === null) return 0n;
+  const blockTime = (await latestBlockTime(indexerHttpUrl, 10_000)) ?? new Date();
+  return state.dust.balance(blockTime);
+}
+
+/**
  * Hold until the wallet can pay for transactions on a remote network. Returns
  * at once when it already can, so only a new wallet sees the faucet prompt.
  */
@@ -611,6 +725,26 @@ export async function waitForNightThenDust(
   { registerDust = true, label = 'wallet' }: FundingGateOptions = {},
 ): Promise<void> {
   const address = String(keystore.getBech32Address());
+  const isMainnet = envConfig.networkId === 'mainnet';
+  if (isMainnet) assertExpectedMainnetAddress(address);
+
+  // DUST first: a wallet that can already pay needs no NIGHT and no
+  // registration. A mainnet wallet whose DUST comes from cNIGHT registered on
+  // Cardano holds no NIGHT on Midnight at all.
+  if (registerDust) {
+    const dust = await dustAtLatestBlock(wallet, envConfig.indexer);
+    if (dust >= MIN_DUST_SPECKS) {
+      logger.info(`${label}: ${formatDust(dust)} DUST at the latest block; ready.`);
+      return;
+    }
+    if (isMainnet) {
+      throw new Error(
+        `${label} at ${address} has ${formatDust(dust)} DUST, below the ${formatDust(MIN_DUST_SPECKS)} ` +
+          'a run needs (MIDNIGHT_MIN_DUST). Mainnet has no faucet: wait for DUST to accrue in Lace.',
+      );
+    }
+  }
+
   // Bounded peek: if state() hasn't emitted yet, assume "not funded" and fall
   // into the wait below, which has its own timeout.
   const current = await Rx.firstValueFrom(

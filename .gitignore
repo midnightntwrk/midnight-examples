@@ -19,6 +19,7 @@ packages/*/LICENSE
 **/midnight-level-db/
 **/.env.preprod
 **/.env.preview
+**/.env.mainnet
 **/.env
 **/.env*.local
 # Custom-network endpoints and seeds (MIDNIGHT_NETWORK=custom); keep the examples

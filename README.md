@@ -189,6 +189,29 @@ MIDNIGHT_ENV_FILE=.env.custom.postfork npm run test:custom
 
 The same rule applies here: run one suite at a time.
 
+### Mainnet (single wallet)
+
+Mainnet runs with **one wallet** and **real funds**, so only the seven suites that
+need a single wallet have a `test:mainnet` script: hello-world, calculator,
+election, secret-message, private-bid, token-transfers and zk-loan. The root
+`npm run test:mainnet` runs those seven in turn and skips the rest.
+
+Copy `.env.mainnet.example` to `.env.mainnet` (gitignored) and fill in:
+
+- `BLOCKFROST_PROJECT_ID`: a token for a Midnight **mainnet** Blockfrost project.
+- `MIDNIGHT_MAINNET_ALICE_MNEMONIC`: the wallet's recovery phrase, for example from Lace.
+- `MIDNIGHT_MAINNET_ALICE_ADDRESS`: the wallet's unshielded address, copied from
+  Lace. A suite stops before its first transaction unless the mnemonic derives
+  exactly this address.
+
+Mainnet has no faucet, so the wallet must already hold enough DUST
+(`MIDNIGHT_MIN_DUST`, default 60). The suites never wait for NIGHT or register
+it for DUST there. A wallet whose DUST comes from cNIGHT on Cardano holds no
+NIGHT on Midnight, so token-transfers skips its two NIGHT tests on mainnet.
+
+Run a local proof server whose version matches the mainnet ledger, and run one
+suite at a time.
+
 ## Adding / working with examples
 
 - **Scaffold a new example with `npm run new:example -- <name> [--witnesses]`.** It

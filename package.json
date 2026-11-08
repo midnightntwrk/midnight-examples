@@ -39,7 +39,8 @@
     "test:local": "npm run test:local --workspaces --if-present",
     "test:preprod": "npm run test:preprod --workspaces --if-present",
     "test:preview": "npm run test:preview --workspaces --if-present",
-    "test:custom": "npm run test:custom --workspaces --if-present"
+    "test:custom": "npm run test:custom --workspaces --if-present",
+    "test:mainnet": "npm run test:mainnet --workspaces --if-present"
   },
   "devDependencies": {
     "bn.js": "5.2.5",

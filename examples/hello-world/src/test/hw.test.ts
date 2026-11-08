@@ -72,6 +72,10 @@ function resolveHelloWorldWallet(net: string, networkId: string): WalletSetup {
     if (net !== 'local') logger.info(`Using ALICE from the root .env.${net}.`);
     return { secret: shared, isNew: false };
   }
+  if (net === 'mainnet') {
+    // No throwaway wallet on mainnet: there is no faucet to fund it from.
+    throw new Error('Set MIDNIGHT_MAINNET_ALICE_MNEMONIC in the repo-root .env.mainnet (see .env.mainnet.example).');
+  }
   const { seed, isNew } = getOrCreateTestWallet(WALLETS_DIR, networkId);
   logger.info(
     isNew

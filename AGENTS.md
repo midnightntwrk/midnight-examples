@@ -41,7 +41,7 @@ truth over your own recollection of Midnight/Compact APIs.
   which Trivy flags (CVE-2026-41907, fixed in 11.1.1). It only calls
   `require("uuid").v5`, which 11.x keeps. Drop the override once the plugin
   widens its range.
-- **Never commit secrets.** Real `.env.preprod` / `.env.preview` and
+- **Never commit secrets.** Real `.env.preprod` / `.env.preview` / `.env.mainnet` and
   `midnight-level-db/`, `logs/`, wallet preseed state are gitignored. Only the
   `.env.*.example` templates are tracked. The `preseed/` bundles ARE committed on
   purpose — they hold public chain state and a public key that gets replaced on
@@ -109,6 +109,11 @@ over an hour on preprod; the examples don't use fast sync:
 npm run wallets:new   # mint the 4 shared wallets into a repo-root .env.<network>
 npm run test:preprod  # every suite, sequentially (they share those wallets)
 ```
+
+Mainnet runs only the 7 single-wallet suites (`npm run test:mainnet`) with one
+real wallet from `.env.mainnet` (see `.env.mainnet.example` and the README's
+"Mainnet (single wallet)"). The wallet must already hold DUST; each suite checks
+the derived address against `MIDNIGHT_MAINNET_ALICE_ADDRESS` before it transacts.
 
 ## Examples
 
