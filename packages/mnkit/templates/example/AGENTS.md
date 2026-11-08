@@ -122,8 +122,9 @@ indexer's lag, the proof server's version and, on preprod, the Blockfrost key.
 <!-- @endif -->
 <!-- @if standalone -->
 - Remote-network wiring is shared, not copied. `MidnightWalletProvider` (with
-  `syncWallet`) comes from `@midnightntwrk/mnkit-wallet`; its `build` takes an
-  optional `{ fastSync }`, and the test resolves its wallet with
+  `syncWallet`) comes from `@midnightntwrk/mnkit-wallet`; on a remote network
+  it saves the wallet's state after each sync (`.wallet-state/`) and restores
+  it on the next build, and the test resolves its wallet with
   `resolveWallet(network, role)` from the same package. Do not
   write a per-example seed resolver; the shared one knows every suite's role
   names (ALICE, BOB, CHARLIE, DAVE and aliases) and reads

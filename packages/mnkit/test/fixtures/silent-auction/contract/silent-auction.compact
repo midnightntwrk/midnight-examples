@@ -3,7 +3,7 @@
     that remains unknown to bidders until the max number of bids
     has been reached. Bidders are aware of each others bids and current highest bid.
 **/
-pragma language_version 0.23;
+pragma language_version 0.28;
 import CompactStandardLibrary;
 
 export enum AuctionState {

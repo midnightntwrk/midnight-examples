@@ -109,7 +109,7 @@ jobs:
 
   # Every UI scaffolded by `npm run new:ui` (marked by its ui/new-ui.json, the same
   # marker `npm run new:ui -- --check-all` uses):
-  # its template-owned files must match templates/ui, and it must typecheck,
+  # its template-owned files must match packages/mnkit/templates/ui, and it must typecheck,
   # pass its unit tests and build (Vite/Rollup bundling problems only show up
   # there). No local network needed. The wallet flow needs a
   # human (Lace approvals), so there is no E2E step.
@@ -229,7 +229,7 @@ jobs:
       - name: Setup Compact Compiler
         uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
         with:
-          compact-version: '0.31.1'
+          compact-version: '0.36.0'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -269,10 +269,8 @@ jobs:
           # A contract with a constructor argument, a witness, a pure circuit, a Map
           # and a shielded-coin argument, plus a second, witness-less contract that
           # mints: compile:fast compiles both, and --derive wires the second one.
-          # The contracts come from mnkit's own fixture, which stays on mnkit's
-          # Ledger 8 compiler pin; examples/ is on the Ledger 9 pin.
-          cp packages/mnkit/test/fixtures/private-tip-jar/contract/private-tip-jar.compact examples/ci-derive/contract/ci-derive.compact
-          cp packages/mnkit/test/fixtures/private-tip-jar/contract/tip-token.compact examples/ci-derive/contract/tip-token.compact
+          cp examples/private-tip-jar/contract/private-tip-jar.compact examples/ci-derive/contract/ci-derive.compact
+          cp examples/private-tip-jar/contract/tip-token.compact examples/ci-derive/contract/tip-token.compact
           npm install
           npm run compile:fast -w @midnight-ntwrk/example-ci-derive
           npm run new:example -- ci-derive --derive
@@ -293,13 +291,10 @@ jobs:
           # new:ui refuses an example that hasn't passed the in-memory gate.
           if node scripts/new-ui.mjs ci-derive > "$RUNNER_TEMP/new-ui.log" 2>&1; then exit 1; fi
           grep -q 'in-memory gate' "$RUNNER_TEMP/new-ui.log"
-          # The in-memory gate end to end on a real example (spec lint, compile:fast,
-          # derive, typecheck, test:sim and the SPEC code checks) is off for now:
-          # the pipeline enforces mnkit's Ledger 8 compiler pin (0.31.1), and the
-          # examples are on Ledger 9 (0.36.0). Turn it back on once mnkit moves to
-          # Ledger 9. Each example's matrix job still compiles, typechecks, runs
-          # test:sim and lints its SPEC.md.
-          # TODO(mnkit Ledger 9): npm run pipeline -- private-tip-jar --until sim
+          # The in-memory gate end to end on a real example: spec lint, compile:fast,
+          # derive, typecheck, test:sim and the SPEC code checks. (Each example's
+          # SPEC.md is also linted in its matrix job.)
+          npm run pipeline -- private-tip-jar --until sim
 
   # mnkit as a user gets it: pack mnkit and the runtime packages, scaffold each
   # fixture with the packed CLI outside the workspace, derive (twice, no diff),
@@ -318,17 +313,16 @@ jobs:
         upgrade: [false]
         # hello-world also compiles once on a machine without Compact, so
         # `mnkit compile` installs the CLI and compiler (--fresh-compact).
-        # The upgrade test: scaffold with the previous mnkit, then `mnkit
-        # upgrade` to this one (scripts/mnkit-e2e.sh --upgrade-from).
-        include:
-          - fixture: private-tip-jar
-            upgrade: true
+        # The upgrade test (scaffold with the previous mnkit, then `mnkit
+        # upgrade` to this one: scripts/mnkit-e2e.sh --upgrade-from) is off:
+        # every earlier mnkit is on Ledger 8 and was never published, and 0.2.0
+        # ships on Ledger 9 with no Ledger 8 upgrade path.
+        # TODO(mnkit 0.2.0 on npm): add back
+        #   include: [{ fixture: private-tip-jar, upgrade: true }]
+        # with MNKIT_UPGRADE_FROM set to 0.2.0, then to the previous release.
+        # Then delete the Yarn install branch in scripts/mnkit-e2e.sh.
     env:
-      # The mnkit to upgrade from: 0.1.0, never published. The tag marks commit
-      # 7ff0a29, so it stays reachable however PR 62 merges. Once 0.2.0 is on
-      # npm, make it that version, and from then on the previous release. Then
-      # delete the Yarn install branch in scripts/mnkit-e2e.sh.
-      MNKIT_UPGRADE_FROM: mnkit-upgrade-base-0.1.0
+      MNKIT_UPGRADE_FROM: ''
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  #v7.0.1
@@ -340,7 +334,7 @@ jobs:
       - name: Setup Compact Compiler
         uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
         with:
-          compact-version: '0.31.1'
+          compact-version: '0.36.0'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -354,8 +348,13 @@ jobs:
         # stays on PATH, and mnkit-e2e.sh runs the scaffolded projects with it, as users do.
         run: npx --yes npm@11.21.0 ci
 
-      - name: Pack, scaffold, derive, test:sim, add ui and validate
-        run: bash scripts/mnkit-e2e.sh --devnet ${FRESH:+--fresh-compact} ${UPGRADE:+--upgrade-from "$MNKIT_UPGRADE_FROM"} ${{ matrix.fixture }}
+      # No --devnet for now: the local devnet can't run Ledger 9 yet. compose.yml
+      # pins midnight-node 2.1.0-rc.4, which rejects calls built with the final
+      # Ledger 9 libraries, and no published indexer follows node 2.1.101.
+      # TODO(mnkit L9 devnet): add --devnet back once a public indexer follows
+      # node 2.1.10x and the compose pins move to it.
+      - name: Pack, scaffold, derive, test:sim and add ui
+        run: bash scripts/mnkit-e2e.sh ${FRESH:+--fresh-compact} ${UPGRADE:+--upgrade-from "$MNKIT_UPGRADE_FROM"} ${{ matrix.fixture }}
         env:
           MNKIT_E2E_DIR: ${{ runner.temp }}/mnkit-e2e
           UPGRADE: ${{ matrix.upgrade && 'true' || '' }}

@@ -47,10 +47,10 @@ mn-examples/
 ├── packages/
 │   ├── mnkit/            # the scaffolder: engine, CLI and templates/example (copied by `npm run new:example`)
 │   │   └── templates/ui/ # browser UI scaffold rendered by `npm run new:ui`
-│   ├── fast-sync/        # @midnightntwrk/mnkit-wallet: wallet provider, pre-seed fast sync, .env seeds, funding gate
+│   ├── fast-sync/        # @midnightntwrk/mnkit-wallet: wallet provider, saved wallet state, .env seeds, funding gate
 │   ├── sim/              # @midnightntwrk/mnkit-sim: in-memory contract harness for *.sim.test.ts
 │   └── coins/            # @midnightntwrk/mnkit-coins: shielded-coin helpers for tests
-├── preseed/              # pre-seed reference bundles, per network
+├── preseed/              # pre-seed reference bundles, per network (Ledger 8; unused while pre-seeding is off)
 ├── toolchain.json        # the one toolchain pin (`npm run toolchain:check`)
 ├── tsconfig.base.json    # shared TypeScript compiler options
 ├── vitest.config.ts      # aggregate test projects (per-example configs still own env)
@@ -197,10 +197,10 @@ The same rule applies here: run one suite at a time.
   then only write the `.compact` contract and the test bodies. See
   `packages/mnkit/templates/example/`.
 - **Add a browser UI with `npm run new:ui <name>`** once the contract compiles and
-  its tests pass. It renders `templates/ui/` into `examples/<name>/ui`, deriving
+  its tests pass. It renders `packages/mnkit/templates/ui/` into `examples/<name>/ui`, deriving
   circuits, witnesses and ledger fields from the compiled contract, so the UI
   typechecks, tests and builds before any use-case code is written. See
-  `templates/ui/AGENTS.md` (copied into every generated UI).
+  `packages/mnkit/templates/ui/AGENTS.md` (copied into every generated UI).
 - The scripted generation pipeline (prompt, scaffold, generate, devnet test, UI
   generator, UI code, serve) is drawn in [`docs/generation-flow.md`](./docs/generation-flow.md).
 - The `.compact` **source is committed** (only generated `contract/managed/` output is
