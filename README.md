@@ -101,22 +101,6 @@ npm run compile  # compile every example's contract (parallel)
 Flags for a script go after `--`, or npm takes them as its own options:
 `npm run new:ui -- <name> --check`.
 
-### Local devnet: not on Ledger 9 yet
-
-The examples are on the Ledger 9 stack, but the local devnet (`npm run env:up`,
-from each example's `compose.yml`) still pulls the newest *public* images: node
-`2.1.0-rc.4` and indexer `4.4.0-rc.6`. That node predates the Ledger 9 release
-and rejects contract calls (`1010: Invalid Transaction: Custom error: 104`), so
-`test:local`, `validate`, the devnet step of `pipeline` and the example jobs in
-CI fail. That changes once node 2.1.100+ and indexer 4.4.100 are published and
-pinned in the `compose.yml` files.
-
-**Until then, network tests are supported on preview only**
-(`npm run test:preview`, see
-[Running against a remote network](#running-against-a-remote-network-preprod--preview)).
-Typecheck and the in-memory tests (`npm run test:sim`) don't need a network
-and are unaffected.
-
 Run a single example end-to-end (compile is already done above):
 
 ```bash

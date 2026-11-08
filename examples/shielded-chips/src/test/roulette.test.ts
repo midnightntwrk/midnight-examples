@@ -619,7 +619,12 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
     expect(supply._totalBurned).toEqual(supplyBefore._totalBurned);
   });
 
-  it('Alice mints into the treasury and burns it — the Merkle-spend burn path', async () => {
+  // TODO(node 2.1.200): un-skip. Node 2.1.101 (local devnet, Preview, Preprod)
+  // rejects burnFromTreasury with `1010: Invalid Transaction: Custom error: 104`:
+  // a coin overwrite under-declares bytes_written,
+  // https://github.com/midnightntwrk/midnight-ledger/issues/839. The fix ships
+  // in node 2.1.200.
+  it.skip('Alice mints into the treasury and burns it — the Merkle-spend burn path', async () => {
     const supplyBefore = await chipsLedgerState();
 
     logger.info('Alice minting 60 chips into the treasury...');

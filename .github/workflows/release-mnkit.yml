@@ -222,11 +222,8 @@ jobs:
           echo "::error::mnkit@$VERSION is not on npm after 5 minutes"
           exit 1
 
-      # No --devnet (validate on a local network) for now: the local devnet
-      # can't run Ledger 9 until a published indexer follows node 2.1.10x.
-      # TODO(mnkit L9 devnet): add --devnet back, as in ci.yaml's mnkit-e2e.
-      - name: npx mnkit init, derive and test:sim from npm
-        run: bash scripts/mnkit-e2e.sh --from-registry "$VERSION" hello-world
+      - name: npx mnkit init, derive, test:sim and validate on a local network from npm
+        run: bash scripts/mnkit-e2e.sh --from-registry "$VERSION" --devnet hello-world
         env:
           VERSION: ${{ needs.publish.outputs.version }}
           MNKIT_E2E_DIR: ${{ runner.temp }}/mnkit-smoke

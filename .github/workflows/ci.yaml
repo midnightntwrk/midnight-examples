@@ -348,13 +348,8 @@ jobs:
         # stays on PATH, and mnkit-e2e.sh runs the scaffolded projects with it, as users do.
         run: npx --yes npm@11.21.0 ci
 
-      # No --devnet for now: the local devnet can't run Ledger 9 yet. compose.yml
-      # pins midnight-node 2.1.0-rc.4, which rejects calls built with the final
-      # Ledger 9 libraries, and no published indexer follows node 2.1.101.
-      # TODO(mnkit L9 devnet): add --devnet back once a public indexer follows
-      # node 2.1.10x and the compose pins move to it.
-      - name: Pack, scaffold, derive, test:sim and add ui
-        run: bash scripts/mnkit-e2e.sh ${FRESH:+--fresh-compact} ${UPGRADE:+--upgrade-from "$MNKIT_UPGRADE_FROM"} ${{ matrix.fixture }}
+      - name: Pack, scaffold, derive, test:sim, add ui and validate on a local network
+        run: bash scripts/mnkit-e2e.sh --devnet ${FRESH:+--fresh-compact} ${UPGRADE:+--upgrade-from "$MNKIT_UPGRADE_FROM"} ${{ matrix.fixture }}
         env:
           MNKIT_E2E_DIR: ${{ runner.temp }}/mnkit-e2e
           UPGRADE: ${{ matrix.upgrade && 'true' || '' }}

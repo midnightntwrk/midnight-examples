@@ -27,4 +27,4 @@ The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-
 
 - Generated projects are on the Ledger 9 stack: Compact compiler 0.36.0 (language 0.28), Midnight.js 5.0.0 (`midnight-js-network-id` 5.0.0-rc.5), testkit-js 5.0.0, wallet SDK 2.0.0 (`@midnightntwrk/wallet-sdk`), proof server 9.0.0. The examples, their UIs and mnkit now share one set of pins in `toolchain.json`.
 - Pre-seed fast sync is disabled until it is ported to wallet SDK 2: a `fastSync` option is accepted and ignored, and `preseed:cut` refuses to run. See FAST-SYNC.md.
-- `mnkit validate` and the other local-network steps need a local devnet that runs Ledger 9. The pinned `compose.yml` images (node 2.1.0-rc.4, indexer 4.4.0-rc.6) don't yet, so CI runs mnkit's end-to-end test without the devnet for now.
+- The local devnet (`compose.yml`) runs node 2.1.101 and indexer 4.4.101, so `mnkit validate` and the other local-network steps work on Ledger 9.
