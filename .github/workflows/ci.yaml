@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [hello-world, private-party, battleship, calculator, token-transfers, silent-auction, election, secret-message, zk-loan, shielded-chips, private-bid, private-tip-jar]
+        example: [hello-world, private-party, battleship, calculator, token-transfers, silent-auction, election, secret-message, zk-loan, shielded-chips, private-bid, private-tip-jar, leaderboard]
     defaults:
       run:
         working-directory: examples/${{ matrix.example }}
@@ -64,6 +64,21 @@ jobs:
 
       - name: Compile contract
         run: npm run compile
+
+      # An example that commits its compiler output (leaderboard, whose Vercel
+      # build has no compiler) must commit what `npm run compile` produces.
+      # Compiles to the same path are deterministic, so any change means the
+      # committed keys or ZKIR are stale.
+      - name: Check committed compiler output is up to date
+        run: |
+          if [ -n "$(git ls-files contract/managed)" ]; then
+            changed="$(git status --porcelain -- contract/managed)"
+            if [ -n "$changed" ]; then
+              echo "::error::contract/managed is out of date. Run npm run compile in examples/${{ matrix.example }} and commit the result."
+              echo "$changed"
+              exit 1
+            fi
+          fi
 
       # Seconds, and its errors are clearer than the same mistake surfacing
       # inside a devnet test run.

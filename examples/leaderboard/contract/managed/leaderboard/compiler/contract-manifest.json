@@ -1,0 +1,79 @@
+{
+  "manifest-version": "1",
+  "compiler-version": "0.36.0",
+  "compiler-commit": "b5d9e4dfc532fe47011c4f6296e254f4853eb469",
+  "language-version": "0.28.0",
+  "runtime-version": "0.21.0",
+  "compiler": {
+    "type": "directory",
+    "contract-info.json": {
+      "type": "file",
+      "size": 2649,
+      "hash": "2e2b3b6399f25800470857bad99b1356d45e7bce0409e7ea69de5a2e620177a5"
+    }
+  },
+  "contract": {
+    "type": "directory",
+    "index.d.ts": {
+      "type": "file",
+      "size": 2799,
+      "hash": "a551c4404a867575dcd11f37c1e2cc672034dda8881dcb782919b8e23394267e"
+    },
+    "index.js": {
+      "type": "file",
+      "size": 39611,
+      "hash": "2e9d6d62791b1ff6ebbb212062cbdfcc189f8db29ca9f59ab84672c49054f33a"
+    },
+    "index.js.map": {
+      "type": "file",
+      "size": 1705,
+      "hash": "5cae096b5b71b0985d540c51687916d04dc5f15f511bdae45d78bbd882f42109"
+    }
+  },
+  "zkir": {
+    "type": "directory",
+    "submitScore.bzkir": {
+      "type": "file",
+      "size": 1084,
+      "hash": "6aa2c515609d76cfe3f26ba2a399dc3986752ecb07a3ec14c85feb03105ac994"
+    },
+    "submitScore.zkir": {
+      "type": "file",
+      "size": 3367,
+      "hash": "25ba68e3f182a2439b11b03a66ea5f38c91bb07c501ac4601bf329bca00dadfb"
+    },
+    "verifyOwnership.bzkir": {
+      "type": "file",
+      "size": 726,
+      "hash": "3a287d6288c37ce265be8f42c48b881b1e68503ec5d0da09ca17d835e7896b63"
+    },
+    "verifyOwnership.zkir": {
+      "type": "file",
+      "size": 2675,
+      "hash": "8658cfc721d5bdbee8bfd6d0ed00c5d79dcde73a022039d4f9fd6950bc3949cf"
+    }
+  },
+  "keys": {
+    "type": "directory",
+    "submitScore.prover": {
+      "type": "file",
+      "size": 11277644,
+      "hash": "3f1307418d222c0571825958be7dd096b0457304687ecd39a0957143822e91f9"
+    },
+    "submitScore.verifier": {
+      "type": "file",
+      "size": 2121,
+      "hash": "7e2a95768e28411ef88624a96f8f857c53e662fd84b3fa00301b88bb819cbdba"
+    },
+    "verifyOwnership.prover": {
+      "type": "file",
+      "size": 11277286,
+      "hash": "f0eaf88eba58b969001f50cb2887ed8829e501fe0fdd7bc54590e11af3744e84"
+    },
+    "verifyOwnership.verifier": {
+      "type": "file",
+      "size": 2121,
+      "hash": "7e13cc03b0b4e64bb70c003434727df6156a6aa707399c7ba8b102b58d100bbd"
+    }
+  }
+}
