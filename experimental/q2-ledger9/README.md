@@ -23,9 +23,9 @@ src/test/<dapp>.test.ts         # one end-to-end suite per dapp
 
 ## Why a separate npm project
 
-mn-examples is pinned to the ledger 8 stack, and a version move there has to be a
-coordinated, repo-wide pass (root `AGENTS.md`). This directory runs on the Ledger 9
-release stack instead. [`COMPATIBILITY.md`](COMPATIBILITY.md) lists the versions, what
+This directory predates the examples' move to Ledger 9 and keeps its own npm project
+and pins, so a coordinated version pass in mn-examples (root `AGENTS.md`) doesn't
+move it. It runs on the Ledger 9 release stack. [`COMPATIBILITY.md`](COMPATIBILITY.md) lists the versions, what
 is still pre-release, and the latest local devnet result.
 
 So it is its own npm project: its own `package.json`, `package-lock.json` and `.npmrc`,
@@ -63,7 +63,7 @@ npm run env:up          # local Ledger 9 node + indexer + proof server (env:down
 npm run test:local      # against that devnet on :9944 / :8088
 ```
 
-The devnet uses the same ports as the mn-examples local network (ledger 8). Stop that
+The devnet uses the same ports as the mn-examples local network. Stop that
 network first, or these suites will talk to the wrong node and proof server.
 
 The suites source secrets from `.env.<network>` via vitest's `loadEnv`. On remote

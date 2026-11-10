@@ -10,6 +10,11 @@ documented privacy assumptions actually hold against live on-chain state.
 - **Devnet images:** `midnight-node:1.0.0`, `indexer-standalone:4.3.3`, `proof-server:8.1.0`
 - **Language:** `pragma language_version 0.23`
 
+> **Recorded on Ledger 8.** This report predates the Ledger 9 move (compiler
+> 0.36.0, language 0.28, node 2.1.x, proof server 9.0.0) and has not been re-run on
+> it yet. The contracts and the privacy test suite (`src/test/privacy.test.ts`)
+> are on Ledger 9; the findings below are the Ledger 8 run's.
+
 ---
 
 ## 1. Ran the DApp on local — 17/17 e2e tests passed

@@ -89,7 +89,7 @@ const App: React.FC = () => {
               verticalAlign: 'middle',
             }}
           />
-          Privacy-preserving loans · Midnight Preprod · Ledger v8
+          Privacy-preserving loans · Midnight Preprod · Ledger 9
         </Typography>
 
         <Typography
