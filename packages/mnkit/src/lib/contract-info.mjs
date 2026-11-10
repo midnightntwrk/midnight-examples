@@ -168,10 +168,10 @@ export const enumValuesOf = (t) => (!t ? null : t['type-name'] === 'Alias' ? enu
 export function readConstructor(exampleDir, managed) {
   const dts = fs.readFileSync(path.join(exampleDir, 'contract', 'managed', managed, 'contract', 'index.d.ts'), 'utf8');
   if (!dts.includes('initialState(context: __compactRuntime.ConstructorContext<PS>')) return null;
-  // A constructor without parameters is exactly this line.
-  const hasArgs = !dts.includes(
-    'initialState(context: __compactRuntime.ConstructorContext<PS>): __compactRuntime.ConstructorResult<PS>;',
-  );
+  // A constructor without parameters is exactly this line (async from Compact
+  // 0.35, compact-runtime 0.20: the result is a Promise; older compilers
+  // return it directly).
+  const hasArgs = !/initialState\(context: __compactRuntime\.ConstructorContext<PS>\): (?:Promise<)?__compactRuntime\.ConstructorResult<PS>>?;/.test(dts);
   const params = hasArgs
     ? (dts.match(/initialState\(context: __compactRuntime\.ConstructorContext<PS>,\s*([^)]*)\)/)?.[1] ?? '...')
         .replace(/\s+/g, ' ')

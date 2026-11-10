@@ -20,7 +20,7 @@
 // This file also runs in the browser (a generated UI imports it), so it must
 // not import any `node:*` module.
 import { type Ledger } from './managed/private-tip-jar/contract/index.js';
-import { type WitnessContext } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import { type WitnessContext } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 
 /**
  * The private state each party keeps for the tip jar, in their own local

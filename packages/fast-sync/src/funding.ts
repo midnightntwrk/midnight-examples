@@ -13,8 +13,8 @@
 // the repo that did this, and generalized with `registerDust` for Dave.
 
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { unshieldedToken } from '@midnight-ntwrk/midnight-js-protocol/ledger';
-import type { FacadeState, UnshieldedKeystore, WalletFacade } from '@midnight-ntwrk/wallet-sdk';
+import { unshieldedToken } from '@midnight-ntwrk/midnight-js-protocol/v9';
+import type { FacadeState, UnshieldedKeystore, WalletFacade } from '@midnightntwrk/wallet-sdk';
 import * as Rx from 'rxjs';
 import type { Logger } from 'pino';
 
@@ -49,17 +49,33 @@ async function latestBlockTime(indexerHttpUrl: string, timeoutMs: number): Promi
   }
 }
 
+/** 1 DUST is 10^15 Specks (SPECKS_PER_DUST in the ledger). */
+const SPECKS_PER_DUST = 10n ** 15n;
+
+/**
+ * The DUST a wallet must hold before a suite transacts: enough to pay for a
+ * deploy. MIDNIGHT_MIN_DUST overrides it, in DUST (default 60).
+ */
+const MIN_DUST_SPECKS =
+  BigInt(Math.round(Number(process.env['MIDNIGHT_MIN_DUST'] ?? '60') * 1e6)) * (SPECKS_PER_DUST / 10n ** 6n);
+
+function formatDust(specks: bigint): string {
+  return `${specks / SPECKS_PER_DUST}.${(specks % SPECKS_PER_DUST).toString().padStart(15, '0').slice(0, 6)}`;
+}
+
 /**
  * Block until the wallet holds at least `minCoins` spendable DUST coin(s).
  *
- * With `indexerHttpUrl`, also block until that DUST is worth something at the
- * latest block's time, which is the time the wallet values DUST at when it
- * balances a transaction. On a fresh local devnet the DUST coins exist from
- * genesis, but until the first block after genesis the latest block carries
- * the genesis timestamp, when they are worth 0: a transaction balanced then
- * fails with Wallet.InsufficientFunds ("could not balance dust").
+ * With `indexerHttpUrl`, also block until the DUST is worth at least
+ * MIN_DUST_SPECKS (MIDNIGHT_MIN_DUST, default 60 DUST) at the latest block's
+ * time, which is the time the wallet values DUST at when it balances a
+ * transaction. DUST accrues after registration, so a freshly registered wallet
+ * holds a coin worth almost nothing, too little to pay for a deploy ("could not
+ * balance dust"). On a fresh local devnet the DUST coins exist from genesis,
+ * but until the first block after genesis the latest block carries the genesis
+ * timestamp, when they are worth 0.
  *
- * Shared by the funding gate and each example's scripts/wait-for-dust.ts.
+ * Shared by the funding gate and each project's scripts/wait-for-dust.ts.
  */
 export async function waitForDust(
   logger: Logger,
@@ -73,7 +89,7 @@ export async function waitForDust(
   const state = await Rx.firstValueFrom(
     wallet.state().pipe(
       Rx.tap((s: FacadeState) =>
-        logger.info(`dust: ${s.dust.availableCoins.length} coin(s), balance ${s.dust.balance(new Date())} STAR`),
+        logger.info(`dust: ${s.dust.availableCoins.length} coin(s), ${formatDust(s.dust.balance(new Date()))} DUST`),
       ),
       Rx.filter((s: FacadeState) => s.dust.availableCoins.length >= minCoins),
       Rx.take(1),
@@ -84,17 +100,28 @@ export async function waitForDust(
     ),
   );
   if (indexerHttpUrl) {
+    logger.info(`Waiting for >=${formatDust(MIN_DUST_SPECKS)} DUST at the latest block...`);
+    let latest = state;
+    let lastLogged = 0;
     for (;;) {
       const blockTime = await latestBlockTime(indexerHttpUrl, Math.min(INDEXER_REQUEST_TIMEOUT_MS, deadline - Date.now()));
-      const atBlock = blockTime ? state.dust.balance(blockTime) : 0n;
-      if (atBlock > 0n) {
-        logger.info(`dust: balance ${atBlock} STAR at the latest block (${blockTime?.toISOString()})`);
+      const atBlock = blockTime ? latest.dust.balance(blockTime) : 0n;
+      if (atBlock >= MIN_DUST_SPECKS) {
+        logger.info(`dust: ${formatDust(atBlock)} DUST at the latest block (${blockTime?.toISOString()})`);
         break;
       }
       if (Date.now() > deadline) {
-        throw new Error(`DUST still worth 0 at the latest block after ${timeoutMs}ms (block time ${blockTime?.toISOString() ?? 'unknown'})`);
+        throw new Error(
+          `DUST at ${formatDust(atBlock)}, below ${formatDust(MIN_DUST_SPECKS)}, after ${timeoutMs}ms ` +
+            `(block time ${blockTime?.toISOString() ?? 'unknown'})`,
+        );
       }
-      await new Promise((r) => setTimeout(r, 2_000));
+      if (Date.now() - lastLogged >= 60_000) {
+        logger.info(`  DUST ${formatDust(atBlock)} / ${formatDust(MIN_DUST_SPECKS)}`);
+        lastLogged = Date.now();
+      }
+      await new Promise((r) => setTimeout(r, 5_000));
+      latest = await Rx.firstValueFrom(wallet.state());
     }
   }
   logger.info('DUST ready.');
@@ -214,7 +241,7 @@ async function registerNightForDust(
   const recipe = await wallet.registerNightUtxosForDustGeneration(
     unregistered,
     keystore.getPublicKey(),
-    (payload) => keystore.signData(payload),
+    (payload) => keystore.signDataAsync(payload),
   );
   const txId = await wallet.submitTransaction(await wallet.finalizeRecipe(recipe));
   logger.info(`DUST registration tx submitted: ${txId}`);

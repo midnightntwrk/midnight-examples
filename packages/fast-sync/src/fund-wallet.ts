@@ -37,9 +37,9 @@
 import { createHash } from 'node:crypto';
 import type { Logger } from 'pino';
 import * as Rx from 'rxjs';
-import { nativeToken } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+import { nativeToken } from '@midnight-ntwrk/midnight-js-protocol/v9';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { DustAddress, MidnightBech32m, UnshieldedAddress } from '@midnight-ntwrk/wallet-sdk';
+import { DustAddress, MidnightBech32m, UnshieldedAddress } from '@midnightntwrk/wallet-sdk';
 import { assembleWallet, type AssembledWallet } from './fast-wallet.js';
 import { waitForDust } from './funding.js';
 import { registerNightForDust, transferNight } from './local-funding.js';
@@ -106,14 +106,14 @@ export async function fundWallet(
     // Tracked before the sync wait, so the finally below stops a wallet that
     // never syncs; a running wallet keeps the process alive.
     opened.push(w);
-    await w.facade.start(w.zswapSecretKeys, w.dustSecretKey);
+    await w.facade.start(w.seeds);
     await Rx.firstValueFrom(
       w.facade.state().pipe(
         Rx.filter(
           (s) =>
-            strictlyComplete(s.shielded.state.progress) &&
+            strictlyComplete(s.shielded.progress) &&
             strictlyComplete(s.unshielded.progress) &&
-            strictlyComplete(s.dust.state.progress),
+            strictlyComplete(s.dust.progress),
         ),
         Rx.take(1),
         Rx.timeout({

@@ -21,7 +21,7 @@ import {
   submitCallTx,
   type DeployedContract,
 } from '@midnight-ntwrk/midnight-js-contracts';
-import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 // @if monorepo
 import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust } from '../wallet.js';
@@ -32,7 +32,7 @@ import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
-import { buildProviders, type __Name__Providers } from '../providers.js';
+import { buildProviders, ledgerState, type __Name__Providers } from '../providers.js';
 __PRIVATE_STATE_IMPORT__
 import {
   Compiled__Name__Contract,
@@ -74,7 +74,8 @@ describe(`__Title__ Contract (${network})`, () => {
 
   const config = getConfig();
   const isRemote = network !== 'local';
-  // A wallet with no preseed syncs from genesis: about 78 minutes on preprod.
+  // A wallet syncs from genesis the first time (saved state makes later runs
+  // fast): the timeout covers that first sync.
   const syncTimeoutMs = Number(
     process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ?? (isRemote ? 120 * 60_000 : 10 * 60_000),
   );
@@ -85,7 +86,7 @@ describe(`__Title__ Contract (${network})`, () => {
   async function queryLedger() {
     const state = await providers.publicDataProvider.queryContractState(contractAddress);
     expect(state).not.toBeNull();
-    return ledger(state!.data);
+    return ledger(ledgerState(state));
   }
 
   beforeAll(async () => {
@@ -108,8 +109,8 @@ describe(`__Title__ Contract (${network})`, () => {
     // from genesis (over an hour on preprod). Pass a role name
     // @endif
     // @if standalone
-    // the Alice wallet from .env.<network> (MIDNIGHT_<NETWORK>_SEED), fast-syncing
-    // from a pre-seed bundle when one is set up (MIDNIGHT_PRESEED_DIR). Pass a role name
+    // the Alice wallet from .env.<network> (MIDNIGHT_<NETWORK>_SEED). It syncs
+    // from genesis the first time; saved state makes later runs fast. Pass a role name
     // @endif
     // (e.g. resolveWallet(network, 'BOB')) if your suite needs more than one.
     const setup = resolveWallet(network);
@@ -159,7 +160,7 @@ describe(`__Title__ Contract (${network})`, () => {
   // @generated-stub end contract-deploys
 
   it('deploys the contract', async () => {
-    const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {
+    const deployed: DeployedContract<Contract> = await deployContract(providers, {
       compiledContract: Compiled__Name__Contract,
       privateStateId: PRIVATE_STATE_ID,
       // @generated-stub begin private-state sha=0
@@ -188,7 +189,7 @@ describe(`__Title__ Contract (${network})`, () => {
   // imported/defined for you. Example shape:
   //
   // it('does the thing', async () => {
-  //   await (submitCallTx<Contract, 'yourCircuit'>)(providers, {
+  //   await submitCallTx(providers, {
   //     compiledContract: Compiled__Name__Contract,
   //     contractAddress,
   //     privateStateId: PRIVATE_STATE_ID,

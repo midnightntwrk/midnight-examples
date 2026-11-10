@@ -619,7 +619,7 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
     expect(supply._totalBurned).toEqual(supplyBefore._totalBurned);
   });
 
-  it('Alice mints into the treasury and burns it — the Merkle-spend burn path', async () => {
+  it('Alice mints into the treasury', async () => {
     const supplyBefore = await chipsLedgerState();
 
     logger.info('Alice minting 60 chips into the treasury...');
@@ -634,6 +634,18 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
     const minted = await chipsLedgerState();
     expect(minted._totalMinted).toEqual(supplyBefore._totalMinted + 60n);
     expect(minted._treasury.size()).toEqual(1n);
+    const [, treasuryCoin] = [...minted._treasury][0]!;
+    expect(treasuryCoin.value).toEqual(60n);
+  });
+
+  // TODO(node 2.1.200): un-skip. Node 2.1.101 (local devnet, Preview, Preprod)
+  // rejects burnFromTreasury with `1010: Invalid Transaction: Custom error: 104`:
+  // a coin overwrite under-declares bytes_written,
+  // https://github.com/midnightntwrk/midnight-ledger/issues/839. The fix ships
+  // in node 2.1.200. While skipped, the treasury keeps the 60-chip coin, which
+  // the non-house test below only needs a key for.
+  it.skip('Alice burns from the treasury — the Merkle-spend burn path', async () => {
+    const minted = await chipsLedgerState();
     const [key, treasuryCoin] = [...minted._treasury][0]!;
     expect(treasuryCoin.value).toEqual(60n);
 

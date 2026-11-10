@@ -180,7 +180,8 @@ first_compile() {
   test -x "$fresh_home/.local/bin/compact" || { echo "✖ no compact CLI in $fresh_home/.local/bin" >&2; exit 1; }
   test -d "$fresh_home/.compact/versions/$pin" || { echo "✖ compiler $pin not in $fresh_home/.compact" >&2; exit 1; }
   # There was no default compiler, so the pin became it.
-  [ "$(HOME="$fresh_home" "$fresh_home/.local/bin/compact" compile --version)" = "$pin" ] \
+  # 0.36.0 prints "<version> (<commit> <date>)"; compare the version alone.
+  [ "$(HOME="$fresh_home" "$fresh_home/.local/bin/compact" compile --version | cut -d' ' -f1)" = "$pin" ] \
     || { echo "✖ compiler $pin is not the default in $fresh_home" >&2; exit 1; }
 }
 

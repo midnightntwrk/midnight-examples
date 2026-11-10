@@ -17,7 +17,7 @@
 // Compact cannot express. Each witness receives a WitnessContext and returns a
 // tuple [nextPrivateState, returnValue].
 import { type Ledger, type Witnesses } from './managed/__name__/contract/index.js';
-import { type WitnessContext } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import { type WitnessContext } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 
 // The private state carried between witness calls. If your contract keeps no
 // private state, leave this as the empty record.

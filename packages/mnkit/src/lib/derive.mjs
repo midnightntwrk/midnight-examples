@@ -306,8 +306,8 @@ export function derive(exampleDir, name, names, { coinsPackage = '@midnightntwrk
   const privacyTest = (indent) =>
     [
       `${indent}// SPEC.md → Privacy invariants: one entry per "never on chain" line.`,
-      `${indent}it('keeps secrets out of public state', () => {`,
-      `${indent}  const l = deploy().ledger();`,
+      `${indent}it('keeps secrets out of public state', async () => {`,
+      `${indent}  const l = (await deploy()).ledger();`,
       `${indent}  expect(Object.keys(l).sort()).toEqual([${ledgerFields.map((l) => quote(l.name)).sort().join(', ')}]);`,
       `${indent}  assertNotInPublicState(l, {`,
       `${indent}    // TODO: secretName: bytes,`,
@@ -367,7 +367,7 @@ export function derive(exampleDir, name, names, { coinsPackage = '@midnightntwrk
             : []),
           `${indent}let ${s.camel}Address: ContractAddress;`,
           `${indent}it(${quote(`deploys ${s.name}`)}, async () => {`,
-          `${indent}  const deployed: DeployedContract<${s.Name}Contract> = await (deployContract<${s.Name}Contract>)(${s.camel}Providers, {`,
+          `${indent}  const deployed: DeployedContract<${s.Name}Contract> = await deployContract(${s.camel}Providers, {`,
           `${indent}    compiledContract: Compiled${s.Name}Contract,`,
           ...(s.params.length ? [argsFor(s.params)(`${indent}    `)] : []),
           `${indent}  });`,

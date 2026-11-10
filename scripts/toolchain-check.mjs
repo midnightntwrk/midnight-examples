@@ -21,9 +21,7 @@
 // UI, template and package (any other @midnight-ntwrk or @midnightntwrk
 // dependency is unpinned, and fails), the runtime packages' README overrides, and the pragma of every
 // contract and engine test fixture. experimental/ is left out on purpose: it
-// tracks release candidates. Interim, until mnkit moves to Ledger 9: the
-// examples and their UIs are held to toolchain.json's `examples` section (the
-// Ledger 9 stack), and mnkit's projects to the top-level pins (Ledger 8). It also fails when
+// tracks release candidates. It also fails when
 // package-lock.json nests a package inside a workspace (see below).
 // Zero dependencies — Node built-ins only.
 
@@ -59,55 +57,21 @@ const exampleProjects = dirsUnder('examples')
   .flatMap((d) => [d, path.join(d, 'ui')])
   .filter((d) => fs.existsSync(path.join(d, 'package.json')));
 const projects = [
-  ...dirsUnder('templates'),
   ...dirsUnder(path.join('packages', 'mnkit', 'templates')),
   ...exampleProjects,
   ...dirsUnder('packages'),
 ].filter((d) => fs.existsSync(path.join(d, 'package.json')));
-
-// The examples' Ledger 9 pins (toolchain.json `examples`). Everything else
-// (mnkit, its template and runtime packages) keeps the top-level pins.
-const ex = tc.examples;
-// templates/ui is the interim Ledger 9 copy of mnkit's UI template that the
-// examples' UIs render from (scripts/new-ui.mjs), so it follows the examples.
-const isExample = (dir) =>
-  exampleProjects.includes(dir) || dir === path.join(REPO_ROOT, 'templates', 'ui');
-const compilerFor = (dir) => (isExample(dir) ? ex : tc).compact;
-const imagesFor = (dir) => (isExample(dir) ? ex : tc).images;
-
-/**
- * The version spec the examples pin `pkg` to, or null if they don't pin it.
- * Like pinFor, for the Ledger 9 stack: Midnight.js and testkit-js are still on
- * the @midnight-ntwrk scope, the wallet SDK and the ledger packages are on
- * @midnightntwrk.
- */
-function examplePin(pkg, { peer = false } = {}) {
-  const pin = (() => {
-    // network-id has no 5.0.0 final yet, so it has its own pin.
-    if (pkg === '@midnight-ntwrk/midnight-js-network-id') return ex.npm['midnight-js-network-id'] ?? ex.npm['midnight-js'];
-    if (pkg.startsWith('@midnight-ntwrk/midnight-js-')) return ex.npm['midnight-js'];
-    if (pkg === '@midnight-ntwrk/testkit-js') return ex.npm['testkit-js'];
-    if (pkg === '@midnightntwrk/wallet-sdk') return ex.npm['wallet-sdk'];
-    if (pkg.startsWith('@midnightntwrk/wallet-sdk-')) return ex.npm[pkg.slice('@midnightntwrk/'.length)] ?? null;
-    if (pkg === '@midnight-ntwrk/dapp-connector-api') return ex.npm['dapp-connector-api'];
-    if (/^@midnight-?ntwrk\//.test(pkg) && typeof ex.overrides?.[pkg] === 'string') return ex.overrides[pkg];
-    if (pkg === 'vite') return ex.npm.vite;
-    if (pkg === 'vitest') return `^${ex.npm.vitest}`;
-    return null;
-  })();
-  return pin && peer && !pin.startsWith('^') ? `~${pin}` : pin;
-}
 
 // --- README table -----------------------------------------------------------
 {
   const f = path.join(REPO_ROOT, 'README.md');
   const src = read(f);
   const rows = [
-    ['Compact language', /^\| Compact language \(`pragma`\) \| `([^`]+)` \|/m, ex.compact.language],
-    ['Compact compiler', /^\| Compact compiler .*\| `([^`]+)` \|/m, ex.compact.compiler],
-    ['midnight-js', /^\| `@midnight-ntwrk\/midnight-js-\*` \| `([^`]+)` \|/m, ex.npm['midnight-js']],
-    ['testkit-js', /^\| `@midnight-ntwrk\/testkit-js` \| `([^`]+)` \|/m, ex.npm['testkit-js']],
-    ['wallet SDK', /^\| wallet SDK \| `([^`]+)` \|/m, ex.npm['wallet-sdk']],
+    ['Compact language', /^\| Compact language \(`pragma`\) \| `([^`]+)` \|/m, tc.compact.language],
+    ['Compact compiler', /^\| Compact compiler .*\| `([^`]+)` \|/m, tc.compact.compiler],
+    ['midnight-js', /^\| `@midnight-ntwrk\/midnight-js-\*` \| `([^`]+)` \|/m, tc.npm['midnight-js']],
+    ['testkit-js', /^\| `@midnight-ntwrk\/testkit-js` \| `([^`]+)` \|/m, tc.npm['testkit-js']],
+    ['wallet SDK', /^\| wallet SDK \| `([^`]+)` \|/m, tc.npm['wallet-sdk']],
     ['Node.js', /^\| Node\.js \| `([^`]+)` /m, tc.node],
     ['npm', /^\| npm \| `([^`]+)` /m, tc.npmCli],
     ['Vitest', /^\| Vitest \| `([^`]+)` \|/m, tc.npm.vitest],
@@ -125,13 +89,7 @@ function examplePin(pkg, { peer = false } = {}) {
     // Any value form: bare, '…' or "…". Anything but a plain version is a mismatch.
     const hits = [...src.matchAll(/compact-version:\s*['"]?([^'"\s#]*)['"]?/g)];
     if (hits.length === 0 && name === 'ci.yaml') problems.push(`${rel(f)}: no compact-version found`);
-    // ci.yaml's example and ui jobs build the examples (Ledger 9); every other
-    // job and workflow builds mnkit (Ledger 8).
-    for (const m of hits) {
-      const job = [...src.slice(0, m.index).matchAll(/^ {2}([A-Za-z0-9_-]+):\s*$/gm)].pop()?.[1];
-      const want = name === 'ci.yaml' && ['example', 'ui'].includes(job) ? ex.compact.compiler : tc.compact.compiler;
-      expect(`${rel(f)}:${lineOf(src, m.index)}`, 'compact-version', m[1], want);
-    }
+    for (const m of hits) expect(`${rel(f)}:${lineOf(src, m.index)}`, 'compact-version', m[1], tc.compact.compiler);
     for (const m of src.matchAll(/\bnpm@([0-9][^\s'"]*)/g)) expect(`${rel(f)}:${lineOf(src, m.index)}`, 'npm', m[1], tc.npmCli);
   }
 }
@@ -143,8 +101,8 @@ expect('.nvmrc', 'Node', read(path.join(REPO_ROOT, '.nvmrc')).trim(), tc.node);
   expect('package.json', 'engines.node', root.engines?.node, `>=${tc.node}.0.0`);
   const pm = root.devEngines?.packageManager;
   expect('package.json', 'devEngines.packageManager', pm && `${pm.name}@${pm.version}`, `npm@>=${NPM_FLOOR}`);
-  // The examples' overrides (npm syntax) plus mnkit's, and nothing else.
-  const want = { ...ex.overrides, ...npmOverrides(tc.overrides) };
+  // toolchain.json's overrides in npm syntax, and nothing else.
+  const want = npmOverrides(tc.overrides);
   for (const pkg of new Set([...Object.keys(want), ...Object.keys(root.overrides ?? {})])) {
     expect('package.json', `overrides["${pkg}"]`, JSON.stringify(root.overrides?.[pkg]), JSON.stringify(want[pkg]));
   }
@@ -173,7 +131,7 @@ for (const name of ['fast-sync', 'sim', 'coins']) {
     if (!(pkg in tc.overrides)) problems.push(`${where}: overrides["${pkg}"] is not in toolchain.json overrides`);
     else expect(where, `overrides["${pkg}"]`, version, tc.overrides[pkg]);
   }
-  for (const hit of src.matchAll(/(@midnight-ntwrk\/[a-z0-9-]+)@([0-9][^\s`]*)/g)) {
+  for (const hit of src.matchAll(/(@midnight-?ntwrk\/[a-z0-9-]+)@([0-9][^\s`]*)/g)) {
     const want = pinFor(tc, hit[1]);
     if (want) expect(`${rel(f)}:${lineOf(src, hit.index)}`, hit[1], hit[2], want);
   }
@@ -200,7 +158,7 @@ for (const [dir, f] of projects.flatMap((d) => ['compose.yml', 'compose.yaml'].m
   const src = read(f);
   for (const m of src.matchAll(/image:\s*['"]?([^'"\s:]+(?::\d+\/[^'"\s:]+)?)(?::([^'"\s]+))?['"]?/g)) {
     const [, image, tag] = m;
-    const want = imagesFor(dir)[image];
+    const want = tc.images[image];
     if (want) expect(`${rel(f)}:${lineOf(src, m.index)}`, image, tag, want);
     else problems.push(`${rel(f)}:${lineOf(src, m.index)}: image ${image} is not pinned in toolchain.json`);
   }
@@ -215,7 +173,7 @@ for (const dir of projects) {
   for (const field of ['dependencies', 'devDependencies', 'peerDependencies']) {
     for (const [pkg, spec] of Object.entries(p[field] ?? {})) {
       const peer = field === 'peerDependencies';
-      const want = isExample(dir) ? examplePin(pkg, { peer }) : pinFor(tc, pkg, { peer });
+      const want = pinFor(tc, pkg, { peer });
       if (want) expect(rel(f), `${field}["${pkg}"]`, spec, want);
       // Every other Midnight package but the lockstep runtime packages needs a pin.
       else if (/^@(midnight-ntwrk|midnightntwrk)\//.test(pkg) && !/^(@midnightntwrk\/mnkit-|@midnight-ntwrk\/example-)/.test(pkg)) {
@@ -240,7 +198,7 @@ for (const dir of [...projects, ...dirsUnder(path.join('packages', 'mnkit', 'tes
     const src = read(f);
     const m = /pragma\s+language_version\s+([^;]+);/.exec(src);
     // A module-only file (zk-loan's schnorr.compact) may leave the pragma to its importer.
-    if (m) expect(rel(f), 'pragma language_version', m[1].trim(), compilerFor(dir).language);
+    if (m) expect(rel(f), 'pragma language_version', m[1].trim(), tc.compact.language);
   }
 }
 

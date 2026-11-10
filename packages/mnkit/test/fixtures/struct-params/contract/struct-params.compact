@@ -1,6 +1,6 @@
 // Not an example: constructor parameters the compiler writes as inline
 // objects in index.d.ts (an unexported struct, a ShieldedCoinInfo).
-pragma language_version 0.23;
+pragma language_version 0.28;
 import CompactStandardLibrary;
 
 export struct Limits {

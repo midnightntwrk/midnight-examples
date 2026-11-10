@@ -18,9 +18,9 @@
 import { ApiPromise, WsProvider } from '@polkadot/api';
 import { u8aToHex } from '@polkadot/util';
 import type { ISubmittableResult } from '@polkadot/types/types';
-import type { FinalizedTransaction } from '@midnight-ntwrk/midnight-js-protocol/ledger';
-import { SubmissionEvent, type SubmissionService } from '@midnight-ntwrk/wallet-sdk/capabilities/submission';
-import { SerializedTransaction } from '@midnight-ntwrk/wallet-sdk-abstractions';
+import type { FinalizedTransaction } from '@midnight-ntwrk/midnight-js-protocol/v9';
+import { SubmissionEvent, type SubmissionService } from '@midnightntwrk/wallet-sdk/capabilities/submission';
+import { SerializedTransaction } from '@midnightntwrk/wallet-sdk-abstractions';
 import type { Logger } from 'pino';
 
 /**
