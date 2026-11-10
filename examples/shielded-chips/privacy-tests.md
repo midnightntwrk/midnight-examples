@@ -36,7 +36,8 @@ test:local` then drove the whole flow against the live devnet with real proofs.
 | Charlie cannot claim winnings (bet BLACK, winner RED) | ✅ |
 | Alice burns half of her swept chips — the same-tx transient burn path | ✅ |
 | Bob cannot burn, even chips he owns — burn is house-only | ✅ |
-| Alice mints into the treasury and burns it — the Merkle-spend burn path | ✅ |
+| Alice mints into the treasury | ✅ |
+| Alice burns from the treasury — the Merkle-spend burn path | ⏭️ skipped until node 2.1.200 ([midnight-ledger issue 839](https://github.com/midnightntwrk/midnight-ledger/issues/839)) |
 | Every supply-changing circuit rejects a non-house caller | ✅ |
 | The house cannot burn more than a coin holds | ✅ |
 

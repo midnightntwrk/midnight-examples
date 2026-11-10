@@ -24,7 +24,7 @@
 // `npm run compile` in the project first; the managed/ output is
 // gitignored.
 // @endif
-import { CompiledContract } from "@midnight-ntwrk/midnight-js-protocol/compact-js";
+import { CompiledContract } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-js";
 import {
   Contract,
   ledger,

@@ -187,7 +187,7 @@ if (!isRemote && !((await answers(config.node)) && (await answers(config.indexer
 
 setNetworkId(config.networkId);
 const envConfig: EnvironmentConfiguration = { walletNetworkId: config.networkId, ...config };
-// A wallet with no preseed syncs from genesis: about 78 minutes on preprod.
+// A wallet syncs from genesis the first time (saved state makes later runs fast).
 const syncTimeoutMs = Number(process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ?? (isRemote ? 120 * 60_000 : 10 * 60_000));
 
 const deployments = { ...(readDeployments(network)?.contracts ?? {}) };

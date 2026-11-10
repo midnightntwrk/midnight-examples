@@ -24,8 +24,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/compact-js';
-import type { Contract as ContractTypes } from '@midnight-ntwrk/midnight-js-protocol/compact-js/effect/Contract';
+import type { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-js';
+import type { Contract as ContractTypes } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-js/effect/Contract';
 
 /** The networks `mnkit deploy` targets. Mainnet is left out on purpose. */
 export const DEPLOY_NETWORKS = ['local', 'preview', 'preprod'] as const;

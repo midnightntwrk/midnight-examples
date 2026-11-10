@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## mnkit 0.2.0 (unreleased)
 
-The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-wallet`, `@midnightntwrk/mnkit-sim` and `@midnightntwrk/mnkit-coins`. All four share one version. `0.2.0-rc.1` goes to the `next` dist-tag first.
+The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-wallet`, `@midnightntwrk/mnkit-sim` and `@midnightntwrk/mnkit-coins`. All four share one version. Release candidates (`0.2.0-rc.2`) go to the `next` dist-tag first; `0.2.0-rc.1` was never published.
 
 ### Added
 
@@ -21,4 +21,10 @@ The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-
 - `mnkit doctor` checks the machine, and with `--network <net>` checks the network's node, indexer and proof server.
 - `mnkit add ui` adds a browser UI as a workspace, and `mnkit add contract <name>` adds another contract.
 - `mnkit upgrade` moves a project to the current templates and toolchain with a three-way merge (`--check`, `--force`).
-- `@midnightntwrk/mnkit-wallet` (wallet sync with preseed bundles, `MidnightWalletProvider`, `fundWallet`, `waitForDust`), `@midnightntwrk/mnkit-sim` and `@midnightntwrk/mnkit-coins`.
+- `@midnightntwrk/mnkit-wallet` (`MidnightWalletProvider`, wallet state saved after each sync on a remote network and restored on the next build, `fundWallet`, `waitForDust`), `@midnightntwrk/mnkit-sim` and `@midnightntwrk/mnkit-coins`.
+
+### Toolchain
+
+- Generated projects are on the Ledger 9 stack: Compact compiler 0.36.0 (language 0.28), Midnight.js 5.0.0 (`midnight-js-network-id` 5.0.0-rc.5), testkit-js 5.0.0, wallet SDK 2.0.0 (`@midnightntwrk/wallet-sdk`), proof server 9.0.0. The examples, their UIs and mnkit now share one set of pins in `toolchain.json`.
+- Pre-seed fast sync is disabled until it is ported to wallet SDK 2: a `fastSync` option is accepted and ignored, and `preseed:cut` refuses to run. See FAST-SYNC.md.
+- The local devnet (`compose.yml`) runs node 2.1.101 and indexer 4.4.101, so `mnkit validate` and the other local-network steps work on Ledger 9.
