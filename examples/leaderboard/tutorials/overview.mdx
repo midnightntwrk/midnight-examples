@@ -64,7 +64,8 @@ Later they can prove that an entry is theirs with a zero-knowledge proof.
 1. Install the Lace extension and create a new wallet.
 2. Set the network to **Preprod**.
 3. Set the proof server to `http://localhost:6300`. Start one from `examples/leaderboard` with
-   `npm run proof:up`.
+   `npm run proof:up`. Lace generates the DApp's proofs, and proof inputs include private data,
+   so prove locally rather than on a public proof server.
 4. Fund your wallet with tNIGHT from the [Preprod faucet](https://midnight-tmnight-preprod.nethermind.dev/).
 5. Go to Tokens, click **Generate tDUST**, and confirm the transaction.
 

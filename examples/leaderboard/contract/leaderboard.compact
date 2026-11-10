@@ -69,8 +69,8 @@ export circuit submitScore(
  * Prove ownership of a leaderboard entry via ZK proof.
  *
  * The caller proves that ownerCommitment(theirSecretKey) matches
- * the ownerHash stored in the entry. The secret key never leaves
- * the user's machine.
+ * the ownerHash stored in the entry. The secret key is a private
+ * input to the proof and is never disclosed on chain.
  */
 export circuit verifyOwnership(targetEntryId: Uint<64>): [] {
   assert(scores.member(disclose(targetEntryId)), "entry not found");

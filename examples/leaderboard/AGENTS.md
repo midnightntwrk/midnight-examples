@@ -18,8 +18,9 @@ DApp Connector API `4.0.1`, Node 22.
   revealing the key.
 - **A shared API layer.** `api/index.ts` (`LeaderboardAPI`) runs in the browser
   with Lace's providers and in Node with the test harness's providers.
-- **A browser DApp on a static host.** The UI gets the proof server and indexer
-  from Lace (`getConfiguration()`), serves the circuit keys from its own origin,
+- **A browser DApp on a static host.** The UI gets the indexer from Lace
+  (`getConfiguration()`), delegates proving to the wallet
+  (`dappConnectorProofProvider`), serves the circuit keys from its own origin,
   and reads the leaderboard from Blockfrost without a wallet. It deploys to
   Vercel with no server code.
 

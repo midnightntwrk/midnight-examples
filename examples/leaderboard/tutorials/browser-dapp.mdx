@@ -116,7 +116,6 @@ const initializeProviders = async (logger: Logger): Promise<LeaderboardProviders
 
   const connectedAPI = await connectToWallet(logger, networkId);
   const config = await connectedAPI.getConfiguration();
-  if (!config.proverServerUri) throw new Error('Lace did not provide a proof server URI.');
   const shieldedAddresses = await connectedAPI.getShieldedAddresses();
   // The keys, ZKIR and integrity manifest are served from this site's root
   // (see publicDir in vite.config.ts).
@@ -124,10 +123,17 @@ const initializeProviders = async (logger: Logger): Promise<LeaderboardProviders
     fetchFunc: fetch.bind(window),
   });
 
+  // The wallet generates the proofs (getProvingProvider).
+  const proofProvider = await dappConnectorProofProvider(
+    connectedAPI,
+    zkConfigProvider,
+    ledger.CostModel.initialCostModel(),
+  );
+
   return {
     privateStateProvider: inMemoryPrivateStateProvider<'leaderboardPrivateState', LeaderboardPrivateState>(),
     zkConfigProvider,
-    proofProvider: httpClientProofProvider(config.proverServerUri, zkConfigProvider),
+    proofProvider,
     // The provider's default WebSocket is isomorphic-ws's Node export, which
     // its browser build lacks, so pass the browser's own.
     publicDataProvider: indexerPublicDataProvider(
@@ -158,8 +164,12 @@ const initializeProviders = async (logger: Logger): Promise<LeaderboardProviders
 };
 ```
 
-- **Proof server and indexer** come from the wallet's `getConfiguration()`, so the DApp uses
-  whatever network and proof server the player chose in Lace.
+- **Indexer** comes from the wallet's `getConfiguration()`, so the DApp uses whatever network
+  the player chose in Lace.
+- **Proving** is delegated to the wallet. `dappConnectorProofProvider` hands the circuit keys to
+  Lace through `getProvingProvider`, and Lace generates each proof with the prover the player
+  set up. Proof inputs include private data such as the player's secret key, so use a proof
+  server you run yourself, not a public one.
 - **ZK config** comes from the DApp's own origin, through `FetchZkConfigProvider`.
 - **Private state** is held in memory (below).
 - **Wallet and submission**: Midnight.js hands over a proven but unbalanced transaction. Lace
@@ -321,7 +331,8 @@ entries made with this browser's key.
 
 ## Run the DApp
 
-Start a proof server for Lace (set Lace's proof server to `http://localhost:6300`), then start the
+Start a local proof server for Lace to prove with (set Lace's proof server to
+`http://localhost:6300`), then start the
 dev server with your Blockfrost Preprod project ID:
 
 ```bash

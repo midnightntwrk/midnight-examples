@@ -96,8 +96,8 @@ export circuit submitScore(
 }
 ```
 
-- `localSecretKey()` calls the witness to get the player's secret. It stays on the player's
-  machine; only hashes of it reach the ledger.
+- `localSecretKey()` calls the witness to get the player's secret. It is a private input to the
+  proof; only hashes of it reach the ledger.
 - `nextId.increment(1)` then `nextId.read()` gives the new entry's id. The first entry is 1.
 - `disclose()` marks a value as safe to make public. Every value a ledger write stores, and every
   branch condition derived from a circuit argument, has to be disclosed.

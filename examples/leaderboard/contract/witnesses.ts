@@ -23,10 +23,12 @@ import { type Ledger } from './managed/leaderboard/contract/index.js';
 import { type WitnessContext } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 
 /**
- * The private state each player keeps in their own private-state store. The
- * secret key never leaves the player's machine: `localSecretKey` hands it to
- * the circuit, which only uses it inside the proof. On chain, an entry stores
- * `ownerCommitment(secretKey)`, so the same key is what later proves ownership.
+ * The private state each player keeps in their own private-state store.
+ * `localSecretKey` hands the secret key to the circuit, which uses it only as a
+ * private proof input: it is never written on chain. The prover does see it, so
+ * prove with the wallet or a proof server you run yourself, not a public one.
+ * On chain, an entry stores `ownerCommitment(secretKey)`, so the same key is
+ * what later proves ownership.
  */
 export type LeaderboardPrivateState = {
   readonly secretKey: Uint8Array;

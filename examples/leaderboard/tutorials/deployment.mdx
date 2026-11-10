@@ -11,7 +11,7 @@ tags: ["deployment", "vercel", "tutorial", "leaderboard", "preprod"]
 
 # Part 4: Production deployment
 
-The DApp has no server code. The browser talks to Lace, the indexer, and the proof server
+The DApp has no server code. The browser talks to Lace and the indexer
 directly, so any static host can serve it. This part deploys it to Vercel.
 
 ## Vercel build configuration
@@ -85,7 +85,7 @@ check the ownership proof end to end.
 | Frontend and circuit keys | Vercel (static files) |
 | Chain | Midnight Preprod |
 | Leaderboard reads | Blockfrost's Midnight Preprod indexer |
-| Wallet, fees, and proof generation | Lace and the proof server it is set to |
+| Wallet, fees, and proof generation | Lace (proving is delegated to the wallet) |
 | Test tokens | Preprod faucet |
 
 This layout carries over to other Midnight DApps. The contract defines the on-chain logic, an API

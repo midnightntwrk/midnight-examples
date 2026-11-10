@@ -15,8 +15,8 @@
   "dependencies": {
     "@midnight-ntwrk/dapp-connector-api": "4.0.1",
     "@midnight-ntwrk/midnight-js-contracts": "5.0.0",
+    "@midnight-ntwrk/midnight-js-dapp-connector-proof-provider": "5.0.0",
     "@midnight-ntwrk/midnight-js-fetch-zk-config-provider": "5.0.0",
-    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "5.0.0",
     "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "5.0.0",
     "@midnight-ntwrk/midnight-js-network-id": "5.0.0-rc.5",
     "@midnight-ntwrk/midnight-js-protocol": "5.0.0",

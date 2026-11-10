@@ -25,7 +25,7 @@ import { BehaviorSubject, catchError, concatMap, filter, firstValueFrom, interva
 import { type Logger } from 'pino';
 import { type ConnectedAPI, type InitialAPI } from '@midnight-ntwrk/dapp-connector-api';
 import { FetchZkConfigProvider } from '@midnight-ntwrk/midnight-js-fetch-zk-config-provider';
-import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
+import { dappConnectorProofProvider } from '@midnight-ntwrk/midnight-js-dapp-connector-proof-provider';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
 import {
   createLedger9MidnightProvider,
@@ -124,7 +124,6 @@ const initializeProviders = async (logger: Logger): Promise<LeaderboardProviders
 
   const connectedAPI = await connectToWallet(logger, networkId);
   const config = await connectedAPI.getConfiguration();
-  if (!config.proverServerUri) throw new Error('Lace did not provide a proof server URI.');
   const shieldedAddresses = await connectedAPI.getShieldedAddresses();
   // The keys, ZKIR and integrity manifest are served from this site's root
   // (see publicDir in vite.config.ts).
@@ -132,10 +131,17 @@ const initializeProviders = async (logger: Logger): Promise<LeaderboardProviders
     fetchFunc: fetch.bind(window),
   });
 
+  // The wallet generates the proofs (getProvingProvider).
+  const proofProvider = await dappConnectorProofProvider(
+    connectedAPI,
+    zkConfigProvider,
+    ledger.CostModel.initialCostModel(),
+  );
+
   return {
     privateStateProvider: inMemoryPrivateStateProvider<'leaderboardPrivateState', LeaderboardPrivateState>(),
     zkConfigProvider,
-    proofProvider: httpClientProofProvider(config.proverServerUri, zkConfigProvider),
+    proofProvider,
     // The provider's default WebSocket is isomorphic-ws's Node export, which
     // its browser build lacks, so pass the browser's own.
     publicDataProvider: indexerPublicDataProvider(
