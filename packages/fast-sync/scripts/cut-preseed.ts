@@ -30,7 +30,7 @@ import { gzipSync } from 'node:zlib';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import * as Rx from 'rxjs';
-import type { FacadeState } from '@midnight-ntwrk/wallet-sdk';
+import type { FacadeState } from '@midnightntwrk/wallet-sdk';
 import pino from 'pino';
 import {
   assembleWallet,
@@ -71,6 +71,14 @@ const logger = pino({
   level: process.env['LOG_LEVEL'] ?? 'info',
   transport: { target: 'pino-pretty' },
 });
+
+// Pre-seeding is disabled on Ledger 9 (see src/fast-wallet.ts and FAST-SYNC.md):
+// nothing reads a bundle, and the v1 snapshot rewriter in src/preseed.ts can't
+// use one cut from wallet SDK 2. Refuse rather than write a bundle nobody uses.
+if (process.env['MNKIT_PRESEED_FORCE'] !== '1') {
+  console.error('preseed:cut is disabled: fast-sync pre-seeding is not ported to wallet SDK 2 (Ledger 9) yet. See FAST-SYNC.md.');
+  process.exit(1);
+}
 
 if (network === 'local') {
   throw new Error('A local devnet syncs from genesis in seconds; it needs no reference bundle.');
@@ -164,7 +172,7 @@ const assembled = await assembleWallet(
 const syncTimeoutMs = Number(
   process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ?? (fromGenesis ? 180 * 60_000 : 90 * 60_000),
 );
-await assembled.facade.start(assembled.zswapSecretKeys, assembled.dustSecretKey);
+await assembled.facade.start(assembled.seeds);
 
 try {
   logger.info('Syncing the cutter to chain tip...');
@@ -175,16 +183,16 @@ try {
         emissions++;
         if (emissions % 10 === 1) {
           logger.info(
-            `sync [${emissions}]: shielded=${fmt(s.shielded.state.progress)}, ` +
-              `unshielded=${fmt(s.unshielded.progress)}, dust=${fmt(s.dust.state.progress)}`,
+            `sync [${emissions}]: shielded=${fmt(s.shielded.progress)}, ` +
+              `unshielded=${fmt(s.unshielded.progress)}, dust=${fmt(s.dust.progress)}`,
           );
         }
       }),
       Rx.filter(
         (s: FacadeState) =>
-          isComplete(s.shielded.state.progress) &&
+          isComplete(s.shielded.progress) &&
           isComplete(s.unshielded.progress) &&
-          isComplete(s.dust.state.progress),
+          isComplete(s.dust.progress),
       ),
       Rx.take(1),
       Rx.timeout({

@@ -6,8 +6,8 @@
 // MidnightWalletProvider methods), so every generated UI shares one
 // `npm run fund:wallet` instead of each example copying it.
 
-import { nativeToken } from '@midnight-ntwrk/midnight-js-protocol/ledger';
-import type { DustAddress, UnshieldedAddress } from '@midnight-ntwrk/wallet-sdk';
+import { nativeToken } from '@midnight-ntwrk/midnight-js-protocol/v9';
+import type { DustAddress, UnshieldedAddress } from '@midnightntwrk/wallet-sdk';
 import type { AssembledWallet } from './fast-wallet.js';
 
 const ttlOneHour = () => new Date(Date.now() + 60 * 60_000);
@@ -25,10 +25,9 @@ export async function transferNight(
 ): Promise<string> {
   const recipe = await w.facade.transferTransaction(
     [{ type: 'unshielded', outputs: [{ type: nativeToken().raw, receiverAddress: to, amount }] }],
-    { shieldedSecretKeys: w.zswapSecretKeys, dustSecretKey: w.dustSecretKey },
     { ttl },
   );
-  const signed = await w.facade.signRecipe(recipe, (payload) => w.keystore.signData(payload));
+  const signed = await w.facade.signRecipe(recipe, (payload) => w.keystore.signDataAsync(payload));
   return await w.facade.submitTransaction(await w.facade.finalizeRecipe(signed));
 }
 
@@ -59,7 +58,7 @@ export async function registerNightForDust(
   const recipe = await w.facade.registerNightUtxosForDustGeneration(
     unregistered,
     w.keystore.getPublicKey(),
-    (payload) => w.keystore.signData(payload),
+    (payload) => w.keystore.signDataAsync(payload),
     dustReceiver,
   );
   return await w.facade.submitTransaction(await w.facade.finalizeRecipe(recipe));

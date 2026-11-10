@@ -116,7 +116,7 @@ describe('renderExample in standalone mode', () => {
     expect(pkg.devDependencies.mnkit).toBe('^0.1.0');
     expect(pkg.overrides).toEqual(npmOverrides(tc.overrides));
     expect(pkg.overrides['vite-plugin-top-level-await']).toEqual({ '@swc/core': '1.15.47', uuid: '11.1.1' });
-    expect(pkg.overrides['@midnight-ntwrk/wallet-sdk']).toBe(tc.npm['wallet-sdk']);
+    expect(pkg.overrides['@midnightntwrk/wallet-sdk']).toBe(tc.npm['wallet-sdk']);
     expect(pkg.engines.node).toBe(`>=${tc.node}.0.0`);
   });
 

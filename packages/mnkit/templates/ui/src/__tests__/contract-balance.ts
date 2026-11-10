@@ -16,8 +16,8 @@
 // Template-owned: `mnkit upgrade` replaces this file unless you have edited it.
 // A module, not a test: vitest only runs *.test.ts.
 // @endif
-import type { CircuitContext } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
-import { nativeToken } from "@midnight-ntwrk/midnight-js-protocol/ledger";
+import type { CircuitContext } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
+import { nativeToken } from "@midnight-ntwrk/midnight-js-protocol/v9";
 
 type UnshieldedToken = ReturnType<typeof nativeToken>;
 
@@ -30,7 +30,7 @@ export function withUnshieldedBalance<PS>(
   amount: bigint,
   token: UnshieldedToken = nativeToken(),
 ): CircuitContext<PS> {
-  const q = ctx.currentQueryContext;
+  const q = ctx.callContext.currentQueryContext;
   q.block = { ...q.block, balance: new Map([[token, amount]]) };
   return ctx;
 }

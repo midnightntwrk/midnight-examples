@@ -50,14 +50,16 @@ const deploy = () =>
 
 // Everything above is generated boilerplate. Your tests begin here.
 //
-//   sim.call('circuit', ...args)        one transaction; returns { result, ledger }
+//   await sim.call('circuit', ...args)  one transaction; resolves to { result, ledger }
 //   sim.as(coinPublicKeyHex)            later calls come from another wallet
 //   sim.privateState = ...              swap the private state (another user)
-//   expectRejects(() => sim.call(...), 'assert message')   every guard
+//   await expectRejects(() => sim.call(...), 'assert message')   every guard
+//
+// deploy() and call() are async (compact-runtime 0.20+), so tests are too.
 
 describe('__Title__ (in memory)', () => {
-  it('deploys', () => {
-    expect(deploy().ledger()).toBeDefined();
+  it('deploys', async () => {
+    expect((await deploy()).ledger()).toBeDefined();
   });
 
   // @generated-stub begin circuits sha=0
@@ -65,8 +67,8 @@ describe('__Title__ (in memory)', () => {
 
   // @generated-stub begin privacy sha=0
   // SPEC.md → Privacy invariants: one entry per "never on chain" line.
-  it('keeps secrets out of public state', () => {
-    assertNotInPublicState(deploy().ledger(), {
+  it('keeps secrets out of public state', async () => {
+    assertNotInPublicState((await deploy()).ledger(), {
       // TODO: secretName: bytes,
     });
   });
