@@ -22,7 +22,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { Sim, assertNotInPublicState, expectRejects } from './sim.js';
-import { Contract, ledger, Phase } from '../../contract/managed/voting/contract/index.js';
+import { Contract, ledger, Phase, pureCircuits } from '../../contract/managed/voting/contract/index.js';
 // @generated-stub begin coin-imports sha=e3b0c44298fc
 // @generated-stub end coin-imports
 import { createVotingPrivateState, witnesses, Vote } from '../../contract/witnesses.js';
@@ -442,9 +442,11 @@ describe('Voting (in memory)', () => {
     const sim = await deploy();
     for (const k of LOW_ORDER_KEYS) {
       expect(isUsableAdminKey(k)).toBe(false);
+      expect(pureCircuits.isLowOrderKey(k)).toBe(true);
       await expectRejects(() => sim.call('addAdminKey', k), 'Not a usable admin key');
     }
     expect(sim.ledger().adminEncKeys.isEmpty()).toBe(true);
+    expect(pureCircuits.isLowOrderKey(newAdminEncryptionKeys().publicKey)).toBe(false);
   });
 
   it('casts a ballot whose encryption ends in a zero byte (the trailer keeps the blob in normal form)', async () => {
