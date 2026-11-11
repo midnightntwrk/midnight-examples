@@ -25,6 +25,7 @@ import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-p
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
 import { levelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider';
+import { inMemoryPrivateStateProvider } from '@midnight-ntwrk/testkit-js';
 import { type MidnightWalletProvider } from './wallet.js';
 import { type NetworkConfig } from './config.js';
 import { type ImpureCircuits } from '../contract/index.js';
@@ -55,26 +56,31 @@ export type PrivateStateStore = {
 /**
  * The providers for one contract. Without `privateState` the store is a
  * throwaway one for tests: a fresh name each call, under ./midnight-level-db.
- * scripts/deploy.ts passes a persistent store instead.
+ * scripts/deploy.ts passes a persistent store instead (it keeps the contract's
+ * signing key). `'memory'` keeps private state in this process only, for
+ * scripts/cli.ts, which sets it before every call.
  */
 export function buildProviders(
   wallet: MidnightWalletProvider,
   zkConfigPath: string,
   config: NetworkConfig,
-  privateState?: PrivateStateStore,
+  privateState?: PrivateStateStore | 'memory',
 ): VotingProviders {
   const zkConfigProvider = new NodeZkConfigProvider<VotingCircuits>(zkConfigPath);
   return {
-    privateStateProvider: levelPrivateStateProvider({
-      ...(privateState ? { midnightDbName: privateState.dbName } : {}),
-      // The random suffix keeps each provider set's private-state store separate
-      // when a test builds several sets (wallets, contracts) in the same millisecond.
-      privateStateStoreName:
-        privateState?.storeName ?? `voting-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      // this password has requirements (capital/special chars >= 3)
-      privateStoragePasswordProvider: () => privateState?.password ?? 'Voting-Test-Password',
-      accountId: wallet.getCoinPublicKey(),
-    }),
+    privateStateProvider:
+      privateState === 'memory'
+        ? inMemoryPrivateStateProvider()
+        : levelPrivateStateProvider({
+          ...(privateState ? { midnightDbName: privateState.dbName } : {}),
+          // The random suffix keeps each provider set's private-state store separate
+          // when a test builds several sets (wallets, contracts) in the same millisecond.
+          privateStateStoreName:
+            privateState?.storeName ?? `voting-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          // this password has requirements (capital/special chars >= 3)
+          privateStoragePasswordProvider: () => privateState?.password ?? 'Voting-Test-Password',
+          accountId: wallet.getCoinPublicKey(),
+        }),
     publicDataProvider: indexerPublicDataProvider(
       config.indexer,
       config.indexerWS,

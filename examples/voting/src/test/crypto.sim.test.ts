@@ -18,6 +18,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   Vote,
+  isUsableAdminKey,
   newAdminEncryptionKeys,
   newSecretKey,
   openBallot,
@@ -26,6 +27,7 @@ import {
   sealBallot,
   voteInstance,
   keyFingerprint,
+  usableAdminKeys,
 } from '../crypto.js';
 
 const PID = proposalIdFromLabel('MIP-0018');
@@ -79,6 +81,37 @@ describe('ballot sealing', () => {
     expect(() => sealBallot({ vote: Vote.YES, salt: new Uint8Array(8) }, [newAdminEncryptionKeys().publicKey], V)).toThrow(
       'salt',
     );
+  });
+});
+
+// Low-order X25519 points: every scalar gives an all-zero shared secret.
+const ZERO_KEY = new Uint8Array(32);
+const ONE_KEY = Uint8Array.from([1, ...new Array<number>(31).fill(0)]);
+
+describe('unusable admin keys', () => {
+  it('rejects low-order and wrong-length keys and accepts a real one', () => {
+    expect(isUsableAdminKey(ZERO_KEY)).toBe(false);
+    expect(isUsableAdminKey(ONE_KEY)).toBe(false);
+    expect(isUsableAdminKey(new Uint8Array(31))).toBe(false);
+    expect(isUsableAdminKey(newAdminEncryptionKeys().publicKey)).toBe(true);
+  });
+
+  it('splits a published key set into usable and unusable keys', () => {
+    const good = newAdminEncryptionKeys().publicKey;
+    expect(usableAdminKeys([ZERO_KEY, good, ONE_KEY])).toEqual({ usable: [good], unusable: [ZERO_KEY, ONE_KEY] });
+  });
+
+  it('seals to the usable keys when a low-order key is published, in either position', () => {
+    const a = newAdminEncryptionKeys();
+    for (const keys of [[ZERO_KEY, a.publicKey], [a.publicKey, ZERO_KEY], [ONE_KEY, a.publicKey, ZERO_KEY]]) {
+      const blob = sealBallot(opening, keys, V);
+      expect(blob[33]).toBe(1);
+      expect(openBallot(blob, a.secretKey, V)).toEqual(opening);
+    }
+  });
+
+  it('refuses to seal when no published key is usable', () => {
+    expect(() => sealBallot(opening, [ZERO_KEY, ONE_KEY], V)).toThrow('No usable admin keys');
   });
 });
 

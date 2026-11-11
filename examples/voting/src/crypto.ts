@@ -119,6 +119,29 @@ export const newAdminEncryptionKeys = (): AdminEncryptionKeys => {
 
 export const adminEncryptionPublicKey = (secretKey: Uint8Array): Uint8Array => x25519.getPublicKey(secretKey);
 
+/**
+ * Whether a ballot can be encrypted to this X25519 key. A low-order key (all
+ * zeros, u = 1, …) gives an all-zero shared secret for every scalar, so noble
+ * refuses it and nobody could decrypt with it anyway. One probe is enough.
+ */
+export const isUsableAdminKey = (key: Uint8Array): boolean => {
+  if (key.length !== 32) return false;
+  try {
+    x25519.getSharedSecret(x25519.utils.randomSecretKey(), key);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Splits published admin keys into the ones a ballot can be encrypted to and the rest. */
+export const usableAdminKeys = (keys: readonly Uint8Array[]): { usable: Uint8Array[]; unusable: Uint8Array[] } => {
+  const usable: Uint8Array[] = [];
+  const unusable: Uint8Array[] = [];
+  for (const k of keys) (isUsableAdminKey(k) ? usable : unusable).push(k);
+  return { usable, unusable };
+};
+
 /** A ballot opening: what `count` takes besides the nullifier. */
 export type BallotOpening = { vote: Vote; salt: Uint8Array };
 
@@ -142,10 +165,13 @@ const isVote = (v: number): v is Vote => v === Vote.YES || v === Vote.NO || v ==
 /**
  * Encrypts a ballot opening to every admin key. The header and the vote
  * (proposal id and contract address) are bound in as associated data, so a
- * blob copied into another vote won't decrypt.
+ * blob copied into another vote won't decrypt. Unusable keys (see
+ * `isUsableAdminKey`) are left out, so one bad published key can't block a cast.
  */
-export const sealBallot = (opening: BallotOpening, adminKeys: readonly Uint8Array[], v: VoteInstance): Uint8Array => {
-  if (adminKeys.length === 0 || adminKeys.length > 255) throw new Error('Need 1 to 255 admin keys');
+export const sealBallot = (opening: BallotOpening, published: readonly Uint8Array[], v: VoteInstance): Uint8Array => {
+  const adminKeys = usableAdminKeys(published).usable;
+  if (adminKeys.length === 0) throw new Error('No usable admin keys to encrypt the ballot to');
+  if (adminKeys.length > 255) throw new Error('Need 1 to 255 admin keys');
   if (opening.salt.length !== 32) throw new Error('salt must be 32 bytes');
   const contentKey = randomBytes(32);
   const eph = x25519.utils.randomSecretKey();

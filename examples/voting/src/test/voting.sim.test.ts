@@ -373,6 +373,23 @@ describe('Voting (in memory)', () => {
     );
   });
 
+  it('a low-order admin key published next to a good one does not block casting or counting', async () => {
+    const sim = (await deploy()).at(T0);
+    const voters = [newSecretKey(), newSecretKey()];
+    const admin = newAdminEncryptionKeys();
+    for (const sk of voters) await sim.call('enrol', voterKey(sk));
+    // The contract can't tell a low-order X25519 key from a good one; the CLI refuses it.
+    await sim.call('addAdminKey', new Uint8Array(32));
+    await sim.call('addAdminKey', admin.publicKey);
+    await sim.call('open', BigInt(DEADLINE));
+    const published = [...sim.ledger().adminEncKeys];
+    expect(published).toHaveLength(2);
+    await cast(sim, voters[0], Vote.YES, published);
+    await cast(sim, voters[1], Vote.NO, published);
+    expect(await adminCount(sim.at(DEADLINE), admin.secretKey)).toEqual([]);
+    expect([sim.ledger().yes, sim.ledger().no, sim.ledger().abstain]).toEqual([1n, 1n, 0n]);
+  });
+
   // @generated-stub begin circuits sha=445b258edf5d
   // Covered by the describe blocks above.
   // @generated-stub end circuits

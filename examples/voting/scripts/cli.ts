@@ -38,8 +38,9 @@
 // Options: --contract <address> (default: deployments/<network>.json), --wallet <ROLE>
 // (the wallet that pays fees; default ALICE, from .env.<network> off local).
 // VOTING_KEYS_DIR picks another key directory, to act as several people on one
-// machine. Off local, MIDNIGHT_PRIVATE_STATE_PASSWORD encrypts the local
-// private-state store, as for `npm run deploy`.
+// machine. The CLI keeps the circuit's private state (your secret) in memory
+// for one run only, so voters sharing a fee wallet never share it. Voters who
+// run at the same time should still each pay fees with their own --wallet.
 
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -61,12 +62,14 @@ import {
   adminEncryptionPublicKey,
   ballotNullifier,
   checkOpening,
+  isUsableAdminKey,
   keyFingerprint,
   openBallot,
   ownOpening,
   passes,
   proposalLabel,
   sealBallot,
+  usableAdminKeys,
   voteInstance,
   voterKey,
 } from '../src/crypto.js';
@@ -78,7 +81,6 @@ import { MidnightWalletProvider, resolveWallet, syncWallet, waitForDust, waitFor
 // @ts-expect-error WebSocket global assignment for apollo
 globalThis.WebSocket = WebSocket;
 
-const LOCAL_PASSWORD = 'Mnkit-Local-Deploy-Only!';
 const HOUR = 3600;
 const logger = pino({ level: process.env['LOG_LEVEL'] ?? 'warn', transport: { target: 'pino-pretty' } });
 
@@ -136,8 +138,6 @@ const castRecord = (address: string) => `${keysDir()}/cast-${network}-${address}
 type Session = { providers: VotingProviders; stop: () => Promise<void> };
 
 async function session(): Promise<Session> {
-  const password = isRemote ? process.env['MIDNIGHT_PRIVATE_STATE_PASSWORD'] : LOCAL_PASSWORD;
-  if (!password) die(`Set MIDNIGHT_PRIVATE_STATE_PASSWORD (in .env.${network} or the environment).`);
   const envConfig: EnvironmentConfiguration = { walletNetworkId: config.networkId, ...config };
   const setup = resolveWallet(network, opts.wallet);
   const wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
@@ -152,11 +152,10 @@ async function session(): Promise<Session> {
   } else {
     await waitForDust(logger, wallet.wallet, 1, timeout, config.indexer);
   }
-  const providers = buildProviders(wallet, zkConfigPath, config, {
-    dbName: fileURLToPath(new URL(`../.mnkit/private-state/${network}`, import.meta.url)),
-    storeName: 'voting-cli',
-    password: password!,
-  });
+  // In memory: each call sets the private state it needs, and nothing outlives
+  // this process, so two identities on one fee wallet can't read or overwrite
+  // each other's secret.
+  const providers = buildProviders(wallet, zkConfigPath, config, 'memory');
   return { providers, stop: () => wallet.stop() };
 }
 
@@ -222,6 +221,7 @@ const commands: Record<string, () => Promise<void>> = {
     const admin = readAdminKeys();
     const key = opts.key ? fromHex(opts.key) : adminEncryptionPublicKey(admin.encSecretKey);
     if (key.length !== 32) die('--key must be a 32-byte X25519 public key in hex');
+    if (!isUsableAdminKey(key)) die('--key is not a usable X25519 public key (low-order): ballots could not be encrypted to it');
     console.log(`  Publishing admin key ${keyFingerprint(key)}: announce this fingerprint so voters can check it.`);
     await withSession((s, a) => call(s, a, createVotingPrivateState(admin.secretKey), 'addAdminKey', [key]));
   },
@@ -253,6 +253,11 @@ const commands: Record<string, () => Promise<void>> = {
       ? Math.floor(Date.parse(opts.deadline) / 1000)
       : now() + Math.round(Number(opts.days ?? '7') * 24 * HOUR);
     if (!Number.isFinite(deadline) || deadline <= now()) die('The deadline must be a valid time in the future');
+    // Opening freezes the admin keys and there is no way to remove one, so
+    // refuse to open with a key voters' clients would have to skip.
+    const { unusable } = usableAdminKeys([...(await readLedger()).adminEncKeys]);
+    if (unusable.length > 0)
+      die(`Unusable admin key(s) ${unusable.map(keyFingerprint).join(', ')} are published: redeploy without them before opening`);
     await withSession((s, a) => call(s, a, createVotingPrivateState(admin.secretKey), 'open', [BigInt(deadline)]));
     console.log(`✔ Voting is open until ${iso(BigInt(deadline))}. Counting closes 48 hours after that.`);
   },
@@ -268,7 +273,9 @@ const commands: Record<string, () => Promise<void>> = {
     if (l.ballots.member(ballotNullifier(voter.secretKey, v))) die('You have already voted');
     const left = Number(l.deadline) - now();
     if (left < 10 * 60) console.warn(`! Only ${left}s left: a cast that lands after the deadline is rejected.`);
-    const adminKeys = [...l.adminEncKeys];
+    const { usable: adminKeys, unusable } = usableAdminKeys([...l.adminEncKeys]);
+    for (const k of unusable) console.warn(`! Skipping unusable admin key ${keyFingerprint(k)}`);
+    if (adminKeys.length === 0) die('No usable admin key to encrypt your ballot to; ask the admin');
     // The proof doesn't cover these keys (they come from the indexer): check the
     // fingerprints against the ones the admin announced.
     console.log(`  Encrypting to admin key(s): ${adminKeys.map(keyFingerprint).join(', ')}`);

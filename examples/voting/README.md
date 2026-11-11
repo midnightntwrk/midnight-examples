@@ -57,9 +57,14 @@ The header of `scripts/cli.ts` lists every command.
 - **Keys.** These are secrets. The CLI keeps them in `examples/voting/.voting/`
   (gitignored), or in `VOTING_KEYS_DIR`.
 - **Wallets.** Fees are paid by the wallet named with `--wallet` (default ALICE),
-  from the repo-root `.env.<network>`.
-- **Password.** Off local, `MIDNIGHT_PRIVATE_STATE_PASSWORD` encrypts the local
-  private-state store.
+  from the repo-root `.env.<network>`. Voters who cast at the same time on one
+  machine should each use their own `--wallet`: two runs on one fee wallet can
+  clash over its DUST.
+- **Private state.** The CLI keeps your secret in memory for one run only and
+  never writes it to the private-state store, so identities sharing a fee
+  wallet stay separate.
+- **Password.** Off local, `MIDNIGHT_PRIVATE_STATE_PASSWORD` encrypts the
+  private-state store `npm run deploy` uses. The other commands don't need it.
 - **Proof server.** Start a proof server first (`npm run proof:up`).
 
 ```bash

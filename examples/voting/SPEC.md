@@ -102,6 +102,13 @@ Each line ends with the key (or key prefix) of its entry in the
 - The admin encryption keys a voter's client reads come from the indexer and
   aren't checked by the proof: the CLI prints their fingerprints so voters can
   compare them with the ones the admin announced.
+- The contract can't check that an admin key is a usable X25519 key, and keys
+  can't be removed once added. The CLI refuses to publish a low-order key or to
+  open with one published, and a voter's client leaves unusable keys out of
+  the ballot, so one bad key can't block casting.
+- The CLI keeps the circuit's private state (the voter or admin secret) in
+  memory for one run. It never writes it to the private-state store, so two
+  identities sharing a fee wallet can't read or overwrite each other's secret.
 - The CLI keeps the vote this machine cast in `.voting/` (mode 0600) so
   `self-count` can default to it.
 - A voter can prove how they voted by revealing their opening (vote-buying is
