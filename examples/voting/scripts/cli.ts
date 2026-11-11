@@ -22,13 +22,17 @@
 //   deploy --proposal MIP-0018    deploy a vote (runs scripts/deploy.ts as the admin)
 //   add-admin-key [--key <hex>]   publish an X25519 key ballots get encrypted to (default: yours)
 //   enrol <voterKey…> | --roster roster.json   enrol voter keys (a roster is [{name, key}])
-//   open [--days 7 | --deadline <ISO time>]    freeze the list and open voting
+//   open [--days 7 | --deadline <ISO time>]    freeze the list and open voting; announce the
+//                                 printed admin key set fingerprint with the roster
 //   close-early                   start counting once every enrolled voter has cast
 //   count                         decrypt and count every uncounted ballot
 // Voter:
 //   voter keygen [--force]        make .voting/voter.json and print the key to send the admin
 //   voter key                     print your voter key again
-//   cast yes|no|abstain           cast your one ballot
+//   cast yes|no|abstain --admin-keys <fingerprint>
+//                                 cast your one ballot, sealed only if the admin keys
+//                                 match the fingerprint the admin announced
+//                                 (or set VOTING_ADMIN_KEYS)
 //   self-count [yes|no|abstain]   count your own ballot if the admin hasn't (vote defaults to
 //                                 the one this machine cast)
 // Anyone:
@@ -60,9 +64,12 @@ import { createVotingPrivateState, type VotingPrivateState } from '../contract/w
 import {
   Vote,
   adminEncryptionPublicKey,
+  adminKeySetFingerprint,
+  ballotRecipients,
   ballotNullifier,
   checkOpening,
   isUsableAdminKey,
+  MAX_ADMIN_KEYS,
   keyFingerprint,
   openBallot,
   ownOpening,
@@ -102,6 +109,7 @@ const { values: opts, positionals } = parseArgs({
     days: { type: 'string' },
     deadline: { type: 'string' },
     force: { type: 'boolean', default: false },
+    'admin-keys': { type: 'string' },
   },
 });
 
@@ -222,6 +230,9 @@ const commands: Record<string, () => Promise<void>> = {
     const key = opts.key ? fromHex(opts.key) : adminEncryptionPublicKey(admin.encSecretKey);
     if (key.length !== 32) die('--key must be a 32-byte X25519 public key in hex');
     if (!isUsableAdminKey(key)) die('--key is not a usable X25519 public key (low-order): ballots could not be encrypted to it');
+    const l = await readLedger();
+    if (l.adminEncKeys.member(key)) die('That admin key is already published');
+    if (l.adminEncKeys.size() >= BigInt(MAX_ADMIN_KEYS)) die(`A vote can have at most ${MAX_ADMIN_KEYS} admin keys`);
     console.log(`  Publishing admin key ${keyFingerprint(key)}: announce this fingerprint so voters can check it.`);
     await withSession((s, a) => call(s, a, createVotingPrivateState(admin.secretKey), 'addAdminKey', [key]));
   },
@@ -259,7 +270,10 @@ const commands: Record<string, () => Promise<void>> = {
     if (unusable.length > 0)
       die(`Unusable admin key(s) ${unusable.map(keyFingerprint).join(', ')} are published: redeploy without them before opening`);
     await withSession((s, a) => call(s, a, createVotingPrivateState(admin.secretKey), 'open', [BigInt(deadline)]));
+    const keySet = adminKeySetFingerprint([...(await readLedger()).adminEncKeys]);
     console.log(`✔ Voting is open until ${iso(BigInt(deadline))}. Counting closes 48 hours after that.`);
+    console.log(`  Admin key set: ${keySet}`);
+    console.log(`  Announce it with the roster and voter root: voters cast with --admin-keys ${keySet}`);
   },
 
   async cast() {
@@ -273,14 +287,23 @@ const commands: Record<string, () => Promise<void>> = {
     if (l.ballots.member(ballotNullifier(voter.secretKey, v))) die('You have already voted');
     const left = Number(l.deadline) - now();
     if (left < 10 * 60) console.warn(`! Only ${left}s left: a cast that lands after the deadline is rejected.`);
-    const { usable: adminKeys, unusable } = usableAdminKeys([...l.adminEncKeys]);
+    // The admin keys come from the indexer. Seal only to the set the admin
+    // announced: a substituted or added key would let someone else read the
+    // vote. (The contract also rejects a recipient that isn't published, but
+    // by then the node has seen the blob.)
+    const published = [...l.adminEncKeys];
+    const expected = (opts['admin-keys'] ?? process.env['VOTING_ADMIN_KEYS'])?.trim().toLowerCase();
+    if (!expected) die('cast needs --admin-keys <fingerprint>: the admin key set fingerprint the admin announced');
+    const actual = adminKeySetFingerprint(published);
+    if (actual !== expected)
+      die(`The admin keys don't match the announced fingerprint (got ${actual}, expected ${expected}). Not casting.`);
+    const { usable: adminKeys, unusable } = usableAdminKeys(published);
     for (const k of unusable) console.warn(`! Skipping unusable admin key ${keyFingerprint(k)}`);
     if (adminKeys.length === 0) die('No usable admin key to encrypt your ballot to; ask the admin');
-    // The proof doesn't cover these keys (they come from the indexer): check the
-    // fingerprints against the ones the admin announced.
-    console.log(`  Encrypting to admin key(s): ${adminKeys.map(keyFingerprint).join(', ')}`);
+    console.log(`  Admin keys match ${actual}; encrypting to ${adminKeys.length} key(s).`);
     const blob = sealBallot(ownOpening(voter.secretKey, v, vote), adminKeys, v);
-    await withSession((s, a) => call(s, a, createVotingPrivateState(voter.secretKey, vote), 'cast', [blob]));
+    const recipients = ballotRecipients(adminKeys);
+    await withSession((s, a) => call(s, a, createVotingPrivateState(voter.secretKey, vote), 'cast', [blob, recipients]));
     // Kept only so self-count can default to the vote cast here. It is your
     // vote in plain text: delete the file if that matters to you.
     fs.writeFileSync(castRecord(address), `${JSON.stringify({ vote: VOTE_NAMES[vote] })}\n`, { mode: 0o600 });
@@ -363,6 +386,7 @@ const commands: Record<string, () => Promise<void>> = {
     for (const k of l.voterKeys) console.log(`  voter key:   ${toHex(k)}`);
     console.log(`Voter root:    ${l.voters.root().field.toString(16)}`);
     console.log(`Admin keys:    ${[...l.adminEncKeys].map(keyFingerprint).join(', ') || 'none'}`);
+    if (!l.adminEncKeys.isEmpty()) console.log(`Admin key set: ${adminKeySetFingerprint([...l.adminEncKeys])}`);
     console.log(`Cast:          ${l.castCount}`);
     console.log(`Counted:       ${l.counted.size()}`);
     for (const n of uncounted(l)) console.log(`  uncounted:   ${toHex(n)}`);

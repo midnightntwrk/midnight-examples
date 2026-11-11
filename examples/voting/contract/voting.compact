@@ -69,10 +69,15 @@ export circuit enrol(pk: Bytes<32>): [] {
   enrolled.increment(1);
 }
 
+// At most 8 admin keys: a ballot names its recipients in a Vector<8> (below).
 export circuit addAdminKey(key: Bytes<32>): [] {
   requireAdmin();
   assert(phase == Phase.ENROLMENT, "Enrolment is closed");
-  adminEncKeys.insert(disclose(key));
+  const k = disclose(key);
+  assert(k != default<Bytes<32>>, "Not an admin key");
+  assert(!adminEncKeys.member(k), "Admin key already added");
+  assert(adminEncKeys.size() < 8, "Too many admin keys");
+  adminEncKeys.insert(k);
 }
 
 export circuit open(d: Uint<64>): [] {
@@ -88,7 +93,12 @@ export circuit open(d: Uint<64>): [] {
   phase = Phase.OPEN;
 }
 
-export circuit cast(enc: Opaque<"Uint8Array">): [] {
+// `recipients` are the admin keys the voter's client sealed `enc` to, padded
+// with zeros. Each must be a published admin key: the client reads the keys
+// from an indexer, and a substituted key would fail here against the real
+// ledger state. The proof can't see inside `enc`; an honest client seals it to
+// exactly these keys.
+export circuit cast(enc: Opaque<"Uint8Array">, recipients: Vector<8, Bytes<32>>): [] {
   assert(phase == Phase.OPEN, "Voting is not open");
   assert(!closedEarly, "Voting is closed");
   assert(blockTimeLt(deadline), "Voting is closed");
@@ -99,6 +109,11 @@ export circuit cast(enc: Opaque<"Uint8Array">): [] {
   const instance = kernel.self().bytes;
   const n = disclose(ballotNullifier(sk, proposalId, instance));
   assert(!ballots.member(n), "Already voted");
+  const rs = disclose(recipients);
+  assert(rs[0] != default<Bytes<32>>, "No ballot recipient");
+  for (const r of rs) {
+    assert(r == default<Bytes<32>> || adminEncKeys.member(r), "Ballot recipient is not an admin key");
+  }
   ballots.insert(n, ballotCommit(vote(), ballotSalt(sk, proposalId, instance)));
   encBallots.insert(n, disclose(enc));
   castCount.increment(1);

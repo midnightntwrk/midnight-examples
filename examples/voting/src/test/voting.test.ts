@@ -38,6 +38,7 @@ import {
   passes,
   proposalIdFromLabel,
   sealBallot,
+  ballotRecipients,
   voteInstance,
   voterKey,
 } from '../crypto.js';
@@ -239,7 +240,7 @@ describe(`Voting Contract (${network})`, () => {
   const castFor = async (p: VotingProviders, i: number) => {
     await setPrivateState(p, VOTER_IDS[i], createVotingPrivateState(VOTER_SKS[i], VOTES[i]));
     const blob = sealBallot({ vote: VOTES[i], salt: ballotSalt(VOTER_SKS[i], V()) }, [ADMIN_ENC.publicKey], V());
-    await call(p, VOTER_IDS[i], 'cast', [blob]);
+    await call(p, VOTER_IDS[i], 'cast', [blob, ballotRecipients([ADMIN_ENC.publicKey])]);
   };
 
   it('accepts two casts submitted at the same time from different wallets', async () => {

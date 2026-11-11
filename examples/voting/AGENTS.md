@@ -22,6 +22,10 @@
     the voter's secret, so the voter only ever backs up one key.
   - It also stores an `Opaque<"Uint8Array">` blob that the client encrypts off
     chain to every admin key published in `adminEncKeys`.
+  - `cast` also takes the keys the blob is sealed to (`Vector<8>`, zero-padded)
+    and checks each is in `adminEncKeys`. The keys come from the indexer, so a
+    made-up key fails against the real state. The CLI also requires the
+    announced admin key set fingerprint (`--admin-keys`) before sealing.
   - The client side is in `src/crypto.ts`: X25519, HKDF-SHA256 and
     XChaCha20-Poly1305 from `@noble/*`. The header, proposal id and contract
     address are the associated data.

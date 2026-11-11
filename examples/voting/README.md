@@ -76,12 +76,12 @@ npm run vote -- voter keygen
 
 # Admin, per vote:
 npm run vote -- deploy --proposal MIP-0018
-npm run vote -- add-admin-key              # publish your ballot-encryption key; announce the printed fingerprint
+npm run vote -- add-admin-key              # publish your ballot-encryption key (up to 8 admin keys)
 npm run vote -- enrol --roster roster.json # [{ "name": "...", "key": "<voter key>" }]
-npm run vote -- open --days 7              # freezes the list; prints the deadline
+npm run vote -- open --days 7              # freezes the list; prints the deadline and the admin key set fingerprint
 
 # Voters:
-npm run vote -- cast yes                   # or no / abstain; one ballot, final
+npm run vote -- cast yes --admin-keys <fp> # or no / abstain; one ballot, final
 
 # Anyone:
 npm run vote -- status                     # turnout, deadline, uncounted ballots
@@ -98,10 +98,19 @@ Publish the roster and the voter-tree root printed by `enrol` before you open
 voting. Anyone can then check that the list wasn't changed. Once voting is open,
 the contract rejects further enrolment.
 
+When you open voting, announce the admin key set fingerprint that `open` prints
+(`status` prints it too) on the same channel as the roster. `cast` reads the
+admin keys from the indexer and refuses to seal a ballot unless they match the
+fingerprint passed in `--admin-keys` (or `VOTING_ADMIN_KEYS`). Without that
+check, an indexer that swapped in or added a key could read the vote.
+
 ## Rules the contract enforces
 
 - `cast` is accepted only while the block time is before `deadline`, and only
   until an early close.
+- `cast` names the admin keys its ballot is sealed to (up to 8, zero-padded),
+  and each must be a published admin key. A ballot sealed to a key the indexer
+  made up is rejected on chain.
 - `closeEarly` is admin-only, and only once every enrolled voter has cast. It ends
   casting and starts counting early.
 - `count` is accepted from the close until 48 hours after the deadline. An early

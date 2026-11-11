@@ -40,6 +40,9 @@ import {
   passes,
   proposalIdFromLabel,
   sealBallot,
+  ballotRecipients,
+  usableAdminKeys,
+  MAX_ADMIN_KEYS,
   voterKey,
 } from '../crypto.js';
 
@@ -85,9 +88,17 @@ const setup = async (nVoters = 3) => {
   return { sim, voters, admins, adminKeys: admins.map((a) => a.publicKey) };
 };
 
-const cast = async (sim: VotingSim, sk: Uint8Array, vote: Vote, adminKeys: Uint8Array[], blob?: Uint8Array) => {
+/** A voter's cast, as scripts/cli.ts does it: seal to the usable admin keys and name them as recipients. */
+const cast = async (
+  sim: VotingSim,
+  sk: Uint8Array,
+  vote: Vote,
+  adminKeys: Uint8Array[],
+  blob?: Uint8Array,
+  recipients = ballotRecipients(usableAdminKeys(adminKeys).usable),
+) => {
   sim.privateState = createVotingPrivateState(sk, vote);
-  return sim.call('cast', blob ?? sealBallot({ vote, salt: ballotSalt(sk, V(sim)) }, adminKeys, V(sim)));
+  return sim.call('cast', blob ?? sealBallot({ vote, salt: ballotSalt(sk, V(sim)) }, adminKeys, V(sim)), recipients);
 };
 
 /**
@@ -178,6 +189,17 @@ describe('Voting (in memory)', () => {
       await expectRejects(() => sim.call('open', BigInt(DEADLINE)), 'Voting already opened');
     });
 
+    it('rejects the zero key, a duplicate key, and more than MAX_ADMIN_KEYS keys', async () => {
+      const sim = await deploy();
+      await expectRejects(() => sim.call('addAdminKey', new Uint8Array(32)), 'Not an admin key');
+      const first = newAdminEncryptionKeys().publicKey;
+      await sim.call('addAdminKey', first);
+      await expectRejects(() => sim.call('addAdminKey', first), 'Admin key already added');
+      for (let i = 1; i < MAX_ADMIN_KEYS; i++) await sim.call('addAdminKey', newAdminEncryptionKeys().publicKey);
+      expect(sim.ledger().adminEncKeys.size()).toBe(BigInt(MAX_ADMIN_KEYS));
+      await expectRejects(() => sim.call('addAdminKey', newAdminEncryptionKeys().publicKey), 'Too many admin keys');
+    });
+
     it('freezes the voter list and admin keys once voting opens', async () => {
       const { sim } = await setup();
       asAdmin(sim);
@@ -192,7 +214,10 @@ describe('Voting (in memory)', () => {
       const sk = newSecretKey();
       await sim.call('enrol', voterKey(sk));
       sim.privateState = createVotingPrivateState(sk, Vote.YES);
-      await expectRejects(() => sim.call('cast', new Uint8Array(8)), 'Voting is not open');
+      await expectRejects(
+        () => sim.call('cast', new Uint8Array(8), ballotRecipients([newAdminEncryptionKeys().publicKey])),
+        'Voting is not open',
+      );
     });
 
     it('rejects a voter who is not enrolled', async () => {
@@ -215,7 +240,7 @@ describe('Voting (in memory)', () => {
       await s1.call('addAdminKey', adminKeys[0]);
       await s1.call('open', BigInt(DEADLINE));
       s1.privateState = createVotingPrivateState(outsider, Vote.YES);
-      await expectRejects(() => s1.call('cast', blob), 'Path is not for this voter');
+      await expectRejects(() => s1.call('cast', blob, ballotRecipients([adminKeys[0]])), 'Path is not for this voter');
       // An outsider builds a path for their own key against a tree they aren't in.
       const forged = new Contract({
         ...witnesses,
@@ -227,8 +252,34 @@ describe('Voting (in memory)', () => {
       await s2.call('addAdminKey', adminKeys[0]);
       await s2.call('open', BigInt(DEADLINE));
       s2.privateState = createVotingPrivateState(outsider, Vote.YES);
-      await expectRejects(() => s2.call('cast', blob), 'Not an enrolled voter');
+      await expectRejects(() => s2.call('cast', blob, ballotRecipients([adminKeys[0]])), 'Not an enrolled voter');
       expect(sim.ledger().castCount).toBe(0n);
+    });
+
+    it('rejects a ballot sealed to a key that is not a published admin key', async () => {
+      const { sim, voters, adminKeys } = await setup();
+      // A substituted indexer response: the attacker's key alone, or added to the real ones.
+      const attacker = newAdminEncryptionKeys().publicKey;
+      for (const keys of [[attacker], [...adminKeys, attacker]])
+        await expectRejects(() => cast(sim, voters[0], Vote.YES, keys), 'Ballot recipient is not an admin key');
+      expect(sim.ledger().castCount).toBe(0n);
+    });
+
+    it('rejects a cast that names no recipient', async () => {
+      const { sim, voters, adminKeys } = await setup();
+      const none = Array.from({ length: MAX_ADMIN_KEYS }, () => new Uint8Array(32));
+      await expectRejects(() => cast(sim, voters[0], Vote.YES, adminKeys, undefined, none), 'No ballot recipient');
+      // Padding first, key later: slot 0 must hold a key.
+      const late = [...none.slice(1), adminKeys[0]];
+      await expectRejects(() => cast(sim, voters[0], Vote.YES, adminKeys, undefined, late), 'No ballot recipient');
+    });
+
+    it('accepts a ballot sealed to some, not all, of the admin keys', async () => {
+      const { sim, voters, admins, adminKeys } = await setup();
+      await cast(sim, voters[0], Vote.ABSTAIN, [adminKeys[1]]);
+      const [[, blob]] = [...sim.ledger().encBallots];
+      expect(openBallot(blob, admins[1].secretKey, V(sim))?.vote).toBe(Vote.ABSTAIN);
+      expect(openBallot(blob, admins[0].secretKey, V(sim))).toBeUndefined();
     });
 
     it('rejects a second cast by the same voter, even with a different vote', async () => {
@@ -378,8 +429,11 @@ describe('Voting (in memory)', () => {
     const voters = [newSecretKey(), newSecretKey()];
     const admin = newAdminEncryptionKeys();
     for (const sk of voters) await sim.call('enrol', voterKey(sk));
-    // The contract can't tell a low-order X25519 key from a good one; the CLI refuses it.
-    await sim.call('addAdminKey', new Uint8Array(32));
+    // The contract refuses the zero key but can't tell other low-order X25519
+    // keys (here u = 1) from a good one; the CLI refuses them.
+    const lowOrder = new Uint8Array(32);
+    lowOrder[0] = 1;
+    await sim.call('addAdminKey', lowOrder);
     await sim.call('addAdminKey', admin.publicKey);
     await sim.call('open', BigInt(DEADLINE));
     const published = [...sim.ledger().adminEncKeys];

@@ -28,6 +28,9 @@ import {
   voteInstance,
   keyFingerprint,
   usableAdminKeys,
+  adminKeySetFingerprint,
+  ballotRecipients,
+  MAX_ADMIN_KEYS,
 } from '../crypto.js';
 
 const PID = proposalIdFromLabel('MIP-0018');
@@ -58,10 +61,30 @@ describe('ballot sealing', () => {
     expect(openBallot(blob, a.secretKey, voteInstance(PID, 'cd'.repeat(32)))).toBeUndefined();
   });
 
-  it('gives admin keys a stable 16-hex-digit fingerprint', () => {
+  it('gives admin keys a stable 32-hex-digit fingerprint', () => {
     const k = newAdminEncryptionKeys().publicKey;
-    expect(keyFingerprint(k)).toMatch(/^[0-9a-f]{16}$/);
+    expect(keyFingerprint(k)).toMatch(/^[0-9a-f]{32}$/);
     expect(keyFingerprint(k)).toBe(keyFingerprint(k.slice()));
+  });
+
+  it('fingerprints an admin key set in any order, and changes when a key is added or swapped', () => {
+    const [a, b, c] = [0, 1, 2].map(() => newAdminEncryptionKeys().publicKey);
+    const fp = adminKeySetFingerprint([a, b]);
+    expect(fp).toMatch(/^[0-9a-f]{32}$/);
+    expect(adminKeySetFingerprint([b, a])).toBe(fp);
+    expect(adminKeySetFingerprint([a, b, c])).not.toBe(fp);
+    expect(adminKeySetFingerprint([a, c])).not.toBe(fp);
+    expect(adminKeySetFingerprint([a])).not.toBe(fp);
+  });
+
+  it('pads ballot recipients with zeros to MAX_ADMIN_KEYS, keys first', () => {
+    const k = newAdminEncryptionKeys().publicKey;
+    const r = ballotRecipients([k]);
+    expect(r).toHaveLength(MAX_ADMIN_KEYS);
+    expect(r[0]).toEqual(k);
+    expect(r.slice(1).every((x) => x.length === 32 && x.every((b) => b === 0))).toBe(true);
+    expect(() => ballotRecipients([])).toThrow('admin keys');
+    expect(() => ballotRecipients(Array.from({ length: MAX_ADMIN_KEYS + 1 }, () => k))).toThrow('admin keys');
   });
 
   it('rejects any tampered byte, a truncated blob and an unknown version', () => {

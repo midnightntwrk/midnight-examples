@@ -87,8 +87,32 @@ export const ballotSalt = (sk: Uint8Array, v: VoteInstance): Uint8Array =>
 /** The commitment `cast` stores for an opening. */
 export const ballotCommit = (vote: Vote, salt: Uint8Array): Uint8Array => pureCircuits.ballotCommit(vote, salt);
 
-/** A short fingerprint of an admin encryption key, to confirm out of band before casting. */
-export const keyFingerprint = (key: Uint8Array): string => toHex(sha256(key)).slice(0, 16);
+/** A fingerprint of one admin encryption key (128 bits of SHA-256, as hex). */
+export const keyFingerprint = (key: Uint8Array): string => toHex(sha256(key)).slice(0, 32);
+
+/** The most admin keys a vote can have: `cast` names its recipients in a Vector<8>. */
+export const MAX_ADMIN_KEYS = 8;
+
+const compareBytes = (a: Uint8Array, b: Uint8Array): number => {
+  for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i]! - b[i]!;
+  return a.length - b.length;
+};
+
+/**
+ * One fingerprint for a whole set of admin keys, in any order (128 bits of
+ * SHA-256, as hex). The admin announces it with the roster once voting opens,
+ * and a voter's client refuses to cast unless the keys it read match it.
+ */
+export const adminKeySetFingerprint = (keys: readonly Uint8Array[]): string => {
+  const sorted = [...keys].sort(compareBytes);
+  return toHex(sha256(concat(new TextEncoder().encode('mip-vote:admin-keys'), ...sorted))).slice(0, 32);
+};
+
+/** The `recipients` argument of `cast`: the keys a ballot was sealed to, zero-padded to MAX_ADMIN_KEYS. */
+export const ballotRecipients = (keys: readonly Uint8Array[]): Uint8Array[] => {
+  if (keys.length === 0 || keys.length > MAX_ADMIN_KEYS) throw new Error(`Need 1 to ${MAX_ADMIN_KEYS} admin keys`);
+  return [...keys, ...Array.from({ length: MAX_ADMIN_KEYS - keys.length }, () => new Uint8Array(32))];
+};
 
 /**
  * The on-chain proposal id: the UTF-8 label (for example "MIP-0018"),
@@ -171,7 +195,7 @@ const isVote = (v: number): v is Vote => v === Vote.YES || v === Vote.NO || v ==
 export const sealBallot = (opening: BallotOpening, published: readonly Uint8Array[], v: VoteInstance): Uint8Array => {
   const adminKeys = usableAdminKeys(published).usable;
   if (adminKeys.length === 0) throw new Error('No usable admin keys to encrypt the ballot to');
-  if (adminKeys.length > 255) throw new Error('Need 1 to 255 admin keys');
+  if (adminKeys.length > MAX_ADMIN_KEYS) throw new Error(`Need 1 to ${MAX_ADMIN_KEYS} admin keys`);
   if (opening.salt.length !== 32) throw new Error('salt must be 32 bytes');
   const contentKey = randomBytes(32);
   const eph = x25519.utils.randomSecretKey();

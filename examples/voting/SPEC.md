@@ -56,9 +56,9 @@ keeps an X25519 key pair off chain (not in contract private state) to decrypt
 |---|---|---|---|---|
 | constructor | deployer (becomes admin) | `pid: Bytes<32>` | sets `adminPk`, `proposalId`, `phase = ENROLMENT` | — |
 | `enrol` | admin | `pk: Bytes<32>` | adds `pk` to `voters` and `voterKeys`, increments `enrolled` | `Only the admin can do this`; `Enrolment is closed`; `Voter already enrolled`; `Voter list is full` |
-| `addAdminKey` | admin | `key: Bytes<32>` | adds an X25519 public key to `adminEncKeys` | `Only the admin can do this`; `Enrolment is closed` |
+| `addAdminKey` | admin | `key: Bytes<32>` | adds an X25519 public key to `adminEncKeys` (at most 8) | `Only the admin can do this`; `Enrolment is closed`; `Not an admin key` (all zeros); `Admin key already added`; `Too many admin keys` |
 | `open` | admin | `d: Uint<64>` | sets `deadline = d`, `countingEnds = d + 48h`, `phase = OPEN` | `Only the admin can do this`; `Voting already opened`; `No voters enrolled`; `No admin encryption key`; `Deadline out of range`; `Deadline is in the past` |
-| `cast` | voter | `enc: Opaque<"Uint8Array">` | stores `ballots[n] = ballotCommit(vote, salt)` and `encBallots[n] = enc`, increments `castCount` | `Voting is not open`; `Voting is closed`; `Path is not for this voter`; `Not an enrolled voter`; `Already voted` |
+| `cast` | voter | `enc: Opaque<"Uint8Array">`, `recipients: Vector<8, Bytes<32>>` (the admin keys `enc` is sealed to, zero-padded, first slot set) | checks every non-zero recipient is in `adminEncKeys`; stores `ballots[n] = ballotCommit(vote, salt)` and `encBallots[n] = enc`, increments `castCount` | `Voting is not open`; `Voting is closed`; `Path is not for this voter`; `Not an enrolled voter`; `Already voted`; `No ballot recipient`; `Ballot recipient is not an admin key` |
 | `closeEarly` | admin | — | sets `closedEarly`, which ends casting and starts counting; `countingEnds` is unchanged | `Only the admin can do this`; `Voting is not open`; `Voting is closed`; `Not every voter has cast`; `Deadline already passed` |
 | `count` | anyone | `n0: Bytes<32>`, `v0: Vote`, `s: Bytes<32>` | adds `n0` to `counted`, increments the counter for `v0` | `Voting has not opened`; `Voting is still open`; `Counting window has ended`; `No such ballot`; `Ballot already counted`; `Opening does not match the ballot` |
 | `adminKey` (pure) | off chain | `sk: Bytes<32>` | `persistentHash([pad(32, "mip-vote:admin"), sk])` | — |
@@ -99,11 +99,17 @@ Each line ends with the key (or key prefix) of its entry in the
   but anyone who links a cast transaction to a person (fee payment, network
   metadata, timing) learns that person's vote. With a handful of voters a
   unanimous result exposes every vote anyway.
-- The admin encryption keys a voter's client reads come from the indexer and
-  aren't checked by the proof: the CLI prints their fingerprints so voters can
-  compare them with the ones the admin announced.
-- The contract can't check that an admin key is a usable X25519 key, and keys
-  can't be removed once added. The CLI refuses to publish a low-order key or to
+- The admin encryption keys a voter's client reads come from the indexer. Two
+  checks stop a substituted or added key from reading a vote. `cast` requires
+  every recipient it names to be in `adminEncKeys`, so the real ledger state
+  rejects a made-up key. The CLI also refuses to seal unless the keys match the
+  admin key set fingerprint the admin announced (`--admin-keys`), so the blob
+  never leaves the machine. The contract check alone isn't enough: a rejected
+  transaction still reaches the node, which may be run by the same party as the
+  indexer. The proof can't see inside `enc`, so a client that seals to other
+  keys than it names isn't stopped. That only hurts its own voter.
+- The contract refuses the all-zero key but can't check that an admin key is a
+  usable X25519 key, and keys can't be removed once added. The CLI refuses to publish a low-order key or to
   open with one published, and a voter's client leaves unusable keys out of
   the ballot, so one bad key can't block casting.
 - The CLI keeps the circuit's private state (the voter or admin secret) in
