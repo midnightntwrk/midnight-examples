@@ -1,0 +1,134 @@
+pragma language_version 0.28;
+import CompactStandardLibrary;
+
+export enum Phase { ENROLMENT, OPEN }
+export enum Vote { YES, NO, ABSTAIN }
+
+export sealed ledger adminPk: Bytes<32>;
+export sealed ledger proposalId: Bytes<32>;
+export ledger phase: Phase;
+export ledger voters: MerkleTree<10, Bytes<32>>;
+export ledger voterKeys: Set<Bytes<32>>;
+export ledger adminEncKeys: Set<Bytes<32>>;
+export ledger enrolled: Counter;
+export ledger castCount: Counter;
+export ledger ballots: Map<Bytes<32>, Bytes<32>>;
+export ledger encBallots: Map<Bytes<32>, Opaque<"Uint8Array">>;
+export ledger counted: Set<Bytes<32>>;
+export ledger yes: Counter;
+export ledger no: Counter;
+export ledger abstain: Counter;
+export ledger deadline: Uint<64>;
+export ledger countingEnds: Uint<64>;
+export ledger closedEarly: Boolean;
+
+witness secretKey(): Bytes<32>;
+witness voterPath(pk: Bytes<32>): MerkleTreePath<10, Bytes<32>>;
+witness vote(): Vote;
+
+constructor(pid: Bytes<32>) {
+  adminPk = disclose(adminKey(secretKey()));
+  proposalId = disclose(pid);
+  phase = Phase.ENROLMENT;
+}
+
+export pure circuit adminKey(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "mip-vote:admin"), sk]);
+}
+export pure circuit voterKey(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "mip-vote:pk"), sk]);
+}
+// The nullifier and salt are bound to the proposal and to this contract
+// instance, so the same voter's ballots in two deployments (a rehearsal and the
+// real vote, or a clone that reuses the label) can't be linked or opened with
+// each other's salts.
+export pure circuit ballotNullifier(sk: Bytes<32>, pid: Bytes<32>, instance: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([pad(32, "mip-vote:cast"), sk, pid, instance]);
+}
+export pure circuit ballotSalt(sk: Bytes<32>, pid: Bytes<32>, instance: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([pad(32, "mip-vote:salt"), sk, pid, instance]);
+}
+// The commitment `cast` stores, so the admin can check a decrypted opening
+// before submitting it to `count`.
+export pure circuit ballotCommit(v: Vote, salt: Bytes<32>): Bytes<32> {
+  return persistentCommit<Vote>(v, salt);
+}
+
+circuit requireAdmin(): [] {
+  assert(disclose(adminKey(secretKey())) == adminPk, "Only the admin can do this");
+}
+
+export circuit enrol(pk: Bytes<32>): [] {
+  requireAdmin();
+  assert(phase == Phase.ENROLMENT, "Enrolment is closed");
+  const k = disclose(pk);
+  assert(!voterKeys.member(k), "Voter already enrolled");
+  assert(enrolled.read() < 1024, "Voter list is full");
+  voterKeys.insert(k);
+  voters.insert(k);
+  enrolled.increment(1);
+}
+
+export circuit addAdminKey(key: Bytes<32>): [] {
+  requireAdmin();
+  assert(phase == Phase.ENROLMENT, "Enrolment is closed");
+  adminEncKeys.insert(disclose(key));
+}
+
+export circuit open(d: Uint<64>): [] {
+  requireAdmin();
+  assert(phase == Phase.ENROLMENT, "Voting already opened");
+  assert(enrolled.read() > 0, "No voters enrolled");
+  assert(!adminEncKeys.isEmpty(), "No admin encryption key");
+  const dl = disclose(d);
+  assert(dl < 1000000000000, "Deadline out of range");
+  assert(blockTimeLt(dl), "Deadline is in the past");
+  deadline = dl;
+  countingEnds = (dl + 172800) as Uint<64>;
+  phase = Phase.OPEN;
+}
+
+export circuit cast(enc: Opaque<"Uint8Array">): [] {
+  assert(phase == Phase.OPEN, "Voting is not open");
+  assert(!closedEarly, "Voting is closed");
+  assert(blockTimeLt(deadline), "Voting is closed");
+  const sk = secretKey();
+  const path = voterPath(voterKey(sk));
+  assert(disclose(path.leaf == voterKey(sk)), "Path is not for this voter");
+  assert(voters.checkRoot(disclose(merkleTreePathRoot<10, Bytes<32>>(path))), "Not an enrolled voter");
+  const instance = kernel.self().bytes;
+  const n = disclose(ballotNullifier(sk, proposalId, instance));
+  assert(!ballots.member(n), "Already voted");
+  ballots.insert(n, ballotCommit(vote(), ballotSalt(sk, proposalId, instance)));
+  encBallots.insert(n, disclose(enc));
+  castCount.increment(1);
+}
+
+// Counting can start as soon as every voter has cast, but the counting window
+// still ends 48 hours after the announced deadline: an early close never
+// shortens the time a voter has to count their own ballot.
+export circuit closeEarly(): [] {
+  requireAdmin();
+  assert(phase == Phase.OPEN, "Voting is not open");
+  assert(!closedEarly, "Voting is closed");
+  assert(castCount.read() == enrolled.read(), "Not every voter has cast");
+  assert(blockTimeLt(deadline), "Deadline already passed");
+  closedEarly = true;
+}
+
+export circuit count(n0: Bytes<32>, v0: Vote, s: Bytes<32>): [] {
+  assert(phase == Phase.OPEN, "Voting has not opened");
+  if (!closedEarly) {
+    assert(blockTimeGte(deadline), "Voting is still open");
+  }
+  assert(blockTimeLt(countingEnds), "Counting window has ended");
+  const n = disclose(n0);
+  const v = disclose(v0);
+  assert(ballots.member(n), "No such ballot");
+  assert(!counted.member(n), "Ballot already counted");
+  assert(ballots.lookup(n) == ballotCommit(v, s), "Opening does not match the ballot");
+  counted.insert(n);
+  if (v == Vote.YES) { yes.increment(1); }
+  else if (v == Vote.NO) { no.increment(1); }
+  else { abstain.increment(1); }
+}
