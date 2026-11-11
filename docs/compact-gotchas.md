@@ -39,7 +39,7 @@ trust recalled APIs over it.
   ([LESSONS §6](../examples/shielded-chips/LESSONS.md#6-patterns-that-didnt))
 - **Salt any commitment to a guessable value.** A hash of a vote or a price
   can be brute-forced; `persistentCommit(value, salt)` with a secret salt
-  can't. ([private-bid `placeBid`](../examples/private-bid/contract/private-bid.compact), [election `commitWithSk`](../examples/election/contract/election.compact))
+  can't. ([private-bid `placeBid`](../examples/private-bid/contract/private-bid.compact), [voting `ballotCommit`](../examples/voting/contract/voting.compact))
 - **Narrowing casts fail at run time.** `amount as Uint<16>` rejects values
   above 65535 even when `amount` is a `Uint<64>`. Size counters for their real
   range. ([LESSONS §4](../examples/shielded-chips/LESSONS.md#4-primitive-level-facts-worth-memorizing))
