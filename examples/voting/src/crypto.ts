@@ -33,7 +33,11 @@
 //     wrap_i    = XChaCha20-Poly1305(kek_i, nonce_i, aad = header ‖ context)(contentKey)
 //
 // Wire format (version 1):
-//   0x01 ‖ ephPub(32) ‖ n(1) ‖ n × [nonce_i(24) ‖ wrap_i(48)] ‖ nonce(24) ‖ body(33 + 16)
+//   0x01 ‖ ephPub(32) ‖ n(1) ‖ n × [nonce_i(24) ‖ wrap_i(48)] ‖ nonce(24) ‖ body(33 + 16) ‖ 0x01
+//
+// The trailing 0x01 is there because the runtime rejects an Opaque<"Uint8Array">
+// that ends in a zero byte ("not in normal form"), and the body's last byte is
+// a random Poly1305 tag byte: without it, about one cast in 256 would fail.
 //
 // The circuit can't check this blob against the commitment. A voter's client
 // can write one that is unreadable, or that decrypts to an opening that doesn't
@@ -56,6 +60,7 @@ const INFO = new TextEncoder().encode('mip-vote:ballot:v1');
 const NONCE = 24;
 const WRAP = 32 + 16;
 const PLAIN = 1 + 32;
+const TRAILER = 0x01;
 
 /** A fresh 32-byte secret for a voter or the admin. Back it up: it can't be recovered. */
 export const newSecretKey = (): Uint8Array => randomBytes(32);
@@ -210,7 +215,7 @@ export const sealBallot = (opening: BallotOpening, published: readonly Uint8Arra
   const body = xchacha20poly1305(contentKey, nonce, aad).encrypt(
     concat(Uint8Array.of(opening.vote), opening.salt),
   );
-  return concat(Uint8Array.of(VERSION), ephPub, Uint8Array.of(adminKeys.length), ...wraps, nonce, body);
+  return concat(Uint8Array.of(VERSION), ephPub, Uint8Array.of(adminKeys.length), ...wraps, nonce, body, Uint8Array.of(TRAILER));
 };
 
 /**
@@ -228,7 +233,8 @@ export const openBallot = (
   const ephPub = blob.subarray(1, 33);
   const n = blob[33];
   const bodyStart = header + n * (NONCE + WRAP);
-  if (blob.length !== bodyStart + NONCE + PLAIN + 16) return undefined;
+  const bodyEnd = bodyStart + NONCE + PLAIN + 16;
+  if (blob.length !== bodyEnd + 1 || blob[bodyEnd] !== TRAILER) return undefined;
   const me = x25519.getPublicKey(adminSecretKey);
   let shared: Uint8Array;
   try {
@@ -250,7 +256,7 @@ export const openBallot = (
     }
     try {
       const plain = xchacha20poly1305(contentKey, blob.subarray(bodyStart, bodyStart + NONCE), aad).decrypt(
-        blob.subarray(bodyStart + NONCE),
+        blob.subarray(bodyStart + NONCE, bodyEnd),
       );
       if (!isVote(plain[0])) return undefined;
       return { vote: plain[0], salt: plain.slice(1) };

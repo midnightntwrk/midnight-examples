@@ -56,7 +56,7 @@ keeps an X25519 key pair off chain (not in contract private state) to decrypt
 |---|---|---|---|---|
 | constructor | deployer (becomes admin) | `pid: Bytes<32>` | sets `adminPk`, `proposalId`, `phase = ENROLMENT` | — |
 | `enrol` | admin | `pk: Bytes<32>` | adds `pk` to `voters` and `voterKeys`, increments `enrolled` | `Only the admin can do this`; `Enrolment is closed`; `Voter already enrolled`; `Voter list is full` |
-| `addAdminKey` | admin | `key: Bytes<32>` | adds an X25519 public key to `adminEncKeys` (at most 8) | `Only the admin can do this`; `Enrolment is closed`; `Not an admin key` (all zeros); `Admin key already added`; `Too many admin keys` |
+| `addAdminKey` | admin | `key: Bytes<32>` | adds an X25519 public key to `adminEncKeys` (at most 8) | `Only the admin can do this`; `Enrolment is closed`; `Not a usable admin key` (one of the 14 low-order X25519 encodings); `Admin key already added`; `Too many admin keys` |
 | `open` | admin | `d: Uint<64>` | sets `deadline = d`, `countingEnds = d + 48h`, `phase = OPEN` | `Only the admin can do this`; `Voting already opened`; `No voters enrolled`; `No admin encryption key`; `Deadline out of range`; `Deadline is in the past` |
 | `cast` | voter | `enc: Opaque<"Uint8Array">`, `recipients: Vector<8, Bytes<32>>` (the admin keys `enc` is sealed to, zero-padded, first slot set) | checks every non-zero recipient is in `adminEncKeys`; stores `ballots[n] = ballotCommit(vote, salt)` and `encBallots[n] = enc`, increments `castCount` | `Voting is not open`; `Voting is closed`; `Path is not for this voter`; `Not an enrolled voter`; `Already voted`; `No ballot recipient`; `Ballot recipient is not an admin key` |
 | `closeEarly` | admin | — | sets `closedEarly`, which ends casting and starts counting; `countingEnds` is unchanged | `Only the admin can do this`; `Voting is not open`; `Voting is closed`; `Not every voter has cast`; `Deadline already passed` |
@@ -66,6 +66,7 @@ keeps an X25519 key pair off chain (not in contract private state) to decrypt
 | `ballotNullifier` (pure) | off chain | `sk`, `pid`, `instance: Bytes<32>` (the contract address) | `persistentHash([pad(32, "mip-vote:cast"), sk, pid, instance])` | — |
 | `ballotSalt` (pure) | off chain | `sk`, `pid`, `instance: Bytes<32>` | `persistentHash([pad(32, "mip-vote:salt"), sk, pid, instance])` | — |
 | `ballotCommit` (pure) | off chain | `v: Vote`, `salt: Bytes<32>` | `persistentCommit(v, salt)`; the admin checks each decrypted opening with it before `count` | — |
+| `isLowOrderKey` (pure) | `addAdminKey` | `k: Bytes<32>` | whether `k` is a low-order X25519 point (u = 0, 1, the two order-8 points, p − 1, p, p + 1, with or without the top bit), which no ballot can be sealed to | — |
 
 ## Witnesses
 
@@ -108,10 +109,18 @@ Each line ends with the key (or key prefix) of its entry in the
   transaction still reaches the node, which may be run by the same party as the
   indexer. The proof can't see inside `enc`, so a client that seals to other
   keys than it names isn't stopped. That only hurts its own voter.
-- The contract refuses the all-zero key but can't check that an admin key is a
-  usable X25519 key, and keys can't be removed once added. The CLI refuses to publish a low-order key or to
-  open with one published, and a voter's client leaves unusable keys out of
-  the ballot, so one bad key can't block casting.
+- Keys can't be removed once added, so `addAdminKey` refuses every low-order
+  X25519 key: a vote can't open with a key nobody can encrypt to, even if the
+  admin bypasses the CLI. The contract can't check that the admin holds the
+  matching secret.
+- The ballot blob ends in a 0x01 byte. The runtime rejects an
+  `Opaque<"Uint8Array">` that ends in a zero byte, and the ciphertext's last
+  byte is random.
+- The CLI's deadline checks (`cast`, `open`, `status`, `result`) use the latest
+  block's time from the indexer, not the local clock, so a fast or slow machine
+  clock can't refuse a valid cast or call a result final early. The indexer
+  lags the chain by a few seconds, so a cast close to the deadline can still
+  land too late and be rejected.
 - The CLI keeps the circuit's private state (the voter or admin secret) in
   memory for one run. It never writes it to the private-state store, so two
   identities sharing a fee wallet can't read or overwrite each other's secret.

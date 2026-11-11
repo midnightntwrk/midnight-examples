@@ -42,11 +42,25 @@ import {
   sealBallot,
   ballotRecipients,
   usableAdminKeys,
+  isUsableAdminKey,
   MAX_ADMIN_KEYS,
   voterKey,
 } from '../crypto.js';
 
 const PID = proposalIdFromLabel('MIP-0018');
+
+// The 14 low-order X25519 encodings (u = 0, 1, the two order-8 points, p - 1,
+// p, p + 1, each with and without the top bit), little-endian.
+const P = 2n ** 255n - 19n;
+const LOW_ORDER_KEYS = [
+  0n,
+  1n,
+  325606250916557431795983626356110631294008115727848805560023387167927233504n,
+  39382357235489614581723060781553021112529911719440698176882885853963445705823n,
+  P - 1n,
+  P,
+  P + 1n,
+].flatMap((u) => [u, u + 2n ** 255n].map((x) => Uint8Array.from({ length: 32 }, (_, i) => Number((x >> BigInt(8 * i)) & 255n))));
 const ADMIN_SK = newSecretKey();
 const T0 = 1_800_000_000;
 const HOUR = 3600;
@@ -191,7 +205,7 @@ describe('Voting (in memory)', () => {
 
     it('rejects the zero key, a duplicate key, and more than MAX_ADMIN_KEYS keys', async () => {
       const sim = await deploy();
-      await expectRejects(() => sim.call('addAdminKey', new Uint8Array(32)), 'Not an admin key');
+      await expectRejects(() => sim.call('addAdminKey', new Uint8Array(32)), 'Not a usable admin key');
       const first = newAdminEncryptionKeys().publicKey;
       await sim.call('addAdminKey', first);
       await expectRejects(() => sim.call('addAdminKey', first), 'Admin key already added');
@@ -424,24 +438,24 @@ describe('Voting (in memory)', () => {
     );
   });
 
-  it('a low-order admin key published next to a good one does not block casting or counting', async () => {
-    const sim = (await deploy()).at(T0);
-    const voters = [newSecretKey(), newSecretKey()];
-    const admin = newAdminEncryptionKeys();
-    for (const sk of voters) await sim.call('enrol', voterKey(sk));
-    // The contract refuses the zero key but can't tell other low-order X25519
-    // keys (here u = 1) from a good one; the CLI refuses them.
-    const lowOrder = new Uint8Array(32);
-    lowOrder[0] = 1;
-    await sim.call('addAdminKey', lowOrder);
-    await sim.call('addAdminKey', admin.publicKey);
-    await sim.call('open', BigInt(DEADLINE));
-    const published = [...sim.ledger().adminEncKeys];
-    expect(published).toHaveLength(2);
-    await cast(sim, voters[0], Vote.YES, published);
-    await cast(sim, voters[1], Vote.NO, published);
-    expect(await adminCount(sim.at(DEADLINE), admin.secretKey)).toEqual([]);
-    expect([sim.ledger().yes, sim.ledger().no, sim.ledger().abstain]).toEqual([1n, 1n, 0n]);
+  it('refuses every low-order X25519 key, so a vote never opens with a key nobody can encrypt to', async () => {
+    const sim = await deploy();
+    for (const k of LOW_ORDER_KEYS) {
+      expect(isUsableAdminKey(k)).toBe(false);
+      await expectRejects(() => sim.call('addAdminKey', k), 'Not a usable admin key');
+    }
+    expect(sim.ledger().adminEncKeys.isEmpty()).toBe(true);
+  });
+
+  it('casts a ballot whose encryption ends in a zero byte (the trailer keeps the blob in normal form)', async () => {
+    const { sim, voters, admins, adminKeys } = await setup(1);
+    const opening = { vote: Vote.YES, salt: ballotSalt(voters[0], V(sim)) };
+    // The byte before the trailer is the body's last Poly1305 tag byte: random, zero about 1 time in 256.
+    let blob = sealBallot(opening, adminKeys, V(sim));
+    while (blob[blob.length - 2] !== 0) blob = sealBallot(opening, adminKeys, V(sim));
+    await cast(sim, voters[0], Vote.YES, adminKeys, blob);
+    expect(sim.ledger().castCount).toBe(1n);
+    expect(openBallot(sim.ledger().encBallots.lookup(ballotNullifier(voters[0], V(sim))), admins[0].secretKey, V(sim))).toEqual(opening);
   });
 
   // @generated-stub begin circuits sha=445b258edf5d

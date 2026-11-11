@@ -192,7 +192,25 @@ async function withSession(fn: (s: Session, address: string) => Promise<void>): 
   }
 }
 
-const now = () => Math.floor(Date.now() / 1000);
+/**
+ * The latest block's time in Unix seconds: the clock the contract's deadline
+ * checks use. The local clock can be off; the indexer reports milliseconds.
+ */
+async function chainNow(): Promise<number> {
+  try {
+    const res = await fetch(config.indexer, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query: '{ block { timestamp } }' }),
+    });
+    const ts = ((await res.json()) as { data?: { block?: { timestamp?: unknown } } }).data?.block?.timestamp;
+    if (typeof ts === 'number') return Math.floor(ts / 1000);
+  } catch {
+    // fall through to the local clock
+  }
+  console.warn("! Couldn't read the latest block time from the indexer; using this machine's clock.");
+  return Math.floor(Date.now() / 1000);
+}
 const iso = (secs: bigint) => new Date(Number(secs) * 1000).toISOString();
 const uncounted = (l: Ledger) => [...l.ballots].map(([n]) => n).filter((n) => !l.counted.member(n));
 
@@ -260,10 +278,11 @@ const commands: Record<string, () => Promise<void>> = {
 
   async open() {
     const admin = readAdminKeys();
+    const t = await chainNow();
     const deadline = opts.deadline
       ? Math.floor(Date.parse(opts.deadline) / 1000)
-      : now() + Math.round(Number(opts.days ?? '7') * 24 * HOUR);
-    if (!Number.isFinite(deadline) || deadline <= now()) die('The deadline must be a valid time in the future');
+      : t + Math.round(Number(opts.days ?? '7') * 24 * HOUR);
+    if (!Number.isFinite(deadline) || deadline <= t) die('The deadline must be a valid time in the future');
     // Opening freezes the admin keys and there is no way to remove one, so
     // refuse to open with a key voters' clients would have to skip.
     const { unusable } = usableAdminKeys([...(await readLedger()).adminEncKeys]);
@@ -282,10 +301,11 @@ const commands: Record<string, () => Promise<void>> = {
     const address = contractAddress();
     const l = await readLedger(address);
     const v = voteInstance(l.proposalId, address);
-    if (l.phase !== Phase.OPEN || l.closedEarly || BigInt(now()) >= l.deadline) die('Voting is not open');
+    const t = await chainNow();
+    if (l.phase !== Phase.OPEN || l.closedEarly || BigInt(t) >= l.deadline) die('Voting is not open');
     if (!l.voterKeys.member(voterKey(voter.secretKey))) die('Your voter key is not enrolled in this vote');
     if (l.ballots.member(ballotNullifier(voter.secretKey, v))) die('You have already voted');
-    const left = Number(l.deadline) - now();
+    const left = Number(l.deadline) - t;
     if (left < 10 * 60) console.warn(`! Only ${left}s left: a cast that lands after the deadline is rejected.`);
     // The admin keys come from the indexer. Seal only to the set the admin
     // announced: a substituted or added key would let someone else read the
@@ -367,7 +387,7 @@ const commands: Record<string, () => Promise<void>> = {
 
   async status() {
     const l = await readLedger();
-    const t = BigInt(now());
+    const t = BigInt(await chainNow());
     const state =
       l.phase === Phase.ENROLMENT
         ? 'enrolment'
@@ -394,7 +414,7 @@ const commands: Record<string, () => Promise<void>> = {
 
   async result() {
     const l = await readLedger();
-    const final = BigInt(now()) >= l.countingEnds && l.phase === Phase.OPEN;
+    const final = BigInt(await chainNow()) >= l.countingEnds && l.phase === Phase.OPEN;
     console.log(`${proposalLabel(l.proposalId)}: yes ${l.yes}, no ${l.no}, abstain ${l.abstain}`);
     console.log(`  ${uncounted(l).length} cast but uncounted (left out of the result)`);
     console.log(`  ${passes(l) ? 'PASSES' : 'FAILS'} (yes > no)${final ? '' : ' so far; counting is still open'}`);

@@ -125,7 +125,10 @@ check, an indexer that swapped in or added a key could read the vote.
   See `SPEC.md` → Accepted leaks.
 - The deadline check uses the landing block's time with no tolerance. A cast
   built just before the deadline that lands after it is rejected, so announce
-  deadlines with a margin.
+  deadlines with a margin. The CLI compares deadlines with the latest block's
+  time from the indexer, not your machine's clock.
+- `addAdminKey` refuses low-order X25519 keys, which nobody could encrypt a
+  ballot to.
 
 ## What this example doesn't do
 

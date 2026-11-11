@@ -99,6 +99,13 @@ describe('ballot sealing', () => {
     expect(openBallot(new Uint8Array(0), a.secretKey, V)).toBeUndefined();
   });
 
+  it('never ends a ballot in a zero byte, and refuses one without its trailer', () => {
+    const a = newAdminEncryptionKeys();
+    for (let i = 0; i < 1024; i++) expect(sealBallot(opening, [a.publicKey], V).at(-1)).toBe(1);
+    const blob = sealBallot(opening, [a.publicKey], V);
+    expect(openBallot(blob.subarray(0, blob.length - 1), a.secretKey, V)).toBeUndefined();
+  });
+
   it('needs at least one admin key and a 32-byte salt', () => {
     expect(() => sealBallot(opening, [], V)).toThrow('admin keys');
     expect(() => sealBallot({ vote: Vote.YES, salt: new Uint8Array(8) }, [newAdminEncryptionKeys().publicKey], V)).toThrow(
