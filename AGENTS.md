@@ -187,6 +187,10 @@ for a newcomer is the [Learning path](README.md#learning-path) in the root READM
 - Provide `compile`, `compile:fast`, `typecheck`, `test`, `test:sim`,
   `test:local`, `env:up`, `env:down`, `wait:dust` and `validate` scripts so the
   CI matrix and root aggregates work unchanged.
+- On a PR, CI runs an example's devnet job only when something under
+  `examples/<name>/` or a shared input changed (the `ui` and `mnkit-e2e` jobs
+  are gated the same way). The rules are in `scripts/ci-changes.mjs`: if an
+  example starts reading a file outside its folder, add that file to `SHARED`.
 - Adding a browser frontend is **phase 2**: once the in-memory gate passes
   (`typecheck`, `test:sim`, `npm run spec:lint`), run `npm run new:ui <name>`, or let
   `npm run pipeline <name>` do it. The devnet runs in the background meanwhile and
