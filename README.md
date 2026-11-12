@@ -25,7 +25,7 @@ published on [docs.midnight.network](https://docs.midnight.network/tutorials)
 | 4 | [`private-tip-jar`](./examples/private-tip-jar/tutorials/index.mdx) | Two contracts (jar and tip token), still simple; a first shielded token: anonymous tips into a contract-held pot |
 | 5 | [`shielded-chips`](./examples/shielded-chips) | Complex shielded token integration: a native shielded token, contract custody and payout, and the privacy trade-offs between variations |
 | 6 | [`zk-loan`](./examples/zk-loan/tutorials/index.mdx) | Real use case: private credit scoring against a signed attestation from an off-chain API |
-| 7 | [`midnight-leaderboard`](https://github.com/midnightntwrk/midnight-leaderboard) | Deploying a DApp to Vercel |
+| 7 | [`leaderboard`](./examples/leaderboard/tutorials/index.mdx) | A browser DApp with Lace, deployed to Vercel |
 
 ## Layout
 
@@ -43,6 +43,7 @@ mn-examples/
 │   ├── shielded-chips/   # shielded tokens: MIP-0011 chips + a roulette that custodies and pays out coins privately
 │   ├── private-bid/      # private bid: prove bid >= a public minimum, store only a commitment, reveal later
 │   ├── private-tip-jar/  # anonymous shielded tips into a contract-held pot; only the owner can withdraw
+│   ├── leaderboard/      # arcade leaderboard with ownership proofs + hand-ported browser UI (ui/) deployed to Vercel
 │   └── battleship/       # Compact contract as a state machine, RBAC, private state + browser UI (ui/)
 ├── packages/
 │   ├── mnkit/            # the scaffolder: engine, CLI and templates/example (copied by `npm run new:example`)

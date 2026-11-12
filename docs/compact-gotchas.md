@@ -61,8 +61,8 @@ trust recalled APIs over it.
   re-noncing it to `kernel.self()` on the way in doesn't fully undo that:
   whoever knows the old nonce can derive the new one.
   ([private-tip-jar `tip`](../examples/private-tip-jar/contract/private-tip-jar.compact);
-  wallet balancing: `@midnight-ntwrk/wallet-sdk-shielded` 3.0.2,
-  `dist/v1/Transacting.js`, `#balanceGuaranteedSection`)
+  wallet balancing: `@midnightntwrk/wallet-sdk-shielded` 4.0.0,
+  `dist/v2/Transacting.js`, `#balanceGuaranteedSection`)
 - **Keying a `Map` by a caller-chosen nonce?** Assert `!map.member(nonce)`
   first. A coin with the same nonce and a different value is a different coin,
   so Zswap accepts it, and `insertCoin` would overwrite the entry and strand
@@ -76,7 +76,7 @@ trust recalled APIs over it.
   build the Merkle path, so a wrong one fails when the transaction is built
   or applied.
   ([stdlib 0.36.0](https://github.com/LFDT-Minokawa/compact/blob/compactc-v0.36.0/compiler/standard-library.compact#L196-L202),
-  [zswap transients](https://github.com/midnightntwrk/midnight-ledger/blob/ledger-8.1.2/zswap/src/construct.rs#L386-L412),
+  [zswap transients](https://github.com/midnightntwrk/midnight-ledger/blob/ledger-9.1.0.0/zswap/src/construct.rs#L386-L412),
   [TUTORIAL cheat-sheet](../examples/shielded-chips/TUTORIAL.md#shielded-token-cheat-sheet))
 - **`sendShielded` and `mergeCoin` derive the output nonce from the input
   nonce alone** (`mergeCoin` from its *first* argument), so the argument order

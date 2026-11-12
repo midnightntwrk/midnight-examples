@@ -16,6 +16,9 @@ proof-server 8.1.0) by replaying every block, deserializing every transaction an
 contract state, and attempting the attacks. Where a claim is inference rather than
 observation, it says so.
 
+That devnet ran Ledger 8, and these findings have not been re-checked on Ledger 9.
+The contracts and their privacy tests are on Ledger 9 now.
+
 ---
 
 ## 1. The one rule
