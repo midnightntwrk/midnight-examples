@@ -9,7 +9,7 @@ import {
   findDeployedContract,
   type FoundContract,
 } from "@midnight-ntwrk/midnight-js-contracts";
-import type { ContractAddress } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+import type { ContractAddress } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 // @if ledger
 import { map, type Observable } from "rxjs";
 // @endif
@@ -22,6 +22,9 @@ import {
   type Ledger,
   // @endif
 } from "./contract";
+// @if ledger
+import { contractStateData } from "./providers";
+// @endif
 import type { __Name__Providers } from "./providers";
 
 export type __Name__Contract = FoundContract<Contract>;
@@ -58,8 +61,7 @@ export async function join__Name__(
   providers: __Name__Providers,
   address: ContractAddress,__JOIN_PARAMS__
 ): Promise<__Name__Contract> {
-  providers.privateStateProvider.setContractAddress(address);
-  const stored = await providers.privateStateProvider.get(PRIVATE_STATE_ID);
+  const stored = await providers.privateStateProvider.forContract(address).get(PRIVATE_STATE_ID);
   if (stored !== null) {
     return findDeployedContract(providers, {
       compiledContract: Compiled__Name__Contract,
@@ -90,6 +92,6 @@ export function ledger$(
 ): Observable<Ledger> {
   return providers.publicDataProvider
     .contractStateObservable(address, { type: "latest" })
-    .pipe(map((state) => ledger(state.data)));
+    .pipe(map(({ value }) => ledger(contractStateData(value))));
 }
 // @endif

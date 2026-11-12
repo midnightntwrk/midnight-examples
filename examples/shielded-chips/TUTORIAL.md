@@ -1213,7 +1213,8 @@ Successful output looks like this (wallet-sync chatter trimmed):
      ✓ Charlie forfeits her losing bet into the house pool  23997ms
      ✓ Alice sweeps both pool coins (unused match + forfeited bet)  44044ms
      ✓ Alice burns half of her swept chips — the same-tx transient burn path  30631ms
-     ✓ Alice mints into the treasury and burns it — the Merkle-spend burn path  50619ms
+     ✓ Alice mints into the treasury  20314ms
+     ↓ Alice burns from the treasury — the Merkle-spend burn path
  ✓ src/test/privacy.test.ts (12 tests) 178602ms
      …
 

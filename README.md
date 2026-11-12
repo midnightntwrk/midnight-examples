@@ -48,10 +48,10 @@ mn-examples/
 ├── packages/
 │   ├── mnkit/            # the scaffolder: engine, CLI and templates/example (copied by `npm run new:example`)
 │   │   └── templates/ui/ # browser UI scaffold rendered by `npm run new:ui`
-│   ├── fast-sync/        # @midnightntwrk/mnkit-wallet: wallet provider, pre-seed fast sync, .env seeds, funding gate
+│   ├── fast-sync/        # @midnightntwrk/mnkit-wallet: wallet provider, saved wallet state, .env seeds, funding gate
 │   ├── sim/              # @midnightntwrk/mnkit-sim: in-memory contract harness for *.sim.test.ts
 │   └── coins/            # @midnightntwrk/mnkit-coins: shielded-coin helpers for tests
-├── preseed/              # pre-seed reference bundles, per network
+├── preseed/              # pre-seed reference bundles, per network (Ledger 8; unused while pre-seeding is off)
 ├── toolchain.json        # the one toolchain pin (`npm run toolchain:check`)
 ├── tsconfig.base.json    # shared TypeScript compiler options
 ├── vitest.config.ts      # aggregate test projects (per-example configs still own env)
@@ -101,22 +101,6 @@ npm run compile  # compile every example's contract (parallel)
 
 Flags for a script go after `--`, or npm takes them as its own options:
 `npm run new:ui -- <name> --check`.
-
-### Local devnet: not on Ledger 9 yet
-
-The examples are on the Ledger 9 stack, but the local devnet (`npm run env:up`,
-from each example's `compose.yml`) still pulls the newest *public* images: node
-`2.1.0-rc.4` and indexer `4.4.0-rc.6`. That node predates the Ledger 9 release
-and rejects contract calls (`1010: Invalid Transaction: Custom error: 104`), so
-`test:local`, `validate`, the devnet step of `pipeline` and the example jobs in
-CI fail. That changes once node 2.1.100+ and indexer 4.4.100 are published and
-pinned in the `compose.yml` files.
-
-**Until then, network tests are supported on preview only**
-(`npm run test:preview`, see
-[Running against a remote network](#running-against-a-remote-network-preprod--preview)).
-Typecheck and the in-memory tests (`npm run test:sim`) don't need a network
-and are unaffected.
 
 Run a single example end-to-end (compile is already done above):
 
@@ -198,10 +182,10 @@ The same rule applies here: run one suite at a time.
   then only write the `.compact` contract and the test bodies. See
   `packages/mnkit/templates/example/`.
 - **Add a browser UI with `npm run new:ui <name>`** once the contract compiles and
-  its tests pass. It renders `templates/ui/` into `examples/<name>/ui`, deriving
+  its tests pass. It renders `packages/mnkit/templates/ui/` into `examples/<name>/ui`, deriving
   circuits, witnesses and ledger fields from the compiled contract, so the UI
   typechecks, tests and builds before any use-case code is written. See
-  `templates/ui/AGENTS.md` (copied into every generated UI).
+  `packages/mnkit/templates/ui/AGENTS.md` (copied into every generated UI).
 - The scripted generation pipeline (prompt, scaffold, generate, devnet test, UI
   generator, UI code, serve) is drawn in [`docs/generation-flow.md`](./docs/generation-flow.md).
 - The `.compact` **source is committed** (only generated `contract/managed/` output is

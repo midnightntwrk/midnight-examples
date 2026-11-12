@@ -20,12 +20,12 @@ import {
   CoreWallet as ShieldedCoreWallet,
   Sync as ShieldedSync,
   V1Builder as ShieldedV1Builder,
-} from '@midnight-ntwrk/wallet-sdk/shielded/v1';
+} from '@midnightntwrk/wallet-sdk/shielded/v1';
 import {
   CoreWallet as DustCoreWallet,
   SyncService as DustSyncService,
   V1Builder as DustV1Builder,
-} from '@midnight-ntwrk/wallet-sdk/dust/v1';
+} from '@midnightntwrk/wallet-sdk/dust/v1';
 
 type Updateish<T = unknown> = {
   readonly id: number | bigint | string;

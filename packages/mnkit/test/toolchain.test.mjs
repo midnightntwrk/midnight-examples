@@ -18,37 +18,49 @@ import { pinFor } from '../src/lib/toolchain.mjs';
 
 const tc = {
   npm: {
-    'midnight-js': '4.1.1',
-    'testkit-js': '4.1.1',
-    'wallet-sdk': '1.2.0',
-    'wallet-sdk-address-format': '3.1.2',
+    'midnight-js': '5.0.0',
+    'midnight-js-network-id': '5.0.0-rc.5',
+    'testkit-js': '5.0.0',
+    'wallet-sdk': '2.0.0',
+    'wallet-sdk-address-format': '4.0.0',
     'dapp-connector-api': '4.0.1',
     vitest: '5.0.4',
     vite: '6.4.4',
   },
-  overrides: { '@midnight-ntwrk/ledger-v8': '8.1.2', 'vite-plugin-top-level-await/uuid': '11.1.1' },
+  overrides: { '@midnightntwrk/ledger-v9': '1.0.0', 'vite-plugin-top-level-await/uuid': '11.1.1' },
 };
 
 describe('pinFor', () => {
   it('pins the families and single packages toolchain.json names', () => {
-    expect(pinFor(tc, '@midnight-ntwrk/midnight-js-contracts')).toBe('4.1.1');
-    expect(pinFor(tc, '@midnight-ntwrk/wallet-sdk')).toBe('1.2.0');
+    expect(pinFor(tc, '@midnight-ntwrk/midnight-js-contracts')).toBe('5.0.0');
+    expect(pinFor(tc, '@midnightntwrk/wallet-sdk')).toBe('2.0.0');
+    expect(pinFor(tc, '@midnight-ntwrk/testkit-js')).toBe('5.0.0');
     expect(pinFor(tc, 'vitest')).toBe('^5.0.4');
     expect(pinFor(tc, 'react')).toBeNull();
   });
 
+  it('gives midnight-js-network-id its own pin, falling back to the family', () => {
+    expect(pinFor(tc, '@midnight-ntwrk/midnight-js-network-id')).toBe('5.0.0-rc.5');
+    const { 'midnight-js-network-id': _, ...npm } = tc.npm;
+    expect(pinFor({ ...tc, npm }, '@midnight-ntwrk/midnight-js-network-id')).toBe('5.0.0');
+  });
+
+  it('pins the wallet SDK on @midnightntwrk only', () => {
+    expect(pinFor(tc, '@midnight-ntwrk/wallet-sdk')).toBeNull();
+  });
+
   it('pins a wallet-sdk-* package only when npm names it', () => {
-    expect(pinFor(tc, '@midnight-ntwrk/wallet-sdk-address-format')).toBe('3.1.2');
-    expect(pinFor(tc, '@midnight-ntwrk/wallet-sdk-facade')).toBeNull();
+    expect(pinFor(tc, '@midnightntwrk/wallet-sdk-address-format')).toBe('4.0.0');
+    expect(pinFor(tc, '@midnightntwrk/wallet-sdk-facade')).toBeNull();
   });
 
   it('pins a Midnight package in overrides, but not a nested override', () => {
-    expect(pinFor(tc, '@midnight-ntwrk/ledger-v8')).toBe('8.1.2');
+    expect(pinFor(tc, '@midnightntwrk/ledger-v9')).toBe('1.0.0');
     expect(pinFor(tc, 'vite-plugin-top-level-await/uuid')).toBeNull();
   });
 
   it('turns an exact pin into a tilde range in peerDependencies', () => {
-    expect(pinFor(tc, '@midnight-ntwrk/wallet-sdk-address-format', { peer: true })).toBe('~3.1.2');
+    expect(pinFor(tc, '@midnightntwrk/wallet-sdk-address-format', { peer: true })).toBe('~4.0.0');
     expect(pinFor(tc, 'vitest', { peer: true })).toBe('^5.0.4');
   });
 });

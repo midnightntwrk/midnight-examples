@@ -63,22 +63,29 @@ describe('assertNotInPublicState', () => {
 });
 
 describe('expectRejects', () => {
-  it('returns the error when the message matches', () => {
-    const err = expectRejects(() => {
+  it('returns the error when the message matches', async () => {
+    const err = await expectRejects(() => {
       throw new Error('failed assert: not the owner');
     }, 'not the owner');
     expect(err.message).toContain('not the owner');
   });
 
-  it('fails when the call succeeds', () => {
-    expect(() => expectRejects(() => 1, 'nope')).toThrow('but the call succeeded');
+  it('awaits an async call and catches its rejection', async () => {
+    const err = await expectRejects(async () => {
+      throw new Error('failed assert: not the owner');
+    }, 'not the owner');
+    expect(err.message).toContain('not the owner');
   });
 
-  it('fails when the message differs', () => {
-    expect(() =>
+  it('fails when the call succeeds', async () => {
+    await expect(expectRejects(() => 1, 'nope')).rejects.toThrow('but the call succeeded');
+  });
+
+  it('fails when the message differs', async () => {
+    await expect(
       expectRejects(() => {
         throw new Error('other');
       }, 'not the owner'),
-    ).toThrow('got: other');
+    ).rejects.toThrow('got: other');
   });
 });

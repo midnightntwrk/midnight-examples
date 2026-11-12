@@ -1,6 +1,6 @@
 {
   "name": "@midnightntwrk/mnkit-wallet",
-  "version": "0.2.0-rc.1",
+  "version": "0.2.0-rc.2",
   "type": "module",
   "description": "Test wallets for Midnight projects: the MidnightWalletProvider, network config for local, preview and preprod, seed resolution, pre-seed fast sync and the DUST funding gate. Part of mnkit.",
   "license": "Apache-2.0",
@@ -36,7 +36,7 @@
     "fund:wallet": "vite-node scripts/fund-wallet.ts"
   },
   "dependencies": {
-    "@midnight-ntwrk/wallet-sdk-abstractions": "2.1.0",
+    "@midnightntwrk/wallet-sdk-abstractions": "3.0.0",
     "@polkadot/api": "16.5.6",
     "@polkadot/types": "16.5.6",
     "@polkadot/util": "14.0.3",
@@ -45,20 +45,20 @@
     "rxjs": "^7.8.2"
   },
   "peerDependencies": {
-    "@midnight-ntwrk/midnight-js-network-id": "~4.1.1",
-    "@midnight-ntwrk/midnight-js-protocol": "~4.1.1",
-    "@midnight-ntwrk/midnight-js-types": "~4.1.1",
-    "@midnight-ntwrk/midnight-js-utils": "~4.1.1",
-    "@midnight-ntwrk/testkit-js": "~4.1.1",
-    "@midnight-ntwrk/wallet-sdk": "~1.2.0"
+    "@midnight-ntwrk/midnight-js-network-id": "~5.0.0-rc.5",
+    "@midnight-ntwrk/midnight-js-protocol": "~5.0.0",
+    "@midnight-ntwrk/midnight-js-types": "~5.0.0",
+    "@midnight-ntwrk/midnight-js-utils": "~5.0.0",
+    "@midnight-ntwrk/testkit-js": "~5.0.0",
+    "@midnightntwrk/wallet-sdk": "~2.0.0"
   },
   "devDependencies": {
-    "@midnight-ntwrk/midnight-js-network-id": "4.1.1",
-    "@midnight-ntwrk/midnight-js-protocol": "4.1.1",
-    "@midnight-ntwrk/midnight-js-types": "4.1.1",
-    "@midnight-ntwrk/midnight-js-utils": "4.1.1",
-    "@midnight-ntwrk/testkit-js": "4.1.1",
-    "@midnight-ntwrk/wallet-sdk": "1.2.0",
+    "@midnight-ntwrk/midnight-js-network-id": "5.0.0-rc.5",
+    "@midnight-ntwrk/midnight-js-protocol": "5.0.0",
+    "@midnight-ntwrk/midnight-js-types": "5.0.0",
+    "@midnight-ntwrk/midnight-js-utils": "5.0.0",
+    "@midnight-ntwrk/testkit-js": "5.0.0",
+    "@midnightntwrk/wallet-sdk": "2.0.0",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
     "vite": "6.4.4",

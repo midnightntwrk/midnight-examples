@@ -6,22 +6,19 @@ The below documentation will be provided here to "finish" this example.
 
 ## Set up project
 
-```bash
-git clone git@github.com:midnightntwrk/example-hello-world.git
-```
-
-Install dependencies:
+From the repo root, install dependencies, then move into the example:
 
 ```bash
 npm install
+cd examples/hello-world
 ```
 
 ## Create the contract file
 
-Create a new file named `hello-world.compact` in the `contracts` directory:
+The contract lives in `contract/hello-world.compact`. To write it yourself, create the file:
 
 ```bash
-touch contracts/hello-world.compact
+touch contract/hello-world.compact
 ```
 
 Open this file in VS Code:
@@ -32,7 +29,7 @@ code .
 ## Create the Compact Smart Contract
 
 ```compact
-pragma language_version 0.23;
+pragma language_version 0.28;
 
 export ledger message: Opaque<"string">;
 
@@ -50,17 +47,17 @@ export circuit storeMessage(newMessage: Opaque<"string">): [] {
 Compiling transforms your Compact code into zero-knowledge circuits, generates cryptographic keys, 
 and creates TypeScript APIs and a JavaScript implementation for the contract to be used by DApps. 
 
-Run the compiler from the contracts folder:
+Compile it with compiler 0.36.0 (this runs `compact compile contract/hello-world.compact contract/managed/hello-world`):
 
 ```bash
-compact compile hello-world.compact managed/hello-world
+npm run compile
 ```
 
 You should see the following output:
 
 ```
 Compiling 1 circuits:
-  circuit "storeMessage" (k=6, rows=26)
+  circuit "storeMessage" (k=6, rows=36)
 ```
 
 The compilation process will:
@@ -72,7 +69,7 @@ The compilation process will:
 When compilation completes, you'll see a new directory structure:
 
 ```
-contracts/
+contract/
 ├── managed/
 |   └── hello-world/
 |        ├── compiler/
@@ -91,11 +88,6 @@ Here's what each directory contains:
 - **compiler/**: Compiler-generated JSON output that other tools can use to understand the contract structure.
 
 ## Deploy Contract to Local Devnet
-
-> **The local devnet isn't on Ledger 9 yet.** It still runs public images that predate
-> Ledger 9, so contract calls fail under `npm run test:local`. Run the network tests
-> with `npm run test:preview` for now. See
-> [Local devnet: not on Ledger 9 yet](../../README.md#local-devnet-not-on-ledger-9-yet).
 
 Now that your contract is compiled, it needs to be deployed to the blockchain so that you can interact with it.
 
@@ -118,13 +110,13 @@ The test script will begin to show output from your local devnet and will progre
 
 ```
 [12:46:12.694] INFO (22064): Wallet sync complete after 23 emissions
-[12:46:12.703] INFO (22064): Providers initialized. Ready to test
+[12:46:12.703] INFO (22064): Providers initialized on 'local'. Ready to test!
 [12:46:12.707] INFO (22064): Creating private state...
 [12:46:32.347] INFO (22064): Setting the contract address...
 [12:46:32.347] INFO (22064): Contract deployed at: bba6579743ae23b44301d4a9f8df30dbd5244d63a59d8fbc2c9fc7ea521a04f8
  ✓ src/test/hw.test.ts (2 tests) 39112ms
-   ✓ Hello World Contract > Deploys the contract  19649ms
-   ✓ Hello World Contract > Stores Hello World!   18184ms
+   ✓ Hello World Contract (local) > Deploys the contract  19649ms
+   ✓ Hello World Contract (local) > Stores Hello World!   18184ms
 ```
 
 Stop the Docker container:

@@ -175,6 +175,8 @@ export class MidnightWalletProvider implements Ledger9WalletProvider {
         ? base.withMnemonic(secret.value)
         : base.withSeed(secret.value);
 
+    skipLedgerV8DustHistory(builder);
+
     const built = await builder.buildWithoutStarting();
     const { seeds, keystore } = built;
     const wallet = await restoreSavedState(logger, env, builder, dustOptions, built.wallet, seeds.masterSeed);
@@ -269,6 +271,21 @@ function stateFileFor(networkId: string, masterSeed: string): string | undefined
   if (networkId === 'undeployed' || process.env['MIDNIGHT_WALLET_STATE'] === 'off') return undefined;
   const id = createHash('sha256').update(masterSeed).digest('hex').slice(0, 16);
   return join(STATE_DIR, `${networkId}-${id}.json`);
+}
+
+/**
+ * Turn on the Wallet SDK's `skipLedgerV8DustHistory` for the DUST wallet the
+ * builder makes. On a chain that crossed the Ledger 9 fork in place (preprod,
+ * Preview), the fork emptied all DUST state and re-emitted live DUST as
+ * Ledger 9 events, so a fresh wallet can start at the fork instead of
+ * replaying every Ledger 8 DUST event from genesis: the slow part of a first
+ * sync. Only fresh starts read it (a restore resumes from its saved cursor),
+ * and on a chain that never crossed the fork it changes nothing. The cost is
+ * the wallet's Ledger 8 DUST transaction history, which the examples don't use.
+ * testkit's builder keeps its wallet configuration private, so it is set there.
+ */
+function skipLedgerV8DustHistory(builder: FluentWalletBuilder): void {
+  (builder as unknown as { config: { skipLedgerV8DustHistory?: boolean } }).config.skipLedgerV8DustHistory = true;
 }
 
 /** The three sub-wallets restored from a snapshot, configured as testkit's WalletFactory configures new ones. */

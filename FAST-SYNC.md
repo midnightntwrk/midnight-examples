@@ -1,5 +1,16 @@
 # Fast sync (pre-seed)
 
+> **Disabled on Ledger 9.** Pre-seeding rewrites wallet SDK v1 snapshots
+> (`packages/fast-sync/src/preseed.ts`) and wraps the v1 sync builders
+> (`dedup.ts`). Wallet SDK 2.0 (Ledger 9) changed the snapshot format and added
+> v2 wallet variants, and the bundles under `preseed/` were cut on Ledger 8
+> (preview's chain has since been re-genesised). Until it is ported,
+> `MidnightWalletProvider.build` and `assembleWallet` accept `fastSync` and
+> ignore it, and `npm run preseed:cut` refuses to run. What makes repeat runs
+> fast instead is saved wallet state: after each sync on a remote network the
+> sub-wallets' state goes to `.wallet-state/`, and the next build of the same
+> wallet restores it. The rest of this page describes the Ledger 8 mechanism.
+
 > ⚠️ **Development wallets only — never a mainnet wallet holding real funds.**
 >
 > What makes a wallet safe to pre-seed is not where its seed came from but

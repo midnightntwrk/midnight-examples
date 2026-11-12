@@ -494,7 +494,7 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
         compiledContract: zkLoanCompiledContract,
         privateStateId: 'zkLoanCreditScorerPrivateState',
         initialPrivateState: privateState,
-        // Note: as of midnight-js 4.1.x, `args` is conditionally typed and must be
+        // Note: in midnight-js 5, `args` is conditionally typed and must be
         // omitted entirely when the contract constructor takes no arguments.
       });
 

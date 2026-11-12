@@ -5,18 +5,15 @@ this repo. Every generated UI runs its example's existing contract and
 test-suite calls in the browser behind a Midnight wallet. For how to run this
 one (`examples/hello-world/ui`), see `README.md` next to this file.
 
-This file is template-owned. Its source is `templates/ui/AGENTS.md`, and
+This file is template-owned. Its source is `packages/mnkit/templates/ui/AGENTS.md`, and
 every generated UI gets an identical copy. Edit the template, then run
 `npm run new:ui -- --sync-all`.
 
-`templates/ui/` is the interim Ledger 9 copy of mnkit's UI template
-(`packages/mnkit/templates/ui/`, still on Ledger 8 for `mnkit add ui`). It goes
-away when mnkit moves to Ledger 9; until then, change this copy, not mnkit's.
-
 **Verified against:** `midnight-js-*` 5.0.0 (Ledger 9),
 `@midnight-ntwrk/dapp-connector-api` 4.0.1, Vite 6.4.4, vitest 5, React 19,
-Node 22: typecheck, unit tests and build. The Ledger 9 template has not yet
-been run in a browser with a wallet extension on a Ledger 9 network.
+Node 22: typecheck, unit tests and build. The UIs have been tested in a
+browser with a wallet on Ledger 9; `VERIFIED.md` records which steps were
+verified step by step (those entries predate Ledger 9).
 
 ## Quick recipe
 
@@ -35,7 +32,7 @@ npm run build -w @midnight-ntwrk/example-<name>-ui
   `src/__tests__/<name>-circuits.test.ts`, `README.md`, and
   `verification.json`. Everything else is template-owned (§2), and CI fails
   if an example's copy drifts.
-- **Generic changes go in `templates/ui/`**, then `npm run new:ui -- --sync-all`.
+- **Generic changes go in `packages/mnkit/templates/ui/`**, then `npm run new:ui -- --sync-all`.
 - **Don't** scaffold with `/midnight-dapp-dev:init`, copy another UI, or use
   `examples/zk-loan/ui` as a reference (it's hand-built and not
   authoritative). Check what you reuse against the installed types in
@@ -43,7 +40,7 @@ npm run build -w @midnight-ntwrk/example-<name>-ui
 - **Before you claim it works:** run the verification checklist at the end
   of this file. Record the steps CI can't run (browser, wallet, preprod) in
   `ui/verification.json`, then `--sync`. The status of every UI is in
-  `templates/ui/VERIFIED.md`; don't claim more than it says.
+  `packages/mnkit/templates/ui/VERIFIED.md`; don't claim more than it says.
 
 ## Worked examples
 
@@ -143,11 +140,11 @@ arguments (their picker needs a circuit that returns coins), balance checks
 and token movements.
 
 Create also writes `ui/verification.json` with every step `not-run`, and
-adds the UI's row to `templates/ui/VERIFIED.md`.
+adds the UI's row to `packages/mnkit/templates/ui/VERIFIED.md`.
 
 ### 2. Template-owned files: don't edit them in an example
 
-Everything except the seed files below comes from `templates/ui/`, rendered by
+Everything except the seed files below comes from `packages/mnkit/templates/ui/`, rendered by
 name substitution. This covers configs, providers, wallet context, hooks,
 `lib/` (including `circuit-args.ts`, `ledger-format.ts`, `addresses.ts`,
 `coin-book.ts` and `tokens.ts`), generic components (including
@@ -165,9 +162,9 @@ this `AGENTS.md`.
   differs from the template, when `.template-files` is missing or out of date,
   or when a file the template no longer has is still present. `--sync` fixes
   the last two, deleting the stale files. `--check` also validates every
-  `verification.json` and fails when the table in `templates/ui/VERIFIED.md`
+  `verification.json` and fails when the table in `packages/mnkit/templates/ui/VERIFIED.md`
   is stale (see the Verification checklist).
-- To change generic UI behaviour, edit `templates/ui/`. Then run
+- To change generic UI behaviour, edit `packages/mnkit/templates/ui/`. Then run
   `npm run new:ui -- --sync-all`. It syncs **every** generated UI, including one you
   created earlier in the same change. If a UI's `package.json` changed, it
   then runs `npm install`; commit the `package-lock.json` it writes. Review the
@@ -569,6 +566,6 @@ Run the checks in order, and report which ones you actually ran.
 8. Record what you ran. In `ui/verification.json`, set each step you ran to
    `verified` (or `partial`), with a `date` and `notes` saying exactly what
    ran. Then run `npm run new:ui -- <name> --sync`, which regenerates the table in
-   `templates/ui/VERIFIED.md`. Name the wallet you used in each wallet
+   `packages/mnkit/templates/ui/VERIFIED.md`. Name the wallet you used in each wallet
    step's `notes`. Once the wallet checklist in `ui/README.md` passes, delete
    it: `--check` refuses a `walletCalls: verified` while it's still there.

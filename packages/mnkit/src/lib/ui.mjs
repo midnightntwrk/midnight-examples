@@ -411,7 +411,7 @@ export function planUi(
         : []),
       ...(constructs
         ? [
-            'import { createConstructorContext } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";',
+            'import { createConstructorContext } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";',
             'import { Contract, createInitialPrivateState, ledger } from "../midnight/contract";',
           ]
         : wrappers.length
@@ -429,9 +429,9 @@ export function planUi(
       'describe("__name__ contract (in memory)", () => {',
       ...(constructs
         ? [
-            '  it("constructs and decodes the initial ledger", () => {',
+            '  it("constructs and decodes the initial ledger", async () => {',
             `    const contract = new Contract(${hasWitnesses ? 'witnesses' : '{}'});`,
-            '    const { currentContractState } = contract.initialState(',
+            '    const { currentContractState } = await contract.initialState(',
             '      createConstructorContext(createInitialPrivateState(), COIN_PK),',
             '    );',
             ...(hasLedger
@@ -450,8 +450,10 @@ export function planUi(
         ? [
             '',
             `  // TODO: one test per circuit, asserting on ${hasLedger ? 'the ledger the UI will show' : 'what it returns and does'}:`,
-            '  //   const ctx = createCircuitContext(dummyContractAddress(), COIN_PK,',
-            '  //     currentContractState, createInitialPrivateState());',
+            '  // compact-runtime 0.21 is async, and createCircuitContext takes one options object:',
+            '  //   const ctx = createCircuitContext({ circuitId: "<circuit>",',
+            '  //     contractAddress: dummyContractAddress(), coinPublicKeyOrZswapState: COIN_PK,',
+            '  //     contractState: currentContractState.data, privateState: createInitialPrivateState() });',
             ...(checksUnshieldedBalance
               ? [
                   '  // The contract moves unshielded tokens, and an in-memory context starts',
@@ -461,13 +463,13 @@ export function planUi(
                   '  //   withUnshieldedBalance(ctx, amount);',
                 ]
               : []),
-            '  //   const { result, context } = contract.impureCircuits.<circuit>(ctx, ...args);',
-            ...(hasLedger ? ['  //   expect(ledger(context.currentQueryContext.state)).toEqual(...);'] : []),
+            '  //   const { result, context } = await contract.impureCircuits.<circuit>(ctx, ...args);',
+            ...(hasLedger ? ['  //   expect(ledger(context.callContext.currentQueryContext.state)).toEqual(...);'] : []),
             ...(tokenOps.length
               ? [
                   `  // Token movements (${tokenOps.join(', ')}) aren't ledger state. Assert`,
                   "  // on the call's effects instead, e.g.",
-                  '  //   context.currentQueryContext.effects.unshieldedOutputs  // Map<TokenType, bigint>',
+                  '  //   context.callContext.currentQueryContext.effects.unshieldedOutputs  // Map<TokenType, bigint>',
                   '  // (also unshieldedMints, unshieldedInputs, claimedUnshieldedSpends,',
                   '  // shieldedMints, claimedShieldedReceives, ...). TokenType keys are objects',
                   "  // ({ tag, raw }), so compare the Map's entries; get(key) won't match.",
