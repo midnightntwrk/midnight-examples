@@ -6,8 +6,8 @@
 // no secret and no user-specific material, which is what makes it shippable.
 
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
-import type { DustSecretKey, ZswapSecretKeys } from '@midnight-ntwrk/midnight-js-protocol/ledger';
-import type { PublicKey } from '@midnight-ntwrk/wallet-sdk/unshielded';
+import type { DustSecretKey, ZswapSecretKeys } from '@midnight-ntwrk/midnight-js-protocol/v9';
+import type { PublicKey } from '@midnightntwrk/wallet-sdk/unshielded';
 import type { EmptyRefStates } from './reference-bundle.js';
 
 /** The public identity of the wallet being seeded — the only per-wallet fields. */

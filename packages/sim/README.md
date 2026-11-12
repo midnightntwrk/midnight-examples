@@ -36,14 +36,13 @@ An mnkit project already has these. Anywhere else, add the peer and these
 
 ```json
 "overrides": {
-  "@midnight-ntwrk/ledger-v8": "8.1.2",
-  "@midnight-ntwrk/onchain-runtime-v3": "3.1.1"
+  "@midnightntwrk/ledger-v9": "1.0.0",
+  "@midnightntwrk/onchain-runtime-v4": "4.0.0"
 }
 ```
 
-midnight-js-protocol 4.1.1 pins `ledger-v8` 8.1.0 and `onchain-runtime-v3`
-3.0.0 exactly. Without the overrides you get those versions, which mnkit
-doesn't test, and ledger-v8 8.1.0 lacks the 8.1.2 deserialization security
-fix.
+midnight-js-protocol 5.0.0 pins these at these versions today, but
+compact-runtime 0.21.0 asks for `onchain-runtime-v4` `^4.0.0-rc.3`. The
+overrides keep a later release, which mnkit doesn't test, out of your tree.
 
 Apache-2.0. Source: [midnight-examples/packages/sim](https://github.com/midnightntwrk/midnight-examples/tree/main/packages/sim).

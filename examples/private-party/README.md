@@ -20,11 +20,6 @@ walkthrough is in [`tutorials/`](tutorials/index.mdx) and is published at
 
 ## Run it
 
-> **The local devnet isn't on Ledger 9 yet.** It still runs public images that predate
-> Ledger 9, so contract calls fail under `npm run test:local`. Run the network tests
-> with `npm run test:preview` for now. See
-> [Local devnet: not on Ledger 9 yet](../../README.md#local-devnet-not-on-ledger-9-yet).
-
 From the repo root, install the workspace and compile every contract:
 
 ```bash

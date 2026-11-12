@@ -79,8 +79,8 @@ npm run spec:lint -- <name> [--design]  # SPEC.md alone, then against the compil
 npm run pipeline -- <name> [--json]     # run the next scripts and gates; prints what to do next
 npm run pipeline -- <name> --wait-devnet  # block until the background devnet run finishes
 npm run new:ui <name>                   # phase 2: scaffold its browser UI (after the in-memory gate passes)
-npm run new:ui -- <name> --check        # template-owned UI files still match templates/ui
-npm run new:ui -- --sync-all            # after editing templates/ui: sync every UI (+ npm install)
+npm run new:ui -- <name> --check        # template-owned UI files still match packages/mnkit/templates/ui
+npm run new:ui -- --sync-all            # after editing packages/mnkit/templates/ui: sync every UI (+ npm install)
 npm run new:ui -- --check-all           # CI's drift check for every UI, plus the lockfile check
 npm run fund:wallet <mn_dust_…> [mn_addr_…]  # local devnet: DUST (and NIGHT) for a browser wallet
 ```
@@ -94,13 +94,6 @@ Devnet tests require Docker. `npm run pipeline <name>` chains all of it: it runs
 the devnet in the background once the in-memory gate passes, and never
 compiles while that run holds `.gates/devnet.lock`. Only one devnet runs at a
 time (every example binds the same ports).
-
-**The local devnet isn't on Ledger 9 yet.** `compose.yml` pulls the newest public
-node (`2.1.0-rc.4`) and indexer (`4.4.0-rc.6`), which predate Ledger 9 and reject
-contract calls with `Custom error: 104`. So `test:local`, `validate` and the
-pipeline's devnet step fail no matter what the code does. Don't debug those
-failures. Verify with typecheck and `test:sim`, and run network tests on preview
-(`npm run test:preview`) only. See the README's "Local devnet: not on Ledger 9 yet".
 
 Against a remote network (preprod/preview). Each wallet syncs from genesis,
 over an hour on preprod; the examples don't use fast sync:
@@ -203,13 +196,11 @@ for a newcomer is the [Learning path](README.md#learning-path) in the root READM
   files: `src/midnight/<name>-api.ts`, `src/components/<name>-panel.tsx` and
   `src/__tests__/<name>-circuits.test.ts`. Record the checks CI can't run
   (browser, wallet, preprod) in `ui/verification.json`; `--check` keeps
-  `templates/ui/VERIFIED.md` in step with it, and it is the only place that
+  `packages/mnkit/templates/ui/VERIFIED.md` in step with it, and it is the only place that
   says what a UI has been verified to do. Generic UI changes go in
-  `templates/ui/`, followed by `npm run new:ui -- <name> --sync`; CI runs `--check` on
+  `packages/mnkit/templates/ui/`, followed by `npm run new:ui -- <name> --sync`; CI runs `--check` on
   every generated UI. Details, pins and the verification checklist are in
-  `templates/ui/AGENTS.md`, which every generated UI carries as `ui/AGENTS.md`.
-  `templates/ui/` is an interim Ledger 9 copy of mnkit's template (mnkit's own
-  `packages/mnkit/templates/ui/` stays on Ledger 8 for `mnkit add ui` until mnkit moves).
+  `packages/mnkit/templates/ui/AGENTS.md`, which every generated UI carries as `ui/AGENTS.md`.
 - The scripted generation pipeline (prompt → SPEC → scaffold → contract →
   derive → witnesses and tests → `new:ui` and UI code, with the devnet in the
   background → serve), with each step's gate and fix loop, is in

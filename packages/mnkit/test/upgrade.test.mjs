@@ -102,14 +102,14 @@ describe('mnkit upgrade', () => {
     const plan = planUpgrade(dir, { tc, version: VERSION });
     expect(plan.from).toBe('0.0.9');
     expect(plan.toolchain).toEqual(
-      expect.arrayContaining(['npm.midnight-js: 4.1.0 → 4.1.1', `images.midnightntwrk/proof-server: 8.1.0 → ${tc.images['midnightntwrk/proof-server']}`]),
+      expect.arrayContaining([`npm.midnight-js: 4.1.0 → ${tc.npm['midnight-js']}`, `images.midnightntwrk/proof-server: 8.1.0 → ${tc.images['midnightntwrk/proof-server']}`]),
     );
     // AGENTS.md names the pins; compose.yml carries the images. Neither was edited.
     expect(kinds(plan)).toEqual({ 'AGENTS.md': 'update', 'compose.yml': 'update' });
     const [root] = plan.packages;
     expect(root.changes).toEqual(
       expect.arrayContaining([
-        'dependencies: @midnight-ntwrk/midnight-js-contracts 4.1.0 → 4.1.1',
+        `dependencies: @midnight-ntwrk/midnight-js-contracts 4.1.0 → ${tc.npm['midnight-js']}`,
         `dependencies: @midnightntwrk/mnkit-wallet ^0.0.9 → ^${VERSION}`,
         `devDependencies: mnkit ^0.0.9 → ^${VERSION}`,
         'devDependencies: vitest ^5.0.0 → ^5.0.4',
@@ -129,7 +129,7 @@ describe('mnkit upgrade', () => {
     expect(after.scripts.test).toBe('vitest run --reporter=dot');
     expect(after.devDependencies.vitest).toBe('^5.0.4');
     expect(manifestOf(dir).mnkit).toBe(VERSION);
-    expect(manifestOf(dir).toolchain.npm['midnight-js']).toBe('4.1.1');
+    expect(manifestOf(dir).toolchain.npm['midnight-js']).toBe(tc.npm['midnight-js']);
     // Your providers.ts edit is not a conflict, now or next time.
     expect(hasChanges(planUpgrade(dir, { tc, version: VERSION }))).toBe(false);
     expect(upgrade(dir, { tc, version: VERSION, check: true })).toBe(0);
@@ -284,7 +284,7 @@ describe('mnkit upgrade', () => {
     expect(kinds(plan)).toEqual({ 'ui/src/lib/tokens.ts': 'update' });
     expect(plan.packages[1]).toMatchObject({
       rel: 'ui/package.json',
-      changes: ['dependencies: @midnight-ntwrk/midnight-js-types 4.1.0 → 4.1.1'],
+      changes: [`dependencies: @midnight-ntwrk/midnight-js-types 4.1.0 → ${tc.npm['midnight-js']}`],
     });
     applyUpgrade(dir, plan);
     expect(JSON.parse(read(dir, 'ui/package.json')).dependencies['date-fns']).toBe('^4.0.0');

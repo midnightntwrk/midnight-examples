@@ -6,6 +6,9 @@
 // Why: in Node the harness reads keys from disk (NodeZkConfigProvider). A browser
 // can't, so the UI uses FetchZkConfigProvider, which GETs
 //   <base>/keys/<circuit>.prover, <base>/keys/<circuit>.verifier, <base>/zkir/<circuit>.bzkir
+// and checks each one against <base>/compiler/contract-manifest.json, the
+// compiler's integrity manifest (Midnight.js 5 refuses unverified artifacts by
+// default), so compiler/ is copied too.
 // We serve them from /managed/<contract>/ (see src/midnight/providers.ts).
 //
 // @if monorepo
@@ -84,10 +87,10 @@ const contracts = readdirSync(managed).filter(
 const destRoot = path.resolve(here, "../public/managed");
 rmSync(destRoot, { recursive: true, force: true });
 for (const c of contracts) {
-  for (const dir of ["keys", "zkir"]) {
+  for (const dir of ["keys", "zkir", "compiler"]) {
     cpSync(path.join(managed, c, dir), path.join(destRoot, c, dir), { recursive: true });
   }
 }
 console.log(
-  `[copy:zk] copied keys/ and zkir/ of ${contracts.join(", ")} to ${path.relative(process.cwd(), destRoot)}`,
+  `[copy:zk] copied keys/, zkir/ and compiler/ of ${contracts.join(", ")} to ${path.relative(process.cwd(), destRoot)}`,
 );

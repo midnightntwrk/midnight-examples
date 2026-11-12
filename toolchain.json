@@ -1,27 +1,28 @@
 {
-  "$comment": "The one toolchain pin. Every other copy (README table, ci.yaml, compose.yml, package.json, .nvmrc, pragmas) must agree: `npm run toolchain:check`. Bump versions here first, in one coordinated pass. Interim, until mnkit moves to Ledger 9: the top-level pins are mnkit's Ledger 8 stack (packages/mnkit and its template, fast-sync, sim, coins, which mnkit itself reads), and `examples` holds the Ledger 9 stack the examples and their UIs use. `examples.overrides` is npm overrides syntax and is merged into the root package.json overrides. `networks` holds each network's public endpoints, which every src/config.ts must use and `mnkit doctor --network` probes; preprod is Blockfrost, whose project ID is added at runtime from BLOCKFROST_PROJECT_ID and never stored here.",
+  "$comment": "The one toolchain pin. Every other copy (README table, ci.yaml, compose.yml, package.json, .nvmrc, pragmas) must agree: `npm run toolchain:check`. Bump versions here first, in one coordinated pass. mnkit generates projects from these pins, and the examples, their UIs and the runtime packages use the same ones. `overrides` is the root package.json's npm overrides (an `a/b` key is the scoped override `a: { b }`). `networks` holds each network's public endpoints, which every src/config.ts must use and `mnkit doctor --network` probes; preprod is Blockfrost, whose project ID is added at runtime from BLOCKFROST_PROJECT_ID and never stored here.",
   "compact": {
-    "compiler": "0.31.1",
-    "language": "0.23",
+    "compiler": "0.36.0",
+    "language": "0.28",
     "cli": "0.5.3",
     "installerSha256": "5ad9c8f53dd09c39ebd4290dc47d1742d36b01ad65859eed41e7658ac65bdff8"
   },
   "node": "22",
   "npmCli": "11.21.0",
   "npm": {
-    "midnight-js": "4.1.1",
-    "testkit-js": "4.1.1",
-    "wallet-sdk": "1.2.0",
-    "wallet-sdk-abstractions": "2.1.0",
-    "wallet-sdk-address-format": "3.1.2",
+    "midnight-js": "5.0.0",
+    "midnight-js-network-id": "5.0.0-rc.5",
+    "testkit-js": "5.0.0",
+    "wallet-sdk": "2.0.0",
+    "wallet-sdk-abstractions": "3.0.0",
+    "wallet-sdk-address-format": "4.0.0",
     "dapp-connector-api": "4.0.1",
     "vitest": "5.0.4",
     "vite": "6.4.4"
   },
   "images": {
-    "midnightntwrk/proof-server": "8.1.3",
-    "midnightntwrk/indexer-standalone": "4.3.5",
-    "midnightntwrk/midnight-node": "1.0.400"
+    "midnightntwrk/proof-server": "9.0.0",
+    "midnightntwrk/indexer-standalone": "4.4.101",
+    "midnightntwrk/midnight-node": "2.1.101"
   },
   "networks": {
     "local": {
@@ -50,38 +51,11 @@
     }
   },
   "overrides": {
-    "@midnight-ntwrk/wallet-sdk": "1.2.0",
-    "@midnight-ntwrk/ledger-v8": "8.1.2",
-    "@midnight-ntwrk/onchain-runtime-v3": "3.1.1",
-    "@midnight-ntwrk/zkir-v2": "2.1.1",
+    "@midnightntwrk/wallet-sdk": "2.0.0",
+    "@midnightntwrk/ledger-v9": "1.0.0",
+    "@midnightntwrk/onchain-runtime-v4": "4.0.0",
+    "@midnightntwrk/zkir-v3": "3.2.0",
     "vite-plugin-top-level-await/@swc/core": "1.15.47",
     "vite-plugin-top-level-await/uuid": "11.1.1"
-  },
-  "examples": {
-    "compact": {
-      "compiler": "0.36.0",
-      "language": "0.28"
-    },
-    "npm": {
-      "midnight-js": "5.0.0",
-      "midnight-js-network-id": "5.0.0-rc.5",
-      "testkit-js": "5.0.0",
-      "wallet-sdk": "2.0.0",
-      "wallet-sdk-address-format": "4.0.0",
-      "dapp-connector-api": "4.0.1",
-      "vitest": "5.0.4",
-      "vite": "6.4.4"
-    },
-    "images": {
-      "midnightntwrk/proof-server": "9.0.0",
-      "midnightntwrk/indexer-standalone": "4.4.0-rc.6",
-      "midnightntwrk/midnight-node": "2.1.0-rc.4"
-    },
-    "overrides": {
-      "@midnightntwrk/wallet-sdk": "2.0.0",
-      "@midnightntwrk/ledger-v9": "1.0.0",
-      "@midnightntwrk/onchain-runtime-v4": "4.0.0",
-      "@midnightntwrk/zkir-v3": "3.2.0"
-    }
   }
 }

@@ -11,7 +11,7 @@ import { existsSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { WalletSeeds } from '@midnight-ntwrk/testkit-js';
-import { createKeystore } from '@midnight-ntwrk/wallet-sdk/unshielded';
+import { createKeystore } from '@midnightntwrk/wallet-sdk/unshielded';
 import {
   getChainTipHeight,
   getConfig,
@@ -65,7 +65,7 @@ interface Minted {
 
 const minted: Minted[] = ROLES.map((role) => {
   const seed = randomBytes(32).toString('hex');
-  const keystore = createKeystore(WalletSeeds.fromMasterSeed(seed).unshielded, config.networkId);
+  const keystore = createKeystore({ kind: 'schnorr', secret: WalletSeeds.fromMasterSeed(seed).unshielded }, config.networkId);
   return { role, seed, address: String(keystore.getBech32Address()) };
 });
 
