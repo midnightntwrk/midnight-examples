@@ -11,8 +11,9 @@ every generated UI gets an identical copy. Edit the template, then run
 
 **Verified against:** `midnight-js-*` 5.0.0 (Ledger 9),
 `@midnight-ntwrk/dapp-connector-api` 4.0.1, Vite 6.4.4, vitest 5, React 19,
-Node 22: typecheck, unit tests and build. The Ledger 9 template has not yet
-been run in a browser with a wallet extension on a Ledger 9 network.
+Node 22: typecheck, unit tests and build. The UIs have been tested in a
+browser with a wallet on Ledger 9; `VERIFIED.md` records which steps were
+verified step by step (those entries predate Ledger 9).
 
 ## Quick recipe
 
