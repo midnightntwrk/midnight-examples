@@ -1,0 +1,351 @@
+---
+SPDX-License-Identifier: Apache-2.0
+copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+sidebar_label: "Browser DApp"
+title: "Browser DApp"
+description: "A React frontend that connects to the Lace wallet, reads leaderboard state from the Midnight indexer, and submits scores on-chain."
+sidebar_position: 4
+toc_max_heading_level: 2
+tags: ["react", "vite", "lace", "dapp-connector", "tutorial", "leaderboard", "frontend"]
+---
+
+# Part 3: Browser DApp
+
+This part covers the React frontend in
+[`ui/`](https://github.com/midnightntwrk/midnight-examples/tree/main/examples/leaderboard/ui).
+It uses the same `LeaderboardAPI` as the tests, but gets its providers from the Lace wallet, and
+reads the leaderboard from the indexer so that visitors without a wallet can see it too.
+
+## The UI package
+
+The UI is a workspace of its own, `@midnight-ntwrk/example-leaderboard-ui`, built with React and
+Vite:
+
+```json title="ui/package.json"
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+```
+
+It imports the contract and the API by relative path from `../contract` and `../api`, so there is
+nothing to build before it.
+
+## Vite configuration
+
+[`ui/vite.config.ts`](https://github.com/midnightntwrk/midnight-examples/blob/main/examples/leaderboard/ui/vite.config.ts)
+does two Midnight-specific things:
+
+```typescript title="ui/vite.config.ts"
+  publicDir: path.resolve(here, '../contract/managed/leaderboard'),
+```
+
+```typescript title="ui/vite.config.ts"
+  plugins: [react(), wasm(), topLevelAwait()],
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'esnext',
+    },
+    // The ledger and onchain runtime ship as WASM packages and must not be
+    // pre-bundled by esbuild.
+    exclude: [
+      '@midnightntwrk/ledger-v9',
+      '@midnightntwrk/onchain-runtime-v4',
+      '@midnight-ntwrk/midnight-js-protocol',
+    ],
+  },
+```
+
+- `publicDir` points at the compiler output. Midnight.js fetches each circuit's prover key,
+  verifier key, and ZKIR, plus the compiler's integrity manifest, from the DApp's own origin.
+  `contract/managed/leaderboard` already has that layout, so Vite serves it in development and
+  copies it into `dist/` on build.
+- The ledger and onchain runtime are WebAssembly packages. `vite-plugin-wasm` and
+  `vite-plugin-top-level-await` load them, and `optimizeDeps.exclude` keeps esbuild from
+  pre-bundling them.
+
+## Connect to Lace
+
+[`ui/src/contexts/BrowserLeaderboardManager.ts`](https://github.com/midnightntwrk/midnight-examples/blob/main/examples/leaderboard/ui/src/contexts/BrowserLeaderboardManager.ts)
+bridges the wallet and the API. A wallet that supports the DApp Connector API puts itself under
+`window.midnight`. The manager waits for one whose API version it supports, then asks it to
+connect on the DApp's network:
+
+```typescript title="ui/src/contexts/BrowserLeaderboardManager.ts"
+const getFirstCompatibleWallet = (): InitialAPI | undefined => {
+  if (!window.midnight) return undefined;
+  return Object.values(window.midnight).find(
+    (wallet): wallet is InitialAPI =>
+      !!wallet && typeof wallet === 'object' && 'apiVersion' in wallet &&
+      semver.satisfies(wallet.apiVersion, COMPATIBLE_CONNECTOR_API_VERSION),
+  );
+};
+```
+
+```typescript title="ui/src/contexts/BrowserLeaderboardManager.ts"
+const connectToWallet = (logger: Logger, networkId: string): Promise<ConnectedAPI> =>
+  firstValueFrom(
+    interval(100).pipe(
+      map(() => getFirstCompatibleWallet()),
+      filter((api): api is InitialAPI => !!api),
+      take(1),
+      timeout({ first: 3_000, with: () => throwError(() => new Error('Could not find Midnight Lace wallet.')) }),
+      concatMap(async (initialAPI) => {
+        logger.info({ name: initialAPI.name, version: initialAPI.apiVersion }, 'Connecting to wallet');
+        return initialAPI.connect(networkId);
+      }),
+      timeout({ first: 5_000, with: () => throwError(() => new Error('Lace wallet failed to respond.')) }),
+      catchError((error) => throwError(() => (error instanceof Error ? error : new Error('Wallet not authorized')))),
+    ),
+  );
+```
+
+Lace asks the player to approve the connection.
+
+## Providers from the wallet
+
+Once connected, the DApp builds the same provider set the tests use, with the wallet's services
+behind it:
+
+```typescript title="ui/src/contexts/BrowserLeaderboardManager.ts"
+const initializeProviders = async (logger: Logger): Promise<LeaderboardProviders> => {
+  const networkId = (import.meta.env.VITE_NETWORK_ID ?? 'preprod') as NetworkId;
+  setNetworkId(networkId);
+
+  const connectedAPI = await connectToWallet(logger, networkId);
+  const config = await connectedAPI.getConfiguration();
+  const shieldedAddresses = await connectedAPI.getShieldedAddresses();
+  // The keys, ZKIR and integrity manifest are served from this site's root
+  // (see publicDir in vite.config.ts).
+  const zkConfigProvider = new FetchZkConfigProvider<LeaderboardCircuitKeys>(window.location.origin, {
+    fetchFunc: fetch.bind(window),
+  });
+
+  // The wallet generates the proofs (getProvingProvider).
+  const proofProvider = await dappConnectorProofProvider(
+    connectedAPI,
+    zkConfigProvider,
+    ledger.CostModel.initialCostModel(),
+  );
+
+  return {
+    privateStateProvider: inMemoryPrivateStateProvider<'leaderboardPrivateState', LeaderboardPrivateState>(),
+    zkConfigProvider,
+    proofProvider,
+    // The provider's default WebSocket is isomorphic-ws's Node export, which
+    // its browser build lacks, so pass the browser's own.
+    publicDataProvider: indexerPublicDataProvider(
+      config.indexerUri,
+      config.indexerWsUri,
+      WebSocket as unknown as Parameters<typeof indexerPublicDataProvider>[2],
+    ),
+    // Midnight.js 5 providers are tagged with the ledger eras they serve. Lace
+    // works with Ledger 9 transactions; these wrappers lift the Ledger 9-only
+    // implementations into the tagged interfaces.
+    walletProvider: createLedger9WalletProvider({
+      getCoinPublicKey: () => shieldedAddresses.shieldedCoinPublicKey as ledger.CoinPublicKey,
+      getEncryptionPublicKey: () => shieldedAddresses.shieldedEncryptionPublicKey as ledger.EncPublicKey,
+      balanceTx: async (tx: LedgerTransaction<'Unbound', 'v9'>): Promise<ledger.FinalizedTransaction> => {
+        const received = await connectedAPI.balanceUnsealedTransaction(toHex(tx.serialize()));
+        return ledger.Transaction.deserialize('signature', 'proof', 'binding', fromHex(received.tx));
+      },
+    }),
+    midnightProvider: createLedger9MidnightProvider(
+      async (tx: LedgerTransaction<'Finalized', 'v9'>): Promise<ledger.TransactionId> => {
+        const serialized = tx.serialize();
+        await connectedAPI.submitTransaction(toHex(serialized));
+        return ledger.Transaction.deserialize('signature', 'proof', 'binding', serialized).identifiers()[0];
+      },
+    ),
+    config: { networkId, ttlSeconds: TX_TTL_SECONDS },
+  };
+};
+```
+
+- **Indexer** comes from the wallet's `getConfiguration()`, so the DApp uses whatever network
+  the player chose in Lace.
+- **Proving** is delegated to the wallet. `dappConnectorProofProvider` hands the circuit keys to
+  Lace through `getProvingProvider`, and Lace generates each proof with the prover the player
+  set up. Proof inputs include private data such as the player's secret key, so use a proof
+  server you run yourself, not a public one.
+- **ZK config** comes from the DApp's own origin, through `FetchZkConfigProvider`.
+- **Private state** is held in memory (below).
+- **Wallet and submission**: Midnight.js hands over a proven but unbalanced transaction. Lace
+  balances it, adds the fees, and signs it with `balanceUnsealedTransaction`, then sends it with
+  `submitTransaction`. `createLedger9WalletProvider` and `createLedger9MidnightProvider` adapt
+  these Ledger 9 functions to the providers Midnight.js 5 expects.
+
+## The player's secret key
+
+Ownership proofs only work if the player keeps the same secret key. The manager makes one on the
+first visit and keeps it in `localStorage`:
+
+```typescript title="ui/src/contexts/BrowserLeaderboardManager.ts"
+  private getSecretKey(): Uint8Array {
+    const storageKey = 'midnight-leaderboard-secret';
+    const stored = localStorage.getItem(storageKey);
+    if (stored) {
+      return Uint8Array.from(atob(stored), (c) => c.charCodeAt(0));
+    }
+    const secret = crypto.getRandomValues(new Uint8Array(32));
+    localStorage.setItem(storageKey, btoa(String.fromCharCode(...secret)));
+    return secret;
+  }
+```
+
+Clearing the site's data loses the key, and with it the ability to prove ownership of earlier
+entries. A production DApp would encrypt the key or derive it from the wallet.
+
+## In-memory private state
+
+Midnight.js stores each contract's private state through a `PrivateStateProvider`. The DApp
+rebuilds its private state from the stored key on every page load, so
+[`ui/src/in-memory-private-state-provider.ts`](https://github.com/midnightntwrk/midnight-examples/blob/main/examples/leaderboard/ui/src/in-memory-private-state-provider.ts)
+keeps it in memory. `forContract` scopes the states to one contract address:
+
+```typescript title="ui/src/in-memory-private-state-provider.ts"
+  const forContract = (address: ContractAddress): ContractPrivateStates<PSI, PS> => {
+    // The same checks the persistent provider makes: 32 bytes of hex,
+    // compared in lower case.
+    assertIsContractAddress(address);
+    const contractAddress = address.toLowerCase();
+    const scoped = (): Map<PSI, PS> => {
+      let m = states.get(contractAddress);
+      if (m === undefined) states.set(contractAddress, (m = new Map()));
+      return m;
+    };
+    return {
+      contractAddress,
+      async set(id: PSI, state: PS) {
+        scoped().set(id, state);
+      },
+      async get(id: PSI) {
+        return states.get(contractAddress)?.get(id) ?? null;
+      },
+      async remove(id: PSI) {
+        states.get(contractAddress)?.delete(id);
+      },
+      async clear() {
+        states.delete(contractAddress);
+      },
+      exportPrivateStates: unsupported('exportPrivateStates'),
+      importPrivateStates: unsupported('importPrivateStates'),
+    };
+  };
+```
+
+## Read the leaderboard without a wallet
+
+Anyone can read the leaderboard, so the page shouldn't need a wallet to show it.
+[`ui/src/hooks/useLeaderboard.ts`](https://github.com/midnightntwrk/midnight-examples/blob/main/examples/leaderboard/ui/src/hooks/useLeaderboard.ts)
+queries the indexer's GraphQL API with a plain `fetch()` and decodes the state with the
+compiled contract's `ledger()` and the API's `deriveState`:
+
+```typescript title="ui/src/hooks/useLeaderboard.ts"
+const BLOCKFROST_PROJECT_ID = import.meta.env.VITE_BLOCKFROST_PROJECT_ID ?? '';
+const INDEXER_URL = `${import.meta.env.VITE_INDEXER_URL ?? 'https://midnight-preprod.blockfrost.io/api/v0'}?project_id=${encodeURIComponent(BLOCKFROST_PROJECT_ID)}`;
+
+const CONTRACT_STATE_QUERY = `
+  query ContractState($address: HexEncoded!) {
+    contractAction(address: $address) {
+      state
+    }
+  }
+`;
+```
+
+```typescript title="ui/src/hooks/useLeaderboard.ts"
+      const res = await fetch(INDEXER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: CONTRACT_STATE_QUERY, variables: { address: contractAddress } }),
+      });
+
+      const gql = await res.json();
+      if (gql.errors) {
+        throw new Error(gql.errors[0]?.message ?? 'Indexer query failed');
+      }
+
+      const stateHex = gql.data?.contractAction?.state;
+      if (!stateHex) {
+        throw new Error('Contract not found');
+      }
+
+      const state = deriveState(ledger(ContractState.deserialize(fromHex(stateHex)).data));
+      setEntries(state.entries);
+      setEntryCount(state.entryCount);
+```
+
+The hook polls every 15 seconds. On Preprod the indexer is Blockfrost's, and every request needs a
+Blockfrost project ID. Vite builds `VITE_BLOCKFROST_PROJECT_ID` into the JavaScript bundle, where
+anyone can read it, so use a project ID you are prepared to treat as public.
+
+## Submit a score
+
+[`ui/src/App.tsx`](https://github.com/midnightntwrk/midnight-examples/blob/main/examples/leaderboard/ui/src/App.tsx)
+holds the game: ten seconds of clicking, then a choice of how to name the entry. Submitting joins
+the contract through the manager and calls the API:
+
+```typescript title="ui/src/App.tsx"
+  const submitScore = useCallback(async () => {
+    if (lastScore === 0 || !wallet) return;
+    setSubmitting(true);
+    setSubmitStatus('Joining contract…');
+    setError(null);
+    try {
+      const manager = getManager();
+      const deployment$ = manager.resolve(contractAddress as any);
+      const result = await new Promise<any>((resolve, reject) => {
+        const sub = deployment$.subscribe((d) => {
+          if (d.status === 'deployed') { Promise.resolve().then(() => sub.unsubscribe()); resolve(d); }
+          if (d.status === 'failed') { Promise.resolve().then(() => sub.unsubscribe()); reject(d.error); }
+        });
+      });
+      setSubmitStatus('Generating proof & submitting…');
+      const name = displayMode === DisplayMode.PUBLIC
+        ? address!.slice(0, 12) + '..' + address!.slice(-12)
+        : displayMode === DisplayMode.CUSTOM ? customName : undefined;
+      await result.api.submitScore(lastScore, name);
+      setSubmitting(false); setSubmitStatus(null);
+      setShowResult(false); setLastScore(0);
+      setTimeout(() => refreshLeaderboard(), 3000);
+    } catch (e: any) {
+      setSubmitting(false); setSubmitStatus(null);
+      setError(friendlyError(e));
+    }
+  }, [wallet, lastScore, displayMode, customName, contractAddress, refreshLeaderboard]);
+```
+
+The display mode decides the name:
+
+- **Custom**: the name the player typed, passed through the `getCustomName` witness.
+- **Public**: part of the wallet's unshielded address, also passed as a custom name. This links
+  the entry to the wallet.
+- **Anonymous**: no name, so the circuit stores `persistentHash(sk)` and the UI shows a generated
+  name.
+
+With a wallet connected, each entry in the table has a **Prove** button that calls `verifyOwnership`. It succeeds only for
+entries made with this browser's key.
+
+## Run the DApp
+
+Start a local proof server for Lace to prove with (set Lace's proof server to
+`http://localhost:6300`), then start the
+dev server with your Blockfrost Preprod project ID:
+
+```bash
+npm run proof:up
+cd ui
+VITE_BLOCKFROST_PROJECT_ID=<your project id> npm run dev
+```
+
+Open http://localhost:3000 in the browser where Lace is installed, connect the wallet, and click
+**Switch**, then **Deploy New**. Lace asks you to approve the deployment. When it
+completes, the new contract's address is copied to your clipboard. Share it so others can join
+the same leaderboard: **Switch**, paste the address, and join.
+
+## Next steps
+
+In [Part 4](/tutorials/leaderboard/deployment) you deploy the DApp to Vercel.

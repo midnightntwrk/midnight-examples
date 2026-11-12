@@ -1,0 +1,206 @@
+---
+SPDX-License-Identifier: Apache-2.0
+copyright: This file is part of midnight-examples. Copyright (C) Midnight Foundation. Licensed under the Apache License, Version 2.0 (the "License"); You may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+sidebar_label: "Smart contract"
+title: "The leaderboard contract"
+description: "A Compact smart contract with arcade-style scoring, witnesses that supply private data on demand, and ownership proofs, for a leaderboard DApp on Midnight."
+sidebar_position: 2
+toc_max_heading_level: 2
+tags: ["compact", "smart-contract", "tutorial", "leaderboard", "zk", "ledger", "privacy"]
+---
+
+# Part 1: The smart contract
+
+This part walks through
+[`contract/leaderboard.compact`](https://github.com/midnightntwrk/midnight-examples/blob/main/examples/leaderboard/contract/leaderboard.compact),
+the Compact contract behind the leaderboard, and the in-memory tests that check it.
+
+## State and witnesses
+
+The contract stores a `ScoreEntry` struct in a `Map` keyed by an auto-incrementing counter, and
+declares two witnesses that let the TypeScript host feed private data into a circuit.
+
+```compact title="contract/leaderboard.compact"
+pragma language_version 0.28;
+
+import CompactStandardLibrary;
+
+struct ScoreEntry {
+  score: Uint<64>,
+  displayName: Bytes<32>,
+  ownerHash: Bytes<32>
+}
+
+export ledger scores: Map<Uint<64>, ScoreEntry>;
+export ledger nextId: Counter;
+
+witness localSecretKey(): Bytes<32>;
+witness getCustomName(): Bytes<32>;
+```
+
+`scores` is a public ledger field that anyone can read from the indexer. `nextId` counts entries
+and gives each one its own key. The two `witness` declarations tell the compiler that the
+TypeScript host supplies `localSecretKey` and `getCustomName` at run time:
+
+- `localSecretKey` returns the player's secret key, kept in their private state.
+- `getCustomName` returns the display name for the current submission.
+
+Neither value appears on-chain unless a circuit passes it through `disclose()`.
+
+## ownerCommitment
+
+This pure circuit derives an on-chain identity from a secret key. It hashes the key with a domain
+separator using `persistentHash`, giving a commitment that can be stored on the ledger and checked
+later without revealing the key.
+
+```compact title="contract/leaderboard.compact"
+export circuit ownerCommitment(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "leaderboard:owner:"), sk]);
+}
+```
+
+The domain separator `"leaderboard:owner:"` keeps this hash from colliding with hashes of the same
+key made for other purposes. Because `ownerCommitment` is exported and uses no ledger state or
+witness, the compiler also emits it as a pure function in TypeScript, so a test or a UI can compute
+the expected commitment off-chain.
+
+## submitScore
+
+The main circuit creates a new entry with the caller's score, display name, and owner commitment.
+
+```compact title="contract/leaderboard.compact"
+export circuit submitScore(
+  score: Uint<64>,
+  useCustomName: Boolean
+): [] {
+  const sk = localSecretKey();
+  const ownerHash = ownerCommitment(sk);
+
+  nextId.increment(1);
+  const entryId = disclose(nextId.read() as Uint<64>);
+
+  if (disclose(useCustomName)) {
+    const customName = getCustomName();
+    scores.insert(entryId, ScoreEntry {
+      score: disclose(score),
+      displayName: disclose(customName),
+      ownerHash: disclose(ownerHash)
+    });
+  } else {
+    scores.insert(entryId, ScoreEntry {
+      score: disclose(score),
+      displayName: disclose(persistentHash<Bytes<32>>(sk)),
+      ownerHash: disclose(ownerHash)
+    });
+  }
+}
+```
+
+- `localSecretKey()` calls the witness to get the player's secret. It is a private input to the
+  proof; only hashes of it reach the ledger.
+- `nextId.increment(1)` then `nextId.read()` gives the new entry's id. The first entry is 1.
+- `disclose()` marks a value as safe to make public. Every value a ledger write stores, and every
+  branch condition derived from a circuit argument, has to be disclosed.
+- The `if` decides the display name. When `useCustomName` is true, the circuit calls the
+  `getCustomName()` witness. When it is false, no witness is called and the display name is
+  `persistentHash(sk)`: raw hash bytes that the UI renders as a generated name such as
+  "Crimson Tiger".
+
+Every call adds an entry, so the same player can appear many times, as on an arcade cabinet. All
+of one player's entries carry the same `ownerHash`, so they can be linked to each other, though
+not to the player's wallet.
+
+## verifyOwnership
+
+This circuit lets a player prove they own an entry without revealing their secret key.
+
+```compact title="contract/leaderboard.compact"
+export circuit verifyOwnership(targetEntryId: Uint<64>): [] {
+  assert(scores.member(disclose(targetEntryId)), "entry not found");
+  const entry = scores.lookup(disclose(targetEntryId));
+  const callerHash = ownerCommitment(localSecretKey());
+  assert(callerHash == entry.ownerHash, "not the owner");
+}
+```
+
+The caller proves that `ownerCommitment` of their witness key matches the `ownerHash` stored in
+the entry. It writes nothing to the ledger: a successful transaction is the proof. A DApp can use
+it to claim a prize or unlock a badge. Anyone watching the chain sees that someone proved
+ownership of that entry id, but not who.
+
+## Compile the contract
+
+From `examples/leaderboard`:
+
+```bash
+npm run compile
+```
+
+```text
+Compiling 2 circuits:
+```
+
+The compiler writes the TypeScript bindings, the proving and verifying keys, and the ZKIR for
+`submitScore` and `verifyOwnership` to `contract/managed/leaderboard/`. `ownerCommitment` is
+pure, so it needs no keys.
+
+Unlike the other examples, this directory is committed to the repository. The Vercel build in
+Part 4 has no Compact compiler, so it takes the keys from here. If you change the contract,
+compile it again and commit the result; CI fails if the committed output doesn't match a fresh
+compile.
+
+## Test the contract in memory
+
+[`src/test/leaderboard.sim.test.ts`](https://github.com/midnightntwrk/midnight-examples/blob/main/examples/leaderboard/src/test/leaderboard.sim.test.ts)
+runs the circuits in memory, with no network and no proofs. Each test deploys a fresh leaderboard
+with Alice's private state:
+
+```typescript title="src/test/leaderboard.sim.test.ts"
+const ALICE_SK = bytes32();
+const BOB_SK = bytes32();
+
+const deploy = () =>
+  Sim.deploy({
+    contract: new Contract(witnesses),
+    ledger,
+    privateState: createLeaderboardPrivateState(ALICE_SK),
+  });
+```
+
+To act as Bob, a test swaps the private state the next call's witnesses see. This test checks that
+`verifyOwnership` rejects a key that didn't make the entry:
+
+```typescript title="src/test/leaderboard.sim.test.ts"
+  it('rejects an ownership proof from another key', async () => {
+    const sim = await deploy();
+    await sim.call('submitScore', 99n, false);
+    sim.privateState = createLeaderboardPrivateState(BOB_SK);
+    await expectRejects(() => sim.call('verifyOwnership', 1n), 'not the owner');
+  });
+```
+
+The last test is the privacy check: after several submissions and a proof, neither player's
+secret key appears anywhere in the public ledger.
+
+```typescript title="src/test/leaderboard.sim.test.ts"
+  it('never puts a secret key in public state', async () => {
+    const sim = await deploy();
+    setCustomName('alice');
+    await sim.call('submitScore', 5n, true);
+    await sim.call('submitScore', 6n, false);
+    sim.privateState = createLeaderboardPrivateState(BOB_SK);
+    await sim.call('submitScore', 8n, false);
+    await sim.call('verifyOwnership', 3n);
+    assertNotInPublicState(sim.ledger(), { aliceSecretKey: ALICE_SK, bobSecretKey: BOB_SK });
+```
+
+Run them:
+
+```bash
+npm run test:sim
+```
+
+## Next steps
+
+In [Part 2](/tutorials/leaderboard/api-layer) you wire the contract to TypeScript: its witnesses,
+its exports, and an API class that the browser DApp and the network tests share.
