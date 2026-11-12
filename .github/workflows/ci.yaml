@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions: {}
 
@@ -18,6 +19,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Which of the heavy jobs below a change can affect (scripts/ci-changes.mjs
+  # has the path rules). On a PR, an example job, the ui job and the mnkit-e2e
+  # jobs with nothing to check skip their steps and pass in seconds, so every
+  # check name still appears. Pushes to main and manual runs check everything.
+  changes:
+    name: changes
+    if: github.repository == 'midnightntwrk/midnight-examples'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      examples: ${{ steps.plan.outputs.examples }}
+      ui: ${{ steps.plan.outputs.ui }}
+      mnkit: ${{ steps.plan.outputs.mnkit }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  #v7.0.1
+        with:
+          persist-credentials: false
+          # A PR checks out its merge commit, whose first parent is the base tip.
+          fetch-depth: 2
+
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  #v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Work out what to check
+        id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = pull_request ]; then
+            json=$(node scripts/ci-changes.mjs 'HEAD^1')
+          else
+            json=$(node scripts/ci-changes.mjs --all)
+          fi
+          echo "$json"
+          node -e '
+            const r = JSON.parse(process.argv[1]);
+            console.log(`examples=${JSON.stringify(r.examples)}\nui=${r.ui}\nmnkit=${r.mnkit}`);
+          ' "$json" >> "$GITHUB_OUTPUT"
+
   # One job per example: compile the contract AND run its test suite against a
   # fresh local Midnight network. "Compilation is not correctness" — every
   # example must compile and run on each toolchain release.
@@ -27,6 +73,7 @@ jobs:
     runs-on: ubuntu-latest
     # The slowest suite (shielded-chips) takes about 20 minutes; the rest under 10.
     timeout-minutes: 45
+    needs: changes
     permissions:
       contents: read
     strategy:
@@ -36,13 +83,23 @@ jobs:
     defaults:
       run:
         working-directory: examples/${{ matrix.example }}
+    env:
+      RUN: ${{ contains(fromJSON(needs.changes.outputs.examples), matrix.example) }}
     steps:
+      - name: Nothing to check
+        if: env.RUN != 'true'
+        # No checkout on this path, so examples/<name> doesn't exist.
+        working-directory: .
+        run: echo "No change in this PR affects ${{ matrix.example }}; skipped (see scripts/ci-changes.mjs)."
+
       - name: Checkout code
+        if: env.RUN == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  #v7.0.1
         with:
           persist-credentials: false
 
       - name: Setup Compact Compiler
+        if: env.RUN == 'true'
         uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
         with:
           compact-version: '0.36.0'
@@ -50,19 +107,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Node.js
+        if: env.RUN == 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  #v7.1.0
         with:
           node-version-file: .nvmrc
 
       - name: Use the pinned npm (min-release-age in .npmrc needs 11.10+)
+        if: env.RUN == 'true'
         working-directory: .
         run: npm install -g npm@11.21.0
 
       - name: Install dependencies (whole workspace)
+        if: env.RUN == 'true'
         working-directory: .
         run: npm ci
 
       - name: Compile contract
+        if: env.RUN == 'true'
         run: npm run compile
 
       # An example that commits its compiler output (leaderboard, whose Vercel
@@ -83,38 +144,44 @@ jobs:
       # Seconds, and its errors are clearer than the same mistake surfacing
       # inside a devnet test run.
       - name: Typecheck harness and tests
+        if: env.RUN == 'true'
         run: npm run typecheck
 
       # In-memory contract tests (src/**/*.sim.test.ts): no Docker, seconds.
       # Logic errors fail here before the network is started.
       - name: Run in-memory contract tests
+        if: env.RUN == 'true'
         run: npm run test:sim
 
       # SPEC.md against the compiled contract and the sim tests (examples with
       # a design card only).
       - name: Lint SPEC.md
+        if: env.RUN == 'true'
         run: if [ -f SPEC.md ]; then node ../../scripts/spec-lint.mjs ${{ matrix.example }}; fi
 
       - name: Start local Midnight network
+        if: env.RUN == 'true'
         run: npm run env:up
 
       - name: Wait for DUST to accrue
+        if: env.RUN == 'true'
         run: npm run wait:dust
 
       - name: Run tests against local network
+        if: env.RUN == 'true'
         run: npm run test:local
 
       # Must run before env:down, which removes the containers and their logs.
       - name: Collect service logs on failure
-        if: failure()
+        if: failure() && env.RUN == 'true'
         run: mkdir -p logs && docker compose logs --no-color --timestamps > logs/compose.log 2>&1 || true
 
       - name: Stop local Midnight network
-        if: always()
+        if: always() && env.RUN == 'true'
         run: npm run env:down
 
       - name: Upload service logs on failure
-        if: failure()
+        if: failure() && env.RUN == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  #v7.0.2
         with:
           name: docker-compose-logs-${{ matrix.example }}
@@ -133,15 +200,24 @@ jobs:
     if: github.repository == 'midnightntwrk/midnight-examples'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: changes
     permissions:
       contents: read
+    env:
+      RUN: ${{ needs.changes.outputs.ui }}
     steps:
+      - name: Nothing to check
+        if: env.RUN != 'true'
+        run: echo "No change in this PR affects the generated UIs; skipped (see scripts/ci-changes.mjs)."
+
       - name: Checkout code
+        if: env.RUN == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  #v7.0.1
         with:
           persist-credentials: false
 
       - name: Setup Compact Compiler
+        if: env.RUN == 'true'
         uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
         with:
           compact-version: '0.36.0'
@@ -149,17 +225,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Node.js
+        if: env.RUN == 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  #v7.1.0
         with:
           node-version-file: .nvmrc
 
       - name: Use the pinned npm (min-release-age in .npmrc needs 11.10+)
+        if: env.RUN == 'true'
         run: npm install -g npm@11.21.0
 
       - name: Install dependencies (whole workspace)
+        if: env.RUN == 'true'
         run: npm ci
 
       - name: Check, typecheck, unit-test, and build each generated UI
+        if: env.RUN == 'true'
         run: |
           set -euo pipefail
           found=0
@@ -319,6 +399,7 @@ jobs:
     name: mnkit e2e (${{ matrix.fixture }}${{ matrix.upgrade && ', upgrade' || '' }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    needs: changes
     permissions:
       contents: read
     strategy:
@@ -337,9 +418,15 @@ jobs:
         # with MNKIT_UPGRADE_FROM set to 0.2.0, then to the previous release.
         # Then delete the Yarn install branch in scripts/mnkit-e2e.sh.
     env:
+      RUN: ${{ needs.changes.outputs.mnkit }}
       MNKIT_UPGRADE_FROM: ''
     steps:
+      - name: Nothing to check
+        if: env.RUN != 'true'
+        run: echo "No change in this PR affects mnkit; skipped (see scripts/ci-changes.mjs)."
+
       - name: Checkout code
+        if: env.RUN == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  #v7.0.1
         with:
           persist-credentials: false
@@ -347,6 +434,7 @@ jobs:
           fetch-depth: ${{ matrix.upgrade && '0' || '1' }}
 
       - name: Setup Compact Compiler
+        if: env.RUN == 'true'
         uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
         with:
           compact-version: '0.36.0'
@@ -354,16 +442,19 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Node.js
+        if: env.RUN == 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  #v7.1.0
         with:
           node-version-file: .nvmrc
 
       - name: Install dependencies (whole workspace; builds the runtime packages)
+        if: env.RUN == 'true'
         # npm 11 for the repo (its lockfile and .npmrc need 11.10+), through npx: Node's own npm
         # stays on PATH, and mnkit-e2e.sh runs the scaffolded projects with it, as users do.
         run: npx --yes npm@11.21.0 ci
 
       - name: Pack, scaffold, derive, test:sim, add ui and validate on a local network
+        if: env.RUN == 'true'
         run: bash scripts/mnkit-e2e.sh --devnet ${FRESH:+--fresh-compact} ${UPGRADE:+--upgrade-from "$MNKIT_UPGRADE_FROM"} ${{ matrix.fixture }}
         env:
           MNKIT_E2E_DIR: ${{ runner.temp }}/mnkit-e2e
@@ -371,7 +462,7 @@ jobs:
           FRESH: ${{ matrix.fixture == 'hello-world' && !matrix.upgrade && 'true' || '' }}
 
       - name: Upload service logs on failure
-        if: failure()
+        if: failure() && env.RUN == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  #v7.0.2
         with:
           name: mnkit-e2e-logs-${{ matrix.fixture }}${{ matrix.upgrade && '-upgrade' || '' }}
