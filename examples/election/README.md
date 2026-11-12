@@ -52,3 +52,5 @@ To run it against **preprod** or **preview** instead, start a local proof server
 printed addresses at the faucet, and run `npm run test:preprod`. The wallet seeds
 live in one repo-root `.env.<network>` that every example shares. Each wallet
 syncs from genesis, which takes over an hour on preprod.
+
+<!-- CI path-gating test: throwaway, do not merge. -->
