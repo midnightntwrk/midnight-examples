@@ -1,5 +1,5 @@
 {
-  "name": "@midnight-ntwrk/example-election",
+  "name": "@midnight-ntwrk/example-voting",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,21 +7,24 @@
     "node": ">=22.0.0"
   },
   "scripts": {
-    "compile": "compact compile contract/election.compact contract/managed/election",
-    "compile:fast": "compact compile --skip-zk contract/election.compact contract/managed/election",
+    "compile": "node ../../scripts/compile-contracts.mjs",
+    "compile:fast": "node ../../scripts/compile-contracts.mjs --skip-zk",
     "typecheck": "tsc --noEmit -p .",
     "test": "NODE_OPTIONS='--experimental-vm-modules' vitest run --exclude 'src/**/*.sim.test.ts'",
     "test:sim": "vitest run --passWithNoTests .sim.test.ts",
     "test:local": "MIDNIGHT_NETWORK=local npm test --",
     "test:preview": "MIDNIGHT_NETWORK=preview npm test --",
     "test:preprod": "MIDNIGHT_NETWORK=preprod npm test --",
-    "test:custom": "MIDNIGHT_NETWORK=custom npm test --",
     "env:up": "docker compose up -d --wait",
     "env:down": "docker compose down",
     "proof:up": "docker compose up -d --wait proof-server",
     "proof:down": "docker compose stop proof-server",
     "wait:dust": "vite-node scripts/wait-for-dust.ts",
-    "validate": "node ../../scripts/validate-example.mjs"
+    "deploy": "vite-node scripts/deploy.ts",
+    "deploy:preview": "MIDNIGHT_NETWORK=preview npm run deploy --",
+    "deploy:preprod": "MIDNIGHT_NETWORK=preprod npm run deploy --",
+    "validate": "node ../../scripts/validate-example.mjs",
+    "vote": "vite-node scripts/cli.ts --"
   },
   "dependencies": {
     "@midnight-ntwrk/midnight-js-contracts": "5.0.0",
@@ -35,6 +38,9 @@
     "@midnight-ntwrk/midnight-js-utils": "5.0.0",
     "@midnight-ntwrk/testkit-js": "5.0.0",
     "@midnightntwrk/wallet-sdk": "2.0.0",
+    "@noble/ciphers": "2.4.0",
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
     "pino": "^9.0.0",
     "pino-pretty": "^13.0.0",
     "rxjs": "^7.8.2",

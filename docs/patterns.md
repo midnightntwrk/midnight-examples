@@ -28,18 +28,18 @@ Entries name a symbol rather than a line number, so search the file for it.
 | Hash commitment of a witness secret | secret-message | `secret-message.compact` → `publishMessageHash`, `hashMessageWithSeparator` |
 | Domain-separated hashing, binding to `kernel.self()` | secret-message | `secret-message.compact` → `hashMessageWithAddress` |
 | First caller becomes the owner; owner-only removal | secret-message | `secret-message.compact` → `publishMessageHashWithOwner`, `removeMessageHash` |
-| Identity key derived from a witness secret | election, battleship | `getDappPubKey(localSk())` |
+| Identity key derived from a witness secret | voting, battleship | `voting.compact` → `adminKey(secretKey())`, `voterKey`; battleship `getDappPubKey(localSk())` |
 | Per-deployment identity (`kernel.self()` in the key) | private-bid | `private-bid.compact` → `derive` |
 | Salted `persistentCommit`, then reveal | private-bid | `private-bid.compact` → `placeBid`, `revealBid` |
 | Value stays private while a public bound is proven | private-bid | `placeBid` (`amount >= minimumBid`) |
-| Commit-reveal with `persistentHash(value, sk)` | election | `election.compact` → `commitVote`, `revealVote`, `commitWithSk` |
+| Salted `persistentCommit` of a vote, opened at count time | voting | `voting.compact` → `ballotCommit`, `ballotSalt`, `count` |
 | Commitment made in the constructor, revealed later | silent-auction | `silent-auction.compact` → `constructor`, `commitPrice`, `revealWin` |
-| `sealed` (set-once) ledger fields | silent-auction, election, private-party | `export sealed ledger …` |
-| State machine on an `enum` ledger field | battleship, silent-auction, election | `TurnState`, `AuctionState`, `VotingState` |
+| `sealed` (set-once) ledger fields | silent-auction, voting, private-party | `export sealed ledger …` |
+| State machine on an `enum` ledger field | battleship, silent-auction, voting | `TurnState`, `AuctionState`, `Phase` |
 | Two roles and turn-taking | battleship | `battleship.compact` → `acceptGame`, `player1Shoot`, `checkBoard1` |
 | Off-chain data checked against a commitment | battleship | `commitBoardSpace`, `checkBoard1` |
-| `Set` guard against double actions | election | `registeredVoters`, `hashedVoteMap`, `revealedVoters` |
-| `Counter` tallies | election, battleship | `candidate0VoteCounter`, `board1HitCount` |
+| `Set` guard against double actions | voting | `voterKeys`, `counted` (and the nullifier key in `ballots`) |
+| `Counter` tallies | voting, battleship | `yes`/`no`/`abstain`, `board1HitCount` |
 | `Map` of bids (raise-only, highest bid) | silent-auction | `silent-auction.compact` → `bid` |
 | Nested `Map`s; batched migration | zk-loan | `zk-loan.compact` → `loans`, `changePin` |
 | Admin key, blacklist, admin rotation | zk-loan | `blacklistUser`, `rotateAdmin` |

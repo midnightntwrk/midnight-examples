@@ -1,4 +1,4 @@
-// This file is part of example-election.
+// This file is part of example-voting.
 // Copyright (C) Midnight Foundation
 // SPDX-License-Identifier: Apache-2.0
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,6 +49,9 @@ import {
   type FacadeState,
   type UnshieldedKeystore,
   type WalletSeeds,
+  ShieldedAddress,
+  ShieldedCoinPublicKey,
+  ShieldedEncryptionPublicKey,
 } from '@midnightntwrk/wallet-sdk';
 import {
   type DustWalletOptions,
@@ -142,6 +145,74 @@ export class MidnightWalletProvider implements Ledger9WalletProvider {
 
   private async activeProtocolVersion(): Promise<ProtocolVersion.ProtocolVersion> {
     return (await Rx.firstValueFrom(this.wallet.state())).activeProtocolVersion;
+  }
+
+  /** This wallet's own shielded address, for self-transfers. */
+  getShieldedAddress(): ShieldedAddress {
+    return new ShieldedAddress(
+      ShieldedCoinPublicKey.fromHexString(this.getCoinPublicKey()),
+      ShieldedEncryptionPublicKey.fromHexString(this.getEncryptionPublicKey()),
+    );
+  }
+
+  /**
+   * Send `amount` of `tokenType` from this wallet back to itself.
+   *
+   * You don't need this to pay a contract. A coin a circuit `receiveShielded`s
+   * is a NEW coin the transaction creates: pass `freshCoin(color, value)` from
+   * src/test/coins.ts, and the wallet pays for it from whichever
+   * coins it selects and makes change. That pays an exact amount, and since
+   * the nonce is fresh, nobody who knows your wallet's coins (whoever minted or
+   * sent them) can recognise it. Earlier examples did a self-transfer like
+   * this before every deposit to get the same effect.
+   *
+   * What it is for: reshaping the wallet itself, for example to hold a coin of
+   * an exact value for a test.
+   */
+  async splitShieldedCoin(
+    tokenType: string,
+    amount: bigint,
+    ttl: Date = ttlOneHour(),
+  ): Promise<void> {
+    const balanceOf = async (): Promise<bigint> => {
+      const state = await this.wallet.waitForSyncedState();
+      return state.shielded.balances[tokenType] ?? 0n;
+    };
+    // A self-transfer is value preserving for this token (fees are paid in
+    // DUST), so the pre-transfer balance is what we wait to see come back.
+    const expected = await balanceOf();
+
+    this.logger.info(`Self-transferring ${amount} of ${tokenType.slice(0, 16)}… to re-nonce`);
+    const recipe = await this.wallet.transferTransaction(
+      [
+        {
+          type: 'shielded',
+          outputs: [{ type: tokenType, receiverAddress: this.getShieldedAddress(), amount }],
+        },
+      ],
+      { ttl, payFees: true },
+    );
+    const signed = await this.wallet.signRecipe(recipe, (payload) =>
+      this.unshieldedKeystore.signDataAsync(payload),
+    );
+    const finalized = await this.wallet.finalizeRecipe(signed);
+    await this.wallet.submitTransaction(finalized);
+
+    // submitTransaction returns once the transaction is accepted, not once it
+    // is on chain and indexed. Until then the input coin is spent and the
+    // replacement is not visible yet, so wait for the balance to reappear
+    // before anyone tries to use the new coin.
+    const deadline = Date.now() + 300_000;
+    for (;;) {
+      if ((await balanceOf()) === expected) {
+        this.logger.info('Re-nonced coin is visible; split complete');
+        return;
+      }
+      if (Date.now() > deadline) {
+        throw new Error(`Split of ${tokenType} did not settle within 300s`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+    }
   }
 
   async start(): Promise<void> {
@@ -358,6 +429,7 @@ export async function saveWalletState(logger: Logger, wallet: WalletFacade): Pro
   logger.info(`Saved wallet state to ${file}.`);
 }
 
+
 // ---------------------------------------------------------------------------
 // Which wallet a run uses
 // ---------------------------------------------------------------------------
@@ -373,15 +445,15 @@ export const LOCAL_SEEDS = {
 /** The four wallets a remote run is funded with. */
 export type Role = keyof typeof LOCAL_SEEDS;
 
-/** Suite-specific role names and the wallet each one uses. */
+/**
+ * Suite-specific role names and the wallet each one uses. Add your own (say,
+ * `ORGANIZER: 'ALICE'`) so a test reads `resolveWallet(network, 'ORGANIZER')`.
+ */
 const ROLE_ALIASES: Record<string, Role> = {
   ALICE: 'ALICE',
   BOB: 'BOB',
   CHARLIE: 'CHARLIE',
   DAVE: 'DAVE',
-  ORGANIZER: 'ALICE',
-  BIDDER_ONE: 'BOB',
-  BIDDER_TWO: 'CHARLIE',
 };
 
 export interface ResolvedWallet {

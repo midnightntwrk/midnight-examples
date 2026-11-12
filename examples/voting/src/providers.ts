@@ -1,4 +1,4 @@
-// This file is part of example-election.
+// This file is part of example-voting.
 // Copyright (C) Midnight Foundation
 // SPDX-License-Identifier: Apache-2.0
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,6 +25,7 @@ import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-p
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { NodeZkConfigProvider } from '@midnight-ntwrk/midnight-js-node-zk-config-provider';
 import { levelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider';
+import { inMemoryPrivateStateProvider } from '@midnight-ntwrk/testkit-js';
 import { type MidnightWalletProvider } from './wallet.js';
 import { type NetworkConfig } from './config.js';
 import { type ImpureCircuits } from '../contract/index.js';
@@ -32,27 +33,54 @@ import { type ImpureCircuits } from '../contract/index.js';
 // The set of callable circuit ids, derived from the compiled contract's
 // generated types. This tracks whatever circuits your .compact exports, so you
 // never have to edit this file when you add, remove, or rename a circuit.
-export type ElectionCircuits = keyof ImpureCircuits<unknown>;
+export type VotingCircuits = keyof ImpureCircuits<unknown>;
 
-export type ElectionProviders = MidnightProviders<any>;
+export type VotingProviders = MidnightProviders<any>;
 
 // How long a built transaction stays valid, in seconds (Midnight.js 5's
 // `config.ttlSeconds`).
 const TX_TTL_SECONDS = Number(process.env['MIDNIGHT_TX_TTL_SECONDS'] ?? 3600);
 
+/**
+ * Where a provider set keeps private state and the contracts' signing keys.
+ * `dbName` is the LevelDB directory, `storeName` the store inside it, and
+ * `password` encrypts both (at least 16 characters, with 3 of: upper case,
+ * lower case, digits, symbols).
+ */
+export type PrivateStateStore = {
+  dbName: string;
+  storeName: string;
+  password: string;
+};
+
+/**
+ * The providers for one contract. Without `privateState` the store is a
+ * throwaway one for tests: a fresh name each call, under ./midnight-level-db.
+ * scripts/deploy.ts passes a persistent store instead (it keeps the contract's
+ * signing key). `'memory'` keeps private state in this process only, for
+ * scripts/cli.ts, which sets it before every call.
+ */
 export function buildProviders(
   wallet: MidnightWalletProvider,
   zkConfigPath: string,
   config: NetworkConfig,
-): ElectionProviders {
-  const zkConfigProvider = new NodeZkConfigProvider<ElectionCircuits>(zkConfigPath);
+  privateState?: PrivateStateStore | 'memory',
+): VotingProviders {
+  const zkConfigProvider = new NodeZkConfigProvider<VotingCircuits>(zkConfigPath);
   return {
-    privateStateProvider: levelPrivateStateProvider({
-      privateStateStoreName: `election-${Date.now()}`,
-      // this password has requirements (capital/special chars >= 3)
-      privateStoragePasswordProvider: () => 'Election-Test-Password',
-      accountId: wallet.getCoinPublicKey(),
-    }),
+    privateStateProvider:
+      privateState === 'memory'
+        ? inMemoryPrivateStateProvider()
+        : levelPrivateStateProvider({
+          ...(privateState ? { midnightDbName: privateState.dbName } : {}),
+          // The random suffix keeps each provider set's private-state store separate
+          // when a test builds several sets (wallets, contracts) in the same millisecond.
+          privateStateStoreName:
+            privateState?.storeName ?? `voting-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          // this password has requirements (capital/special chars >= 3)
+          privateStoragePasswordProvider: () => privateState?.password ?? 'Voting-Test-Password',
+          accountId: wallet.getCoinPublicKey(),
+        }),
     publicDataProvider: indexerPublicDataProvider(
       config.indexer,
       config.indexerWS,
