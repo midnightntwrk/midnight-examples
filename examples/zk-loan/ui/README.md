@@ -71,7 +71,7 @@ change for every example.
 Vite 6 cannot simply be contained to this workspace:
 
 - **`installConfig.hoistingLimits: "workspaces"`** duplicates `compact-runtime`,
-  `ledger-v8` and the other Midnight runtime packages into `ui/node_modules`,
+  `ledger-v9` and the other Midnight runtime packages into `ui/node_modules`,
   while the contract module keeps loading the root copy. That split is a
   runtime hazard.
 - **Pinning Vite 8 at the root** pushes `vite-plugin-node-polyfills`, which has

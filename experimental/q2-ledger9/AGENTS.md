@@ -40,5 +40,5 @@ mn-examples example:
   `midnight-level-db-*` private-state dirs are gitignored here. The root `.gitignore` does
   not cover them, so keep this directory's `.gitignore`. Only `.env.stagenet.example` is
   tracked.
-- **Do not trust memory for Compact or SDK APIs.** These APIs are pre-release and differ
-  from the ledger 8 examples. Compile and run anything you add.
+- **Do not trust memory for Compact or SDK APIs.** These APIs are new in Ledger 9 and
+  still moving between releases. Compile and run anything you add.
