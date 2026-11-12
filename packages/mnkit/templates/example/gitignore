@@ -10,6 +10,8 @@ midnight-level-db/
 .env
 .env.*
 .fast-sync-wallets/
+# Saved wallet sync state for remote networks (@midnightntwrk/mnkit-wallet)
+.wallet-state/
 # Deploy state: the private state and signing keys `mnkit deploy` keeps (back
 # it up for a real network), and the local devnet's records, which a restart
 # empties. deployments/preview.json and preprod.json are committed.
