@@ -14,7 +14,7 @@ services:
       start_period: 10s
 
   indexer:
-    image: 'midnightntwrk/indexer-standalone:4.4.0-rc.6'
+    image: 'midnightntwrk/indexer-standalone:4.4.101'
     # Backstop for the node healthcheck below: retry a startup crash instead of
     # failing `docker compose up --wait`.
     restart: on-failure
@@ -41,7 +41,7 @@ services:
         condition: service_healthy
 
   node:
-    image: 'midnightntwrk/midnight-node:2.1.0-rc.4'
+    image: 'midnightntwrk/midnight-node:2.1.101'
     ports:
       - '127.0.0.1:9944:9944'
     # Healthy only once block 1 exists, not just once /health answers. The
