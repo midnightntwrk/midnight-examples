@@ -20,6 +20,7 @@
 
 import { ZkLoanSimulator } from './zk-loan.simulator.js';
 import { createCustomSignedProfile, generateProviderKeyPair } from './utils/test-data.js';
+import { JUBJUB_ORDER, TWO_248 } from '../../attestation-api/signing.js';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import {
   ecMul,
@@ -27,11 +28,14 @@ import {
   ecMulGenerator,
   type WitnessContext,
 } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
-import { type Ledger } from '../../contract/managed/zk-loan/contract/index.js';
+import { type Ledger, pureCircuits } from '../../contract/managed/zk-loan/contract/index.js';
 import { type ZkLoanPrivateState } from '../../contract/witnesses.js';
 import { describe, it, expect } from 'vitest';
 
 setNetworkId('undeployed');
+
+// BLS12-381 scalar field prime, the modulus of circuit arithmetic.
+const P = 52435875175126190479447740508185965837690552500527637822603658699938581184513n;
 
 describe('ZkLoan contract (simulator)', () => {
   // Helper: set up private state with valid attestation for a given profile.
@@ -1123,11 +1127,9 @@ describe('ZkLoan contract (simulator)', () => {
     // unconstrained `Field`, so the equation only had to hold modulo the field
     // prime P — a prover could pick ANY r (challenge) and solve for a matching q,
     // decoupling the challenge from the hash and forging signatures. Constraining
-    // the quotient to Uint<7> with `q < 116` forces the canonical integer
-    // decomposition, so r is pinned to cFull mod 2^248.
-    const P = 52435875175126190479447740508185965837690552500527637822603658699938581184513n;
-    const JUBJUB_ORDER = 6554484396890773809930967563523245729705921265872317281365359162392183254199n;
-    const TWO_248 = 452312848583266388373324160190187140051835877600158453279131187530910662656n;
+    // the quotient to Uint<7> and bounding it forces the canonical integer
+    // decomposition, so r is pinned to cFull mod 2^248. The bound is
+    // q < 115, or q == 115 with r < P - 115 * 2^248 (see the next test).
     const mod = (a: bigint, m: bigint): bigint => ((a % m) + m) % m;
     const modInv = (a: bigint, m: bigint): bigint => {
       let [oldR, r] = [mod(a, m), m];
@@ -1181,9 +1183,114 @@ describe('ZkLoan contract (simulator)', () => {
       userSecretKey: attacker.userSecretKey,
     };
 
-    // Pre-fix this forgery was accepted; the Uint<7> quotient + `q < 116` range
-    // check now rejects it before any loan is recorded.
+    // Pre-fix this forgery was accepted; the Uint<7> quotient + range check now
+    // rejects it before any loan is recorded.
     await expect(attacker.requestLoan(5000n, pin)).rejects.toThrow();
+  });
+
+  // Fixed provider key, user secret and PIN, so the attestation message is
+  // fixed and a nonce with a given challenge property can be found quickly by
+  // walking forward from a precomputed start (re-found if the hash changes).
+  const FIXED_PROVIDER_SK = 990335906608427855168819520260519306836497n;
+  const FIXED_PROVIDER_ID = 2n;
+  const FIXED_PIN = 1234n;
+  const FIXED_USER_SECRET = new Uint8Array(32).fill(7);
+
+  async function fixedKeySetup(witnessOverrides: Parameters<typeof ZkLoanSimulator.create>[0] = {}) {
+    const simulator = await ZkLoanSimulator.create(witnessOverrides);
+    const pk = ecMulGenerator(FIXED_PROVIDER_SK);
+    await simulator.registerProvider(FIXED_PROVIDER_ID, pk);
+    const msg = [800n, 5000n, 60n, simulator.computeUserPubKeyHash(FIXED_USER_SECRET, FIXED_PIN)];
+    // First nonce k >= start whose challenge hash satisfies `want`. One point
+    // addition per step instead of a scalar multiplication.
+    const findNonce = (start: bigint, want: (cFull: bigint) => boolean) => {
+      const G = ecMulGenerator(1n);
+      let k = start;
+      let R = ecMulGenerator(k);
+      let cFull = pureCircuits.schnorrChallenge(R.x, R.y, pk.x, pk.y, msg);
+      while (!want(cFull)) {
+        k += 1n;
+        R = ecAdd(R, G);
+        cFull = pureCircuits.schnorrChallenge(R.x, R.y, pk.x, pk.y, msg);
+      }
+      return { k, R, cFull };
+    };
+    const useSignature = (announcement: ReturnType<typeof ecMulGenerator>, response: bigint) => {
+      simulator.privateState = {
+        creditScore: 800n,
+        monthlyIncome: 5000n,
+        monthsAsCustomer: 60n,
+        attestationSignature: { announcement, response },
+        attestationProviderId: FIXED_PROVIDER_ID,
+        userSecretKey: FIXED_USER_SECRET,
+      };
+    };
+    return { simulator, pk, findNonce, useSignature };
+  }
+
+  it('accepts only one decomposition of the challenge', async () => {
+    // floor(P / 2^248) == 115, so a plain `q < 116` bound is not tight: when
+    // cFull < 116 * 2^248 - P (about 0.06% of hashes), both (0, cFull) and
+    // (115, cFull + P - 115 * 2^248) satisfy q * 2^248 + r == cFull mod P with
+    // r < 2^248. This builds such a challenge and a signature that is valid for
+    // the second decomposition's r, and checks the circuit rejects it.
+    const LIMIT = 116n * TWO_248 - P;
+    let target = -1n;
+    let altR = 0n;
+    const altReduction = (
+      { privateState }: WitnessContext<Ledger, ZkLoanPrivateState>,
+      challengeHash: bigint,
+    ): [ZkLoanPrivateState, [bigint, bigint]] =>
+      challengeHash === target
+        ? [privateState, [115n, altR]]
+        : [privateState, [challengeHash / TWO_248, challengeHash % TWO_248]];
+    const { simulator, pk, findNonce, useSignature } = await fixedKeySetup({ getSchnorrReduction: altReduction });
+
+    const { k, R, cFull } = findNonce(1072n, (c) => c < LIMIT);
+    target = cFull;
+    altR = cFull + P - 115n * TWO_248;
+    expect(altR < TWO_248).toBe(true);
+    expect((115n * TWO_248 + altR) % P).toEqual(cFull);
+
+    // A signature that verifies under the alternative challenge altR.
+    const response = (k + altR * FIXED_PROVIDER_SK) % JUBJUB_ORDER;
+    const lhs = ecMulGenerator(response);
+    const rhs = ecAdd(R, ecMul(pk, altR));
+    expect(lhs.x).toEqual(rhs.x);
+    expect(lhs.y).toEqual(rhs.y);
+
+    useSignature(R, response);
+    await expect(simulator.requestLoan(5000n, FIXED_PIN)).rejects.toThrow('Schnorr quotient out of range');
+  });
+
+  it('accepts an honest signature with q == 115', async () => {
+    // The other side of the bound: about 0.8% of honest challenges have
+    // q == 115, and those must still verify.
+    const { simulator, findNonce, useSignature } = await fixedKeySetup();
+    const { k, R, cFull } = findNonce(34n, (c) => c / TWO_248 === 115n);
+    const response = (k + (cFull % TWO_248) * FIXED_PROVIDER_SK) % JUBJUB_ORDER;
+    useSignature(R, response);
+    await simulator.requestLoan(5000n, FIXED_PIN);
+  });
+
+  it('rejects a response shifted by the Jubjub order', async () => {
+    // response is a JubjubScalar, so s + order is rejected by the generated
+    // witness type check instead of being reduced back to s by a cast.
+    const simulator = await ZkLoanSimulator.create();
+    setAttestedPrivateState(simulator, 800n, 5000n, 60n);
+    const { announcement, response } = simulator.privateState.attestationSignature;
+    simulator.privateState = {
+      ...simulator.privateState,
+      attestationSignature: { announcement, response: response + JUBJUB_ORDER },
+    };
+    await expect(simulator.requestLoan(5000n, 1234n)).rejects.toThrow(/type error: getAttestedScoringWitness/);
+
+    // The unshifted signature still goes through.
+    simulator.privateState = {
+      ...simulator.privateState,
+      attestationSignature: { announcement, response },
+    };
+    await simulator.requestLoan(5000n, 1234n);
   });
 
   it('throws when non-admin tries to register provider', async () => {

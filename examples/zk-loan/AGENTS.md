@@ -12,8 +12,8 @@
 - **Verifying an off-chain attestation in-circuit**: a registered provider
   Schnorr-signs the profile on Jubjub; `schnorr.compact` verifies it inside the
   proof, so a tampered profile cannot pass. Includes a witness-assisted
-  challenge reduction whose quotient is range-bounded (a soundness fix with a
-  regression test).
+  challenge reduction whose quotient is typed and range-bounded so the
+  decomposition is unique (soundness fixes with regression tests).
 - **Witness-derived identity**: one 32-byte `userSecretKey` in private state
   yields both the admin key (`deriveAdminPublicKey`) and a PIN-bound,
   rotatable user key (`deriveUserPublicKey`) via domain-separated
@@ -33,7 +33,7 @@ ported.
 - `contract/zk-loan.compact` + `contract/schnorr.compact` (committed),
   `contract/index.ts`, `contract/witnesses.ts`.
 - `src/` harness. Two suites:
-  - `src/test/zk-loan.sim.test.ts` — 62 contract unit tests against the
+  - `src/test/zk-loan.sim.test.ts` — 65 contract unit tests against the
     in-memory simulator (`src/test/zk-loan.simulator.ts`); no network needed:
     `npm run compile:fast && npm run test:sim`.
   - `src/test/zk-loan.test.ts` — on-chain deploy/call flow via midnight-js,

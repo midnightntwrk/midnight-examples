@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `examples/voting`: anonymous, allow-listed yes / no / abstain voting with one transaction per voter, for MIP and MPS votes. Voters prove membership of a Merkle voter list and publish a per-proposal nullifier with a hiding commitment, plus a copy of the ballot encrypted to the admin keys (X25519 + XChaCha20-Poly1305). After voting closes, the admin decrypts the ballots and calls a permissionless `count`, which is checked against each commitment. Includes an admin/voter CLI (`npm run vote`).
 
+### Fixed
+
+- `examples/zk-loan`: the Schnorr verifier's `response` is a `JubjubScalar` now, so the generated witness type check rejects `s + order` (the old `response as JubjubScalar` cast reduced it back to `s`); signers must reduce `s` mod the order. The challenge quotient bound is tight: `q < 115`, or `q == 115` with the remainder below `P - 115 * 2^248`. With `q < 116` about 0.06% of challenge hashes had two accepted `(q, r)` pairs. Three simulator tests cover it, and the tutorials match the code. `requestLoan`'s circuit changes, so its prover and verifier keys change: redeploy rather than pointing a rebuilt UI at an existing contract.
+
 ## mnkit 0.2.0 (unreleased)
 
 The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-wallet`, `@midnightntwrk/mnkit-sim` and `@midnightntwrk/mnkit-coins`. All four share one version. Release candidates (`0.2.0-rc.2`) go to the `next` dist-tag first; `0.2.0-rc.1` was never published.
