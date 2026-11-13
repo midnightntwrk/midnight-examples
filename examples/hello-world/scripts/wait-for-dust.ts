@@ -22,11 +22,9 @@ import pino from 'pino';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import { getConfig } from '../src/config.js';
-import { MidnightWalletProvider, syncWallet, waitForDust } from '../src/wallet.js';
+import { buildWallet, LOCAL_SEEDS, syncWallet, waitForDust } from '../src/wallet.js';
 
 // Must match src/test/hw.test.ts.
-const ALICE_SEED = '0000000000000000000000000000000000000000000000000000000000000001';
-
 const logger = pino({
   level: process.env['LOG_LEVEL'] ?? 'info',
   transport: { target: 'pino-pretty' },
@@ -50,11 +48,8 @@ const envConfig: EnvironmentConfiguration = { walletNetworkId: config.networkId,
 
 logger.info(`Waiting for Alice to have ≥${minCoins} DUST coin(s) (timeout ${timeoutMs}ms)`);
 
-const wallet = await MidnightWalletProvider.build(logger, envConfig, {
-  kind: 'seed',
-  value: ALICE_SEED,
-});
-await wallet.start();
+const wallet = await buildWallet(logger, envConfig, { kind: 'seed', value: LOCAL_SEEDS.ALICE });
+await wallet.start(false);
 try {
   await syncWallet(logger, wallet.wallet, timeoutMs);
   await waitForDust(logger, wallet.wallet, minCoins, timeoutMs, config.indexer);

@@ -13,6 +13,7 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { CompiledContract } from '@midnight-ntwrk/compact-js';
+import { ContractState } from '@midnight-ntwrk/compact-runtime';
 import { deployContract, submitCallTx } from '@midnight-ntwrk/midnight-js-contracts';
 
 import type { Providers } from './providers.js';
@@ -52,6 +53,21 @@ export function contractAddressBytes(contractAddress: string): Uint8Array {
   return new Uint8Array(buf);
 }
 
+/* ── cross-contract module resolution ─────────────────────────────────────── */
+
+// Midnight.js 5 runs a cross-contract call's callee locally, so it needs the
+// callee's compiled module. Every contract this process deploys is recorded
+// here by address; providers hand this registry to Midnight.js.
+const modulesByCompiled = new WeakMap<object, CompiledModule>();
+const modulesByAddress = new Map<string, CompiledModule>();
+
+export const contractModuleProvider = {
+  resolve(calleeAddress: string) {
+    const module = modulesByAddress.get(calleeAddress.replace(/^0x/, '').toLowerCase());
+    return module ? () => Promise.resolve(module as never) : undefined;
+  },
+};
+
 /* ── load + bind ──────────────────────────────────────────────────────────── */
 
 /** True if `npm run compile` has emitted this contract's TS bindings. */
@@ -88,6 +104,7 @@ export async function loadContract(
     : CompiledContract.withVacantWitnesses;
 
   const compiledContract = make(tag, module.Contract).pipe(withW, withAssets(managedDir));
+  modulesByCompiled.set(compiledContract as object, module);
   return { zkConfigPath: managedDir, module, compiledContract };
 }
 
@@ -148,6 +165,8 @@ export async function deployFresh(
       args,
     });
     const pub = deployed.deployTxData.public;
+    const module = modulesByCompiled.get(compiledContract as object);
+    if (module) modulesByAddress.set(pub.contractAddress.replace(/^0x/, '').toLowerCase(), module);
     return { contractAddress: pub.contractAddress, txId: pub.txId, deployed };
   } catch (e) {
     throw new Error(`deploy(${privateStateId}) failed: ${causeChain(e)}`, { cause: e });
@@ -200,7 +219,17 @@ export async function readLedger<L>(
 ): Promise<L> {
   const state = await providers.publicDataProvider.queryContractState(contractAddress);
   if (!state) throw new Error(`no contract state at ${contractAddress}`);
-  return module.ledger(state.data) as L;
+  return module.ledger(decodeContractState(state.contractState)) as L;
+}
+
+/**
+ * Midnight.js 5 hands back a contract state as the ledger's bytes tagged with
+ * the era that wrote them; decode it with this runtime's ledger 9 ContractState.
+ */
+export function decodeContractState(
+  serialized: { deserialize(decoders: { v9: typeof ContractState }): ContractState },
+): unknown {
+  return serialized.deserialize({ v9: ContractState }).data;
 }
 
 /** Project an in-hand contract state (e.g. a call's nextContractState) — no indexer. */

@@ -98,7 +98,7 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
   mainnet: bet colors and values, the pool, the commitments. Coins, keys, and
   which wallet placed which bet stay private.
 - **Prove with a proof server you run yourself** (`npm run proof:up` in
-  `examples/shielded-chips`, proof server 8.1.0), or with the wallet if it
+  `examples/shielded-chips`, proof server 9.0.0), or with the wallet if it
   supports `getProvingProvider`. Never a hosted one: it sees your keys and
   coins. The burn circuits' prover keys are about 20 MB each.
 - **Use your own wallets.** Never use the repo's fast-sync or seeded test

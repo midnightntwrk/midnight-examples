@@ -11,7 +11,7 @@
 // plain ESM with no Node dependencies, so we import it directly. Run
 // `npm run compile` in examples/shielded-chips first; the managed/ output is
 // gitignored.
-import { CompiledContract } from "@midnight-ntwrk/midnight-js-protocol/compact-js";
+import { CompiledContract } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-js";
 import {
   Contract,
   ledger,

@@ -116,7 +116,7 @@ describe('renderExample in standalone mode', () => {
     expect(pkg.devDependencies.mnkit).toBe('^0.1.0');
     expect(pkg.overrides).toEqual(npmOverrides(tc.overrides));
     expect(pkg.overrides['vite-plugin-top-level-await']).toEqual({ '@swc/core': '1.15.47', uuid: '11.1.1' });
-    expect(pkg.overrides['@midnight-ntwrk/wallet-sdk']).toBe(tc.npm['wallet-sdk']);
+    expect(pkg.overrides['@midnightntwrk/wallet-sdk']).toBe(tc.npm['wallet-sdk']);
     expect(pkg.engines.node).toBe(`>=${tc.node}.0.0`);
   });
 
@@ -125,7 +125,18 @@ describe('renderExample in standalone mode', () => {
     expect(files['.gitignore']).toBeUndefined();
     expect(files['mnkit.json']).toBeUndefined();
     expect(JSON.parse(files['tsconfig.json']).extends).toBe('../../tsconfig.base.json');
-    expect(JSON.parse(files['package.json']).dependencies['@midnightntwrk/mnkit-sim']).toBe('*');
+    // Its own helpers, not the mnkit runtime packages: it imports only published SDK packages.
+    const deps = Object.keys(JSON.parse(files['package.json']).dependencies);
+    expect(deps.filter((d) => d.startsWith('@midnightntwrk/mnkit-'))).toEqual([]);
+    for (const rel of ['src/wallet.ts', 'src/test/sim.ts', 'src/test/coins.ts']) expect(files[rel], rel).toBeDefined();
+    for (const [rel, content] of Object.entries(files)) expect(content, rel).not.toMatch(/from '@midnightntwrk\/mnkit-/);
+  });
+
+  it('gives a standalone project the runtime packages instead of the helper copies', () => {
+    const files = byRel(standalone());
+    for (const rel of ['src/wallet.ts', 'src/test/sim.ts', 'src/test/coins.ts']) expect(files[rel], rel).toBeUndefined();
+    expect(files['src/providers.ts']).toContain("from '@midnightntwrk/mnkit-wallet'");
+    expect(files['src/test/my-app.sim.test.ts']).toContain("from '@midnightntwrk/mnkit-sim'");
   });
 });
 

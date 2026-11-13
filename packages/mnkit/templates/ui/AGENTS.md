@@ -23,9 +23,11 @@ This file is template-owned: `mnkit upgrade` replaces it unless you have
 edited it.
 
 <!-- @endif -->
-**Verified against:** `midnight-js-*` 4.1.1, `@midnight-ntwrk/dapp-connector-api`
-4.0.1, Vite 6.4.4, vitest 5, React 19, Node 22, a Midnight wallet extension
-on the local devnet.
+**Verified against:** `midnight-js-*` 5.0.0 (Ledger 9),
+`@midnight-ntwrk/dapp-connector-api` 4.0.1, Vite 6.4.4, vitest 5, React 19,
+Node 22: typecheck, unit tests and build. The UIs have been tested in a
+browser with a wallet on Ledger 9; `VERIFIED.md` records which steps were
+verified step by step (those entries predate Ledger 9).
 
 <!-- @if monorepo -->
 ## Quick recipe
@@ -422,12 +424,14 @@ battleship's `ShipForm`.
 
 ### 4. Pins (already set by the template; keep them)
 
-- **Exact versions:** `midnight-js-*` `4.1.1` and
+- **Exact versions:** `midnight-js-*` `5.0.0` (`midnight-js-network-id`
+  `5.0.0-rc.5`: it has no 5.0.0),
+  `@midnightntwrk/wallet-sdk-address-format` `4.0.0` and
   `@midnight-ntwrk/dapp-connector-api` `4.0.1`.
 - **`@swc/core` `1.15.47` under `vite-plugin-top-level-await`** (an override
   in `toolchain.json`): the plugin's 1.6.0, the latest, fails the production
   build with ``missing field `type` `` on `@swc/core` 1.16.
-- **No separate runtime packages:** no direct `ledger-v8`, `compact-runtime` or
+- **No separate runtime packages:** no direct `ledger-v9`, `compact-runtime` or
   `compact-js`. Import them via
   `@midnight-ntwrk/midnight-js-protocol/{ledger,compact-runtime,compact-js}`.
 <!-- @if monorepo -->
@@ -598,8 +602,8 @@ that same receiver. Amounts on chain are in STAR (1 NIGHT = 1,000,000 STAR).
   `undefined` once bundled for the browser (named import from a default-only
   module). Pass `window.WebSocket`. The Vite build warning about it remains
   and is harmless.
-- **`optimizeDeps.exclude`:** it must be exactly `ledger-v8`,
-  `onchain-runtime-v3` and `midnight-js-protocol`.
+- **`optimizeDeps.exclude`:** it must be exactly `@midnightntwrk/ledger-v9`,
+  `@midnightntwrk/onchain-runtime-v4` and `midnight-js-protocol`.
   - Excluding `midnight-js-protocol` is required because esbuild can't
     enumerate `export *` from an excluded package.
   - Excluding `compact-runtime` breaks its CommonJS `object-inspect` import.
@@ -647,6 +651,16 @@ that same receiver. Amounts on chain are in STAR (1 NIGHT = 1,000,000 STAR).
   (private-party's `_secret`), the generic form offers a hex input for it.
   Replace that form. Keep the secret in private state and pass it from there,
   as the Node test does.
+- **compact-runtime 0.21 is async:** `initialState` and every circuit return
+  a Promise, and `createCircuitContext` takes one options object
+  (`{ circuitId, contractAddress, coinPublicKeyOrZswapState, contractState,
+  privateState }`). The query context and private state sit under
+  `context.callContext`. Await every call (`await expect(p).rejects.toThrow()`
+  for a rejection); the seed circuits tests show the pattern.
+- **Era-tagged contract state:** Midnight.js 5 serves each contract state as
+  a `ContractStateRead`, whose `contractState` is serialized and tagged with
+  the ledger era that wrote it. Decode it with `contractStateData()` from
+  `src/midnight/providers.ts`.
 - **In-memory contract balance is empty:** `createCircuitContext` starts
   `block.balance` empty, and a `receiveUnshielded` in one in-memory call
   doesn't credit the next. So an `unshieldedBalanceGte` assert always fails
@@ -655,7 +669,7 @@ that same receiver. Amounts on chain are in STAR (1 NIGHT = 1,000,000 STAR).
   point (see private-party's circuits test).
 - **Token movements aren't ledger state:** mints, sends and receives don't
   show up in `ledger()`. In memory, read them from
-  `context.currentQueryContext.effects` (`unshieldedMints`,
+  `context.callContext.currentQueryContext.effects` (`unshieldedMints`,
   `unshieldedInputs`, `unshieldedOutputs`, `claimedUnshieldedSpends`,
   `shieldedMints`, `claimedShieldedReceives`, ...). Those Maps are keyed by
   objects (`{ tag: "unshielded", raw }`, `{ tag: "user", address }`), so
@@ -719,21 +733,22 @@ Run the checks in order, and report which ones you actually ran.
    - In the page console, run a circuit in memory (this proves WASM loads).
      The runtime isn't pre-bundled, so import it by its `/@id/` path:
      ```js
-     const rt = await import('/@id/@midnight-ntwrk/midnight-js-protocol/compact-runtime');
+     const rt = await import('/@id/@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime');
      const m = await import('/src/midnight/contract.ts');
      const c = new m.Contract({});  // or the witnesses, via '/@fs/<abs path>/contract/witnesses.ts'
      const pk = '00'.repeat(32);
-     const { currentContractState: s } = c.initialState(rt.createConstructorContext({}, pk));
-     const ctx = rt.createCircuitContext(rt.dummyContractAddress(), pk, s.data, {});
-     m.ledger(c.impureCircuits.<circuit>(ctx, ...args).context.currentQueryContext.state);
+     const { currentContractState: s } = await c.initialState(rt.createConstructorContext({}, pk));
+     const ctx = rt.createCircuitContext({ circuitId: '<circuit>', contractAddress: rt.dummyContractAddress(),
+       coinPublicKeyOrZswapState: pk, contractState: s.data, privateState: {} });
+     m.ledger((await c.impureCircuits.<circuit>(ctx, ...args)).context.callContext.currentQueryContext.state);
      ```
    - `fetch('/managed/<name>/keys/<circuit>.verifier')` returns binary data,
      not `text/html`. (Vite may send no content-type at all; that's fine.
      Check that the byte length matches the file.)
    - With `persistent` private state: in the console,
      `persistentPrivateStateProvider({ accountId, passphrase })` from
-     `/src/midnight/private-state.ts`, `setContractAddress`, `set` a state,
-     reload, open it again and `get` it back. Then check that a wrong
+     `/src/midnight/private-state.ts`, `forContract(<address>)`, `set` a
+     state, reload, open it again and `get` it back. Then check that a wrong
      passphrase throws `WrongPassphraseError`. Delete the test database
      afterwards (`indexedDB.deleteDatabase("level-js-<name>-ui-private-state")`).
 <!-- @if monorepo -->

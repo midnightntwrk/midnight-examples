@@ -53,10 +53,12 @@ const dirsUnder = (d) =>
         .filter((e) => e.isDirectory())
         .map((e) => path.join(REPO_ROOT, d, e.name))
     : [];
+const exampleProjects = dirsUnder('examples')
+  .flatMap((d) => [d, path.join(d, 'ui')])
+  .filter((d) => fs.existsSync(path.join(d, 'package.json')));
 const projects = [
-  ...dirsUnder('templates'),
   ...dirsUnder(path.join('packages', 'mnkit', 'templates')),
-  ...dirsUnder('examples').flatMap((d) => [d, path.join(d, 'ui')]),
+  ...exampleProjects,
   ...dirsUnder('packages'),
 ].filter((d) => fs.existsSync(path.join(d, 'package.json')));
 
@@ -99,8 +101,10 @@ expect('.nvmrc', 'Node', read(path.join(REPO_ROOT, '.nvmrc')).trim(), tc.node);
   expect('package.json', 'engines.node', root.engines?.node, `>=${tc.node}.0.0`);
   const pm = root.devEngines?.packageManager;
   expect('package.json', 'devEngines.packageManager', pm && `${pm.name}@${pm.version}`, `npm@>=${NPM_FLOOR}`);
-  for (const [pkg, want] of Object.entries(npmOverrides(tc.overrides))) {
-    expect('package.json', `overrides["${pkg}"]`, JSON.stringify(root.overrides?.[pkg]), JSON.stringify(want));
+  // toolchain.json's overrides in npm syntax, and nothing else.
+  const want = npmOverrides(tc.overrides);
+  for (const pkg of new Set([...Object.keys(want), ...Object.keys(root.overrides ?? {})])) {
+    expect('package.json', `overrides["${pkg}"]`, JSON.stringify(root.overrides?.[pkg]), JSON.stringify(want[pkg]));
   }
 }
 
@@ -127,7 +131,7 @@ for (const name of ['fast-sync', 'sim', 'coins']) {
     if (!(pkg in tc.overrides)) problems.push(`${where}: overrides["${pkg}"] is not in toolchain.json overrides`);
     else expect(where, `overrides["${pkg}"]`, version, tc.overrides[pkg]);
   }
-  for (const hit of src.matchAll(/(@midnight-ntwrk\/[a-z0-9-]+)@([0-9][^\s`]*)/g)) {
+  for (const hit of src.matchAll(/(@midnight-?ntwrk\/[a-z0-9-]+)@([0-9][^\s`]*)/g)) {
     const want = pinFor(tc, hit[1]);
     if (want) expect(`${rel(f)}:${lineOf(src, hit.index)}`, hit[1], hit[2], want);
   }
@@ -149,7 +153,7 @@ for (const name of ['fast-sync', 'sim', 'coins']) {
 
 // --- compose images ----------------------------------------------------------
 // Both names docker compose reads. An image with no tag is a mismatch too.
-for (const f of projects.flatMap((d) => ['compose.yml', 'compose.yaml'].map((n) => path.join(d, n)))) {
+for (const [dir, f] of projects.flatMap((d) => ['compose.yml', 'compose.yaml'].map((n) => [d, path.join(d, n)]))) {
   if (!fs.existsSync(f)) continue;
   const src = read(f);
   for (const m of src.matchAll(/image:\s*['"]?([^'"\s:]+(?::\d+\/[^'"\s:]+)?)(?::([^'"\s]+))?['"]?/g)) {
@@ -168,7 +172,8 @@ for (const dir of projects) {
   expect(rel(f), 'engines.node', p.engines?.node, `>=${tc.node}.0.0`);
   for (const field of ['dependencies', 'devDependencies', 'peerDependencies']) {
     for (const [pkg, spec] of Object.entries(p[field] ?? {})) {
-      const want = pinFor(tc, pkg, { peer: field === 'peerDependencies' });
+      const peer = field === 'peerDependencies';
+      const want = pinFor(tc, pkg, { peer });
       if (want) expect(rel(f), `${field}["${pkg}"]`, spec, want);
       // Every other Midnight package but the lockstep runtime packages needs a pin.
       else if (/^@(midnight-ntwrk|midnightntwrk)\//.test(pkg) && !/^(@midnightntwrk\/mnkit-|@midnight-ntwrk\/example-)/.test(pkg)) {

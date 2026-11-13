@@ -21,7 +21,7 @@ import {
   submitCallTx,
   type DeployedContract,
 } from '@midnight-ntwrk/midnight-js-contracts';
-import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import pino from 'pino';
 
@@ -29,9 +29,10 @@ import { getConfig } from '../config.js';
 import {
   MidnightWalletProvider,
   syncWallet,
+  resolveWallet,
+  waitForNightThenDust,
 } from '../wallet.js';
-import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
-import { buildProviders, type CalculatorProviders } from '../providers.js';
+import { buildProviders, ledgerState, type CalculatorProviders } from '../providers.js';
 import { createCalculatorPrivateState } from '../../contract/witnesses.js';
 import {
   CompiledCalculatorContract,
@@ -68,7 +69,7 @@ describe(`Calculator Contract (${network})`, () => {
   async function queryResult(): Promise<bigint> {
     const state = await providers.publicDataProvider.queryContractState(contractAddress);
     expect(state).not.toBeNull();
-    return ledger(state!.data).result;
+    return ledger(ledgerState(state)).result;
   }
 
   beforeAll(async () => {
@@ -85,12 +86,10 @@ describe(`Calculator Contract (${network})`, () => {
       proofServer: config.proofServer,
     };
 
-    // Alice, fast-syncing from the shipped reference bundle when the root
-    // .env.<network> records a birthday for her. See FAST-SYNC.md.
+    // Alice: the genesis-funded seed locally, otherwise the shared wallet in the
+    // root .env.<network>, which syncs from genesis.
     const setup = resolveWallet(network);
-    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret, {
-      fastSync: setup.fastSync,
-    });
+    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
     await wallet.start();
     await syncWallet(logger, wallet.wallet, syncTimeoutMs);
 
@@ -120,7 +119,7 @@ describe(`Calculator Contract (${network})`, () => {
   // Everything above is harness setup. Your tests begin here.
 
   it('deploys the contract', async () => {
-    const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {
+    const deployed: DeployedContract<Contract> = await deployContract(providers, {
       compiledContract: CompiledCalculatorContract,
       privateStateId: PRIVATE_STATE_ID,
       initialPrivateState: createCalculatorPrivateState(),
@@ -136,7 +135,7 @@ describe(`Calculator Contract (${network})`, () => {
   });
 
   it('adds two numbers', async () => {
-    await (submitCallTx<Contract, 'add'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledCalculatorContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -147,7 +146,7 @@ describe(`Calculator Contract (${network})`, () => {
   });
 
   it('subtracts two numbers', async () => {
-    await (submitCallTx<Contract, 'subtract'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledCalculatorContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -158,7 +157,7 @@ describe(`Calculator Contract (${network})`, () => {
   });
 
   it('multiplies two numbers', async () => {
-    await (submitCallTx<Contract, 'multiply'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledCalculatorContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -169,7 +168,7 @@ describe(`Calculator Contract (${network})`, () => {
   });
 
   it('squares a number', async () => {
-    await (submitCallTx<Contract, 'square'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledCalculatorContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -182,7 +181,7 @@ describe(`Calculator Contract (${network})`, () => {
   // `divide` verifies the off-chain `divMod` witness on-chain and stores the
   // quotient. 20 / 6 = 3 remainder 2, so `result` becomes 3.
   it('divides two numbers (verifying the divMod witness)', async () => {
-    await (submitCallTx<Contract, 'divide'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledCalculatorContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,

@@ -15,8 +15,8 @@ file is the browser counterpart of a piece of the Node test harness in
 | `hello-world-api.ts` | `test/hw.test.ts` | `deployContract` / `findDeployedContract` / `callTx.storeMessage`, plus a live `message$` stream |
 
 It is the reference output of `npm run new:ui` (Vite, React 19, Tailwind v4,
-shadcn), pinned to this repo's toolchain: `midnight-js-*` 4.1.1,
-`dapp-connector-api` 4.0.1, and Vite 6.4.3, which matches the hoisted root Vite
+shadcn), pinned to this repo's toolchain: `midnight-js-*` 5.0.0 (Ledger 9),
+`dapp-connector-api` 4.0.1, and Vite 6.4.4, which matches the hoisted root Vite
 (see the root `AGENTS.md`). Everything except `hello-world-api.ts`,
 `components/hello-world-panel.tsx`, `__tests__/message.test.ts` and this README
 is rendered from `packages/mnkit/templates/ui/`. Edit those files there, not here. CI fails
@@ -142,9 +142,10 @@ the UI must not join CI's local-network runs.
   browser build of `isomorphic-ws` only has a default export, so that default
   is `undefined` once bundled. `providers.ts` passes `window.WebSocket`
   explicitly.
-- **`optimizeDeps.exclude` must stay minimal.** Only `ledger-v8`,
-  `onchain-runtime-v3` (the WASM packages) and `midnight-js-protocol` (which
-  `export *`s ledger-v8) are excluded. Excluding `compact-runtime` too breaks
+- **`optimizeDeps.exclude` must stay minimal.** Only
+  `@midnightntwrk/ledger-v9`, `@midnightntwrk/onchain-runtime-v4` (the WASM
+  packages) and `midnight-js-protocol` (which `export *`s the ledger) are
+  excluded. Excluding `compact-runtime` too breaks
   its CommonJS `object-inspect` import in dev.
 - **Several wallets.** `window.midnight` can hold more than one wallet (and
   Lace adds an `mnLace` alias). The first entry isn't necessarily the one

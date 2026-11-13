@@ -77,7 +77,9 @@ export function checkCompactVersion(pin, { asDefault = false } = {}) {
       ? `Compact compiler ${pin} is not installed. Run \`compact update ${pin} --no-set-default\`.`
       : `\`compact compile --version\` failed: ${(r.stderr || r.stdout).trim()}`;
   }
-  const found = r.stdout.trim();
+  // 0.36.0 prints `0.36.0 (<commit> <date>)`; older compilers print the bare version.
+  const out = r.stdout.trim();
+  const found = /^(\d+\.\d+\.\d+\S*)/.exec(out)?.[1] ?? out;
   if (pin && found !== pin) {
     return `Compact compiler ${found} is the default, but toolchain.json pins ${pin}. Run \`compact update ${pin}\`.`;
   }

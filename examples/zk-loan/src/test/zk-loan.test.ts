@@ -26,14 +26,13 @@ import {
   type ContractAddress,
   CompactTypeBytes,
   transientHash,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
-import { MidnightWalletProvider, syncWallet } from '../wallet.js';
-import { buildProviders, type ZkLoanCircuits, type ZkLoanProviders } from '../providers.js';
+import { MidnightWalletProvider, syncWallet, resolveWallet, waitForNightThenDust } from '../wallet.js';
+import { buildProviders, ledgerState, type ZkLoanCircuits, type ZkLoanProviders } from '../providers.js';
 import { createZkLoanPrivateState, type ZkLoanPrivateState } from '../../contract/witnesses.js';
 import {
   CompiledZkLoanContract,
@@ -97,7 +96,7 @@ describe(`Zk Loan Contract (${network})`, () => {
   async function queryLedger() {
     const state = await providers.publicDataProvider.queryContractState(contractAddress);
     expect(state).not.toBeNull();
-    return ledger(state!.data);
+    return ledger(ledgerState(state));
   }
 
   beforeAll(async () => {
@@ -115,13 +114,11 @@ describe(`Zk Loan Contract (${network})`, () => {
     };
 
     // Locally this is the genesis-funded Alice seed. On a remote network it is
-    // the shared Alice wallet from the repo-root .env.<network>, fast-syncing
-    // from the reference bundle when a birthday is recorded. Pass a role name
+    // the shared Alice wallet from the repo-root .env.<network>, which syncs
+    // from genesis (over an hour on preprod). Pass a role name
     // (e.g. resolveWallet(network, 'BOB')) if your suite needs more than one.
     const setup = resolveWallet(network);
-    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret, {
-      fastSync: setup.fastSync,
-    });
+    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
     await wallet.start();
     await syncWallet(logger, wallet.wallet, syncTimeoutMs);
 
@@ -219,8 +216,7 @@ describe(`Zk Loan Contract (${network})`, () => {
   // Store a party's private state so the witnesses can present it, keyed to the
   // deployed contract.
   async function setPrivateState(id: string, state: ZkLoanPrivateState): Promise<void> {
-    providers.privateStateProvider.setContractAddress(contractAddress);
-    await providers.privateStateProvider.set(id, state);
+    await providers.privateStateProvider.forContract(contractAddress).set(id, state);
   }
 
   // Thin wrapper over submitCallTx so each step reads as the circuit call it is.
@@ -229,7 +225,7 @@ describe(`Zk Loan Contract (${network})`, () => {
     circuitId: K,
     ...args: CircuitArgs<K>
   ) {
-    return (submitCallTx<Contract, K>)(providers, {
+    return submitCallTx(providers, {
       compiledContract: CompiledZkLoanContract,
       contractAddress,
       privateStateId,
@@ -243,7 +239,7 @@ describe(`Zk Loan Contract (${network})`, () => {
   // ---------------------------------------------------------------------------
 
   it('deploys the contract with the deployer as admin', async () => {
-    const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {
+    const deployed: DeployedContract<Contract> = await deployContract(providers, {
       compiledContract: CompiledZkLoanContract,
       privateStateId: ALICE_STATE_ID,
       initialPrivateState: createZkLoanPrivateState(aliceSecret),

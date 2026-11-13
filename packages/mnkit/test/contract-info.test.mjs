@@ -44,10 +44,10 @@ describe('listCompiled / contractSources', () => {
     const dir = tmpDir();
     fs.mkdirSync(path.join(dir, 'contract'));
     const w = (f, s) => fs.writeFileSync(path.join(dir, 'contract', f), s);
-    w('main.compact', 'pragma language_version 0.23;\nimport "lib";\n// include "commented-out"\n');
+    w('main.compact', 'pragma language_version 0.28;\nimport "lib";\n// include "commented-out"\n');
     w('lib.compact', 'export circuit f(): [] {}');
     w('schnorr.compact', '// a module\nmodule Schnorr {\n  export circuit g(): [] {}\n}\n');
-    w('commented-out.compact', 'pragma language_version 0.23;');
+    w('commented-out.compact', 'pragma language_version 0.28;');
     w('module-then-more.compact', 'module M {\n}\nexport circuit h(): [] {}\n');
     expect(contractSources(dir).map((c) => c.name)).toEqual(['commented-out', 'main', 'module-then-more']);
   });

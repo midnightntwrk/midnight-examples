@@ -7,26 +7,25 @@ import {
   submitCallTx,
   type DeployedContract,
 } from '@midnight-ntwrk/midnight-js-contracts';
-import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
-import { MidnightWalletProvider, syncWallet } from '../wallet.js';
 import {
-  findReferenceRoot,
-  getChainTipHeight,
+  buildWallet,
   getOrCreateTestWallet,
   resolveWallet,
-  waitForNightThenDust,
-  type FastSyncOptions,
+  syncWallet,
+  waitForFunding,
+  type MidnightWalletProvider,
   type WalletSecret,
-} from '@midnightntwrk/mnkit-wallet';
-import { buildProviders, type HelloWorldProviders } from '../providers.js';
+} from '../wallet.js';
+import { buildProviders, ledgerState, type HelloWorldProviders } from '../providers.js';
 
 // Where an auto-generated throwaway wallet is cached (gitignored). Only used
 // when the root .env.<network> has no wallet for this network.
-const WALLETS_DIR = fileURLToPath(new URL('../../.fast-sync-wallets', import.meta.url));
+const WALLETS_DIR = fileURLToPath(new URL('../../.test-wallets', import.meta.url));
 import {
   CompiledHelloWorldContract,
   Contract,
@@ -47,8 +46,6 @@ process.on('uncaughtException', (err) => {
   console.error('UNCAUGHT EXCEPTION:', err);
 });
 
-const ALICE_LOCAL_SEED =
-  '0000000000000000000000000000000000000000000000000000000000000001';
 const PRIVATE_STATE_ID = 'AlicePrivateHWState';
 
 const logger = pino({
@@ -60,54 +57,28 @@ const network = process.env['MIDNIGHT_NETWORK'] ?? 'local';
 
 interface WalletSetup {
   secret: WalletSecret;
-  fastSync?: FastSyncOptions;
   /** True when a fresh wallet was just generated and still needs funding. */
   isNew: boolean;
 }
 
 // Resolve the wallet for a run.
 //
-// Preferred: one of the four shared wallets from the repo-root .env.<network>,
-// which carry a recorded birthday and therefore fast-sync. Failing that, this
-// example keeps its original standalone behaviour — generate a throwaway wallet
-// at the current tip, fast-sync it, and ask the developer to fund it — so
-// hello-world still works as a zero-setup smoke test.
-async function resolveHelloWorldWallet(
-  net: string,
-  config: ReturnType<typeof getConfig>,
-): Promise<WalletSetup> {
-  if (net === 'local') {
-    return { secret: { kind: 'seed', value: ALICE_LOCAL_SEED }, isNew: false };
+// Preferred: Alice from the repo-root .env.<network>. Failing that, generate a
+// throwaway wallet, save it, and ask the developer to fund it, so hello-world
+// still works as a zero-setup smoke test.
+function resolveHelloWorldWallet(net: string, networkId: string): WalletSetup {
+  const shared = resolveWallet(net);
+  if (shared) {
+    if (net !== 'local') logger.info(`Using ALICE from the root .env.${net}.`);
+    return { secret: shared, isNew: false };
   }
-
-  try {
-    const shared = resolveWallet(net);
-    logger.info(
-      shared.fastSync
-        ? `Using ${shared.role} from the root .env.${net} (birthday ${shared.fastSync.birthday}); fast-sync enabled.`
-        : `Using ${shared.role} from the root .env.${net} — no birthday recorded, so this is a full sync.`,
-    );
-    return { secret: shared.secret, fastSync: shared.fastSync, isNew: false };
-  } catch {
-    // Nothing in .env — fall through to the self-service path below.
-  }
-
-  const tip = await getChainTipHeight(config.indexer);
-  if (tip === undefined) {
-    throw new Error(`Could not read the ${net} chain tip to set the new wallet's birthday.`);
-  }
-  const { wallet, isNew } = getOrCreateTestWallet(WALLETS_DIR, config.networkId, tip);
+  const { seed, isNew } = getOrCreateTestWallet(WALLETS_DIR, networkId);
   logger.info(
     isNew
-      ? `Generated a new ${net} wallet (birthday ${wallet.birthday}); it will fast-sync, then you will be asked to fund it.`
-      : `Reusing the saved ${net} wallet (birthday ${wallet.birthday}).`,
+      ? `Generated a new ${net} wallet; it syncs, then you are asked to fund it.`
+      : `Reusing the saved ${net} wallet.`,
   );
-  const referenceRoot = findReferenceRoot(config.networkId);
-  return {
-    secret: { kind: 'seed', value: wallet.seed },
-    ...(referenceRoot ? { fastSync: { referenceRoot, birthday: wallet.birthday } } : {}),
-    isNew,
-  };
+  return { secret: { kind: 'seed', value: seed }, isNew };
 }
 
 describe(`Hello World Contract (${network})`, () => {
@@ -119,13 +90,13 @@ describe(`Hello World Contract (${network})`, () => {
   const isRemote = network !== 'local';
   const syncTimeoutMs = Number(
     process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ??
-      (isRemote ? 60 * 60_000 : 10 * 60_000),
+      (isRemote ? 90 * 60_000 : 10 * 60_000),
   );
 
   async function queryLedger(p: HelloWorldProviders) {
     const state = await p.publicDataProvider.queryContractState(contractAddress);
     expect(state).not.toBeNull();
-    return ledger(state!.data);
+    return ledger(ledgerState(state));
   }
 
   beforeAll(async () => {
@@ -142,24 +113,17 @@ describe(`Hello World Contract (${network})`, () => {
       proofServer: config.proofServer,
     };
 
-    const setup = await resolveHelloWorldWallet(network, config);
-    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret, {
-      fastSync: setup.fastSync,
-    });
-    await wallet.start();
+    const setup = resolveHelloWorldWallet(network, config.networkId);
+    wallet = await buildWallet(logger, envConfig, setup.secret);
+    await wallet.start(false);
     await syncWallet(logger, wallet.wallet, syncTimeoutMs);
 
     if (isRemote) {
       // A freshly generated wallet holds no NIGHT. Block until the developer
       // funds it at the faucet, then until it has spendable DUST for fees.
-      await waitForNightThenDust(
-        logger,
-        wallet.wallet,
-        wallet.unshieldedKeystore,
-        envConfig,
-        config.faucet,
-        { label: 'hello-world wallet' },
-      );
+      await waitForFunding(logger, wallet.wallet, wallet.unshieldedKeystore, envConfig, {
+        label: 'hello-world wallet',
+      });
     }
 
     providers = buildProviders(wallet, zkConfigPath, config);
@@ -179,7 +143,7 @@ describe(`Hello World Contract (${network})`, () => {
     logger.info(`Creating private state...`);
 
     const deployed: DeployedContract<Contract> =
-      await (deployContract<Contract>)(providers, {
+      await deployContract(providers, {
         compiledContract: CompiledHelloWorldContract,
         privateStateId: PRIVATE_STATE_ID,
         initialPrivateState: {},
@@ -198,7 +162,7 @@ describe(`Hello World Contract (${network})`, () => {
   it('Stores Hello World!', async () => {
     const message = 'Hello World!';
 
-    await (submitCallTx<Contract, 'storeMessage'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledHelloWorldContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,

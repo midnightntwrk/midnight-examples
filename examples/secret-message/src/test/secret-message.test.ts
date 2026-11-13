@@ -24,7 +24,7 @@ import {
 import {
   encodeContractAddress,
   type ContractAddress,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import pino from 'pino';
 
@@ -32,9 +32,10 @@ import { getConfig } from '../config.js';
 import {
   MidnightWalletProvider,
   syncWallet,
+  resolveWallet,
+  waitForNightThenDust,
 } from '../wallet.js';
-import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
-import { buildProviders, type SecretMessageProviders } from '../providers.js';
+import { buildProviders, ledgerState, type SecretMessageProviders } from '../providers.js';
 import {
   createSecretMessagePrivateState,
   encodeMessage,
@@ -97,7 +98,7 @@ describe(`Secret Message Contract (${network})`, () => {
   async function queryLedger(address: ContractAddress = contractAddress) {
     const state = await providers.publicDataProvider.queryContractState(address);
     expect(state).not.toBeNull();
-    return ledger(state!.data);
+    return ledger(ledgerState(state));
   }
 
   beforeAll(async () => {
@@ -114,12 +115,10 @@ describe(`Secret Message Contract (${network})`, () => {
       proofServer: config.proofServer,
     };
 
-    // Alice, fast-syncing from the shipped reference bundle when the root
-    // .env.<network> records a birthday for her. See FAST-SYNC.md.
+    // Alice: the genesis-funded seed locally, otherwise the shared wallet in the
+    // root .env.<network>, which syncs from genesis.
     const setup = resolveWallet(network);
-    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret, {
-      fastSync: setup.fastSync,
-    });
+    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
     await wallet.start();
     await syncWallet(logger, wallet.wallet, syncTimeoutMs);
 
@@ -151,7 +150,7 @@ describe(`Secret Message Contract (${network})`, () => {
   // ---------------------------------------------------------------------------
 
   it('deploys the contract', async () => {
-    const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {
+    const deployed: DeployedContract<Contract> = await deployContract(providers, {
       compiledContract: CompiledSecretMessageContract,
       privateStateId: PRIVATE_STATE_ID,
       initialPrivateState: createSecretMessagePrivateState(SECRET_MESSAGE),
@@ -178,7 +177,7 @@ describe(`Secret Message Contract (${network})`, () => {
   // ---------------------------------------------------------------------------
 
   it('publishes the hash of the secret, not the secret itself', async () => {
-    await (submitCallTx<Contract, 'publishMessageHash'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledSecretMessageContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -230,7 +229,7 @@ describe(`Secret Message Contract (${network})`, () => {
   // ---------------------------------------------------------------------------
 
   it('publishes a domain-separated hash of the same secret', async () => {
-    await (submitCallTx<Contract, 'publishMessageHashWithSeparator'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledSecretMessageContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -263,7 +262,7 @@ describe(`Secret Message Contract (${network})`, () => {
   // ---------------------------------------------------------------------------
 
   it('publishes a hash separated by this contract instance', async () => {
-    await (submitCallTx<Contract, 'publishMessageWithSeparator'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledSecretMessageContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -288,7 +287,7 @@ describe(`Secret Message Contract (${network})`, () => {
     // The static separator of circuit 2 is identical in every deployment, so two
     // instances holding the same message would publish the same commitment — an
     // observer could link them. The address separator breaks that link.
-    const second: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {
+    const second: DeployedContract<Contract> = await deployContract(providers, {
       compiledContract: CompiledSecretMessageContract,
       privateStateId: SECOND_PRIVATE_STATE_ID,
       initialPrivateState: createSecretMessagePrivateState(SECRET_MESSAGE),
@@ -296,7 +295,7 @@ describe(`Secret Message Contract (${network})`, () => {
     const secondAddress = second.deployTxData.public.contractAddress;
     expect(secondAddress).not.toEqual(contractAddress);
 
-    await (submitCallTx<Contract, 'publishMessageWithSeparator'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledSecretMessageContract,
       contractAddress: secondAddress,
       privateStateId: SECOND_PRIVATE_STATE_ID,
@@ -323,7 +322,7 @@ describe(`Secret Message Contract (${network})`, () => {
   // ---------------------------------------------------------------------------
 
   it('claims ownership on the first owned publish', async () => {
-    await (submitCallTx<Contract, 'publishMessageHashWithOwner'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledSecretMessageContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -349,7 +348,7 @@ describe(`Secret Message Contract (${network})`, () => {
   it('lets the established owner publish again', async () => {
     // messageOwner is now non-zero, so the second disjunct of the assert carries
     // the call: the caller proves knowledge of the key behind the stored pubkey.
-    await (submitCallTx<Contract, 'publishMessageHashWithOwner'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledSecretMessageContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -363,7 +362,7 @@ describe(`Secret Message Contract (${network})`, () => {
 
   it('rejects an owned publish from a non-owner', async () => {
     await expect(
-      (submitCallTx<Contract, 'publishMessageHashWithOwner'>)(providers, {
+      submitCallTx(providers, {
         compiledContract: CompiledSecretMessageContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_ID,
@@ -385,7 +384,7 @@ describe(`Secret Message Contract (${network})`, () => {
     const before = await queryLedger();
 
     await expect(
-      (submitCallTx<Contract, 'removeMessageHash'>)(providers, {
+      submitCallTx(providers, {
         compiledContract: CompiledSecretMessageContract,
         contractAddress,
         privateStateId: PRIVATE_STATE_ID,
@@ -400,7 +399,7 @@ describe(`Secret Message Contract (${network})`, () => {
   });
 
   it('lets the owner take the message down', async () => {
-    await (submitCallTx<Contract, 'removeMessageHash'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledSecretMessageContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -417,7 +416,7 @@ describe(`Secret Message Contract (${network})`, () => {
     // Worth being explicit about: the takedown resets messageOwner to the zero
     // value, which is exactly the "unclaimed" sentinel. Ownership is not sticky —
     // the next caller, owner or not, claims the slot.
-    await (submitCallTx<Contract, 'publishMessageHashWithOwner'>)(providers, {
+    await submitCallTx(providers, {
       compiledContract: CompiledSecretMessageContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,

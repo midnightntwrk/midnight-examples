@@ -24,12 +24,11 @@ import { randomBytes } from 'node:crypto';
 import pino from 'pino';
 import { submitCallTx, deployContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
-import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import { getConfig } from '../config.js';
-import { MidnightWalletProvider, syncWallet, type WalletSecret } from '../wallet.js';
-import { buildProviders, type BattleshipProviders } from '../providers.js';
+import { MidnightWalletProvider, syncWallet, type WalletSecret, resolveWallet, waitForNightThenDust } from '../wallet.js';
+import { buildProviders, ledgerState, type BattleshipProviders } from '../providers.js';
 import {
     CompiledBattleshipContract,
     ledger,
@@ -88,7 +87,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
     async function queryLedger(providers: BattleshipProviders) {
         const state = await providers.publicDataProvider.queryContractState(contractAddress);
         expect(state).not.toBeNull();
-        return ledger(state!.data);
+        return ledger(ledgerState(state));
     }
 
     // setup before tests
@@ -106,15 +105,11 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
             proofServer: config.proofServer,
         };
 
-        aliceWallet = await MidnightWalletProvider.build(logger, envConfig, aliceSetup.secret, {
-            fastSync: aliceSetup.fastSync,
-        });
+        aliceWallet = await MidnightWalletProvider.build(logger, envConfig, aliceSetup.secret);
         await aliceWallet.start();
         await syncWallet(logger, aliceWallet.wallet, syncTimeoutMs);
 
-        bobWallet = await MidnightWalletProvider.build(logger, envConfig, bobSetup.secret, {
-            fastSync: bobSetup.fastSync,
-        });
+        bobWallet = await MidnightWalletProvider.build(logger, envConfig, bobSetup.secret);
         await bobWallet.start();
         await syncWallet(logger, bobWallet.wallet, syncTimeoutMs);
 
@@ -168,7 +163,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
             aliceSk,
         );
 
-        const deployed: any = await (deployContract<Contract>)(aliceProviders, {
+        const deployed: any = await deployContract(aliceProviders, {
             compiledContract: CompiledBattleshipContract,
             privateStateId: ALICE_PRIVATE_ID,
             initialPrivateState: alicePrivateState,
@@ -199,13 +194,12 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
             bobSk
         );
 
-        bobProviders.privateStateProvider.setContractAddress(contractAddress);
-        await bobProviders.privateStateProvider.set(BOB_PRIVATE_ID, bobInitialPrivateState);
-        const bobPrivateState = await bobProviders.privateStateProvider.get(BOB_PRIVATE_ID);
+        await bobProviders.privateStateProvider.forContract(contractAddress).set(BOB_PRIVATE_ID, bobInitialPrivateState);
+        const bobPrivateState = await bobProviders.privateStateProvider.forContract(contractAddress).get(BOB_PRIVATE_ID);
 
         logger.info(`Bob is accepting the game...`);
         const txData: FinalizedCallTxData<Contract, 'acceptGame'> = 
-            await (submitCallTx<Contract, 'acceptGame'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -224,7 +218,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Bob tries to shoot out of turn...`);
         await expect(async () => {
-            await (submitCallTx<Contract, 'player2Shoot'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -236,7 +230,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Alice shoots (MISS) at Bobs board...`);
         const txData: FinalizedCallTxData<Contract, 'player1Shoot'> = 
-            await (submitCallTx<Contract, 'player1Shoot'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -255,7 +249,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Bob checks his board...`);
         const txData: FinalizedCallTxData<Contract, 'checkBoard2'> = 
-            await (submitCallTx<Contract, 'checkBoard2'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -272,7 +266,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Bob shoots at Alice's board (HIT)`);
         const txData: FinalizedCallTxData<Contract, 'player2Shoot'> = 
-            await (submitCallTx<Contract, 'player2Shoot'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -291,7 +285,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Alice is checking the board...`);
         const txData: FinalizedCallTxData<Contract, 'checkBoard1'> = 
-            await (submitCallTx<Contract, 'checkBoard1'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -310,7 +304,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
         
         logger.info(`Alice shoots (HIT) at Bobs board...`);
         const txData: FinalizedCallTxData<Contract, 'player1Shoot'> = 
-            await (submitCallTx<Contract, 'player1Shoot'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -328,7 +322,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
     it('Stops Bob from being a cheater', async () => {
 
         logger.info(`Bob realizes it is going to be a HIT and tries to cheat...`);
-        const bobPrivateState = await bobProviders.privateStateProvider.get(BOB_PRIVATE_ID);
+        const bobPrivateState = await bobProviders.privateStateProvider.forContract(contractAddress).get(BOB_PRIVATE_ID);
         const cheatBobPrivateState = createBattlePrivateState(
             BigInt(15),
             BigInt(16),
@@ -336,9 +330,9 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
             ShotState.MISS,
             bobPrivateState.sk,
         );
-        await bobProviders.privateStateProvider.set(BOB_PRIVATE_ID, cheatBobPrivateState);
+        await bobProviders.privateStateProvider.forContract(contractAddress).set(BOB_PRIVATE_ID, cheatBobPrivateState);
         await expect(async () => {
-            await (submitCallTx<Contract, 'checkBoard2'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -348,7 +342,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
         logger.info(`Bobs cheating attempt was rejected!`);
 
         logger.info(`Bob is resetting his board to the original private state...`);
-        await bobProviders.privateStateProvider.set(BOB_PRIVATE_ID, bobPrivateState);
+        await bobProviders.privateStateProvider.forContract(contractAddress).set(BOB_PRIVATE_ID, bobPrivateState);
         logger.info(`Bob successfully reverted his private state to the original!`);
 
         const state = await queryLedger(aliceProviders);
@@ -361,7 +355,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Bob checks his board...`);
         const txData: FinalizedCallTxData<Contract, 'checkBoard2'> = 
-            await (submitCallTx<Contract, 'checkBoard2'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -379,7 +373,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
         logger.info(`Bob shoots his second shot(HIT)...`);
         const txData: FinalizedCallTxData<Contract, 'player2Shoot'> = 
-            await (submitCallTx<Contract, 'player2Shoot'>)(bobProviders, {
+            await submitCallTx(bobProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: BOB_PRIVATE_ID,
@@ -397,10 +391,10 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
     it('Stops Alice from cheating', async () => {
 
         logger.info(`Alice realizes she is going to lose, so tries to change the ship location...`);
-        const oldAlicePrivateState = await aliceProviders.privateStateProvider.get(ALICE_PRIVATE_ID);
+        const oldAlicePrivateState = await aliceProviders.privateStateProvider.forContract(contractAddress).get(ALICE_PRIVATE_ID);
         
         // create new private state after retrieving current private state. Not strictly necessary.
-        let newAlicePrivateState = await aliceProviders.privateStateProvider.get(ALICE_PRIVATE_ID);
+        let newAlicePrivateState = await aliceProviders.privateStateProvider.forContract(contractAddress).get(ALICE_PRIVATE_ID);
         newAlicePrivateState = createBattlePrivateState(
             BigInt(1),
             BigInt(10),// changed the location locally, but can't change contract
@@ -408,10 +402,10 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
             ShotState.MISS,
             newAlicePrivateState.sk,
         );
-        await aliceProviders.privateStateProvider.set(ALICE_PRIVATE_ID, newAlicePrivateState);
+        await aliceProviders.privateStateProvider.forContract(contractAddress).set(ALICE_PRIVATE_ID, newAlicePrivateState);
 
         await expect(async () => {
-            await (submitCallTx<Contract, 'checkBoard1'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,
@@ -421,7 +415,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
         logger.info(`Alice was rejected from changing the ship location!`);
 
         logger.info(`Alice resets to original ship location...`);
-        await aliceProviders.privateStateProvider.set(ALICE_PRIVATE_ID, oldAlicePrivateState);
+        await aliceProviders.privateStateProvider.forContract(contractAddress).set(ALICE_PRIVATE_ID, oldAlicePrivateState);
         logger.info(`Reverted Alice's private state correctly!`);
 
     });
@@ -429,7 +423,7 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
         
         logger.info(`Alice is checking the board...`);
         const txData: FinalizedCallTxData<Contract, 'checkBoard1'> = 
-            await (submitCallTx<Contract, 'checkBoard1'>)(aliceProviders, {
+            await submitCallTx(aliceProviders, {
                 compiledContract: CompiledBattleshipContract,
                 contractAddress,
                 privateStateId: ALICE_PRIVATE_ID,

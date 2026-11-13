@@ -95,11 +95,11 @@ npm run env:down
 Proof generation dominates the runtime, so expect several minutes of wall
 clock. Set `LOG_LEVEL=debug` for verbose wallet-sync output.
 
-To run against **preprod** or **preview** instead, see
-[FAST-SYNC.md](../../FAST-SYNC.md) at the repo root. In short: start a local proof
-server (`npm run proof:up`), then from the repo root run `npm run preseed:cut` followed
-by `npm run wallets:new`, fund the printed addresses at the faucet, and run
-`npm run test:preprod`. This suite uses the shared Alice, Bob, and Charlie wallets.
+To run against **preprod** or **preview** instead, start a local proof server
+(`npm run proof:up`), then from the repo root run `npm run wallets:new`, fund the
+printed addresses at the faucet, and run `npm run test:preprod`. This suite uses
+the shared Alice, Bob, and Charlie wallets. Each one syncs from genesis, which
+takes over an hour on preprod.
 
 ## How a round plays out
 

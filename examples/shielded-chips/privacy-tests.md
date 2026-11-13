@@ -10,6 +10,11 @@ documented privacy assumptions actually hold against live on-chain state.
 - **Devnet images:** `midnight-node:1.0.0`, `indexer-standalone:4.3.3`, `proof-server:8.1.0`
 - **Language:** `pragma language_version 0.23`
 
+> **Recorded on Ledger 8.** This report predates the Ledger 9 move (compiler
+> 0.36.0, language 0.28, node 2.1.x, proof server 9.0.0) and has not been re-run on
+> it yet. The contracts and the privacy test suite (`src/test/privacy.test.ts`)
+> are on Ledger 9; the findings below are the Ledger 8 run's.
+
 ---
 
 ## 1. Ran the DApp on local — 17/17 e2e tests passed
@@ -36,7 +41,8 @@ test:local` then drove the whole flow against the live devnet with real proofs.
 | Charlie cannot claim winnings (bet BLACK, winner RED) | ✅ |
 | Alice burns half of her swept chips — the same-tx transient burn path | ✅ |
 | Bob cannot burn, even chips he owns — burn is house-only | ✅ |
-| Alice mints into the treasury and burns it — the Merkle-spend burn path | ✅ |
+| Alice mints into the treasury | ✅ |
+| Alice burns from the treasury — the Merkle-spend burn path | ⏭️ skipped until node 2.1.200 ([midnight-ledger issue 839](https://github.com/midnightntwrk/midnight-ledger/issues/839)) |
 | Every supply-changing circuit rejects a non-house caller | ✅ |
 | The house cannot burn more than a coin holds | ✅ |
 

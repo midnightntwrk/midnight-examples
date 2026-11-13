@@ -10,7 +10,7 @@ import {
   findDeployedContract,
   type FoundContract,
 } from "@midnight-ntwrk/midnight-js-contracts";
-import type { ContractAddress } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+import type { ContractAddress } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import { map, type Observable } from "rxjs";
 import {
   CompiledCalculatorContract,
@@ -20,7 +20,7 @@ import {
   type Contract,
   type Ledger,
 } from "./contract";
-import type { CalculatorProviders } from "./providers";
+import { contractStateData, type CalculatorProviders } from "./providers";
 
 export type CalculatorContract = FoundContract<Contract>;
 
@@ -211,5 +211,5 @@ export function ledger$(
 ): Observable<Ledger> {
   return providers.publicDataProvider
     .contractStateObservable(address, { type: "latest" })
-    .pipe(map((state) => ledger(state.data)));
+    .pipe(map(({ value }) => ledger(contractStateData(value))));
 }

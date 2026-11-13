@@ -25,7 +25,7 @@ import {
   type ContractAddress,
   encodeUserAddress,
   encodeCoinPublicKey,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { SucceedEntirely } from '@midnight-ntwrk/midnight-js-types';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import { firstValueFrom } from 'rxjs';
@@ -35,8 +35,9 @@ import { getConfig } from '../config.js';
 import {
   MidnightWalletProvider,
   syncWallet,
+  resolveWallet,
+  waitForNightThenDust,
 } from '../wallet.js';
-import { resolveWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
 import { buildProviders, type TokenTransfersProviders } from '../providers.js';
 import {
   CompiledTokenTransfersContract,
@@ -136,12 +137,10 @@ describe(`Token Transfers Contract (${network})`, () => {
       proofServer: config.proofServer,
     };
 
-    // Alice, fast-syncing from the shipped reference bundle when the root
-    // .env.<network> records a birthday for her. See FAST-SYNC.md.
+    // Alice: the genesis-funded seed locally, otherwise the shared wallet in the
+    // root .env.<network>, which syncs from genesis.
     const setup = resolveWallet(network);
-    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret, {
-      fastSync: setup.fastSync,
-    });
+    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
     await wallet.start();
     await syncWallet(logger, wallet.wallet, syncTimeoutMs);
 
@@ -173,7 +172,7 @@ describe(`Token Transfers Contract (${network})`, () => {
   // ---------------------------------------------------------------------------
 
   it('deploys the contract', async () => {
-    const deployed: DeployedContract<Contract> = await (deployContract<Contract>)(providers, {
+    const deployed: DeployedContract<Contract> = await deployContract(providers, {
       compiledContract: CompiledTokenTransfersContract,
       privateStateId: PRIVATE_STATE_ID,
       initialPrivateState: {},
@@ -202,7 +201,7 @@ describe(`Token Transfers Contract (${network})`, () => {
 
   it('mintAndReceive mints a custom unshielded token into the contract', async () => {
     const amount = 1_000n;
-    const res = await (submitCallTx<Contract, 'mintAndReceive'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -226,7 +225,7 @@ describe(`Token Transfers Contract (${network})`, () => {
     const sendAmount = 400n;
     const before = await aliceUnshielded(customColor);
 
-    const res = await (submitCallTx<Contract, 'sendToUser'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -245,7 +244,7 @@ describe(`Token Transfers Contract (${network})`, () => {
     const before = await aliceUnshielded(customColor);
     expect(before).toEqual(receiveAmount); // Alice holds what sendToUser gave her.
 
-    const res = await (submitCallTx<Contract, 'receiveTokens'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -269,7 +268,7 @@ describe(`Token Transfers Contract (${network})`, () => {
     const amount = 5_000n;
     const before = await aliceUnshielded(NIGHT);
 
-    const res = await (submitCallTx<Contract, 'receiveNightTokens'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -287,7 +286,7 @@ describe(`Token Transfers Contract (${network})`, () => {
     const sendAmount = 2_000n;
     const before = await aliceUnshielded(NIGHT);
 
-    const res = await (submitCallTx<Contract, 'sendNightTokensToUser'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -311,7 +310,7 @@ describe(`Token Transfers Contract (${network})`, () => {
     const nonce = new Uint8Array(32).fill(9);
     const value = 250n;
 
-    const res = await (submitCallTx<Contract, 'mintShieldedToSelf'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -338,7 +337,7 @@ describe(`Token Transfers Contract (${network})`, () => {
     const mintValue = 500n;
     const sendValue = 300n;
 
-    const res = await (submitCallTx<Contract, 'mintAndSendShielded'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,
@@ -359,7 +358,7 @@ describe(`Token Transfers Contract (${network})`, () => {
 
   it('receiveShieldedTokens pulls the shielded coin back from Alice', async () => {
     // Feed back the exact coin Alice received above; the contract receives it.
-    const res = await (submitCallTx<Contract, 'receiveShieldedTokens'>)(providers, {
+    const res = await submitCallTx(providers, {
       compiledContract: CompiledTokenTransfersContract,
       contractAddress,
       privateStateId: PRIVATE_STATE_ID,

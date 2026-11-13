@@ -54,7 +54,12 @@ import {
   syncWallet,
   waitForDust,
   waitForNightThenDust,
+// @if monorepo
+} from '../src/wallet.js';
+// @endif
+// @if standalone
 } from '@midnightntwrk/mnkit-wallet';
+// @endif
 import { buildProviders, type __Name__Providers } from '../src/providers.js';
 import {
   DEPLOY_NETWORKS,
@@ -182,7 +187,7 @@ if (!isRemote && !((await answers(config.node)) && (await answers(config.indexer
 
 setNetworkId(config.networkId);
 const envConfig: EnvironmentConfiguration = { walletNetworkId: config.networkId, ...config };
-// A wallet with no preseed syncs from genesis: about 78 minutes on preprod.
+// A wallet syncs from genesis the first time (saved state makes later runs fast).
 const syncTimeoutMs = Number(process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ?? (isRemote ? 120 * 60_000 : 10 * 60_000));
 
 const deployments = { ...(readDeployments(network)?.contracts ?? {}) };
@@ -205,7 +210,12 @@ if (replaced) {
 }
 
 const setup = resolveWallet(network);
+// @if monorepo
+const wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
+// @endif
+// @if standalone
 const wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret, { fastSync: setup.fastSync });
+// @endif
 await wallet.start();
 try {
   await syncWallet(logger, wallet.wallet, syncTimeoutMs);

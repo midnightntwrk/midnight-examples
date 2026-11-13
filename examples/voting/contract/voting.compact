@@ -1,0 +1,172 @@
+pragma language_version 0.28;
+import CompactStandardLibrary;
+
+export enum Phase { ENROLMENT, OPEN }
+export enum Vote { YES, NO, ABSTAIN }
+
+export sealed ledger adminPk: Bytes<32>;
+export sealed ledger proposalId: Bytes<32>;
+export ledger phase: Phase;
+export ledger voters: MerkleTree<10, Bytes<32>>;
+export ledger voterKeys: Set<Bytes<32>>;
+export ledger adminEncKeys: Set<Bytes<32>>;
+export ledger enrolled: Counter;
+export ledger castCount: Counter;
+export ledger ballots: Map<Bytes<32>, Bytes<32>>;
+export ledger encBallots: Map<Bytes<32>, Opaque<"Uint8Array">>;
+export ledger counted: Set<Bytes<32>>;
+export ledger yes: Counter;
+export ledger no: Counter;
+export ledger abstain: Counter;
+export ledger deadline: Uint<64>;
+export ledger countingEnds: Uint<64>;
+export ledger closedEarly: Boolean;
+
+witness secretKey(): Bytes<32>;
+witness voterPath(pk: Bytes<32>): MerkleTreePath<10, Bytes<32>>;
+witness vote(): Vote;
+
+constructor(pid: Bytes<32>) {
+  adminPk = disclose(adminKey(secretKey()));
+  proposalId = disclose(pid);
+  phase = Phase.ENROLMENT;
+}
+
+export pure circuit adminKey(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "mip-vote:admin"), sk]);
+}
+export pure circuit voterKey(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "mip-vote:pk"), sk]);
+}
+// The nullifier and salt are bound to the proposal and to this contract
+// instance, so the same voter's ballots in two deployments (a rehearsal and the
+// real vote, or a clone that reuses the label) can't be linked or opened with
+// each other's salts.
+export pure circuit ballotNullifier(sk: Bytes<32>, pid: Bytes<32>, instance: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([pad(32, "mip-vote:cast"), sk, pid, instance]);
+}
+export pure circuit ballotSalt(sk: Bytes<32>, pid: Bytes<32>, instance: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<4, Bytes<32>>>([pad(32, "mip-vote:salt"), sk, pid, instance]);
+}
+// The commitment `cast` stores, so the admin can check a decrypted opening
+// before submitting it to `count`.
+export pure circuit ballotCommit(v: Vote, salt: Bytes<32>): Bytes<32> {
+  return persistentCommit<Vote>(v, salt);
+}
+
+// The X25519 public keys nobody can encrypt to: the low-order points (0, 1,
+// p - 1, the two order-8 points, and p, p + 1), each also with the ignored top
+// bit set. A ballot can't be sealed to one, so `addAdminKey` refuses them.
+export pure circuit isLowOrderKey(k: Bytes<32>): Boolean {
+  const lowOrder = [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128],
+    [224, 235, 122, 124, 59, 65, 184, 174, 22, 86, 227, 250, 241, 159, 196, 106, 218, 9, 141, 235, 156, 50, 177, 253, 134, 98, 5, 22, 95, 73, 184, 0],
+    [224, 235, 122, 124, 59, 65, 184, 174, 22, 86, 227, 250, 241, 159, 196, 106, 218, 9, 141, 235, 156, 50, 177, 253, 134, 98, 5, 22, 95, 73, 184, 128],
+    [95, 156, 149, 188, 163, 80, 140, 36, 177, 208, 177, 85, 156, 131, 239, 91, 4, 68, 92, 196, 88, 28, 142, 134, 216, 34, 78, 221, 208, 159, 17, 87],
+    [95, 156, 149, 188, 163, 80, 140, 36, 177, 208, 177, 85, 156, 131, 239, 91, 4, 68, 92, 196, 88, 28, 142, 134, 216, 34, 78, 221, 208, 159, 17, 215],
+    [236, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 127],
+    [236, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+    [237, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 127],
+    [237, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255],
+    [238, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 127],
+    [238, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
+  ] as Vector<14, Vector<32, Uint<8>>>;
+  return fold((found, lo: Vector<32, Uint<8>>): Boolean => found || k == (lo as Bytes<32>), false, lowOrder);
+}
+
+circuit requireAdmin(): [] {
+  assert(disclose(adminKey(secretKey())) == adminPk, "Only the admin can do this");
+}
+
+export circuit enrol(pk: Bytes<32>): [] {
+  requireAdmin();
+  assert(phase == Phase.ENROLMENT, "Enrolment is closed");
+  const k = disclose(pk);
+  assert(!voterKeys.member(k), "Voter already enrolled");
+  assert(enrolled.read() < 1024, "Voter list is full");
+  voterKeys.insert(k);
+  voters.insert(k);
+  enrolled.increment(1);
+}
+
+// At most 8 admin keys: a ballot names its recipients in a Vector<8> (below).
+export circuit addAdminKey(key: Bytes<32>): [] {
+  requireAdmin();
+  assert(phase == Phase.ENROLMENT, "Enrolment is closed");
+  const k = disclose(key);
+  assert(!isLowOrderKey(k), "Not a usable admin key");
+  assert(!adminEncKeys.member(k), "Admin key already added");
+  assert(adminEncKeys.size() < 8, "Too many admin keys");
+  adminEncKeys.insert(k);
+}
+
+export circuit open(d: Uint<64>): [] {
+  requireAdmin();
+  assert(phase == Phase.ENROLMENT, "Voting already opened");
+  assert(enrolled.read() > 0, "No voters enrolled");
+  assert(!adminEncKeys.isEmpty(), "No admin encryption key");
+  const dl = disclose(d);
+  assert(dl < 1000000000000, "Deadline out of range");
+  assert(blockTimeLt(dl), "Deadline is in the past");
+  deadline = dl;
+  countingEnds = (dl + 172800) as Uint<64>;
+  phase = Phase.OPEN;
+}
+
+// `recipients` are the admin keys the voter's client sealed `enc` to, padded
+// with zeros. Each must be a published admin key: the client reads the keys
+// from an indexer, and a substituted key would fail here against the real
+// ledger state. The proof can't see inside `enc`; an honest client seals it to
+// exactly these keys.
+export circuit cast(enc: Opaque<"Uint8Array">, recipients: Vector<8, Bytes<32>>): [] {
+  assert(phase == Phase.OPEN, "Voting is not open");
+  assert(!closedEarly, "Voting is closed");
+  assert(blockTimeLt(deadline), "Voting is closed");
+  const sk = secretKey();
+  const path = voterPath(voterKey(sk));
+  assert(disclose(path.leaf == voterKey(sk)), "Path is not for this voter");
+  assert(voters.checkRoot(disclose(merkleTreePathRoot<10, Bytes<32>>(path))), "Not an enrolled voter");
+  const instance = kernel.self().bytes;
+  const n = disclose(ballotNullifier(sk, proposalId, instance));
+  assert(!ballots.member(n), "Already voted");
+  const rs = disclose(recipients);
+  assert(rs[0] != default<Bytes<32>>, "No ballot recipient");
+  for (const r of rs) {
+    assert(r == default<Bytes<32>> || adminEncKeys.member(r), "Ballot recipient is not an admin key");
+  }
+  ballots.insert(n, ballotCommit(vote(), ballotSalt(sk, proposalId, instance)));
+  encBallots.insert(n, disclose(enc));
+  castCount.increment(1);
+}
+
+// Counting can start as soon as every voter has cast, but the counting window
+// still ends 48 hours after the announced deadline: an early close never
+// shortens the time a voter has to count their own ballot.
+export circuit closeEarly(): [] {
+  requireAdmin();
+  assert(phase == Phase.OPEN, "Voting is not open");
+  assert(!closedEarly, "Voting is closed");
+  assert(castCount.read() == enrolled.read(), "Not every voter has cast");
+  assert(blockTimeLt(deadline), "Deadline already passed");
+  closedEarly = true;
+}
+
+export circuit count(n0: Bytes<32>, v0: Vote, s: Bytes<32>): [] {
+  assert(phase == Phase.OPEN, "Voting has not opened");
+  if (!closedEarly) {
+    assert(blockTimeGte(deadline), "Voting is still open");
+  }
+  assert(blockTimeLt(countingEnds), "Counting window has ended");
+  const n = disclose(n0);
+  const v = disclose(v0);
+  assert(ballots.member(n), "No such ballot");
+  assert(!counted.member(n), "Ballot already counted");
+  assert(ballots.lookup(n) == ballotCommit(v, s), "Opening does not match the ballot");
+  counted.insert(n);
+  if (v == Vote.YES) { yes.increment(1); }
+  else if (v == Vote.NO) { no.increment(1); }
+  else { abstain.increment(1); }
+}

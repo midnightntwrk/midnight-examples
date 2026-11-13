@@ -18,7 +18,7 @@ import {
   MidnightBech32m,
   ShieldedCoinPublicKey,
   UnshieldedAddress,
-} from "@midnight-ntwrk/wallet-sdk-address-format";
+} from "@midnightntwrk/wallet-sdk-address-format";
 
 /** The TypeScript shape of Compact's `UserAddress` struct. */
 export interface UserAddressValue {

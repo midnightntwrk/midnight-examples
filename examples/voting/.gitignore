@@ -1,0 +1,2 @@
+# Voting keys made by `npm run vote -- admin keygen` / `voter keygen`. Secret: back them up, never commit.
+.voting/

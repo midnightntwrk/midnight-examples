@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ContractAddress } from "@midnight-ntwrk/midnight-js-protocol/compact-runtime";
+import type { ContractAddress } from "@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime";
 import { errorMessage } from "@/lib/errors";
 import { storage } from "@/lib/storage";
 import type { BattleshipProviders } from "@/midnight/providers";

@@ -13,8 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { preprodConfig } from '@midnightntwrk/mnkit-wallet';
-
 export type NetworkConfig = {
   networkId: string;
   indexer: string;
@@ -47,10 +45,69 @@ export const PREVIEW_CONFIG: NetworkConfig = {
   faucet: 'https://midnight-tmnight-preview.nethermind.dev/',
 };
 
-// Preprod goes through Blockfrost, which needs a project token on every
-// request (BLOCKFROST_PROJECT_ID in the gitignored repo-root .env.preprod). The
-// config is shared with the wallet harness in @midnightntwrk/mnkit-wallet
-// and built on demand, so it sees the env vitest loads from .env.preprod.
+// Preprod goes through Blockfrost. Blockfrost rejects every request without a
+// project token, and the SDK's indexer, wallet and node clients only take URLs,
+// so the token rides along as a `project_id` query parameter. It is read from
+// BLOCKFROST_PROJECT_ID (set it in the gitignored repo-root .env.preprod) and
+// must never be written into a source file.
+function withBlockfrostKey(url: string, projectId: string): string {
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}project_id=${encodeURIComponent(projectId)}`;
+}
+
+// Built on demand rather than at import time so it sees the env that vitest
+// loads from .env.preprod.
+export function preprodConfig(): NetworkConfig {
+  const projectId = process.env['BLOCKFROST_PROJECT_ID']?.trim();
+  if (!projectId) {
+    throw new Error(
+      'BLOCKFROST_PROJECT_ID is not set. Add it to the repo-root .env.preprod ' +
+        '(gitignored) or export it in your shell.',
+    );
+  }
+  return {
+    networkId: 'preprod',
+    indexer: withBlockfrostKey('https://midnight-preprod.blockfrost.io/api/v0', projectId),
+    indexerWS: withBlockfrostKey('wss://midnight-preprod.blockfrost.io/api/v0/ws', projectId),
+    node: withBlockfrostKey('https://rpc.midnight-preprod.blockfrost.io', projectId),
+    nodeWS: withBlockfrostKey('wss://rpc.midnight-preprod.blockfrost.io', projectId),
+    proofServer: process.env['MIDNIGHT_PROOF_SERVER'] ?? 'http://127.0.0.1:6300',
+    faucet: 'https://midnight-tmnight-preprod.nethermind.dev/',
+  };
+}
+
+// A network that exists only in env: e.g. a private or short-lived network whose
+// endpoints arrive late. Set these in the gitignored repo-root .env.custom (see
+// .env.custom.example), or in the file named by MIDNIGHT_ENV_FILE, which is
+// layered on top of it (vitest.config.ts). Built on demand so it sees that env.
+export function customConfig(): NetworkConfig {
+  const required = [
+    'MIDNIGHT_NETWORK_ID',
+    'MIDNIGHT_NODE',
+    'MIDNIGHT_NODE_WS',
+    'MIDNIGHT_INDEXER',
+    'MIDNIGHT_INDEXER_WS',
+  ] as const;
+  const value = (name: string): string | undefined => process.env[name]?.trim() || undefined;
+  const missing = required.filter((name) => value(name) === undefined);
+  if (missing.length > 0) {
+    throw new Error(
+      `MIDNIGHT_NETWORK=custom needs ${missing.join(', ')}. Set them in the repo-root ` +
+        '.env.custom (see .env.custom.example), in the file named by MIDNIGHT_ENV_FILE, ' +
+        'or in your shell.',
+    );
+  }
+  return {
+    networkId: value('MIDNIGHT_NETWORK_ID')!,
+    indexer: value('MIDNIGHT_INDEXER')!,
+    indexerWS: value('MIDNIGHT_INDEXER_WS')!,
+    node: value('MIDNIGHT_NODE')!,
+    nodeWS: value('MIDNIGHT_NODE_WS')!,
+    proofServer: value('MIDNIGHT_PROOF_SERVER') ?? 'http://127.0.0.1:6300',
+    faucet: value('MIDNIGHT_FAUCET') ?? '',
+  };
+}
+
 export function getConfig(): NetworkConfig {
   const network = process.env['MIDNIGHT_NETWORK'] ?? 'local';
   switch (network) {
@@ -60,9 +117,11 @@ export function getConfig(): NetworkConfig {
       return PREVIEW_CONFIG;
     case 'preprod':
       return preprodConfig();
+    case 'custom':
+      return customConfig();
     default:
       throw new Error(
-        `Unknown network: ${network}. Supported: 'local', 'preview', 'preprod'.`,
+        `Unknown network: ${network}. Supported: 'local', 'preview', 'preprod', 'custom'.`,
       );
   }
 }

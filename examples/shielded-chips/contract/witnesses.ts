@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type { WitnessContext } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+import type { WitnessContext } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import type { Ledger as RouletteLedger } from './managed/roulette/contract/index.js';
 import type { Ledger as ChipsLedger } from './managed/chips/contract/index.js';
 

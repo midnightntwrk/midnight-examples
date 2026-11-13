@@ -1,7 +1,8 @@
 # AGENTS.md — calculator
 
-**Verified against:** Compact language `0.23`, compiler `0.31.1`,
-`@midnight-ntwrk/midnight-js-*` `4.1.1`, wallet SDK `1.2.0`, Node 22.
+**Verified against:** Compact language `0.28`, compiler `0.36.0`,
+`@midnight-ntwrk/midnight-js-*` `5.0.0` (Ledger 9), wallet SDK `2.0.0`
+(`@midnightntwrk/wallet-sdk`), Node 22.
 
 ## What it teaches
 
@@ -16,7 +17,7 @@
 - `contract/calculator.compact` (committed), `contract/index.ts`,
   `contract/witnesses.ts` (implements the `divMod` witness).
 - `src/` harness. `src/test/calculator.sim.test.ts`: the reference in-memory
-  test (`@midnightntwrk/mnkit-sim`): every circuit, a lying `divMod`
+  test (`src/test/sim.ts`): every circuit, a lying `divMod`
   witness, overflow rejections; `npm run compile:fast && npm run test:sim`, no
   Docker. `src/test/calculator.test.ts`: the same circuits on the devnet.
 

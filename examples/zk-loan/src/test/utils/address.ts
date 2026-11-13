@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { encodeCoinPublicKey } from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
-import { encodeContractAddress } from '@midnight-ntwrk/midnight-js-protocol/ledger';
+import { encodeCoinPublicKey } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
+import { encodeContractAddress } from '@midnight-ntwrk/midnight-js-protocol/v9';
 
 /**
  * @description Converts an ASCII string to its hexadecimal representation,

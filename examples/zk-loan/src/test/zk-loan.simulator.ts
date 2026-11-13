@@ -17,15 +17,25 @@
 // proofs) so contract logic can be unit-tested in milliseconds. Ported from
 // midnightntwrk/example-zkloan (contract/src/test/zkloan-credit-scorer.simulator.ts).
 
+//
+// From compact-runtime 0.20 (Compact 0.35) the constructor and circuits are
+// async and createCircuitContext takes one options object. So the simulator is
+// built with `await ZkLoanSimulator.create()`, every circuit method is async,
+// and each call gets a fresh context built from the current public state,
+// private state and zswap local state.
+
 import {
+  type ChargedState,
   type CircuitContext,
+  type CircuitResults,
+  type EncodedZswapLocalState,
   createConstructorContext,
   createCircuitContext,
   sampleContractAddress,
   type JubjubPoint,
   transientHash,
   CompactTypeBytes,
-} from '@midnight-ntwrk/midnight-js-protocol/compact-runtime';
+} from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { Contract, type Ledger, ledger, pureCircuits } from '../../contract/managed/zk-loan/contract/index.js';
 import { type ZkLoanPrivateState, witnesses } from '../../contract/witnesses.js';
 import { createEitherTestUser } from './utils/address.js';
@@ -33,9 +43,18 @@ import { createSignedUserProfile, generateUserSecret, generateProviderKeyPair } 
 
 const bytes32Type = new CompactTypeBytes(32);
 
+type Circuit = (context: CircuitContext<ZkLoanPrivateState>) => Promise<CircuitResults<ZkLoanPrivateState, unknown>>;
+
 export class ZkLoanSimulator {
   readonly contract: Contract<ZkLoanPrivateState>;
-  circuitContext: CircuitContext<ZkLoanPrivateState>;
+  readonly address = sampleContractAddress();
+  /** The contract's public state; `getLedger()` decodes it. */
+  state!: ChargedState;
+  /** The private state the next call's witnesses see. Assign to swap it. */
+  privateState!: ZkLoanPrivateState;
+  private zswapLocalState!: EncodedZswapLocalState;
+  private readonly deployerCoinPublicKey: string;
+  private readonly initialPrivateState: ZkLoanPrivateState;
   readonly providerSk: bigint;
   readonly providerPk: JubjubPoint;
   readonly providerId: bigint = 1n;
@@ -43,8 +62,9 @@ export class ZkLoanSimulator {
 
   // `witnessOverrides` lets a test swap in a malicious witness implementation
   // (e.g. a forged Schnorr challenge reduction) while keeping the rest honest.
-  constructor(witnessOverrides: Partial<typeof witnesses> = {}) {
+  private constructor(witnessOverrides: Partial<typeof witnesses>) {
     const user = createEitherTestUser('Alice');
+    this.deployerCoinPublicKey = user.left.hex;
     this.contract = new Contract<ZkLoanPrivateState>({ ...witnesses, ...witnessOverrides });
 
     // Generate provider key pair
@@ -61,26 +81,47 @@ export class ZkLoanSimulator {
     // Initial private state. `userPubKeyHash` for the attestation message is
     // now derived from the witness secret, not from `ownPublicKey()`.
     const userPubKeyHash = this.computeUserPubKeyHash(this.userSecretKey, 1234n);
-    const initialPrivateState: ZkLoanPrivateState = createSignedUserProfile(
+    this.initialPrivateState = createSignedUserProfile(
       0,
       this.providerSk,
       userPubKeyHash,
       this.providerId,
       this.userSecretKey,
     );
+  }
 
-    const { currentPrivateState, currentContractState, currentZswapLocalState } = this.contract.initialState(
-      createConstructorContext(initialPrivateState, user.left.hex),
+  /** Deploys the contract in memory and registers the default provider. */
+  static async create(witnessOverrides: Partial<typeof witnesses> = {}): Promise<ZkLoanSimulator> {
+    const sim = new ZkLoanSimulator(witnessOverrides);
+    const { currentPrivateState, currentContractState, currentZswapLocalState } = await sim.contract.initialState(
+      createConstructorContext(sim.initialPrivateState, sim.deployerCoinPublicKey),
     );
-    this.circuitContext = createCircuitContext(
-      sampleContractAddress(),
-      currentZswapLocalState,
-      currentContractState,
-      currentPrivateState,
-    );
+    sim.state = currentContractState.data;
+    sim.privateState = currentPrivateState;
+    sim.zswapLocalState = currentZswapLocalState;
 
     // Register the default provider
-    this.registerProvider(this.providerId, this.providerPk);
+    await sim.registerProvider(sim.providerId, sim.providerPk);
+    return sim;
+  }
+
+  /**
+   * Runs one circuit as its own transaction. On success the public, private
+   * and zswap state move forward; if it throws (a failed assert), none change.
+   */
+  private async run(circuitId: string, circuit: Circuit): Promise<Ledger> {
+    const context = createCircuitContext<ZkLoanPrivateState>({
+      circuitId,
+      contractAddress: this.address,
+      coinPublicKeyOrZswapState: this.zswapLocalState,
+      contractState: this.state,
+      privateState: this.privateState,
+    });
+    const { context: after } = await circuit(context);
+    this.state = after.callContext.currentQueryContext.state;
+    this.privateState = after.callContext.currentPrivateState as ZkLoanPrivateState;
+    this.zswapLocalState = after.callContext.currentZswapLocalState ?? this.zswapLocalState;
+    return ledger(this.state);
   }
 
   // Off-chain derivation of the per-user public key (PIN-bound). Uses the
@@ -108,74 +149,47 @@ export class ZkLoanSimulator {
   // non-admin caller (after rotating admin to someone else's pubkey) or to
   // simulate a different user impersonating from the same browser instance.
   public setUserSecret(secret: Uint8Array): void {
-    this.circuitContext = {
-      ...this.circuitContext,
-      currentPrivateState: {
-        ...this.circuitContext.currentPrivateState,
-        userSecretKey: secret,
-      },
-    };
+    this.privateState = { ...this.privateState, userSecretKey: secret };
   }
 
   public getLedger(): Ledger {
-    return ledger(this.circuitContext.currentQueryContext.state);
+    return ledger(this.state);
   }
 
   public getPrivateState(): ZkLoanPrivateState {
-    return this.circuitContext.currentPrivateState;
+    return this.privateState;
   }
 
-  public requestLoan(amountRequested: bigint, secretPin: bigint): Ledger {
-    this.circuitContext = this.contract.impureCircuits.requestLoan(
-      this.circuitContext,
-      amountRequested,
-      secretPin,
-    ).context;
-    return ledger(this.circuitContext.currentQueryContext.state);
+  public requestLoan(amountRequested: bigint, secretPin: bigint): Promise<Ledger> {
+    return this.run('requestLoan', (ctx) => this.contract.impureCircuits.requestLoan(ctx, amountRequested, secretPin));
   }
 
-  public blacklistUser(userPubKey: Uint8Array): Ledger {
-    this.circuitContext = this.contract.impureCircuits.blacklistUser(this.circuitContext, userPubKey).context;
-    return ledger(this.circuitContext.currentQueryContext.state);
+  public blacklistUser(userPubKey: Uint8Array): Promise<Ledger> {
+    return this.run('blacklistUser', (ctx) => this.contract.impureCircuits.blacklistUser(ctx, userPubKey));
   }
 
-  public removeBlacklistUser(userPubKey: Uint8Array): Ledger {
-    this.circuitContext = this.contract.impureCircuits.removeBlacklistUser(this.circuitContext, userPubKey).context;
-    return ledger(this.circuitContext.currentQueryContext.state);
+  public removeBlacklistUser(userPubKey: Uint8Array): Promise<Ledger> {
+    return this.run('removeBlacklistUser', (ctx) => this.contract.impureCircuits.removeBlacklistUser(ctx, userPubKey));
   }
 
-  public changePin(oldPin: bigint, newPin: bigint): Ledger {
-    this.circuitContext = this.contract.impureCircuits.changePin(this.circuitContext, oldPin, newPin).context;
-    return ledger(this.circuitContext.currentQueryContext.state);
+  public changePin(oldPin: bigint, newPin: bigint): Promise<Ledger> {
+    return this.run('changePin', (ctx) => this.contract.impureCircuits.changePin(ctx, oldPin, newPin));
   }
 
-  public respondToLoan(loanId: bigint, secretPin: bigint, accept: boolean): Ledger {
-    this.circuitContext = this.contract.impureCircuits.respondToLoan(
-      this.circuitContext,
-      loanId,
-      secretPin,
-      accept,
-    ).context;
-    return ledger(this.circuitContext.currentQueryContext.state);
+  public respondToLoan(loanId: bigint, secretPin: bigint, accept: boolean): Promise<Ledger> {
+    return this.run('respondToLoan', (ctx) => this.contract.impureCircuits.respondToLoan(ctx, loanId, secretPin, accept));
   }
 
-  public rotateAdmin(newAdminPublicKey: Uint8Array): Ledger {
-    this.circuitContext = this.contract.impureCircuits.rotateAdmin(this.circuitContext, newAdminPublicKey).context;
-    return ledger(this.circuitContext.currentQueryContext.state);
+  public rotateAdmin(newAdminPublicKey: Uint8Array): Promise<Ledger> {
+    return this.run('rotateAdmin', (ctx) => this.contract.impureCircuits.rotateAdmin(ctx, newAdminPublicKey));
   }
 
-  public registerProvider(providerId: bigint, providerPk: JubjubPoint): Ledger {
-    this.circuitContext = this.contract.impureCircuits.registerProvider(
-      this.circuitContext,
-      providerId,
-      providerPk,
-    ).context;
-    return ledger(this.circuitContext.currentQueryContext.state);
+  public registerProvider(providerId: bigint, providerPk: JubjubPoint): Promise<Ledger> {
+    return this.run('registerProvider', (ctx) => this.contract.impureCircuits.registerProvider(ctx, providerId, providerPk));
   }
 
-  public removeProvider(providerId: bigint): Ledger {
-    this.circuitContext = this.contract.impureCircuits.removeProvider(this.circuitContext, providerId).context;
-    return ledger(this.circuitContext.currentQueryContext.state);
+  public removeProvider(providerId: bigint): Promise<Ledger> {
+    return this.run('removeProvider', (ctx) => this.contract.impureCircuits.removeProvider(ctx, providerId));
   }
 
   public createTestUser(str: string): any {

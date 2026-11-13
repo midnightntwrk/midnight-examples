@@ -1,7 +1,8 @@
 # AGENTS.md — shielded-chips
 
-**Verified against:** Compact language `0.23`, compiler `0.31.1`,
-`@midnight-ntwrk/midnight-js-*` `4.1.1`, wallet SDK `1.2.0`, Node 22.
+**Verified against:** Compact language `0.28`, compiler `0.36.0`,
+`@midnight-ntwrk/midnight-js-*` `5.0.0` (Ledger 9), wallet SDK `2.0.0`
+(`@midnightntwrk/wallet-sdk`), Node 22.
 
 ## What it teaches
 
@@ -18,7 +19,7 @@
 - **A `receiveShielded` argument is a new coin, not a wallet coin.** It
   describes the output the transaction creates for the contract; the wallet
   pays for it from whichever coins it selects and makes change. So the tests
-  pass `freshCoin(color, amount)` from `@midnightntwrk/mnkit-coins` (a
+  pass `freshCoin(color, amount)` from `src/test/coins.ts` (a
   fresh random nonce) to `houseDeposit`, `betColor` and `burn`, and the UI
   does the same with `createShieldedCoinInfo` (`freshChip`). No wallet coin shares that
   nonce and the issuer never saw it, so `houseDeposit` stores the coin as it
@@ -78,9 +79,9 @@ npm run env:down
   from private state at claim/forfeit time. Its `mt_index` is recovered from the
   bet transaction's `zswapStartIndex` plus the escrow output's position in
   that transaction, found by commitment because the wallet's change output can
-  come first (`contractCoinMtIndex` from `@midnightntwrk/mnkit-coins` in the
+  come first (`contractCoinMtIndex` from `src/test/coins.ts` in the
   tests; `escrowMtIndex` in `ui/src/midnight/shielded-chips-api.ts`, a browser
-  copy, since that package is Node-only), and written with `rememberEscrow`.
+  copy, since that file is Node-only), and written with `rememberEscrow`.
 - Pool keys in `houseCoins` are deposit nonces, chosen by the caller and
   public, so `houseDeposit` refuses a nonce that is already a key. Otherwise a
   deposit could overwrite a pool entry and strand its coin.

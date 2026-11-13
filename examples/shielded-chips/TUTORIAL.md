@@ -1036,7 +1036,7 @@ transaction. Find the position by commitment: the wallet's change output can
 come first.
 
 ```ts
-// packages/coins/src/coins.ts — contractCoinMtIndex, the core of it
+// src/test/coins.ts — contractCoinMtIndex, the core of it
 const expected = ZswapOutput.newContractOwned(decodeShieldedCoinInfo(coin), 0, contractAddress).commitment;
 const position = (tx.tx.guaranteedOffer?.outputs ?? []).findIndex((o) => o.commitment === expected);
 return BigInt(start + position); // start: the tx's zswapStartIndex, from the indexer
@@ -1068,7 +1068,7 @@ So don't. The argument is a new coin, so make it up:
 
 ```ts
 // src/test/roulette.test.ts
-import { freshCoin } from '@midnightntwrk/mnkit-coins';
+import { freshCoin } from './coins.js';
 const chip = freshCoin(chipColorHex, BET_SIZE); // uniform random nonce (the ledger's createShieldedCoinInfo)
 ```
 
@@ -1213,7 +1213,8 @@ Successful output looks like this (wallet-sync chatter trimmed):
      ✓ Charlie forfeits her losing bet into the house pool  23997ms
      ✓ Alice sweeps both pool coins (unused match + forfeited bet)  44044ms
      ✓ Alice burns half of her swept chips — the same-tx transient burn path  30631ms
-     ✓ Alice mints into the treasury and burns it — the Merkle-spend burn path  50619ms
+     ✓ Alice mints into the treasury  20314ms
+     ↓ Alice burns from the treasury — the Merkle-spend burn path
  ✓ src/test/privacy.test.ts (12 tests) 178602ms
      …
 

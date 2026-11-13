@@ -62,7 +62,7 @@ jobs:
       - name: Setup Compact Compiler
         uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
         with:
-          compact-version: '0.31.1'
+          compact-version: '0.36.0'
           # No cache in a publishing workflow (cache poisoning).
           cache-enabled: false
         env:
@@ -200,7 +200,7 @@ jobs:
       - name: Setup Compact Compiler
         uses: midnightntwrk/setup-compact-action@836895c8fffbbea6bd986af2b17e8941ff29d1f8
         with:
-          compact-version: '0.31.1'
+          compact-version: '0.36.0'
           cache-enabled: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -222,7 +222,7 @@ jobs:
           echo "::error::mnkit@$VERSION is not on npm after 5 minutes"
           exit 1
 
-      - name: npx mnkit init, derive, test:sim and validate from npm
+      - name: npx mnkit init, derive, test:sim and validate on a local network from npm
         run: bash scripts/mnkit-e2e.sh --from-registry "$VERSION" --devnet hello-world
         env:
           VERSION: ${{ needs.publish.outputs.version }}

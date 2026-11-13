@@ -11,6 +11,9 @@ packages/*/LICENSE
 # NOTE: the .compact SOURCE files are committed on purpose - do not ignore them.
 **/contract/managed/
 **/contracts/managed/
+# Except the leaderboard's: its Vercel build has no Compact compiler, so the
+# keys and ZKIR are committed. CI checks they match a fresh compile.
+!examples/leaderboard/contract/managed/
 # ZK keys/zkir copied into a UI's public/ by its copy:zk script
 **/ui/public/managed/
 
@@ -19,7 +22,16 @@ packages/*/LICENSE
 **/midnight-level-db/
 **/.env.preprod
 **/.env.preview
+**/.env
+**/.env*.local
+# Custom-network endpoints and seeds (MIDNIGHT_NETWORK=custom); keep the examples
+**/.env.custom
+**/.env.custom.*
+!**/.env.custom*.example
 **/.fast-sync-wallets/
+**/.test-wallets/
+# Saved wallet sync state for remote networks (examples/*/src/wallet.ts)
+**/.wallet-state/
 # Deploy state from scripts/deploy.ts: private state and signing keys, and the
 # local devnet's deploy records
 **/.mnkit/
