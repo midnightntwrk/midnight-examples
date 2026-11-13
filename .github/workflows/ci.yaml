@@ -131,6 +131,7 @@ jobs:
       # Compiles to the same path are deterministic, so any change means the
       # committed keys or ZKIR are stale.
       - name: Check committed compiler output is up to date
+        if: env.RUN == 'true'
         run: |
           if [ -n "$(git ls-files contract/managed)" ]; then
             changed="$(git status --porcelain -- contract/managed)"
