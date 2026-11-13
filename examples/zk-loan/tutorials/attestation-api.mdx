@@ -136,9 +136,8 @@ export function sign(sk: bigint, msg: bigint[]): Schnorr_SchnorrSignature {
   // pureCircuits.schnorrChallenge returns the full transientHash output; the
   // circuit reduces it mod 2^248 before the EC ops, so do the same here.
   const c = pureCircuits.schnorrChallenge(R.x, R.y, pk.x, pk.y, msg) % TWO_248;
-  // s must be reduced mod the Jubjub order, not left to wrap modulo the
-  // BLS12-381 field: k + c*sk can exceed the field, and the wrapped value is a
-  // different scalar.
+  // s must be reduced mod the Jubjub order: the contract types the response as
+  // a JubjubScalar and rejects any value at or above the order.
   const s = reduce(k + c * sk);
   return { announcement: R, response: s };
 }
