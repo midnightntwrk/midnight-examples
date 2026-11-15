@@ -353,13 +353,6 @@ export interface FundingOptions {
 const DUST_REGISTRATION_RETRY_ATTEMPTS = 5;
 const DUST_REGISTRATION_RETRY_DELAY_MS = 500;
 
-/**
- * Wallet SDK 2.0.0 can throw ProtocolVersionMismatchError on the first
- * `registerNightUtxosForDustGeneration` call made immediately after sync on a
- * Ledger 9 chain (midnight-examples#93). The facade's `currentVersion()` can
- * lag the wallets' reported sync progress. Retry a few times with a short
- * delay until the SDK is fixed.
- */
 const PROTOCOL_VERSION_MISMATCH_TAG =
   '@midnightntwrk/wallet-sdk-abstractions/WalletTransaction/ProtocolVersionMismatchError';
 
@@ -378,6 +371,13 @@ function isProtocolVersionMismatchError(err: unknown): boolean {
   );
 }
 
+/**
+ * Wallet SDK 2.0.0 can throw ProtocolVersionMismatchError on the first
+ * `registerNightUtxosForDustGeneration` call made immediately after sync on a
+ * Ledger 9 chain (midnight-examples#93). The facade's `currentVersion()` can
+ * lag the wallets' reported sync progress. Retry a few times with a short
+ * delay until the SDK is fixed.
+ */
 async function registerNightUtxosForDustGenerationRetrying<T>(
   logger: Logger,
   label: string,
