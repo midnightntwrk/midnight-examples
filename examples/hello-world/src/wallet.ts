@@ -349,11 +349,6 @@ export interface FundingOptions {
   label?: string;
 }
 
-/**
- * Hold until the wallet can pay for transactions on a remote network. Returns
- * at once when it already can, so only a new wallet sees the faucet prompt.
- */
-
 /** How often, and how long to wait, when retrying DUST registration after a protocol-version mismatch. */
 const DUST_REGISTRATION_RETRY_ATTEMPTS = 5;
 const DUST_REGISTRATION_RETRY_DELAY_MS = 500;
@@ -365,15 +360,22 @@ const DUST_REGISTRATION_RETRY_DELAY_MS = 500;
  * lag the wallets' reported sync progress. Retry a few times with a short
  * delay until the SDK is fixed.
  */
+const PROTOCOL_VERSION_MISMATCH_TAG =
+  '@midnightntwrk/wallet-sdk-abstractions/WalletTransaction/ProtocolVersionMismatchError';
+
 function isProtocolVersionMismatchError(err: unknown): boolean {
   if (err == null || typeof err !== 'object') {
     return false;
   }
-  const tag = (err as { _tag?: unknown })._tag;
-  if (typeof tag === 'string' && tag.endsWith('ProtocolVersionMismatchError')) {
-    return true;
-  }
-  return (err as { name?: unknown }).name === 'ProtocolVersionMismatchError';
+  const rec = err as { _tag?: unknown; name?: unknown; constructor?: { name?: unknown } };
+  // Wallet SDK 2.0.0 throws ProtocolVersionMismatchError from WalletFacade.accept
+  // via WalletTransaction.unwrapWithin. Effect TaggedError sets both `name` and
+  // `_tag` to this string; constructor.name is the short class name.
+  return (
+    rec._tag === PROTOCOL_VERSION_MISMATCH_TAG ||
+    rec.name === PROTOCOL_VERSION_MISMATCH_TAG ||
+    rec.constructor?.name === 'ProtocolVersionMismatchError'
+  );
 }
 
 async function registerNightUtxosForDustGenerationRetrying<T>(
@@ -401,6 +403,10 @@ async function registerNightUtxosForDustGenerationRetrying<T>(
   throw lastError;
 }
 
+/**
+ * Hold until the wallet can pay for transactions on a remote network. Returns
+ * at once when it already can, so only a new wallet sees the faucet prompt.
+ */
 export async function waitForFunding(
   logger: Logger,
   wallet: WalletFacade,
