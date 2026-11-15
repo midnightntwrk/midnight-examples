@@ -39,7 +39,6 @@ import { fileURLToPath } from 'node:url';
 import { loadEnv } from 'vite';
 import { WebSocket } from 'ws';
 import pino from 'pino';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { validatePassword } from '@midnight-ntwrk/midnight-js-utils';
 import { deployContract, type DeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
@@ -170,7 +169,6 @@ if (!isRemote && !((await answers(config.node)) && (await answers(config.indexer
   fail('The local network is not running. Start it with `npm run env:up && npm run wait:dust`.');
 }
 
-setNetworkId(config.networkId);
 const envConfig: EnvironmentConfiguration = { walletNetworkId: config.networkId, ...config };
 // A wallet syncs from genesis the first time (saved state makes later runs fast).
 const syncTimeoutMs = Number(process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ?? (isRemote ? 120 * 60_000 : 10 * 60_000));

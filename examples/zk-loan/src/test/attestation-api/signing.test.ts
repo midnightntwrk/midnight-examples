@@ -18,12 +18,9 @@
 // s*G == R + c*pk off-chain, the same equation schnorr.compact checks in-circuit.
 
 import { describe, it, expect } from 'vitest';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { sign, generateKeyPair, signCreditData } from '../../../attestation-api/signing.js';
 import { ecMulGenerator, ecMul, ecAdd } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { pureCircuits } from '../../../contract/index.js';
-
-setNetworkId('undeployed');
 
 const JUBJUB_ORDER = 6554484396890773809930967563523245729705921265872317281365359162392183254199n;
 const TWO_248 = 452312848583266388373324160190187140051835877600158453279131187530910662656n;

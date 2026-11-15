@@ -55,7 +55,9 @@ export const mnkitVersion = () => JSON.parse(fs.readFileSync(path.join(PKG_ROOT,
  */
 export function pinFor(tc, pkg, { peer = false } = {}) {
   const pin = (() => {
-    if (pkg === '@midnight-ntwrk/midnight-js-network-id') return tc.npm['midnight-js-network-id'] ?? tc.npm['midnight-js'];
+    // Ledger 9 examples no longer use this package (midnight-examples#89).
+    // mnkit templates still do, and stay on the last published 5.0.0-rc.5 until mnkit moves.
+    if (pkg === '@midnight-ntwrk/midnight-js-network-id') return '5.0.0-rc.5';
     if (pkg.startsWith('@midnight-ntwrk/midnight-js-')) return tc.npm['midnight-js'];
     if (pkg === '@midnight-ntwrk/testkit-js') return tc.npm['testkit-js'];
     if (pkg === '@midnightntwrk/wallet-sdk') return tc.npm['wallet-sdk'];

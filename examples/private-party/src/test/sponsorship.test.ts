@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomBytes } from 'node:crypto';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { createUnprovenCallTx, deployContract, submitCallTx, type DeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { type ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
@@ -106,8 +105,6 @@ describe(`DUST fee sponsorship — Alice pays Dave's fees (${network})`, () => {
     }
 
     beforeAll(async () => {
-        setNetworkId(config.networkId);
-
         const envConfig: EnvironmentConfiguration = {
             walletNetworkId: config.networkId,
             networkId: config.networkId,
