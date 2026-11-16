@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomBytes } from 'node:crypto';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { createUnprovenDeployTx, deployContract, submitCallTx, type DeployedContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { type ContractAddress, encodeUserAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import pino from 'pino';
@@ -83,8 +82,6 @@ describe(`Private Party smart contract via midnight-js (${network})`, () => {
     // setup before tests
     beforeAll(async () => {
 
-        setNetworkId(config.networkId);
-        
         const envConfig: EnvironmentConfiguration = {
         walletNetworkId: config.networkId,
         networkId: config.networkId,

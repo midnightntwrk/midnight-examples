@@ -424,8 +424,7 @@ battleship's `ShipForm`.
 
 ### 4. Pins (already set by the template; keep them)
 
-- **Exact versions:** `midnight-js-*` `5.0.0` (`midnight-js-network-id`
-  `5.0.0-rc.5`: it has no 5.0.0),
+- **Exact versions:** `midnight-js-*` `5.0.0`,
   `@midnightntwrk/wallet-sdk-address-format` `4.0.0` and
   `@midnight-ntwrk/dapp-connector-api` `4.0.1`.
 - **`@swc/core` `1.15.47` under `vite-plugin-top-level-await`** (an override
