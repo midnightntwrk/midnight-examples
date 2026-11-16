@@ -217,6 +217,58 @@ export async function waitForNightThenDust(
 // to ~4 min on an idle subscription, so right after the faucet transfer the
 // check times out even though the NIGHT is spendable. waitForDust below is the
 // real readiness gate.
+
+/** How often, and how long to wait, when retrying DUST registration after a protocol-version mismatch. */
+const DUST_REGISTRATION_RETRY_ATTEMPTS = 10;
+const DUST_REGISTRATION_RETRY_DELAY_MS = 2_000;
+
+const PROTOCOL_VERSION_MISMATCH_TAG =
+  '@midnightntwrk/wallet-sdk-abstractions/WalletTransaction/ProtocolVersionMismatchError';
+
+function isProtocolVersionMismatchError(err: unknown): boolean {
+  // The SDK's error carries `_tag` set to exactly this string (checked on
+  // wallet-sdk-abstractions 3.0.0); the `name`/class-name checks add nothing.
+  return (
+    err != null &&
+    typeof err === 'object' &&
+    (err as { _tag?: unknown })._tag === PROTOCOL_VERSION_MISMATCH_TAG
+  );
+}
+
+/**
+ * Wallet SDK 2.0.0 can throw ProtocolVersionMismatchError on the first
+ * `registerNightUtxosForDustGeneration` call made immediately after sync on a
+ * Ledger 9 chain (midnight-examples#93). The facade's `currentVersion()` can
+ * lag the wallets' reported sync progress — it only catches up as each
+ * wallet processes its next sync update, roughly a block — so retry over a
+ * few blocks until the SDK is fixed. Same workaround as the examples'
+ * src/wallet.ts copies, for standalone projects that take
+ * `waitForNightThenDust` from this package.
+ */
+async function registerNightUtxosForDustGenerationRetrying<T>(
+  logger: Logger,
+  register: () => Promise<T>,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= DUST_REGISTRATION_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      return await register();
+    } catch (err) {
+      lastError = err;
+      if (!isProtocolVersionMismatchError(err) || attempt === DUST_REGISTRATION_RETRY_ATTEMPTS) {
+        throw err;
+      }
+      logger.warn(
+        `DUST registration hit ProtocolVersionMismatchError (attempt ${attempt}/${DUST_REGISTRATION_RETRY_ATTEMPTS}); retrying in ${DUST_REGISTRATION_RETRY_DELAY_MS}ms`,
+      );
+      await new Promise((resolve) => {
+        setTimeout(resolve, DUST_REGISTRATION_RETRY_DELAY_MS);
+      });
+    }
+  }
+  throw lastError;
+}
+
 async function registerNightForDust(
   logger: Logger,
   wallet: WalletFacade,
@@ -238,10 +290,12 @@ async function registerNightForDust(
     return;
   }
   logger.info(`Registering ${unregistered.length} NIGHT UTXO(s) for DUST generation...`);
-  const recipe = await wallet.registerNightUtxosForDustGeneration(
-    unregistered,
-    keystore.getPublicKey(),
-    (payload) => keystore.signDataAsync(payload),
+  const recipe = await registerNightUtxosForDustGenerationRetrying(logger, () =>
+    wallet.registerNightUtxosForDustGeneration(
+      unregistered,
+      keystore.getPublicKey(),
+      (payload) => keystore.signDataAsync(payload),
+    ),
   );
   const txId = await wallet.submitTransaction(await wallet.finalizeRecipe(recipe));
   logger.info(`DUST registration tx submitted: ${txId}`);

@@ -544,24 +544,19 @@ export interface FundingGateOptions {
 }
 
 /** How often, and how long to wait, when retrying DUST registration after a protocol-version mismatch. */
-const DUST_REGISTRATION_RETRY_ATTEMPTS = 5;
-const DUST_REGISTRATION_RETRY_DELAY_MS = 500;
+const DUST_REGISTRATION_RETRY_ATTEMPTS = 10;
+const DUST_REGISTRATION_RETRY_DELAY_MS = 2_000;
 
 const PROTOCOL_VERSION_MISMATCH_TAG =
   '@midnightntwrk/wallet-sdk-abstractions/WalletTransaction/ProtocolVersionMismatchError';
 
 function isProtocolVersionMismatchError(err: unknown): boolean {
-  if (err == null || typeof err !== 'object') {
-    return false;
-  }
-  const rec = err as { _tag?: unknown; name?: unknown; constructor?: { name?: unknown } };
-  // Wallet SDK 2.0.0 throws ProtocolVersionMismatchError from WalletFacade.accept
-  // via WalletTransaction.unwrapWithin. Effect TaggedError sets both `name` and
-  // `_tag` to this string; constructor.name is the short class name.
+  // The SDK's error carries `_tag` set to exactly this string (checked on
+  // wallet-sdk-abstractions 3.0.0); the `name`/class-name checks add nothing.
   return (
-    rec._tag === PROTOCOL_VERSION_MISMATCH_TAG ||
-    rec.name === PROTOCOL_VERSION_MISMATCH_TAG ||
-    rec.constructor?.name === 'ProtocolVersionMismatchError'
+    err != null &&
+    typeof err === 'object' &&
+    (err as { _tag?: unknown })._tag === PROTOCOL_VERSION_MISMATCH_TAG
   );
 }
 
@@ -569,8 +564,9 @@ function isProtocolVersionMismatchError(err: unknown): boolean {
  * Wallet SDK 2.0.0 can throw ProtocolVersionMismatchError on the first
  * `registerNightUtxosForDustGeneration` call made immediately after sync on a
  * Ledger 9 chain (midnight-examples#93). The facade's `currentVersion()` can
- * lag the wallets' reported sync progress. Retry a few times with a short
- * delay until the SDK is fixed.
+ * lag the wallets' reported sync progress — it only catches up as each
+ * wallet processes its next sync update, roughly a block — so retry over a
+ * few blocks until the SDK is fixed.
  */
 async function registerNightUtxosForDustGenerationRetrying<T>(
   logger: Logger,
