@@ -236,12 +236,12 @@ function isProtocolVersionMismatchError(err: unknown): boolean {
 }
 
 /**
- * Wallet SDK 2.0.0 can throw ProtocolVersionMismatchError on the first
- * `registerNightUtxosForDustGeneration` call made immediately after sync on a
- * Ledger 9 chain (midnight-examples#93). The facade's `currentVersion()` can
- * lag the wallets' reported sync progress — it only catches up as each
- * wallet processes its next sync update, roughly a block — so retry over a
- * few blocks until the SDK is fixed. Same workaround as the examples'
+ * Wallet SDK 2.0.0 can throw ProtocolVersionMismatchError on a
+ * `registerNightUtxosForDustGeneration` call made while the facade is still
+ * crossing a protocol boundary (midnight-examples#93).
+ * `registerNightForDust` waits for the facade to settle before registering,
+ * but a crossing can still land between that read and this call — so retry
+ * over a few blocks as a backstop. Same approach as the examples'
  * src/wallet.ts copies, for standalone projects that take
  * `waitForNightThenDust` from this package.
  */
@@ -274,7 +274,16 @@ async function registerNightForDust(
   wallet: WalletFacade,
   keystore: UnshieldedKeystore,
 ): Promise<void> {
-  const state = await Rx.firstValueFrom(wallet.state());
+  // Registration needs the facade settled on one side of a protocol
+  // boundary: the first state emission can land mid-crossing, while the
+  // facade is still bound to the version the laggard wallets are on, and
+  // registration then fails with ProtocolVersionMismatchError
+  // (midnight-examples#93). testkit's syncWallet waits for the same
+  // `protocol._tag === 'Settled'` reading; the retry below stays as a
+  // backstop for a crossing that lands between this read and the call.
+  const state = await Rx.firstValueFrom(
+    wallet.state().pipe(Rx.filter((s: FacadeState) => s.protocol._tag === 'Settled')),
+  );
   if (state.dust.balance(new Date()) > 0n) {
     logger.info('Wallet already holds DUST; skipping registration.');
     return;
