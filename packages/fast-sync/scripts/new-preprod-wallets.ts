@@ -9,7 +9,6 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { WalletSeeds } from '@midnight-ntwrk/testkit-js';
 import { createKeystore } from '@midnightntwrk/wallet-sdk/unshielded';
 import {
@@ -29,8 +28,6 @@ const config = getConfig(network);
 if (network === 'local') {
   throw new Error('Local runs use the genesis seeds; there is nothing to generate.');
 }
-
-setNetworkId(config.networkId);
 
 const envPath = fileURLToPath(new URL(`../../../.env.${network}`, import.meta.url));
 if (existsSync(envPath) && !force) {

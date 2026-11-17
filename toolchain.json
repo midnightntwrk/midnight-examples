@@ -10,7 +10,6 @@
   "npmCli": "11.21.0",
   "npm": {
     "midnight-js": "5.0.0",
-    "midnight-js-network-id": "5.0.0-rc.5",
     "testkit-js": "5.0.0",
     "wallet-sdk": "2.0.0",
     "wallet-sdk-abstractions": "3.0.0",

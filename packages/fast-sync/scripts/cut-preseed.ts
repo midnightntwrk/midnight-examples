@@ -27,7 +27,6 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import * as Rx from 'rxjs';
 import type { FacadeState } from '@midnightntwrk/wallet-sdk';
@@ -83,8 +82,6 @@ if (process.env['MNKIT_PRESEED_FORCE'] !== '1') {
 if (network === 'local') {
   throw new Error('A local devnet syncs from genesis in seconds; it needs no reference bundle.');
 }
-
-setNetworkId(config.networkId);
 
 if (stamp) {
   const manifestPath = join(REFERENCE_ROOT, config.networkId, 'manifest.json');

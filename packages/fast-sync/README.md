@@ -30,7 +30,7 @@ exactly these versions and add the `overrides` to your `package.json`:
 
 ```sh
 npm install --save-exact @midnightntwrk/mnkit-wallet \
-  @midnight-ntwrk/midnight-js-network-id@5.0.0-rc.5 @midnight-ntwrk/midnight-js-protocol@5.0.0 \
+  @midnight-ntwrk/midnight-js-protocol@5.0.0 \
   @midnight-ntwrk/midnight-js-types@5.0.0 @midnight-ntwrk/midnight-js-utils@5.0.0 \
   @midnight-ntwrk/testkit-js@5.0.0 @midnightntwrk/wallet-sdk@2.0.0
 ```
@@ -44,7 +44,6 @@ npm install --save-exact @midnightntwrk/mnkit-wallet \
 }
 ```
 
-`midnight-js-network-id` has no 5.0.0 release, so it stays on 5.0.0-rc.5.
 Midnight.js 5.0.0 and testkit-js 5.0.0 pin these Ledger 9 packages at these
 versions today, but compact-runtime 0.21.0 asks for `onchain-runtime-v4`
 `^4.0.0-rc.3`. The overrides keep a later release, which mnkit doesn't
