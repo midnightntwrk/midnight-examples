@@ -42,7 +42,7 @@ test:local` then drove the whole flow against the live devnet with real proofs.
 | Alice burns half of her swept chips — the same-tx transient burn path | ✅ |
 | Bob cannot burn, even chips he owns — burn is house-only | ✅ |
 | Alice mints into the treasury | ✅ |
-| Alice burns from the treasury — the Merkle-spend burn path | ⏭️ skipped: [midnight-ledger issue 839](https://github.com/midnightntwrk/midnight-ledger/issues/839), fixed on the client side in ledger-v9 1.0.2 (Midnight.js 5.0.1), not yet re-run on a devnet |
+| Alice burns from the treasury — the Merkle-spend burn path | ✅ (skipped on Ledger 9 until [midnight-ledger issue 839](https://github.com/midnightntwrk/midnight-ledger/issues/839) was fixed in ledger-v9 1.0.2; passed again on Preview on 2026-11-17) |
 | Every supply-changing circuit rejects a non-house caller | ✅ |
 | The house cannot burn more than a coin holds | ✅ |
 
