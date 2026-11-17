@@ -42,11 +42,11 @@ npm install                                  # its own lockfile
 cp .env.stagenet.example .env.stagenet       # fill in funded seeds (gitignored)
 ```
 
-Install Compact 0.36.0 with the Compact CLI, then compile:
+Install Compact 0.36.1 with the Compact CLI, then compile:
 
 ```sh
-compact update 0.36.0
-npm run compile        # runs `compact compile +0.36.0`; gaps are expected
+compact update 0.36.1
+npm run compile        # runs `compact compile +0.36.1`; gaps are expected
 ```
 
 Set `COMPACTC=/path/to/compactc` to compile with a specific compactc binary instead.
@@ -77,9 +77,9 @@ need funding. `trader` / `lp` / `caller_*` are *address-only* participants — t
 deployer pays and submits on their behalf, so their seeds only need to derive a
 distinct address (no funding). Set seeds in `.env.stagenet`.
 
-## Dapp status (Compact 0.36.0)
+## Dapp status (Compact 0.36.1)
 
-Compile status on Compact 0.36.0. For the latest run results, see
+Compile status on Compact 0.36.1 (2026-11-17). For the latest run results, see
 [`COMPATIBILITY.md`](COMPATIBILITY.md#local-devnet-result-2026-11-05).
 
 | Dapp | Contracts | Witnesses | Compile |
@@ -98,7 +98,7 @@ Compile status on Compact 0.36.0. For the latest run results, see
 
 ### secp256k1
 
-Compact 0.36.0 binds the secp256k1 and Keccak surface without a feature flag.
+Compact 0.36.x binds the secp256k1 and Keccak surface without a feature flag.
 `--feature-zkir-v3`, which 0.33.0-rc.2 needed, is no longer accepted. The recover path
 (`Secp256k1EcdsaSignatureWithRecovery` + `secp256k1EcdsaRecover`) is still absent, so
 `recover-secp` stays a compile-gap regression guard.

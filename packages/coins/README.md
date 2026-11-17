@@ -23,12 +23,12 @@ An mnkit project already has these. Anywhere else, add the peer and these
 
 ```json
 "overrides": {
-  "@midnightntwrk/ledger-v9": "1.0.0",
-  "@midnightntwrk/onchain-runtime-v4": "4.0.0"
+  "@midnightntwrk/ledger-v9": "1.0.2",
+  "@midnightntwrk/onchain-runtime-v4": "4.0.2"
 }
 ```
 
-midnight-js-protocol 5.0.0 pins these at these versions today, but
+midnight-js-protocol 5.0.1 pins these at these versions today, but
 compact-runtime 0.21.0 asks for `onchain-runtime-v4` `^4.0.0-rc.3`. The
 overrides keep a later release, which mnkit doesn't test, out of your tree.
 

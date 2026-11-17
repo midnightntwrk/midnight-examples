@@ -24,10 +24,10 @@ mn-examples example:
   third-party lock entries and pin back any younger than that.
 - **Never touch the root install.** Do not edit the root `package.json` or `package-lock.json`, or
   `examples/`, from here.
-- **Compile with Compact 0.36.0** (`npm run compile`, which runs `compact compile +0.36.0`;
+- **Compile with Compact 0.36.1** (`npm run compile`, which runs `compact compile +0.36.1`;
   `COMPACTC=/path/to/compactc` overrides it).
 - **Compile gaps are expected.** self-recursion, axelar-gateway and recover-secp do not
-  compile on 0.36.0, and their suites SKIP behind a GAP banner. Do not "fix" a gap by
+  compile on 0.36.1, and their suites SKIP behind a GAP banner. Do not "fix" a gap by
   changing the contract: the suites are regression guards that run unchanged once the
   compiler catches up.
 - **Run remote suites sequentially.** The deployer and relayer wallets are shared, and so is

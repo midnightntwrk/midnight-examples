@@ -9,8 +9,8 @@
 // dapp compiles into its OWN managed root (DEX / FungibleToken names repeat
 // across dapps) and contracts compile in dependency order.
 //
-// Compiler: Compact toolchain 0.36.0 via the Compact CLI (`compact compile +0.36.0`;
-// install it with `compact update 0.36.0`). Set COMPACTC=/path/to/compactc to use a
+// Compiler: Compact toolchain 0.36.1 via the Compact CLI (`compact compile +0.36.1`;
+// install it with `compact update 0.36.1`). Set COMPACTC=/path/to/compactc to use a
 // specific compactc binary instead. Some contracts need per-contract flags.
 // We compile every dapp regardless and report a summary; the vitest suites skip
 // with a GAP banner when their artifact is missing.
@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONTRACTS = path.join(REPO, 'contracts');
-const EXPECTED_VERSION = '0.36.0';
+const EXPECTED_VERSION = '0.36.1';
 const COMPACTC = process.env.COMPACTC;
 // [command, ...leading args]: either the given compactc binary or the Compact CLI.
 const COMPILER: string[] = COMPACTC ? [COMPACTC] : ['compact', 'compile', `+${EXPECTED_VERSION}`];
@@ -84,7 +84,7 @@ const DAPPS: Dapp[] = [
     ],
   },
   {
-    // ECDSA public-key recovery. The recover API is absent on 0.36.0, so this is a
+    // ECDSA public-key recovery. The recover API is absent on 0.36.1, so this is a
     // compile-gap regression guard that compiles once the API is restored.
     dir: 'recover-secp',
     contracts: [
