@@ -30,25 +30,25 @@ exactly these versions and add the `overrides` to your `package.json`:
 
 ```sh
 npm install --save-exact @midnightntwrk/mnkit-wallet \
-  @midnight-ntwrk/midnight-js-protocol@5.0.0 \
-  @midnight-ntwrk/midnight-js-types@5.0.0 @midnight-ntwrk/midnight-js-utils@5.0.0 \
-  @midnight-ntwrk/testkit-js@5.0.0 @midnightntwrk/wallet-sdk@2.0.0
+  @midnight-ntwrk/midnight-js-protocol@5.0.1 \
+  @midnight-ntwrk/midnight-js-types@5.0.1 @midnight-ntwrk/midnight-js-utils@5.0.1 \
+  @midnight-ntwrk/testkit-js@5.0.1 @midnightntwrk/wallet-sdk@2.0.1
 ```
 
 ```json
 "overrides": {
-  "@midnightntwrk/wallet-sdk": "2.0.0",
-  "@midnightntwrk/ledger-v9": "1.0.0",
-  "@midnightntwrk/onchain-runtime-v4": "4.0.0",
-  "@midnightntwrk/zkir-v3": "3.2.0"
+  "@midnightntwrk/wallet-sdk": "2.0.1",
+  "@midnightntwrk/ledger-v9": "1.0.2",
+  "@midnightntwrk/onchain-runtime-v4": "4.0.2",
+  "@midnightntwrk/zkir-v3": "3.2.1"
 }
 ```
 
-Midnight.js 5.0.0 and testkit-js 5.0.0 pin these Ledger 9 packages at these
+Midnight.js 5.0.1 and testkit-js 5.0.1 pin these Ledger 9 packages at these
 versions today, but compact-runtime 0.21.0 asks for `onchain-runtime-v4`
 `^4.0.0-rc.3`. The overrides keep a later release, which mnkit doesn't
 test, out of your tree. npm rejects an override that differs from a direct
 dependency's range (`EOVERRIDE`), so depend on `wallet-sdk` at exactly
-`2.0.0`.
+`2.0.1`.
 
 Apache-2.0. Source: [midnight-examples/packages/fast-sync](https://github.com/midnightntwrk/midnight-examples/tree/main/packages/fast-sync).

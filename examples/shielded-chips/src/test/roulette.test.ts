@@ -634,12 +634,15 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
     expect(treasuryCoin.value).toEqual(60n);
   });
 
-  // TODO(node 2.1.200): un-skip. Node 2.1.101 (local devnet, Preview, Preprod)
-  // rejects burnFromTreasury with `1010: Invalid Transaction: Custom error: 104`:
-  // a coin overwrite under-declares bytes_written,
-  // https://github.com/midnightntwrk/midnight-ledger/issues/839. The fix ships
-  // in node 2.1.200. While skipped, the treasury keeps the 60-chip coin, which
-  // the non-house test below only needs a key for.
+  // TODO: un-skip once this passes on a local devnet. With ledger-v9 1.0.0
+  // (Midnight.js 5.0.0) node 2.1.101 rejected burnFromTreasury with
+  // `1010: Invalid Transaction: Custom error: 104`: a coin overwrite
+  // under-declared bytes_written,
+  // https://github.com/midnightntwrk/midnight-ledger/issues/839. The fix is on
+  // the client side, in ledger-v9 1.0.2 (Midnight.js 5.0.1, Release 1 1.1-patch),
+  // with no node change; it hasn't been re-run here yet. While skipped, the
+  // treasury keeps the 60-chip coin, which the non-house test below only needs
+  // a key for.
   it.skip('Alice burns from the treasury — the Merkle-spend burn path', async () => {
     const minted = await chipsLedgerState();
     const [key, treasuryCoin] = [...minted._treasury][0]!;

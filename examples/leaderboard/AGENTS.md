@@ -1,7 +1,7 @@
 # AGENTS.md — leaderboard
 
-**Verified against:** Compact language `0.28`, compiler `0.36.0`,
-`@midnight-ntwrk/midnight-js-*` `5.0.0`, `@midnightntwrk/wallet-sdk` `2.0.0`,
+**Verified against:** Compact language `0.28`, compiler `0.36.1`,
+`@midnight-ntwrk/midnight-js-*` `5.0.1`, `@midnightntwrk/wallet-sdk` `2.0.1`,
 DApp Connector API `4.0.1`, Node 22.
 
 ## What it teaches

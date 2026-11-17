@@ -45,18 +45,18 @@
     "rxjs": "^7.8.2"
   },
   "peerDependencies": {
-    "@midnight-ntwrk/midnight-js-protocol": "~5.0.0",
-    "@midnight-ntwrk/midnight-js-types": "~5.0.0",
-    "@midnight-ntwrk/midnight-js-utils": "~5.0.0",
-    "@midnight-ntwrk/testkit-js": "~5.0.0",
-    "@midnightntwrk/wallet-sdk": "~2.0.0"
+    "@midnight-ntwrk/midnight-js-protocol": "~5.0.1",
+    "@midnight-ntwrk/midnight-js-types": "~5.0.1",
+    "@midnight-ntwrk/midnight-js-utils": "~5.0.1",
+    "@midnight-ntwrk/testkit-js": "~5.0.1",
+    "@midnightntwrk/wallet-sdk": "~2.0.1"
   },
   "devDependencies": {
-    "@midnight-ntwrk/midnight-js-protocol": "5.0.0",
-    "@midnight-ntwrk/midnight-js-types": "5.0.0",
-    "@midnight-ntwrk/midnight-js-utils": "5.0.0",
-    "@midnight-ntwrk/testkit-js": "5.0.0",
-    "@midnightntwrk/wallet-sdk": "2.0.0",
+    "@midnight-ntwrk/midnight-js-protocol": "5.0.1",
+    "@midnight-ntwrk/midnight-js-types": "5.0.1",
+    "@midnight-ntwrk/midnight-js-utils": "5.0.1",
+    "@midnight-ntwrk/testkit-js": "5.0.1",
+    "@midnightntwrk/wallet-sdk": "2.0.1",
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
     "vite": "6.4.4",
