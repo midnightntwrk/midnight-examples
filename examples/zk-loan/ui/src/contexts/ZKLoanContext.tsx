@@ -40,10 +40,9 @@ import { assertIsContractAddress } from '@midnight-ntwrk/midnight-js-utils';
 import { FetchZkConfigProvider } from '@midnight-ntwrk/midnight-js-fetch-zk-config-provider';
 import { httpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
-import { getNetworkId, setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { MidnightBech32m, ShieldedAddress } from '@midnightntwrk/wallet-sdk-address-format';
 import { deployContract, findDeployedContract, submitCallTx } from '@midnight-ntwrk/midnight-js-contracts';
-import { type PrivateStateProvider } from '@midnight-ntwrk/midnight-js-types';
+import { type NetworkId, type PrivateStateProvider } from '@midnight-ntwrk/midnight-js-types';
 import { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-js';
 // The contract is imported straight from the example's compiler output and
 // witnesses, not via ../../contract/index.ts: that module resolves its key
@@ -254,7 +253,7 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
     []
   );
 
-  const connectToWallet = useCallback(async (): Promise<{ wallet: ConnectedAPI; config: Configuration }> => {
+  const connectToWallet = useCallback(async (): Promise<{ wallet: ConnectedAPI; config: Configuration; networkId: NetworkId }> => {
     const result = await firstValueFrom(
       interval(100).pipe(
         map(() => {
@@ -296,22 +295,19 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
         concatMap(async (connectedAPI) => {
           const config = await connectedAPI.getConfiguration();
           const status = await connectedAPI.getConnectionStatus();
-
-          // Set network ID globally
-          if (status.status === 'connected') {
-            setNetworkId(status.networkId);
-          }
+          const networkId =
+            status.status === 'connected' ? status.networkId : config.networkId;
 
           logger.info({ config }, 'Connected to wallet connector API');
-          return { wallet: connectedAPI, config };
+          return { wallet: connectedAPI, config, networkId };
         }),
       ),
     );
-    return result as { wallet: ConnectedAPI; config: Configuration };
+    return result as { wallet: ConnectedAPI; config: Configuration; networkId: NetworkId };
   }, [logger]);
 
   const initializeProviders = useCallback(async () => {
-    const { wallet, config } = await connectToWallet();
+    const { wallet, config, networkId } = await connectToWallet();
 
     const addresses = await wallet.getShieldedAddresses();
     const zkConfigPath = window.location.origin;
@@ -325,7 +321,7 @@ export const ZKLoanProvider: React.FC<Readonly<ZKLoanProviderProps>> = ({ logger
     if (addresses.shieldedAddress) {
       try {
         const decoded = MidnightBech32m.parse(addresses.shieldedAddress)
-          .decode(ShieldedAddress, getNetworkId());
+          .decode(ShieldedAddress, networkId);
         const coinPkBytes = new Uint8Array(decoded.coinPublicKey.data);
         if (coinPkBytes.length !== 32) {
           throw new Error(`Expected 32-byte coin public key, got ${coinPkBytes.length}`);

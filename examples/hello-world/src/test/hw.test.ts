@@ -1,7 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { WebSocket } from 'ws';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import {
   deployContract,
   submitCallTx,
@@ -100,8 +99,6 @@ describe(`Hello World Contract (${network})`, () => {
   }
 
   beforeAll(async () => {
-    setNetworkId(config.networkId);
-
     const envConfig: EnvironmentConfiguration = {
       walletNetworkId: config.networkId,
       networkId: config.networkId,

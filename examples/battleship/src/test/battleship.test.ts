@@ -13,7 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 /**
  * This test suite aims to demonstrate interaction with
  * the contract through midnight-js more than as a comprehensive test suite. 
@@ -23,7 +22,6 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import pino from 'pino';
 import { submitCallTx, deployContract } from '@midnight-ntwrk/midnight-js-contracts';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import { getConfig } from '../config.js';
@@ -92,8 +90,6 @@ describe(`Battleship Smart Contract via midnight-js (${network})`, () => {
 
     // setup before tests
     beforeAll(async () => {
-        setNetworkId(config.networkId);
-
         const envConfig: EnvironmentConfiguration = {
             walletNetworkId: config.networkId,
             networkId: config.networkId,

@@ -25,7 +25,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { WebSocket } from 'ws';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import pino from 'pino';
 import { firstValueFrom } from 'rxjs';
@@ -101,8 +100,6 @@ describe(`Leaderboard contract (${network})`, () => {
   }
 
   beforeAll(async () => {
-    setNetworkId(config.networkId);
-
     const envConfig: EnvironmentConfiguration = {
       walletNetworkId: config.networkId,
       networkId: config.networkId,

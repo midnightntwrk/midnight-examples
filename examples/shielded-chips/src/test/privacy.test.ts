@@ -13,7 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 // Privacy-assumption verification for the shielded-chips DApp.
 //
 // This is NOT a re-run of the functional e2e test. It runs one focused
@@ -45,7 +44,6 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomBytes } from 'node:crypto';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import {
   deployContract,
   submitCallTx,
@@ -251,7 +249,6 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
   }
 
   beforeAll(async () => {
-    setNetworkId(config.networkId);
     const env: EnvironmentConfiguration = {
       walletNetworkId: config.networkId,
       networkId: config.networkId,

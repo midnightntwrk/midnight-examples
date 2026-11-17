@@ -7,9 +7,6 @@
 
 import { WebSocket } from 'ws';
 import pino from 'pino';
-
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
-
 import { getConfig } from './config.js';
 import { IS_REMOTE, NETWORK } from './secret.js';
 
@@ -22,8 +19,6 @@ process.on('unhandledRejection', (reason) => {
 });
 
 export const config = getConfig();
-setNetworkId(config.networkId);
-
 export const logger = pino({
   level: process.env['LOG_LEVEL'] ?? 'info',
   transport: { target: 'pino-pretty' },

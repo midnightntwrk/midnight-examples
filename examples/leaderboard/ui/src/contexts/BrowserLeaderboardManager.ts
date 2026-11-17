@@ -31,10 +31,10 @@ import {
   createLedger9MidnightProvider,
   createLedger9WalletProvider,
   type LedgerTransaction,
+  type NetworkId,
 } from '@midnight-ntwrk/midnight-js-types';
 import semver from 'semver';
 import { inMemoryPrivateStateProvider } from '../in-memory-private-state-provider';
-import { type NetworkId, setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 
 export type LeaderboardDeployment =
   | { readonly status: 'in-progress' }
@@ -120,8 +120,6 @@ const TX_TTL_SECONDS = 3600;
 
 const initializeProviders = async (logger: Logger): Promise<LeaderboardProviders> => {
   const networkId = (import.meta.env.VITE_NETWORK_ID ?? 'preprod') as NetworkId;
-  setNetworkId(networkId);
-
   const connectedAPI = await connectToWallet(logger, networkId);
   const config = await connectedAPI.getConfiguration();
   const shieldedAddresses = await connectedAPI.getShieldedAddresses();

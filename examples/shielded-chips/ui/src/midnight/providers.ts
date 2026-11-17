@@ -16,7 +16,6 @@ import { dappConnectorProofProvider } from "@midnight-ntwrk/midnight-js-dapp-con
 import { FetchZkConfigProvider } from "@midnight-ntwrk/midnight-js-fetch-zk-config-provider";
 import { httpClientProofProvider } from "@midnight-ntwrk/midnight-js-http-client-proof-provider";
 import { indexerPublicDataProvider } from "@midnight-ntwrk/midnight-js-indexer-public-data-provider";
-import { setNetworkId } from "@midnight-ntwrk/midnight-js-network-id";
 import {
   CostModel,
   Transaction,
@@ -127,8 +126,6 @@ export async function createContractProviders<C extends string>(
   // endpoints, network id for address encoding) follows from its config, so
   // the same build works on local `undeployed`, preview, and preprod.
   const config = await api.getConfiguration();
-  setNetworkId(config.networkId);
-
   // Pass the browser's WebSocket explicitly. The provider's default comes from
   // `import * as ws from 'isomorphic-ws'` and reads `ws.WebSocket`, but the
   // browser build of isomorphic-ws only has a default export, so that default
