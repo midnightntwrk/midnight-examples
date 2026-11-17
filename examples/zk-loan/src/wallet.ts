@@ -182,7 +182,7 @@ export class MidnightWalletProvider implements Ledger9WalletProvider {
     const wallet = await restoreSavedState(logger, env, builder, dustOptions, built.wallet, seeds.masterSeed);
 
     logger.info(
-      `Wallet built from ${secret.kind}; master seed: ${seeds.masterSeed.slice(0, 8)}...`,
+      `Wallet built from ${secret.kind}; address ${String(keystore.getBech32Address())}`,
     );
 
     return new MidnightWalletProvider(logger, wallet, seeds, keystore);
