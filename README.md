@@ -92,7 +92,7 @@ version changes happen in a coordinated pass. The pins live in
 | Node.js | `22` (see `.nvmrc`) |
 | npm | `11.21.0` (CI; `11.10.0` or newer locally) |
 | Vitest | `5.0.4` |
-| Vite | `6.4.4` |
+| Vite | `6.4.5` |
 | Compact CLI (`compact`) | `0.5.3` |
 | `@midnight-ntwrk/dapp-connector-api` | `4.0.1` |
 | proof server image | `9.0.2` |

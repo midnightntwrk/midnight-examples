@@ -16,7 +16,7 @@
     "wallet-sdk-address-format": "4.0.1",
     "dapp-connector-api": "4.0.1",
     "vitest": "5.0.4",
-    "vite": "6.4.4"
+    "vite": "6.4.5"
   },
   "images": {
     "midnightntwrk/proof-server": "9.0.2",

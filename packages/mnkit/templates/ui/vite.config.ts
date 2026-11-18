@@ -7,13 +7,13 @@ import topLevelAwait from "vite-plugin-top-level-await";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 // @if monorepo
-// Vite is pinned to 6.4.4 in package.json on purpose: it matches the Vite that
+// Vite is pinned to 6.4.5 in package.json on purpose: it matches the Vite that
 // npm hoists to the repo root (see the root AGENTS.md). Asking for a different
 // major here could change what gets hoisted and break other examples' vitest
 // configs.
 // @endif
 // @if standalone
-// Vite is pinned to 6.4.4 in package.json on purpose: npm hoists it to the
+// Vite is pinned to 6.4.5 in package.json on purpose: npm hoists it to the
 // project root, where the contract tests' vitest config loads it too.
 // @endif
 export default defineConfig({
