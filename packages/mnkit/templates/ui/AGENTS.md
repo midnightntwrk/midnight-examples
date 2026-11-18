@@ -24,7 +24,7 @@ edited it.
 
 <!-- @endif -->
 **Verified against:** `midnight-js-*` 5.0.1 (Ledger 9),
-`@midnight-ntwrk/dapp-connector-api` 4.0.1, Vite 6.4.4, vitest 5, React 19,
+`@midnight-ntwrk/dapp-connector-api` 4.0.1, Vite 6.4.5, vitest 5, React 19,
 Node 22: typecheck, unit tests and build. The UIs have been tested in a
 browser with a wallet on Ledger 9; `VERIFIED.md` records which steps were
 verified step by step (those entries predate Ledger 9).
@@ -434,7 +434,7 @@ battleship's `ShipForm`.
   `compact-js`. Import them via
   `@midnight-ntwrk/midnight-js-protocol/{ledger,compact-runtime,compact-js}`.
 <!-- @if monorepo -->
-- **Vite:** `"vite": "6.4.4"`, matching the hoisted root Vite (see root
+- **Vite:** `"vite": "6.4.5"`, matching the hoisted root Vite (see root
   `AGENTS.md`).
 - **Scripts:** only `copy:zk`, `dev`, `build`, `preview`, `typecheck` and
   `test:unit`. **Never** add `compile`, `test`, `test:local`, `env:up` or
@@ -444,13 +444,13 @@ battleship's `ShipForm`.
 After `npm install`, check the hoisting didn't move:
 
 ```bash
-node -p "require('./node_modules/vite/package.json').version"   # 6.4.4
+node -p "require('./node_modules/vite/package.json').version"   # 6.4.5
 node -p "require('./node_modules/bn.js/package.json').version"  # 5.2.5
 ```
 
 <!-- @endif -->
 <!-- @if standalone -->
-- **Vite:** `"vite": "6.4.4"`. npm hoists it to the project root, where the
+- **Vite:** `"vite": "6.4.5"`. npm hoists it to the project root, where the
   contract tests' vitest config loads it too.
 - **Scripts:** only `copy:zk`, `dev`, `build`, `preview`, `typecheck` and
   `test:unit`. Don't add `compile`, `test`, `test:local`, `env:up` or
@@ -459,7 +459,7 @@ node -p "require('./node_modules/bn.js/package.json').version"  # 5.2.5
 After `npm install`, check the hoisting didn't move:
 
 ```bash
-node -p "require('./node_modules/vite/package.json').version"   # 6.4.4
+node -p "require('./node_modules/vite/package.json').version"   # 6.4.5
 ```
 
 <!-- @endif -->
