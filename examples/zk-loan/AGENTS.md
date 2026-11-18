@@ -39,7 +39,8 @@ ported.
   - `src/test/zk-loan.test.ts` — on-chain deploy/call flow via midnight-js,
     run by `npm test` / `npm run validate`.
   - `src/test/attestation-api/*.test.ts` — HTTP and signing tests for the
-    attestation API (port 0, no network).
+    attestation API (port 0, no network, no Docker). They run with the
+    in-memory tests in `npm run test:sim`, and `npm test` excludes them.
 - `attestation-api/` — the attestation provider as a restify service
   (`POST /attest`, `GET /provider-info`, `GET /health`). `signing.ts` is the
   off-chain Schnorr signer; run standalone with `npm run attestation:start`
