@@ -107,6 +107,10 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
   proof server you run yourself (`npm run proof:up` in `examples/hello-world`).
 - **Use your own wallet.** Never use the repo's fast-sync or seeded test wallets
   (`.env.<network>`, `npm run wallets:new`) on mainnet.
+- **Check the wallet's indexer.** The UI uses the indexer the wallet reports.
+  The old `indexer.mainnet.midnight.network` host returns 410 Gone, so a wallet
+  still set to it fails deploys with `Failed to fetch`. Fix it in the wallet's
+  network settings.
 - **Two circuits move real NIGHT.** `receiveNightTokens` pays NIGHT from your
   wallet into the contract, and `sendNightTokensToUser` pays it out to any
   address. Anyone can call it: the contract has no access control, so NIGHT

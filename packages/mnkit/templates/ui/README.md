@@ -47,6 +47,11 @@ On the local devnet, give your browser wallet DUST (and NIGHT) with
 `ui/`). The page prints the exact command when the connected wallet has no DUST.
 
 <!-- @endif -->
+If a deploy or call fails with `Failed to fetch` before proving starts, check
+the indexer in the wallet's network settings. The UI uses the endpoints the
+wallet reports, and the old `indexer.mainnet.midnight.network` and
+`indexer.preprod.midnight.network` hosts return 410 Gone.
+
 ## Scripts
 
 | Script | What it does |

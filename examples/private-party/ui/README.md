@@ -89,6 +89,10 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
   proof server you run yourself (`npm run proof:up` in `examples/hello-world`).
 - **Use your own wallet.** Never use the repo's fast-sync or seeded test wallets
   (`.env.<network>`, `npm run wallets:new`) on mainnet.
+- **Check the wallet's indexer.** The UI uses the indexer the wallet reports.
+  The old `indexer.mainnet.midnight.network` host returns 410 Gone, so a wallet
+  still set to it fails deploys with `Failed to fetch`. Fix it in the wallet's
+  network settings.
 - **`checkIn` pays real NIGHT** (the entry fee, in STAR) into the contract,
   and only the organizer's `claimFees` gets it out. The organizer's secret lives
   in this browser profile's passphrase-encrypted private state: lose the

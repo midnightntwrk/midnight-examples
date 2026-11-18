@@ -103,6 +103,10 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
   coins. The burn circuits' prover keys are about 20 MB each.
 - **Use your own wallets.** Never use the repo's fast-sync or seeded test
   wallets (`.env.<network>`, `npm run wallets:new`) on mainnet.
+- **Check the wallet's indexer.** The UI uses the indexer the wallet reports.
+  The old `indexer.mainnet.midnight.network` host returns 410 Gone, so a wallet
+  still set to it fails deploys with `Failed to fetch`. Fix it in the wallet's
+  network settings.
 - **One round per table.** Betting never reopens; deploy a new table for
   another round (the chips token can be reused).
 
