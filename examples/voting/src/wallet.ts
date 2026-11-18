@@ -714,8 +714,27 @@ export async function waitForNightThenDust(
   // (midnight-examples#93). testkit's syncWallet waits for the same
   // `protocol._tag === 'Settled'` reading; the retry below stays as a
   // backstop for a crossing that lands between this read and the call.
+  // Bounded overall (`first`, not `each`): the state keeps emitting while the
+  // wallets cross, so a per-emission timeout would never fire on a stall.
+  let lastProtocol: FacadeState['protocol'] | undefined;
   const state = await Rx.firstValueFrom(
-    wallet.state().pipe(Rx.filter((s: FacadeState) => s.protocol._tag === 'Settled')),
+    wallet.state().pipe(
+      Rx.tap((s: FacadeState) => {
+        lastProtocol = s.protocol;
+      }),
+      Rx.filter((s: FacadeState) => s.protocol._tag === 'Settled'),
+      Rx.timeout({
+        first: FUND_TIMEOUT_MS,
+        with: () =>
+          Rx.throwError(() => {
+            const p = lastProtocol;
+            const behind = p?._tag === 'Crossing' ? ` (${p.behind.join(', ')} behind)` : '';
+            return new Error(
+              `${label}: wallets still crossing a protocol boundary after ${FUND_TIMEOUT_MS}ms${behind}`,
+            );
+          }),
+      }),
+    ),
   );
   const night = unshieldedToken().raw;
   const unregistered = state.unshielded.availableCoins.filter(
