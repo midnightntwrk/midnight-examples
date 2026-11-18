@@ -33,7 +33,7 @@ verified step by step (those entries predate Ledger 9).
 ## Quick recipe
 
 ```bash
-nvm use                             # Node 22; the generator refuses older
+nvm use                             # Node 22 or newer (.nvmrc pins 22); the generator refuses older
 npm run new:ui -- <name> --dry-run  # preview: forms, TODOs, storage, ⚠ lines
 npm run new:ui -- <name> [--private-state memory|persistent]
 npm install                             # commit the package-lock.json it writes
@@ -639,7 +639,7 @@ that same receiver. Amounts on chain are in STAR (1 NIGHT = 1,000,000 STAR).
   `cause.failure`. Use `lib/errors.ts`.
 - **ZK asset 404s:** a missing ZK asset returns Vite's SPA fallback
   (`text/html`), not a 404. Check the content-type when debugging.
-- **Node version:** use Node 22 (`.nvmrc`). A shell defaulting to Node 20
+- **Node version:** use Node 22 or newer. A shell defaulting to Node 20
   crashed the dev server in hello-world/ui.
 - **`Parameters<>` on `callTx`:** each `contract.callTx.<c>` is overloaded as
   `(...args)` and `(txCtx, ...args)`. `Parameters<typeof callTx.c>` picks the

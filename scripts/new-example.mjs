@@ -53,7 +53,7 @@ function usage() {
       '',
       '  <name>          kebab-case example name (e.g. voting, hello-world)',
       '  --witnesses     generate a witnesses.ts stub and wire withWitnesses()',
-      '  --no-register   do not edit ci.yaml / README.md / AGENTS.md',
+      '  --no-register   do not edit ci.yaml / README.md',
       '  --spec <file>   the reviewed design card (step 1): lint it (npm run spec:lint',
       '                  --file), check --witnesses against its Witnesses section,',
       '                  and use it as the new example\'s SPEC.md',
@@ -148,18 +148,20 @@ function registerCi() {
   return { ok: true, msg: 'ci.yaml: added to CI matrix' };
 }
 
-function registerAgents() {
-  const file = path.join(REPO_ROOT, 'AGENTS.md');
+// README's "All examples" table. (Root AGENTS.md links to it instead of
+// keeping its own copy, so agents don't load the table on every task.)
+function registerExamplesTable() {
+  const file = path.join(REPO_ROOT, 'README.md');
   const content = fs.readFileSync(file, 'utf8');
-  if (content.includes(`| \`${name}\` |`)) return { ok: true, msg: 'AGENTS.md: already listed' };
+  if (content.includes(`[\`${name}\`](`)) return { ok: true, msg: 'README.md: already in All examples' };
   const lines = content.split('\n');
-  const headerIdx = lines.findIndex((l) => /^\|\s*Example\s*\|/.test(l));
-  if (headerIdx === -1) return { ok: false, msg: 'AGENTS.md: could not find the Examples table — add a row manually.' };
+  const headerIdx = lines.findIndex((l) => /^\|\s*Example\s*\|\s*Teaches\s*\|/.test(l));
+  if (headerIdx === -1) return { ok: false, msg: 'README.md: could not find the All examples table — add a row manually.' };
   let i = headerIdx + 2; // skip header + separator
   while (i < lines.length && lines[i].trimStart().startsWith('|')) i++;
-  lines.splice(i, 0, `| \`${name}\` | TODO: what it teaches |`);
+  lines.splice(i, 0, `| [\`${name}\`](./examples/${name}) | TODO: what it teaches | |`);
   fs.writeFileSync(file, lines.join('\n'));
-  return { ok: true, msg: 'AGENTS.md: appended Examples table row' };
+  return { ok: true, msg: 'README.md: appended All examples row' };
 }
 
 function registerReadme() {
@@ -176,7 +178,7 @@ function registerReadme() {
 
 const registration = [];
 if (!noRegister) {
-  for (const fn of [registerCi, registerAgents, registerReadme]) {
+  for (const fn of [registerCi, registerExamplesTable, registerReadme]) {
     try {
       registration.push(fn());
     } catch (err) {
@@ -196,7 +198,7 @@ if (!noRegister) {
   console.log('\n  Registration skipped (--no-register). Remember to add the example to:');
   console.log('    • .github/workflows/ci.yaml matrix');
   console.log('    • README.md Layout tree');
-  console.log('    • AGENTS.md Examples table');
+  console.log('    • README.md All examples table');
 }
 console.log('\n  Next steps (docs/generation-flow.md):');
 console.log(
