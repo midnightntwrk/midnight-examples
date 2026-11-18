@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `examples/shielded-chips`: the "Alice burns from the treasury" end-to-end test runs again. It was skipped on Ledger 9 because the node rejected `burnFromTreasury` with `Custom error: 104` ([midnight-ledger issue 839](https://github.com/midnightntwrk/midnight-ledger/issues/839)); the 1.1-patch's ledger-v9 1.0.2 fixes that on the client side, and the test passes on Preview.
 - `examples/zk-loan`: the Schnorr verifier's `response` is a `JubjubScalar` now, so the generated witness type check rejects `s + order` (the old `response as JubjubScalar` cast reduced it back to `s`); signers must reduce `s` mod the order. The challenge quotient bound is tight: `q < 115`, or `q == 115` with the remainder below `P - 115 * 2^248`. With `q < 116` about 0.06% of challenge hashes had two accepted `(q, r)` pairs. Three simulator tests cover it, and the tutorials match the code. `requestLoan`'s circuit changes, so its prover and verifier keys change: redeploy rather than pointing a rebuilt UI at an existing contract.
 
 ## mnkit 0.2.0 (unreleased)
