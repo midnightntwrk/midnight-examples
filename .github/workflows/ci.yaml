@@ -395,6 +395,10 @@ jobs:
           # without writing anything; once it carries a Reviewed-by line, the
           # runner scaffolds (witnesses from the card), installs, and stops at 3a.
           next() { node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const n=JSON.parse(s).next;console.log(`${n.kind} ${n.step}`)})'; }
+          # No example and no card: the runner writes a blank card to .cards/ and stops at step 1.
+          test "$(npm run -s pipeline -- ci-card --json | next || true)" = "reason 1"
+          test -f .cards/ci-card.md && test ! -e examples/ci-card
+          rm -rf .cards
           cp examples/private-tip-jar/SPEC.md "$RUNNER_TEMP/card.md"
           test "$(npm run -s pipeline -- ci-card --spec "$RUNNER_TEMP/card.md" --no-register --json | next)" = "review 1"
           test ! -e examples/ci-card

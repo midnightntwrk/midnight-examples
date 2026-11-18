@@ -29,7 +29,8 @@
 // loop: run it, do what `next` says, run it again.
 //
 // Order:
-//   (no example yet, --spec <card>) design lint of the card → its review mark
+//   (no example yet) without --spec: a blank card in .cards/<name>.md to fill in
+//   (docs/spec-card.md); with --spec <card>: its design lint → its review mark
 //   → 2 new:example --spec (--witnesses from the card's Witnesses section)
 //   → npm install, then on as below
 //   1 spec lint (design) → 3a contract written? → compile:fast → 3b --derive
@@ -97,6 +98,7 @@ import {
   writeJson,
 } from '../packages/mnkit/src/lib/gates.mjs';
 import { checkDocker, preflight } from '../packages/mnkit/src/lib/preflight.mjs';
+import { skeletonCard } from '../packages/mnkit/src/lib/scaffold.mjs';
 import { cardWitnesses, lintCode, lintDesign, reviewMark } from '../packages/mnkit/src/lib/spec-lint.mjs';
 import { NAME_RE, exitOnError, fail } from '../packages/mnkit/src/lib/template.mjs';
 
@@ -146,7 +148,7 @@ const NET = gatePath(DIR, 'devnet-net.json');
 // What to read when sent back to a step: the context budget in
 // docs/generation-flow.md, by step.
 const READ = {
-  1: ['packages/mnkit/templates/example/SPEC.md', 'examples/private-tip-jar/SPEC.md (a worked example)', 'docs/patterns.md (find the nearest example)'],
+  1: ['docs/spec-card.md (request → card)', 'examples/private-tip-jar/SPEC.md (a worked example)', 'docs/patterns.md (find the nearest example)'],
   '3a': [
     'docs/compact-gotchas.md',
     'docs/patterns.md, then the 1–2 nearest examples’ contract/*.compact',
@@ -471,11 +473,20 @@ if (specPath && !fs.existsSync(specPath)) fail(`--spec: ${opts.spec} not found`)
 if (!fs.existsSync(path.join(DIR, 'package.json'))) {
   if (opts.wait || opts.cancel) fail(`examples/${name} does not exist`);
   if (!specPath) {
+    // Step 1 starts from a blank card in .cards/ (gitignored); an existing draft is kept.
+    const draft = path.join(REPO_ROOT, '.cards', `${name}.md`);
+    const fresh = !fs.existsSync(draft);
+    if (fresh) {
+      fs.mkdirSync(path.dirname(draft), { recursive: true });
+      fs.writeFileSync(draft, skeletonCard(path.join(REPO_ROOT, 'packages', 'mnkit', 'templates', 'example'), name));
+    }
+    step('card', 'pending', { note: `${fresh ? 'wrote a blank card' : 'draft'} at ${rel(draft)}` });
     stop({
       kind: 'reason',
       step: '1',
-      reason: `examples/${name} does not exist: write the design card and have it reviewed, then scaffold from it`,
-      run: [`npm run pipeline -- ${name} --spec <card.md>`],
+      reason: `examples/${name} does not exist: fill in its design card from the request (docs/spec-card.md), then run the pipeline with --spec to lint it`,
+      edit: [rel(draft)],
+      run: [`npm run pipeline -- ${name} --spec ${rel(draft)}`],
       read: READ[1],
     });
   }

@@ -42,3 +42,6 @@ packages/*/LICENSE
 # OS / editor
 .DS_Store
 *.log
+
+# Design cards drafted before their example exists (npm run pipeline -- <name>)
+.cards/

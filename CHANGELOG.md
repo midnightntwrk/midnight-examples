@@ -37,7 +37,7 @@ The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-
 - `mnkit derive` fills the generated stub regions from the compiled contract.
 - `mnkit validate` runs the local-network tests end to end: compile, network up, wait for DUST, `test:local`, network down.
   `--reuse-net` skips the network and DUST steps on a network a `--keep-net` run left up, and `--files <a,b>` runs only those test files; the JSON report (`--report`) lists each test file's result.
-- Design-card helpers in the spec lint: `cardWitnesses` (whether the card's Witnesses section declares any) and `reviewMark` (its `Reviewed-by: <who>, <YYYY-MM-DD>` line).
+- Design-card helpers: `cardWitnesses` (whether the card's Witnesses section declares any) and `reviewMark` (its `Reviewed-by: <who>, <YYYY-MM-DD>` line) in the spec lint, and `skeletonCard` (the template card for a project not scaffolded yet) in the scaffold library.
 - `mnkit deploy [name]` deploys to local, preview or preprod without the UI, and records the address in `deployments/<network>.json`.
 - `mnkit doctor` checks the machine, and with `--network <net>` checks the network's node, indexer and proof server.
 - `mnkit add ui` adds a browser UI as a workspace, and `mnkit add contract <name>` adds another contract.
