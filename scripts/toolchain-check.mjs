@@ -16,11 +16,13 @@
 
 // `npm run toolchain:check`: fails when any copy of a pin disagrees with
 // toolchain.json. The copies: the README table, every workflow's compact-version
-// and npm, .nvmrc, the root package.json (engines, devEngines, overrides), every
-// compose.yml/compose.yaml image, the pinned deps and engines of every example,
-// UI, template and package (any other @midnight-ntwrk or @midnightntwrk
-// dependency is unpinned, and fails), the runtime packages' README overrides, and the pragma of every
-// contract and engine test fixture. experimental/ is left out on purpose: it
+// and npm, .nvmrc, the root package.json (engines, devEngines, Midnight
+// overrides), every compose.yml/compose.yaml image, the Midnight deps and engines
+// of every example, UI, template and package (an unpinned @midnight-ntwrk or
+// @midnightntwrk dependency fails), the runtime packages' README overrides, and
+// the pragma of every contract and engine test fixture. Third-party versions
+// (vite, vitest, third-party overrides) are not checked: Dependabot moves them,
+// and toolchain.json's copy is only the baseline mnkit scaffolds with. experimental/ is left out on purpose: it
 // tracks release candidates. It also fails when
 // package-lock.json nests a package inside a workspace (see below).
 // Zero dependencies — Node built-ins only.
@@ -40,6 +42,8 @@ const expect = (where, what, found, want) => {
   if (found !== want) problems.push(`${where}: ${what} is ${found ?? '(missing)'}, toolchain.json says ${want}`);
 };
 const lineOf = (src, index) => src.slice(0, index).split('\n').length;
+// Only Midnight packages must match toolchain.json exactly.
+const isMidnight = (pkg) => /^@midnight-?ntwrk\//.test(pkg);
 
 // The oldest npm with min-release-age (.npmrc): the root package.json's
 // devEngines asks for it. CI runs toolchain.json's npmCli.
@@ -101,9 +105,9 @@ expect('.nvmrc', 'Node', read(path.join(REPO_ROOT, '.nvmrc')).trim(), tc.node);
   expect('package.json', 'engines.node', root.engines?.node, `>=${tc.node}.0.0`);
   const pm = root.devEngines?.packageManager;
   expect('package.json', 'devEngines.packageManager', pm && `${pm.name}@${pm.version}`, `npm@>=${NPM_FLOOR}`);
-  // toolchain.json's overrides in npm syntax, and nothing else.
+  // toolchain.json's Midnight overrides in npm syntax, and no other Midnight ones.
   const want = npmOverrides(tc.overrides);
-  for (const pkg of new Set([...Object.keys(want), ...Object.keys(root.overrides ?? {})])) {
+  for (const pkg of new Set([...Object.keys(want), ...Object.keys(root.overrides ?? {})].filter(isMidnight))) {
     expect('package.json', `overrides["${pkg}"]`, JSON.stringify(root.overrides?.[pkg]), JSON.stringify(want[pkg]));
   }
 }
@@ -172,11 +176,12 @@ for (const dir of projects) {
   expect(rel(f), 'engines.node', p.engines?.node, `>=${tc.node}.0.0`);
   for (const field of ['dependencies', 'devDependencies', 'peerDependencies']) {
     for (const [pkg, spec] of Object.entries(p[field] ?? {})) {
+      if (!isMidnight(pkg)) continue;
       const peer = field === 'peerDependencies';
       const want = pinFor(tc, pkg, { peer });
       if (want) expect(rel(f), `${field}["${pkg}"]`, spec, want);
       // Every other Midnight package but the lockstep runtime packages needs a pin.
-      else if (/^@(midnight-ntwrk|midnightntwrk)\//.test(pkg) && !/^(@midnightntwrk\/mnkit-|@midnight-ntwrk\/example-)/.test(pkg)) {
+      else if (!/^(@midnightntwrk\/mnkit-|@midnight-ntwrk\/example-)/.test(pkg)) {
         problems.push(`${rel(f)}: ${field}["${pkg}"] is not pinned in toolchain.json (add it to npm, and to pinFor)`);
       }
     }

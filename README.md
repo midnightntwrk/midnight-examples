@@ -101,7 +101,10 @@ version changes happen in a coordinated pass. The pins live in
 
 `npm run toolchain:check` compares this table's compiler, language, SDK, Node,
 npm, Vitest and Vite rows with `toolchain.json`, and the image pins with every
-`compose.yml`. The other rows are copied from `toolchain.json` by hand.
+`compose.yml`. The other rows are copied from `toolchain.json` by hand. In
+`package.json` files it enforces only the Midnight (`@midnight-ntwrk/*`,
+`@midnightntwrk/*`) pins. Vitest, Vite and other third-party versions are the
+baseline new projects start from, and Dependabot may move them ahead.
 
 ## Prerequisites
 
