@@ -36,6 +36,7 @@ The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-
 - `mnkit compile` compiles every contract with the pinned compiler, installing the pinned compiler or Compact CLI when it's missing (`--no-install` opts out).
 - `mnkit derive` fills the generated stub regions from the compiled contract.
 - `mnkit validate` runs the local-network tests end to end: compile, network up, wait for DUST, `test:local`, network down.
+  `--reuse-net` skips the network and DUST steps on a network a `--keep-net` run left up, and `--files <a,b>` runs only those test files; the JSON report (`--report`) lists each test file's result.
 - `mnkit deploy [name]` deploys to local, preview or preprod without the UI, and records the address in `deployments/<network>.json`.
 - `mnkit doctor` checks the machine, and with `--network <net>` checks the network's node, indexer and proof server.
 - `mnkit add ui` adds a browser UI as a workspace, and `mnkit add contract <name>` adds another contract.

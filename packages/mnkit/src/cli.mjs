@@ -43,7 +43,9 @@ Commands:
                     --no-install, or MNKIT_NO_INSTALL=1: fail instead of installing)
   derive            fill the generated stubs from the compiled contract (safe to re-run)
   validate          compile, start a local network, wait for DUST, run the devnet tests
-                    (--keep-net: leave the network up; --report <file>: write a JSON report)
+                    (--keep-net: leave the network up; --reuse-net: skip env:up and wait:dust on
+                    the network a --keep-net run left up; --files <a,b>: run only these test
+                    files; --report <file>: write a JSON report)
   deploy [name]     deploy the compiled contract to local, preview or preprod, compiling first
                     when needed; writes deployments/<network>.json (name: another contract
                     under contract/, default the project's; --network <net>: default local;
@@ -153,7 +155,7 @@ const COMMANDS = {
   },
   validate: {
     noArgs: true,
-    options: { 'keep-net': { type: 'boolean' }, report: { type: 'string' } },
+    options: { 'keep-net': { type: 'boolean' }, 'reuse-net': { type: 'boolean' }, files: { type: 'string' }, report: { type: 'string' } },
     run: async ({ values }) => {
       const dir = process.cwd();
       if (!fs.existsSync(path.join(dir, 'compose.yml'))) fail('run this from a project directory (one with a compose.yml).');
@@ -165,6 +167,8 @@ const COMMANDS = {
         dir,
         pm: 'npm',
         keepNet: values['keep-net'],
+        reuseNet: values['reuse-net'],
+        testFiles: values.files ? values.files.split(',').filter(Boolean) : [],
         reportPath: values.report ? path.resolve(values.report) : null,
       });
     },

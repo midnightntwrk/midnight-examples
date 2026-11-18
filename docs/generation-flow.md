@@ -97,7 +97,7 @@ nothing behind it yet.
 | 3a | Write the contract | reason | Model writes Compact | See [Context budget](#context-budget) | `contract/<name>.compact`, plus any test-only contract beside it (`contract/<token>.compact`) | `npm run compile:fast`, which compiles every contract under `contract/` (`--skip-zk`: no proving keys, under a second for most contracts); on failure, back to 3a |
 | 3b | Derive stubs | script | `npm run new:example -- <name> --derive` ([`packages/mnkit/src/lib/derive.mjs`](../packages/mnkit/src/lib/derive.mjs)) | `contract/managed/<name>/compiler/contract-info.json`, `contract/index.d.ts`, `contract/<name>.compact`, `contract/witnesses.ts` | Fills the unedited `@generated-stub` regions: a typed stub per witness, constructor `args` in both tests' deploy calls, an `it.todo` per circuit, the ledger fields, a privacy-test skeleton. For each other contract: its exports in `contract/index.ts`, plus a provider set and a deploy test in the devnet test. When a circuit takes a shielded coin, or another contract mints to a wallet: the coin-helper imports from `./coins.js` (the example's `src/test/coins.ts`) | Refuses if the contract isn't compiled or declares witnesses without `witnesses.ts`. Re-runnable: edited regions are left alone, and a second run changes nothing |
 | 3c | Witnesses and tests | reason | Model writes code | See [Context budget](#context-budget) | Witness bodies in `contract/witnesses.ts`; `src/test/<name>.sim.test.ts` (logic, a negative test per assert, one `assertNotInPublicState` entry per SPEC privacy invariant); `src/test/<name>.test.ts` (the end-to-end flow) | The **in-memory gate**: `npm run typecheck`, `npm run test:sim` (in memory, no Docker, seconds) and `npm run spec:lint <name>` (the card against the code: circuits, ledger fields, witnesses, every assert in an `expectRejects`, every invariant key in `assertNotInPublicState`, every circuit run, no `it.todo`; and the devnet test written: no `it.todo`, every transaction circuit called, since the devnet starts as soon as this gate passes). The pipeline stamps a pass in `.gates/sim.json`. On failure, back to 3c (or 3a for a contract bug) |
-| 4 | Test on local devnet, **in the background** | script | The pipeline starts `npm run validate -- --keep-net --report .gates/devnet.json` ([`scripts/validate-example.mjs`](../scripts/validate-example.mjs)) detached, after the in-memory gate, the full compile and step 5's `npm install`: `env:up` → `wait:dust` → `test:local`. By hand, `npm run validate -- [--keep-net]` runs the same steps in the foreground (compiling first if needed) and takes the network down | `examples/<name>/compose.yml` (proof server, indexer, node) | `.gates/devnet.json` (steps, failing tests, log tails), `logs/devnet.log`, `logs/compose.log` on failure | Runs while steps 5–6 happen; must pass on the current sources before step 7. On failure the pipeline writes a fix plan (`.gates/devnet-fix.md`): back to 3c/3a, or retry for an infrastructure failure. See [Background devnet](#background-devnet) |
+| 4 | Test on local devnet, **in the background** | script | The pipeline starts `npm run validate -- --keep-net --report .gates/devnet.json` ([`scripts/validate-example.mjs`](../scripts/validate-example.mjs)) detached, after the in-memory gate, the full compile and step 5's `npm install`: `env:up` → `wait:dust` → `test:local`. By hand, `npm run validate -- [--keep-net]` runs the same steps in the foreground (compiling first if needed) and takes the network down | `examples/<name>/compose.yml` (proof server, indexer, node) | `.gates/devnet.json` (steps, failing tests, log tails), `.gates/devnet-passes.json`, `logs/devnet.log`, `logs/compose.log` on failure | Runs while steps 5–6 happen; must pass on the current sources before step 7. After a test-only edit it resumes on the network left up and re-runs only the test files without a pass. On failure the pipeline writes a fix plan (`.gates/devnet-fix.md`): back to 3c/3a, or retry for an infrastructure failure. See [Background devnet](#background-devnet) |
 | 5 | UI generator | script | `npm run new:ui -- <name> [--contract <managed-dir>] [--private-state memory\|persistent]` ([`scripts/new-ui.mjs`](../scripts/new-ui.mjs)); preview with `--dry-run` | `contract/managed/<c>/compiler/contract-info.json`, `contract/managed/<c>/contract/index.d.ts`, `contract/witnesses.ts`, `contract/<c>.compact`, and [`templates/ui/`](../packages/mnkit/templates/ui/) | `examples/<name>/ui/` (Vite + React): template-owned files, seed files, `new-ui.json`, `verification.json` | Refuses without an in-memory gate stamp for the current sources (`--skip-gate` overrides), when the contract isn't compiled, `ui/` already exists, or `witnesses.ts` lacks a `create<X>PrivateState` factory |
 | 6 | Add MN-specific UI code | reason | Model edits seed files only | [`templates/ui/AGENTS.md`](../packages/mnkit/templates/ui/AGENTS.md) (copied into every `ui/AGENTS.md`); existing `examples/*/ui/` | `src/midnight/<name>-api.ts`, `src/components/<name>-panel.tsx`, `src/__tests__/<name>-circuits.test.ts`, `README.md` | `typecheck`, `test:unit` and `build` pass; `npm run new:ui -- <name> --check` shows no template drift; the pipeline stamps a pass in `.gates/ui.json` and skips the four while the UI sources are unchanged; on failure, back to 6 |
 | 7 | Serve to user | output | `npm run dev -w @midnight-ntwrk/example-<name>-ui` (runs `copy:zk`, then Vite on :5173); `npm run fund:wallet` funds a browser wallet on devnet | Built UI, managed ZK assets | Running DApp | The devnet passed on the current sources (the pipeline's join); browser and wallet checks recorded in `ui/verification.json`. The background run leaves the devnet up for this step |
@@ -152,8 +152,22 @@ network is left up for step 7; `npm run env:down` in the example takes it down.
 - **Stale runs.** The source hash ([`packages/mnkit/src/lib/gates.mjs`](../packages/mnkit/src/lib/gates.mjs))
   covers `contract/`, `src/`, `scripts/`, `package.json` and
   `vitest.config.ts`, but not `ui/`. A change there makes the run stale: the
-  next pipeline run cancels it and starts a fresh one once the in-memory gate
-  passes again. UI work never does.
+  next pipeline run cancels it, waits for it to exit, and starts a new one
+  once the in-memory gate passes again. UI work never does.
+- **Resumed runs.** The pipeline records which devnet test files passed
+  (`.gates/devnet-passes.json`), against a hash of every source file except
+  the tests (`src/test/*.test.ts`). After an edit to test files only, and if
+  the network the last run left up is still running with DUST in its wallets
+  (`.gates/devnet-net.json`, checked with `docker compose ps`), the new run is
+  `validate --keep-net --reuse-net --files <…>`. It skips `env:up` and
+  `wait:dust` and runs only the devnet test files with no pass on the current
+  sources: the ones that failed, and the ones edited. The devnet counts as
+  passed once every devnet test file has a pass, from one run or several. A
+  run cancelled during `test:local` may leave a transaction in flight that
+  has spent a DUST coin, so the next run after it is a full one. Any
+  other change (`contract/`, `witnesses.ts`, a helper in `src/test/`,
+  `package.json`) starts a full run, and so does `--retry-devnet`. An edit to
+  a sim test alone keeps the devnet pass.
 - **Order.** `new:ui` and `npm install` run before the devnet starts, so the
   install never rewrites `node_modules` under a running test.
 - **One devnet at a time.** Every example's `compose.yml` binds the same host
@@ -170,6 +184,7 @@ coin selection, sync timing, several wallets.
 |---|---|---|
 | `env:up` | Docker down, an image pull, another example's devnet on the ports | infra: free the ports, `--retry-devnet` |
 | `wait:dust` | no spendable DUST in time | infra: `--retry-devnet`, then a longer `WAIT_FOR_DUST_TIMEOUT_MS` |
+| `test:local`, a connection error or `Custom error: 196` | the network is gone, or a DUST coin was spent twice after a stopped run | infra: `--retry-devnet` starts a fresh network |
 | `test:local`, a timeout | indexer or wallet sync timing | rerun once, then 3c |
 | `test:local`, `failed assert:` | a guard fired that the sim test passes: different caller, private state or coin | 3c (devnet test) |
 | `test:local`, proving | a witness value or argument only the devnet test produces | 3c (witness), else 3a; the UI is affected |
@@ -232,12 +247,17 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
 - **Browser verification.** The checks in `verification.json` (wallet, browser)
   are run by hand. Decide which of them a pipeline can run automatically before
   serving.
-- **Stale devnet runs are cancelled, not resumed.** Each contract-level edit
-  during step 6 restarts the devnet from `env:up`. A run that only re-runs the
-  failed tests on the network left up would be faster; nothing does that yet.
+- **Cancelling on macOS is unchecked.** Cancelling a stale run signals its
+  process group and waits for it to exit. That has been checked on Linux/WSL
+  only (https://github.com/midnightntwrk/midnight-examples/issues/19).
 
 ## Changelog
 
+- 2026-11-18: After a test-only edit, the pipeline resumes on the network
+  the last devnet run left up and re-runs only the devnet test files without a
+  pass (`mnkit validate --reuse-net --files`), instead of starting again from
+  `env:up`. Cancelling a stale run now waits for it to exit
+  (https://github.com/midnightntwrk/midnight-examples/issues/24).
 - 2026-11-18: The pipeline stamps the UI gates in `.gates/ui.json` and skips
   them while nothing the UI depends on has changed: about 14 s off each rerun
   (https://github.com/midnightntwrk/midnight-examples/issues/20).

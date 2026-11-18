@@ -34,7 +34,8 @@ function project() {
     compile: log('compile'),
     'env:up': `${log('env:up')} && node -e "setTimeout(() => {}, 30000)"`,
     'wait:dust': log('wait:dust'),
-    'test:local': log('test:local'),
+    // Logs the test files validate passes on too (not the reporter flags).
+    'test:local': `node -e "require('fs').appendFileSync('steps.log', ['test:local', ...process.argv.slice(1).filter((a) => !a.startsWith('-'))].join(' ') + '\\n')" --`,
     'env:down': log('env:down'),
   };
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'demo', private: true, scripts }));
@@ -74,6 +75,18 @@ describe('mnkit validate', () => {
       expect(report).toMatchObject({ passed: false, failedStep: 'env:up', interrupted: signal, exitCode: exit });
     }, 30_000);
   }
+
+  it('skips env:up and wait:dust with reuseNet, runs only testFiles and keeps the network', async () => {
+    const dir = project();
+    const reportPath = path.join(dir, 'report.json');
+    const child = startValidate(dir, { reuseNet: true, testFiles: ['src/test/a.test.ts', 'src/test/b.test.ts'], reportPath });
+    const [code] = await once(child, 'exit');
+    expect(code).toBe(0);
+    expect(steps(dir)).toEqual(['compile', 'test:local src/test/a.test.ts src/test/b.test.ts']);
+    const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+    expect(report).toMatchObject({ passed: true, reuseNet: true, keepNet: true, networkLeftUp: true, testFiles: ['src/test/a.test.ts', 'src/test/b.test.ts'] });
+    expect(report.steps.filter((s) => s.status === 'skipped').map((s) => s.step)).toEqual(['env:up', 'wait:dust']);
+  }, 30_000);
 
   it('leaves the network up on a signal with keepNet', async () => {
     const dir = project();

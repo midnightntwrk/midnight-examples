@@ -27,6 +27,17 @@
 /** Classes of test:local failure, matched in order against each failure's text. */
 const TEST_CLASSES = [
   {
+    id: 'network',
+    re: /ECONNREFUSED|ECONNRESET|EHOSTUNREACH|fetch failed|socket hang up|Custom error: 196\b|DustDoubleSpend/i,
+    kind: 'infra',
+    route: '4',
+    cause:
+      'the tests could not reach the node, indexer or proof server (the network went down, or the one left up is gone), ' +
+      'or a DUST coin was spent twice (node error 196) because a stopped run left a transaction in flight',
+    actions: ['rerun from a fresh network: `npm run pipeline -- __name__ --retry-devnet`', 'if it fails again, read logs/compose.log'],
+    uiAffected: false,
+  },
+  {
     id: 'timeout',
     re: /timed? ?out|timeout/i,
     kind: 'infra',
@@ -119,8 +130,10 @@ function fileLine(message = '', file) {
  * A fix plan for a failed report:
  *   { kind: 'infra'|'reason', route, cause, actions[], read[], uiAffected, failures[] }
  * `route` is a generation-flow step ('3a', '3c') or '4' (re-run the devnet).
+ * `log` (logs/devnet.log) is only searched for node error 196, which sits deep
+ * in a failure's cause chain, below what the report keeps.
  */
-export function triage(report, name) {
+export function triage(report, name, log = '') {
   const sub = (xs) => xs.map((s) => s.replaceAll('__name__', name));
   const failures = report?.tests?.failures ?? [];
   const step = report?.failedStep ?? null;
@@ -186,7 +199,8 @@ export function triage(report, name) {
   // only: test titles mention coins and tips whatever went wrong.
   const first = failures[0];
   const hay = first ? first.message ?? '' : report.steps?.find((s) => s.step === step)?.outputTail ?? '';
-  const cls = TEST_CLASSES.find((c) => c.re.test(hay)) ?? FALLBACK;
+  const dustDoubleSpend = /Invalid Transaction: Custom error: 196\b/.test(log);
+  const cls = (dustDoubleSpend && TEST_CLASSES.find((c) => c.id === 'network')) || TEST_CLASSES.find((c) => c.re.test(hay)) || FALLBACK;
   const at = first && fileLine(first.message, first.file);
   const actions = sub(cls.actions);
   if (at) actions.unshift(`start at the first failure, ${at}`);
