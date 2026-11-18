@@ -21,9 +21,16 @@
 //   keepNet     leave the network running afterwards. `env:up` is a no-op on a
 //               healthy network, so a fix loop of `validate --keep-net` skips
 //               the network restart; run env:down when done.
+//   reuseNet    the network a previous `--keep-net` run left up is still up and
+//               its wallets have DUST: skip env:up and wait:dust (reported as
+//               skipped). The monorepo's pipeline runner uses it to re-run
+//               tests after a test-only edit. Implies keepNet.
+//   testFiles   run only these test files (paths relative to the project), as
+//               vitest filters after test:local's other arguments.
 //   reportPath  also write a JSON report: each step's status and time, the
 //               source hash at the start and the end (lib/gates.mjs), the
-//               failing tests from vitest's JSON reporter, and the tail of each
+//               failing tests and each test file's result from vitest's JSON
+//               reporter, and the tail of each
 //               failed step's output and of logs/compose.log. The monorepo's
 //               pipeline runner runs validate in the background with this and
 //               triages a failure from it. Output and exit status are
@@ -100,7 +107,7 @@ function stopStep(child, signal) {
  * Runs the gate in project dir `dir` and returns the exit status of the first
  * failed step, or 0.
  */
-export async function validate({ dir, keepNet = false, reportPath = null }) {
+export async function validate({ dir, keepNet = false, reuseNet = false, testFiles = [], reportPath = null }) {
   let child = null;
   let interrupted = null;
   const onSignal = (signal) => {
@@ -111,18 +118,18 @@ export async function validate({ dir, keepNet = false, reportPath = null }) {
   };
   for (const s of SIGNALS) process.on(s, onSignal);
   try {
-    return await gate({ dir, keepNet, reportPath, interrupted: () => interrupted, onChild: (c) => (child = c) });
+    return await gate({ dir, keepNet: keepNet || reuseNet, reuseNet, testFiles, reportPath, interrupted: () => interrupted, onChild: (c) => (child = c) });
   } finally {
     for (const s of SIGNALS) process.off(s, onSignal);
   }
 }
 
-async function gate({ dir, keepNet, reportPath, interrupted, onChild }) {
+async function gate({ dir, keepNet, reuseNet, testFiles, reportPath, interrupted, onChild }) {
   const run = (script, extra) => runScript({ dir, reportPath, onChild }, script, extra);
   const vitestReport = reportPath ? path.join(path.dirname(reportPath), 'devnet-vitest.json') : null;
   const extraArgs = {
     // CLI reporters replace the config's ['default'], so name it again.
-    'test:local': vitestReport ? ['--reporter=default', '--reporter=json', `--outputFile.json=${vitestReport}`] : [],
+    'test:local': [...(vitestReport ? ['--reporter=default', '--reporter=json', `--outputFile.json=${vitestReport}`] : []), ...testFiles],
   };
 
   const report = {
@@ -130,14 +137,20 @@ async function gate({ dir, keepNet, reportPath, interrupted, onChild }) {
     startedAt: new Date().toISOString(),
     sourceHashStart: sourceHash(dir),
     keepNet,
+    reuseNet,
+    testFiles,
     steps: [],
   };
   if (vitestReport) fs.rmSync(vitestReport, { force: true });
 
-  const steps = [...(compileIsStale(dir) ? ['compile'] : []), 'env:up', 'wait:dust', 'test:local'];
+  const steps = [...(compileIsStale(dir) ? ['compile'] : []), ...(reuseNet ? [] : ['env:up', 'wait:dust']), 'test:local'];
   if (!steps.includes('compile')) {
     console.log('• compile skipped: contract/managed has proving keys and is newer than every .compact source');
     report.steps.push({ step: 'compile', status: 'skipped', ms: 0 });
+  }
+  if (reuseNet) {
+    console.log('• env:up and wait:dust skipped: reusing the network left up');
+    for (const step of ['env:up', 'wait:dust']) report.steps.push({ step, status: 'skipped', ms: 0 });
   }
 
   let failed = null;
@@ -182,6 +195,8 @@ async function gate({ dir, keepNet, reportPath, interrupted, onChild }) {
             passed: tests.numPassedTests,
             failed: tests.numFailedTests,
             failures: vitestFailures(tests, dir),
+            // Each test file's result, relative to the project: which files passed.
+            files: (tests.testResults ?? []).map((f) => ({ file: path.relative(dir, f.name ?? '').split(path.sep).join('/'), status: f.status })),
           }
         : null,
     });

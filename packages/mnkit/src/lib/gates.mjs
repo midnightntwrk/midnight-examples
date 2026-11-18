@@ -67,6 +67,20 @@ export function sourceHash(exampleDir) {
   return h.digest('hex');
 }
 
+/**
+ * sha256 of each source file (sourceFiles), keyed by its path relative to the
+ * example with / separators. The pipeline compares two of these to tell a
+ * test-only edit from one that needs a fresh devnet run.
+ */
+export function sourceFileHashes(exampleDir) {
+  return Object.fromEntries(
+    sourceFiles(exampleDir).map((p) => [
+      path.relative(exampleDir, p).split(path.sep).join('/'),
+      crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'),
+    ]),
+  );
+}
+
 /** contract/managed/<c>/compiler/contract-info.json for every compiled contract. */
 export function contractInfos(exampleDir) {
   const managedDir = path.join(exampleDir, 'contract', 'managed');

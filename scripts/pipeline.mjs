@@ -47,7 +47,10 @@
 // compiles (a compile would delete the proving keys under the running tests).
 // A change to the contract-level sources (contract/, src/, package.json; ui/
 // doesn't count) makes the run stale: the next pipeline run cancels it and,
-// once the in-memory gate passes again, starts a fresh one. new:ui and
+// once the in-memory gate passes again, starts a fresh one. After a test-only
+// edit (src/test/*.test.ts) on a network a run left up, it resumes instead:
+// validate --reuse-net re-runs only the devnet test files without a pass on
+// the current sources (.gates/devnet-passes.json). new:ui and
 // `npm install` run before the devnet starts, so the install never rewrites
 // node_modules under a running test.
 //
@@ -77,6 +80,7 @@ import {
   contractInfos,
   gatePath,
   readJson,
+  sourceFileHashes,
   sourceHash,
   walk,
   writeJson,
@@ -118,6 +122,12 @@ const REPORT = gatePath(DIR, 'devnet.json');
 const SIM_STAMP = gatePath(DIR, 'sim.json');
 const SEEDS = gatePath(DIR, 'ui-seeds.json');
 const UI_STAMP = gatePath(DIR, 'ui.json');
+// The per-file source hashes the last devnet run started on; the devnet test
+// files that passed, for one hash of everything else; and a marker that the
+// last run left a network up with DUST in its wallets.
+const DEVNET_FILES = gatePath(DIR, 'devnet-files.json');
+const PASSES = gatePath(DIR, 'devnet-passes.json');
+const NET = gatePath(DIR, 'devnet-net.json');
 
 // What to read when sent back to a step: the context budget in
 // docs/generation-flow.md, by step.
@@ -247,7 +257,9 @@ function devnetStatus() {
       failedStep: report.failedStep ?? undefined,
       steps: report.steps?.map((s) => ({ step: s.step, status: s.status, ms: s.ms })),
       tests: report.tests ? { passed: report.tests.passed, total: report.tests.total } : undefined,
+      resumed: report.reuseNet ? report.testFiles : undefined,
     });
+    recordRun(report);
     fs.rmSync(LOCK, { force: true });
   }
   if (!report) return { status: 'none' };
@@ -258,46 +270,152 @@ function devnetStatus() {
 
 function describeDevnet(d) {
   if (d.status === 'running') return `running (pid ${d.pid}, started ${d.startedAt}; log: ${rel(path.join(DIR, 'logs', 'devnet.log'))})`;
+  if (d.status === 'passed' && !d.stale && d.report?.reuseNet) return `passed (the last run re-ran ${d.report.testFiles.join(', ')} on the network left up)`;
   if (d.status === 'passed') return `passed${d.stale ? ' on older sources (stale)' : `, ${d.report?.tests?.passed ?? '?'} tests`}`;
   if (d.status === 'failed') return `failed at ${d.report?.failedStep ?? 'an unknown step'}${d.stale ? ' on older sources (stale)' : ''}`;
   return d.status;
 }
 
-function cancelDevnet(reason) {
+/**
+ * A test file, devnet or sim: an edit to only these keeps the network and the
+ * other files' devnet passes. The devnet suite is every src/test/*.test.ts but
+ * the sim tests, as the template's `test` script runs it.
+ */
+const isTestFile = (f) => /^src\/test\/.+\.test\.ts$/.test(f);
+const isDevnetTest = (f) => isTestFile(f) && !f.endsWith('.sim.test.ts');
+
+/** sha256 over every source file but the test files: what each devnet test file's pass also depends on. */
+function baseHash(files) {
+  const h = crypto.createHash('sha256');
+  for (const f of Object.keys(files).sort()) if (!isTestFile(f)) h.update(`${f}\0${files[f]}\0`);
+  return h.digest('hex');
+}
+
+/** The devnet test files with no pass on the current sources (`files`: sourceFileHashes). */
+function uncovered(files) {
+  const passes = readJson(PASSES);
+  const tests = Object.keys(files).filter(isDevnetTest);
+  if (passes?.baseHash !== baseHash(files)) return tests;
+  return tests.filter((f) => passes.files?.[f] !== files[f]);
+}
+
+/** Every devnet test file passed on the current sources, in one run or built up over resumed ones. */
+function covered(files) {
+  return readJson(PASSES)?.baseHash === baseHash(files) && uncovered(files).length === 0;
+}
+
+/**
+ * Record a finished (or cancelled) run: whether it left a usable network up,
+ * and which devnet test files passed on the sources it started on. A run whose
+ * sources changed mid-run, or that was stopped, records no passes.
+ */
+function recordRun(report) {
+  const files = readJson(DEVNET_FILES);
+  if (!report || !files) return;
+  const ready = (id) => ['pass', ...(report.reuseNet ? ['skipped'] : [])].includes(report.steps?.find((x) => x.step === id)?.status);
+  // A run stopped during test:local may have left a transaction in flight that
+  // spent a DUST coin: a run started on that network right away can spend it
+  // again (node error 196, DustDoubleSpend). Only a finished test:local leaves
+  // a network to resume on.
+  const inFlight = report.interrupted && report.failedStep === 'test:local';
+  if (report.networkLeftUp && ready('env:up') && ready('wait:dust') && !inFlight) writeJson(NET, { at: report.finishedAt ?? new Date().toISOString() });
+  else fs.rmSync(NET, { force: true });
+  if (!report.tests?.files || report.interrupted || report.sourceHashEnd !== report.sourceHashStart) return;
+  const base = baseHash(files);
+  const prev = readJson(PASSES);
+  const record = prev?.baseHash === base ? prev : { baseHash: base, files: {} };
+  const passed = new Set(report.tests.files.filter((f) => f.status === 'passed').map((f) => f.file));
+  const ran = report.testFiles?.length ? report.testFiles : Object.keys(files).filter(isDevnetTest);
+  for (const f of ran) {
+    if (passed.has(f) && files[f]) record.files[f] = files[f];
+    else delete record.files[f];
+  }
+  writeJson(PASSES, record);
+}
+
+/** The example's compose services are all running, and healthy where they have a health check. */
+function networkUp() {
+  const services = spawnSync('docker', ['compose', 'config', '--services'], { cwd: DIR, encoding: 'utf8' });
+  const ps = spawnSync('docker', ['compose', 'ps', '--format', '{{.Service}}\t{{.State}}\t{{.Health}}'], { cwd: DIR, encoding: 'utf8' });
+  if (services.status !== 0 || ps.status !== 0) return false;
+  const up = new Set(
+    ps.stdout
+      .split('\n')
+      .map((l) => l.split('\t'))
+      .filter(([, state, health]) => state === 'running' && (!health || health === 'healthy'))
+      .map(([service]) => service),
+  );
+  const want = services.stdout.split('\n').filter(Boolean);
+  return want.length > 0 && want.every((x) => up.has(x));
+}
+
+/**
+ * A devnet run can resume on the network left up: nothing but test files
+ * changed since the last full run, that network is still up with DUST, and
+ * the compiled contract is current.
+ */
+function canResume(files) {
+  return readJson(PASSES)?.baseHash === baseHash(files) && fs.existsSync(NET) && !compileIsStale(DIR) && networkUp();
+}
+
+/**
+ * Stop the background run and wait for it to exit (validate stops its step,
+ * then writes its report), so nothing it writes lands after a new run starts.
+ * It leaves the network up (--keep-net). A run stopped before test:local can
+ * be resumed; one stopped during it can't (recordRun).
+ */
+async function cancelDevnet(reason) {
   const lock = readJson(LOCK);
   if (lock && alive(lock.pid)) {
-    try {
-      process.kill(-lock.pid, 'SIGTERM'); // the whole process group: npm, vitest, docker compose
-    } catch {
-      process.kill(lock.pid, 'SIGTERM');
-    }
+    const signal = (sig) => {
+      try {
+        process.kill(-lock.pid, sig); // the whole process group: validate and its steps
+      } catch {
+        try {
+          process.kill(lock.pid, sig);
+        } catch {}
+      }
+    };
+    signal('SIGTERM');
+    for (let i = 0; i < 60 && alive(lock.pid); i++) await new Promise((r) => setTimeout(r, 250));
+    if (alive(lock.pid)) signal('SIGKILL');
     log({ step: 'devnet', status: 'cancelled', reason });
+    const report = readJson(REPORT);
+    if (report && report.startedAt >= lock.startedAt) recordRun(report);
   }
   fs.rmSync(LOCK, { force: true });
   fs.rmSync(REPORT, { force: true });
 }
 
-function startDevnet(hash) {
+/** Start validate in the background: a full run, or (`resume`: test files) one on the network left up. */
+function startDevnet(hash, files, resume = null) {
   fs.rmSync(REPORT, { force: true });
   fs.rmSync(gatePath(DIR, 'devnet-fix.md'), { force: true });
+  writeJson(DEVNET_FILES, files);
+  if (!resume) {
+    fs.rmSync(NET, { force: true });
+    writeJson(PASSES, { baseHash: baseHash(files), files: {} });
+  }
   fs.mkdirSync(path.join(DIR, 'logs'), { recursive: true });
   const out = fs.openSync(path.join(DIR, 'logs', 'devnet.log'), 'w');
-  const child = spawn(process.execPath, [path.join(REPO_ROOT, 'scripts', 'validate-example.mjs'), '--keep-net', '--report', REPORT], {
+  const args = ['--keep-net', '--report', REPORT, ...(resume ? ['--reuse-net', '--files', resume.join(',')] : [])];
+  const child = spawn(process.execPath, [path.join(REPO_ROOT, 'scripts', 'validate-example.mjs'), ...args], {
     cwd: DIR,
     detached: true,
     stdio: ['ignore', out, out],
     env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
   });
   child.unref();
-  const lock = { pid: child.pid, sourceHash: hash, startedAt: new Date().toISOString() };
+  const lock = { pid: child.pid, sourceHash: hash, startedAt: new Date().toISOString(), ...(resume ? { resume } : {}) };
   writeJson(LOCK, lock);
-  log({ step: 'devnet', status: 'started', pid: child.pid });
+  log({ step: 'devnet', status: 'started', pid: child.pid, resume: resume ?? undefined });
   return { status: 'running', ...lock };
 }
 
 /** For a failed run: write the fix plan, and return the `next` action for it. */
 function devnetFailureNext(d) {
-  const plan = triage(d.report, name);
+  const devnetLog = path.join(DIR, 'logs', 'devnet.log');
+  const plan = triage(d.report, name, fs.existsSync(devnetLog) ? fs.readFileSync(devnetLog, 'utf8') : '');
   const fixPath = gatePath(DIR, 'devnet-fix.md');
   fs.writeFileSync(fixPath, fixPlanMarkdown(plan, name, d.report));
   return {
@@ -335,7 +453,7 @@ if (!fs.existsSync(path.join(DIR, 'package.json'))) {
 }
 
 if (opts.cancel) {
-  cancelDevnet('--cancel-devnet');
+  await cancelDevnet('--cancel-devnet');
   console.log(`✔ background devnet for ${name} cancelled (the network is still up: \`npm run env:down\` in examples/${name})`);
   process.exit(0);
 }
@@ -347,7 +465,8 @@ if (opts.wait) {
     await new Promise((r) => setTimeout(r, 5000));
     d = devnetStatus();
   }
-  d.stale = d.sourceHash !== sourceHash(DIR);
+  const current = sourceHash(DIR);
+  d.stale = d.status === 'passed' ? !(covered(sourceFileHashes(DIR)) || d.sourceHash === current) : d.sourceHash !== current;
   state.devnet = d;
   if (d.status === 'passed' && !d.stale) state.next = { kind: 'pass', reason: `the devnet passed on the current sources. Run \`npm run pipeline ${name}\` to finish` };
   else if (d.stale) state.next = { kind: 'reason', reason: `the run finished on older sources; run \`npm run pipeline ${name}\` to start a fresh one` };
@@ -364,7 +483,7 @@ let hash = sourceHash(DIR);
 // before anything below compiles under it.
 const before = devnetStatus();
 if (before.status === 'running' && before.sourceHash !== hash) {
-  cancelDevnet('sources changed');
+  await cancelDevnet('sources changed');
   if (!opts.json) console.log('• devnet: cancelled the background run (the contract, witnesses or tests changed since it started)');
 }
 
@@ -418,7 +537,7 @@ if (compiledOutOfDate && devnetStatus().status === 'running') {
   if (derived !== hash) {
     hash = derived;
     const d = devnetStatus();
-    if (d.status === 'running' && d.sourceHash !== hash) cancelDevnet('derive changed the sources');
+    if (d.status === 'running' && d.sourceHash !== hash) await cancelDevnet('derive changed the sources');
   }
 }
 
@@ -566,18 +685,29 @@ else step('new:ui', 'skipped', { note: 'ui/ exists' });
 
 // 4 · the devnet, in the background
 devnet = devnetStatus();
+const fileHashes = sourceFileHashes(DIR);
 if (devnet.status === 'running') {
-  step('devnet', 'running', { note: `pid ${devnet.pid}` });
-} else if ((devnet.status === 'passed' || devnet.status === 'failed') && devnet.sourceHash === hash && !(devnet.status === 'failed' && opts.retry)) {
-  step('devnet', devnet.status === 'passed' ? 'pass' : 'fail', { note: 'on these sources' });
+  step('devnet', 'running', { note: `pid ${devnet.pid}${devnet.resume ? `, re-running ${devnet.resume.join(', ')}` : ''}` });
+} else if (covered(fileHashes) || (devnet.status === 'passed' && devnet.sourceHash === hash)) {
+  // Every devnet test file passed on these sources, maybe over several runs.
+  devnet = { ...devnet, status: 'passed', sourceHash: hash };
+  step('devnet', 'pass', { note: 'on these sources' });
+} else if (devnet.status === 'failed' && devnet.sourceHash === hash && !opts.retry) {
+  step('devnet', 'fail', { note: 'on these sources' });
 } else {
   const docker = checkDocker();
   if (docker) {
     step('devnet', 'fail', { note: docker });
     stop({ kind: 'infra', step: '4', reason: `the devnet can't start: ${docker}`, run: [`npm run pipeline ${name}`] });
   }
-  devnet = startDevnet(hash);
-  step('devnet', 'running', { note: `started in the background, pid ${devnet.pid}; log: ${rel(path.join(DIR, 'logs', 'devnet.log'))}` });
+  // After a test-only edit, re-run only what has no pass yet on the network left up.
+  // --retry-devnet always starts from a fresh env:up.
+  const resume = !opts.retry && canResume(fileHashes) ? uncovered(fileHashes) : null;
+  devnet = startDevnet(hash, fileHashes, resume);
+  const where = `pid ${devnet.pid}; log: ${rel(path.join(DIR, 'logs', 'devnet.log'))}`;
+  step('devnet', 'running', {
+    note: resume ? `resumed on the network left up, re-running ${resume.join(', ')}; ${where}` : `started in the background, ${where}`,
+  });
 }
 state.devnet = devnet;
 
