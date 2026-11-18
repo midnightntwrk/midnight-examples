@@ -232,6 +232,13 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
 
 ## Changelog
 
+- 2026-11-18: Dropped the unrun Phase 4 baseline plan (`plannedRun` in
+  `reports/generation-baseline.json`). It measured `example-coins` imports and
+  `yarn pipeline`, which https://github.com/midnightntwrk/midnight-examples/issues/82
+  and the move to npm removed
+  (https://github.com/midnightntwrk/midnight-examples/issues/11). A new baseline
+  would be planned against the current flow.
+
 - 2026-11-01: Examples import only published `@midnight-ntwrk/*` packages
   (https://github.com/midnightntwrk/midnight-examples/issues/82). Each example,
   and each one `new:example` scaffolds, carries `src/wallet.ts` (on
