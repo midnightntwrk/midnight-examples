@@ -17,10 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Pre-seed fast sync: the `preseed/` bundles, `npm run preseed:cut`, `FAST-SYNC.md` and the `_BIRTHDAY` lines that `npm run wallets:new` wrote. It was off on Ledger 9 (wallet SDK 2 changed the snapshot format it rewrote), and the Preview bundle came from the chain before the 6 November reset, which made `wallets:new` fail on Preview ([issue 91](https://github.com/midnightntwrk/midnight-examples/issues/91)). Saved wallet state and `skipLedgerV8DustHistory` keep remote syncs short.
 - `@midnight-ntwrk/midnight-js-network-id` and every `setNetworkId()` call, from the examples, their UIs, the mnkit templates, `@midnightntwrk/mnkit-wallet` (no longer a peer dependency) and `toolchain.json`. Midnight.js 5.0.0 doesn't read the global network ID; the providers take `config.networkId`.
 
 ### Fixed
 
+- Saved wallet state (`.wallet-state/`) is checked before it is restored: each save records the indexer's host and its tip (height and block hash), and a state from another indexer, or from a chain that was reset since (Preview kept its genesis hash through the 6 November reset), is not restored, so that wallet syncs from genesis. Files saved before this change are restored once and stamped on their next save ([issue 91](https://github.com/midnightntwrk/midnight-examples/issues/91)).
 - `examples/shielded-chips`: the "Alice burns from the treasury" end-to-end test runs again. It was skipped on Ledger 9 because the node rejected `burnFromTreasury` with `Custom error: 104` ([midnight-ledger issue 839](https://github.com/midnightntwrk/midnight-ledger/issues/839)); the 1.1-patch's ledger-v9 1.0.2 fixes that on the client side, and the test passes on Preview.
 - `examples/zk-loan`: the Schnorr verifier's `response` is a `JubjubScalar` now, so the generated witness type check rejects `s + order` (the old `response as JubjubScalar` cast reduced it back to `s`); signers must reduce `s` mod the order. The challenge quotient bound is tight: `q < 115`, or `q == 115` with the remainder below `P - 115 * 2^248`. With `q < 116` about 0.06% of challenge hashes had two accepted `(q, r)` pairs. Three simulator tests cover it, and the tutorials match the code. `requestLoan`'s circuit changes, so its prover and verifier keys change: redeploy rather than pointing a rebuilt UI at an existing contract.
 
@@ -43,5 +45,5 @@ The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-
 ### Toolchain
 
 - Generated projects are on the Ledger 9 stack: Compact compiler 0.36.1 (language 0.28), Midnight.js 5.0.1, testkit-js 5.0.1, wallet SDK 2.0.1 (`@midnightntwrk/wallet-sdk`), proof server 9.0.2. The examples, their UIs and mnkit now share one set of pins in `toolchain.json`.
-- Pre-seed fast sync is disabled until it is ported to wallet SDK 2: a `fastSync` option is accepted and ignored, and `preseed:cut` refuses to run. See FAST-SYNC.md.
+- Pre-seed fast sync is removed from `@midnightntwrk/mnkit-wallet`: `MidnightWalletProvider.build` and `assembleWallet` no longer take a `fastSync` option, `resolveWallet` no longer returns one or reads `_BIRTHDAY`, and `getOrCreateTestWallet` no longer takes or records a chain tip. `isSeedable`, `preSeedNewWallet`, `findReferenceRoot`, `loadReferenceBundle`, `readReferenceBundle` and `checkChainIdentity` are gone. Saved wallet state is checked against the chain before it is restored; `readChainStamp` and `checkChainStamp` are exported for the same check elsewhere.
 - The local devnet (`compose.yml`) runs node 2.1.101 and indexer 4.4.101, so `mnkit validate` and the other local-network steps work on Ledger 9.

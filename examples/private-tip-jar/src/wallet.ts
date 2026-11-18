@@ -332,11 +332,65 @@ export async function syncWallet(
 // same wallet restores it and syncs only the gap. The local devnet is skipped:
 // it starts from a new genesis each time. MIDNIGHT_WALLET_STATE=off turns this
 // off.
+//
+// Each save is stamped with the indexer's host and its tip (height and block
+// hash), and a restore checks the stamp first. A network reset can keep the
+// genesis hash (Preview's on 6 November 2026 did), so without the check a state
+// from the old chain would be restored onto the new one. And indexers number
+// events differently (Blockfrost's preprod ids run 22 behind the official
+// indexer's), so a state from another indexer would resume from the wrong
+// cursors. If the check fails, the wallet syncs from genesis and the next save
+// replaces the file. A version 1 file (from before stamping) is restored as
+// before and gets its stamp on the next save.
 
 const STATE_DIR = fileURLToPath(new URL('../../../.wallet-state/', import.meta.url));
-const stateFiles = new WeakMap<WalletFacade, string>();
+const stateFiles = new WeakMap<WalletFacade, { file: string; indexer: string }>();
 
-type SavedWalletState = { version: 1; shielded: string; unshielded: string; dust: string };
+type SubWalletStates = { shielded: string; unshielded: string; dust: string };
+/** Where a state was synced: the indexer's host (never its URL, which can carry a token) and a block on its chain. */
+type ChainStamp = { indexer: string; height: number; blockHash: string };
+type SavedWalletState = ({ version: 1 } | { version: 2; chain: ChainStamp }) & SubWalletStates;
+
+/** POST a GraphQL query to the indexer; undefined if it can't be reached. */
+async function indexerQuery<T>(indexerHttpUrl: string, query: string): Promise<T | undefined> {
+  try {
+    const res = await fetch(indexerHttpUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    return res.ok ? ((await res.json()) as { data?: T }).data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** A stamp for the indexer's current tip, or undefined if it can't be read. */
+async function readChainStamp(indexerHttpUrl: string): Promise<ChainStamp | undefined> {
+  const data = await indexerQuery<{ block?: { height?: number; hash?: string } | null }>(
+    indexerHttpUrl,
+    '{ block { height hash } }',
+  );
+  const height = data?.block?.height;
+  const blockHash = data?.block?.hash;
+  if (typeof height !== 'number' || height <= 0 || typeof blockHash !== 'string') return undefined;
+  return { indexer: new URL(indexerHttpUrl).host, height, blockHash };
+}
+
+/** Null when `stamp` is from this indexer and its block is still on the chain, else why not. */
+async function checkChainStamp(indexerHttpUrl: string, stamp: ChainStamp): Promise<string | null> {
+  const host = new URL(indexerHttpUrl).host;
+  if (stamp.indexer !== host) return `it was synced against ${stamp.indexer}, not ${host}`;
+  const data = await indexerQuery<{ block?: { hash?: string } | null }>(
+    indexerHttpUrl,
+    `{ block(offset: { height: ${Math.trunc(stamp.height)} }) { hash } }`,
+  );
+  const hash = data?.block?.hash;
+  if (typeof hash !== 'string') return `the indexer has no block ${stamp.height} or can't be reached (was the network reset?)`;
+  if (hash !== stamp.blockHash) return `block ${stamp.height} is ${hash}, not ${stamp.blockHash} (was the network reset?)`;
+  return null;
+}
 
 function stateFileFor(networkId: string, masterSeed: string): string | undefined {
   if (networkId === 'undeployed' || process.env['MIDNIGHT_WALLET_STATE'] === 'off') return undefined;
@@ -403,22 +457,40 @@ async function restoreSavedState(
   let wallet = fresh;
   if (file && existsSync(file)) {
     try {
-      wallet = await restoreFacade(builder, dustOptions, JSON.parse(readFileSync(file, 'utf8')) as SavedWalletState);
-      logger.info(`Restored wallet state from ${file}.`);
+      const saved = JSON.parse(readFileSync(file, 'utf8')) as SavedWalletState;
+      const mismatch = saved.version === 2 ? await checkChainStamp(env.indexer, saved.chain) : null;
+      if (mismatch) {
+        logger.warn(`Not restoring ${file}: ${mismatch}. Syncing from genesis.`);
+      } else {
+        wallet = await restoreFacade(builder, dustOptions, saved);
+        logger.info(
+          saved.version === 2
+            ? `Restored wallet state from ${file} (chain check passed at block ${saved.chain.height}).`
+            : `Restored wallet state from ${file} (no chain stamp yet; it gets one on the next save).`,
+        );
+      }
     } catch (error) {
       logger.warn(`Could not restore ${file} (${String(error)}); syncing from genesis.`);
     }
   }
-  if (file) stateFiles.set(wallet, file);
+  if (file) stateFiles.set(wallet, { file, indexer: env.indexer });
   return wallet;
 }
 
 /** Save the wallet's state for the next build of the same wallet (no-op on the local devnet). */
 export async function saveWalletState(logger: Logger, wallet: WalletFacade): Promise<void> {
-  const file = stateFiles.get(wallet);
-  if (!file) return;
+  const target = stateFiles.get(wallet);
+  if (!target) return;
+  const { file } = target;
+  const chain = await readChainStamp(target.indexer);
+  if (!chain) {
+    // An unstamped save could never be checked, so keep the previous file.
+    logger.warn(`Could not read the chain tip from the indexer; not saving wallet state to ${file}.`);
+    return;
+  }
   const saved: SavedWalletState = {
-    version: 1,
+    version: 2,
+    chain,
     shielded: await wallet.shielded.serializeState(),
     unshielded: await wallet.unshielded.serializeState(),
     dust: await wallet.dust.serializeState(),

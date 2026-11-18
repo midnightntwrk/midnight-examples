@@ -50,7 +50,7 @@ import {
 import * as Rx from 'rxjs';
 import type { Logger } from 'pino';
 
-import { type FastSyncOptions } from './fast-wallet.js';
+import { type ChainStamp, checkChainStamp, readChainStamp } from './chain-identity.js';
 import type { WalletSecret } from './types.js';
 
 // A proven, not yet bound ledger 9 transaction: what a contract call or deploy
@@ -211,24 +211,14 @@ export class MidnightWalletProvider implements Ledger9WalletProvider {
    * Build an un-started wallet provider.
    *
    * This is the normal `FluentWalletBuilder` path. On a remote network, a
-   * wallet synced before with the same seed is restored from its saved state.
-   * `opts.fastSync` (pre-seeding from a shipped reference bundle) is accepted
-   * but disabled until it is ported to wallet SDK 2; see FAST-SYNC.md.
+   * wallet synced before with the same seed is restored from its saved state,
+   * when that state belongs to the chain the network serves now.
    */
   static async build(
     logger: Logger,
     env: EnvironmentConfiguration,
     secret: WalletSecret,
-    opts?: { fastSync?: FastSyncOptions },
   ): Promise<MidnightWalletProvider> {
-    if (opts?.fastSync) {
-      // Pre-seeding rewrites wallet SDK v1 snapshots and is not ported to
-      // wallet SDK 2 (Ledger 9) yet, so it is off: every wallet takes the
-      // normal path below, and saved state (remote networks) makes later
-      // builds of the same wallet fast instead. See FAST-SYNC.md.
-      logger.info('Fast-sync pre-seeding is disabled on Ledger 9; using the normal sync (with saved state).');
-    }
-
     const dustOptions: DustWalletOptions = {
       ledgerParams: LedgerParameters.initialParameters(),
       additionalFeeOverhead: 1_000n,
@@ -327,11 +317,21 @@ export async function syncWallet(
 // it starts from a new genesis each time. MIDNIGHT_WALLET_STATE=off turns this
 // off. The directory is .wallet-state/ under the working directory (the
 // project root when run through npm scripts), or MIDNIGHT_WALLET_STATE_DIR.
+//
+// Each save is stamped with the indexer's host and its tip (height and block
+// hash), and a restore checks the stamp first (chain-identity.ts). A network
+// reset can keep the genesis hash, so without the check a state from the old
+// chain would be restored onto the new one, and a state from another indexer
+// would resume from cursors that indexer numbers differently. If the check
+// fails, the wallet syncs from genesis and the next save replaces the file.
+// A version 1 file (from before stamping) is restored as before and gets its
+// stamp on the next save.
 
 const stateDir = (): string => resolve(process.env['MIDNIGHT_WALLET_STATE_DIR'] ?? '.wallet-state');
-const stateFiles = new WeakMap<WalletFacade, string>();
+const stateFiles = new WeakMap<WalletFacade, { file: string; indexer: string }>();
 
-type SavedWalletState = { version: 1; shielded: string; unshielded: string; dust: string };
+type SubWalletStates = { shielded: string; unshielded: string; dust: string };
+type SavedWalletState = ({ version: 1 } | { version: 2; chain: ChainStamp }) & SubWalletStates;
 
 function stateFileFor(networkId: string, masterSeed: string): string | undefined {
   if (networkId === 'undeployed' || process.env['MIDNIGHT_WALLET_STATE'] === 'off') return undefined;
@@ -343,7 +343,7 @@ function stateFileFor(networkId: string, masterSeed: string): string | undefined
 async function restoreFacade(
   builder: FluentWalletBuilder,
   dustOptions: DustWalletOptions,
-  saved: SavedWalletState,
+  saved: SubWalletStates,
 ): Promise<WalletFacade> {
   // testkit keeps the builder's wallet configuration private and does not
   // export the function that derives it; reuse it so a restored wallet is
@@ -383,22 +383,40 @@ async function restoreSavedState(
   let wallet = fresh;
   if (file && existsSync(file)) {
     try {
-      wallet = await restoreFacade(builder, dustOptions, JSON.parse(readFileSync(file, 'utf8')) as SavedWalletState);
-      logger.info(`Restored wallet state from ${file}.`);
+      const saved = JSON.parse(readFileSync(file, 'utf8')) as SavedWalletState;
+      const mismatch = saved.version === 2 ? await checkChainStamp(env.indexer, saved.chain) : null;
+      if (mismatch) {
+        logger.warn(`Not restoring ${file}: ${mismatch}. Syncing from genesis.`);
+      } else {
+        wallet = await restoreFacade(builder, dustOptions, saved);
+        logger.info(
+          saved.version === 2
+            ? `Restored wallet state from ${file} (chain check passed at block ${saved.chain.height}).`
+            : `Restored wallet state from ${file} (no chain stamp yet; it gets one on the next save).`,
+        );
+      }
     } catch (error) {
       logger.warn(`Could not restore ${file} (${String(error)}); syncing from genesis.`);
     }
   }
-  if (file) stateFiles.set(wallet, file);
+  if (file) stateFiles.set(wallet, { file, indexer: env.indexer });
   return wallet;
 }
 
 /** Save the wallet's state for the next build of the same wallet (no-op on the local devnet). */
 export async function saveWalletState(logger: Logger, wallet: WalletFacade): Promise<void> {
-  const file = stateFiles.get(wallet);
-  if (!file) return;
+  const target = stateFiles.get(wallet);
+  if (!target) return;
+  const { file } = target;
+  const chain = await readChainStamp(target.indexer);
+  if (!chain) {
+    // An unstamped save could never be checked, so keep the previous file.
+    logger.warn(`Could not read the chain tip from the indexer; not saving wallet state to ${file}.`);
+    return;
+  }
   const saved: SavedWalletState = {
-    version: 1,
+    version: 2,
+    chain,
     shielded: await wallet.shielded.serializeState(),
     unshielded: await wallet.unshielded.serializeState(),
     dust: await wallet.dust.serializeState(),

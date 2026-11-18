@@ -68,8 +68,8 @@ const syncTimeoutMs = Number(
  * Build, start, sync, and (on a remote network) fund-gate one wallet.
  *
  * Locally, ALICE and BOB are the genesis-funded seeds 01 and 02. Remotely they
- * are the shared wallets in the repo-root .env.<network>, fast-syncing from the
- * reference bundle when a birthday is recorded. See FAST-SYNC.md.
+ * are the shared wallets in the repo-root .env.<network>; saved wallet state
+ * makes every run after the first sync only the gap.
  */
 async function buildWallet(
   role: 'ALICE' | 'BOB',
@@ -77,9 +77,7 @@ async function buildWallet(
   faucet: string,
 ): Promise<MidnightWalletProvider> {
   const setup = resolveWallet(network, role);
-  const w = await MidnightWalletProvider.build(logger, env, setup.secret, {
-    fastSync: setup.fastSync,
-  });
+  const w = await MidnightWalletProvider.build(logger, env, setup.secret);
   await w.start();
   await syncWallet(logger, w.wallet, syncTimeoutMs);
   if (isRemote) {

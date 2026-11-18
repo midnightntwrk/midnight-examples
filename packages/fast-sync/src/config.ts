@@ -38,8 +38,8 @@ export const PREVIEW_CONFIG: NetworkConfig = {
 // must never be written into a source file.
 //
 // Blockfrost numbers ledger events and transactions differently from the
-// official indexer, so a preseed bundle or saved wallet state is only valid on
-// the indexer that produced it. See FAST-SYNC.md.
+// official indexer, so saved wallet state is only valid on the indexer that
+// produced it (see chain-identity.ts).
 export function withBlockfrostKey(url: string, projectId: string): string {
   const sep = url.includes('?') ? '&' : '?';
   return `${url}${sep}project_id=${encodeURIComponent(projectId)}`;

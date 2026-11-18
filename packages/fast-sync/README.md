@@ -9,7 +9,12 @@ Test wallets for Midnight projects. Part of
   preview or preprod, `syncWallet` saves the wallet's state to `.wallet-state/`
   (gitignored; `MIDNIGHT_WALLET_STATE_DIR` moves it, `MIDNIGHT_WALLET_STATE=off`
   turns it off) and the next build of the same wallet restores it, so only the
-  blocks since the last run are synced.
+  blocks since the last run are synced. Each save records the indexer's host and
+  its tip (height and block hash), and a restore first checks that block still
+  has that hash on that indexer. A network reset can keep the genesis hash, and
+  indexers number events differently (Blockfrost's preprod ids run 22 behind
+  the official indexer's), so a state from another chain or indexer is not
+  restored: the wallet syncs from genesis and the next save replaces the file.
 - `resolveWallet(network, role?)`: the wallet a suite runs as. Locally, the
   genesis-funded seeds. On preview or preprod, `MIDNIGHT_<NETWORK>_<ROLE>_SEED`
   (or `_MNEMONIC`) from the environment.
@@ -17,11 +22,8 @@ Test wallets for Midnight projects. Part of
   (at least 60 DUST on a remote network; `MIDNIGHT_MIN_DUST` changes it).
 - `getConfig`, `LOCAL_CONFIG`, `PREVIEW_CONFIG`, `preprodConfig`: network
   endpoints.
-- Pre-seed fast sync (`assembleWallet`, `findReferenceRoot`): **disabled on
-  Ledger 9.** It restored a new wallet from a reference bundle by rewriting
-  wallet SDK v1 snapshots, and wallet SDK 2 changed the snapshot format. Until
-  it is ported, a `fastSync` option is accepted and ignored, every wallet syncs
-  normally, and `preseed:cut` refuses to run. See FAST-SYNC.md.
+- `readChainStamp`, `checkChainStamp`: the chain check above, for your own
+  saved state.
 
 ## Install outside mnkit
 

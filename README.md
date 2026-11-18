@@ -65,7 +65,6 @@ mn-examples/
 ├── experimental/q2-ledger9/ # Q2 2026 stagenet suites and the Ledger 9 compatibility matrix
 ├── docs/                 # tutorials sync, Compact patterns and gotchas, the generation flow
 ├── scripts/              # repo tooling: compile, toolchain check, scaffolders, CI path rules
-├── preseed/              # Ledger 8 pre-seed bundles; pre-seeding is off on Ledger 9 (FAST-SYNC.md)
 ├── toolchain.json        # the one toolchain pin (`npm run toolchain:check`)
 ├── tsconfig.base.json    # shared TypeScript compiler options
 ├── vitest.config.ts      # aggregate test projects (per-example configs still own env)
@@ -158,9 +157,10 @@ except `leaderboard` turns on the wallet SDK's `skipLedgerV8DustHistory`, so a n
 wallet's first sync skips the Ledger 8 DUST history (on preprod about 6 minutes
 instead of about 70). After
 each sync, a wallet's state is saved to the gitignored `.wallet-state/` and the
-next run syncs only the gap (`MIDNIGHT_WALLET_STATE=off` turns this off). The
-pre-seed fast sync described in [FAST-SYNC.md](./FAST-SYNC.md) is disabled on
-Ledger 9.
+next run syncs only the gap (`MIDNIGHT_WALLET_STATE=off` turns this off). Each
+saved state records the indexer and a block on its chain, and it isn't restored
+after a network reset or onto another indexer: that wallet syncs from genesis
+again.
 
 ```bash
 cd examples/hello-world && npm run proof:up   # local proof server on :6300

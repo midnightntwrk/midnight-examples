@@ -42,15 +42,8 @@ truth over your own recollection of Midnight/Compact APIs.
   `require("uuid").v5`, which 11.x keeps. Drop the override once the plugin
   widens its range.
 - **Never commit secrets.** Real `.env.preprod` / `.env.preview` and
-  `midnight-level-db/`, `logs/`, wallet preseed state are gitignored. Only the
-  `.env.*.example` templates are tracked. The `preseed/` bundles ARE committed on
-  purpose — they hold public chain state and a public key that gets replaced on
-  restore, no secret.
-- **Never hand-write a `_BIRTHDAY` line in a `.env.<network>`.** It is what
-  authorizes pre-seeding a wallet, and only `npm run wallets:new` — which reads the
-  chain tip as it mints the seed — can state it truthfully. Adding one next to a
-  pre-existing wallet defeats the `isSeedable()` guard and silently hides that
-  wallet's funds. Omitting it is always safe: that wallet just does a full sync.
+  `midnight-level-db/`, `logs/` and `.wallet-state/` (saved wallet sync state)
+  are gitignored. Only the `.env.*.example` templates are tracked.
 - **Remote suites share four wallets** (Alice/Bob/Charlie/Dave, aliased per
   suite by `resolveWallet` in each example's `src/wallet.ts`). Never run them in
   parallel.

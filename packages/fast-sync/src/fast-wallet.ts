@@ -1,11 +1,5 @@
-// Build an un-started WalletFacade and the keys a caller needs alongside it.
-//
-// Fast-sync pre-seeding (restoring a brand-new wallet from a shipped reference
-// bundle so it starts near chain tip) rewrote wallet SDK v1 snapshots and
-// wrapped the v1 sync builders (preseed.ts, dedup.ts). Wallet SDK 2 (Ledger 9)
-// changed both, and pre-seeding is not ported yet, so it is disabled: a
-// `fastSync` option is accepted and ignored, and every wallet is built the way
-// testkit's FluentWalletBuilder builds one. See FAST-SYNC.md.
+// Build an un-started WalletFacade and the keys a caller needs alongside it,
+// the way testkit's FluentWalletBuilder builds one.
 
 import { LedgerParameters, ZswapSecretKeys } from '@midnight-ntwrk/midnight-js-protocol/v9';
 import { type UnshieldedKeystore, type WalletFacade, type WalletSeeds } from '@midnightntwrk/wallet-sdk';
@@ -19,19 +13,6 @@ const DUST_OPTIONS: DustWalletOptions = {
   feeBlocksMargin: 5,
 };
 
-/** Opt-in fast-sync configuration. Omit it entirely for a normal genesis sync. */
-export interface FastSyncOptions {
-  /** Directory holding `<networkId>/{manifest.json,*.dat.gz}` reference bundles. */
-  referenceRoot: string;
-  /**
-   * The wallet's birthday (chain height at creation) for the safety guard. Omit
-   * and it is read from the indexer's current tip — correct ONLY for a wallet
-   * created right now. A wallet with prior history must pass the height it was
-   * created at, or it must not enable fast-sync at all.
-   */
-  birthday?: number;
-}
-
 /** What `assembleWallet` hands back. */
 export interface AssembledWallet {
   facade: WalletFacade;
@@ -39,14 +20,7 @@ export interface AssembledWallet {
   seeds: WalletSeeds;
   zswapSecretKeys: ZswapSecretKeys;
   keystore: UnshieldedKeystore;
-  /** Which sub-wallets were seeded from a reference: always empty while pre-seeding is disabled. */
-  seeded: string[];
-  /** Reference height used: always null while pre-seeding is disabled. */
-  referenceHeight: number | null;
-  /**
-   * The three sub-wallets behind the facade, for `serializeState()` (cutting a
-   * reference bundle). Ordinary callers should drive the facade.
-   */
+  /** The three sub-wallets behind the facade, for `serializeState()`. Ordinary callers should drive the facade. */
   subWallets: {
     shielded: SerializableSubWallet;
     unshielded: SerializableSubWallet;
@@ -54,7 +28,7 @@ export interface AssembledWallet {
   };
 }
 
-/** The one method the bundle cutter needs off a sub-wallet. */
+/** The one method `serializeState()` callers need off a sub-wallet. */
 export interface SerializableSubWallet {
   serializeState(): Promise<string>;
 }
@@ -76,19 +50,12 @@ export async function getChainTipHeight(indexerHttpUrl: string): Promise<number 
   }
 }
 
-/**
- * Derive keys and build an un-started WalletFacade. `fastSync` is accepted for
- * compatibility and ignored while pre-seeding is disabled.
- */
+/** Derive keys and build an un-started WalletFacade. */
 export async function assembleWallet(
   logger: Logger,
   env: EnvironmentConfiguration,
   secret: WalletSecret,
-  fastSync?: FastSyncOptions,
 ): Promise<AssembledWallet> {
-  if (fastSync) {
-    logger.info('Fast-sync pre-seeding is disabled on Ledger 9; syncing normally.');
-  }
   const base = FluentWalletBuilder.forEnvironment(env).withDustOptions(DUST_OPTIONS);
   const builder = secret.kind === 'mnemonic' ? base.withMnemonic(secret.value) : base.withSeed(secret.value);
   const { wallet, seeds, keystore } = await builder.buildWithoutStarting();
@@ -97,8 +64,6 @@ export async function assembleWallet(
     seeds,
     zswapSecretKeys: ZswapSecretKeys.fromSeed(seeds.shielded),
     keystore,
-    seeded: [],
-    referenceHeight: null,
     subWallets: { shielded: wallet.shielded, unshielded: wallet.unshielded, dust: wallet.dust },
   };
 }
