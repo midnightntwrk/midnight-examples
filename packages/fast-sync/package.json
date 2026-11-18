@@ -2,7 +2,7 @@
   "name": "@midnightntwrk/mnkit-wallet",
   "version": "0.2.0-rc.2",
   "type": "module",
-  "description": "Test wallets for Midnight projects: the MidnightWalletProvider, network config for local, preview and preprod, seed resolution, pre-seed fast sync and the DUST funding gate. Part of mnkit.",
+  "description": "Test wallets for Midnight projects: the MidnightWalletProvider, network config for local, preview and preprod, seed resolution, saved wallet state and the DUST funding gate. Part of mnkit.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -32,7 +32,6 @@
     "typecheck": "tsc --noEmit -p .",
     "test:sim": "vitest run",
     "wallets:new": "vite-node scripts/new-preprod-wallets.ts",
-    "preseed:cut": "vite-node scripts/cut-preseed.ts",
     "fund:wallet": "vite-node scripts/fund-wallet.ts"
   },
   "dependencies": {

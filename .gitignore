@@ -38,8 +38,6 @@ packages/*/LICENSE
 **/deployments/local.json
 # Gate stamps, the background devnet lock and its reports (packages/mnkit/src/lib/gates.mjs)
 **/.gates/
-# scratch dir used while re-cutting a pre-seed bundle; only present mid-cut
-preseed/.staging-*/
 
 # OS / editor
 .DS_Store

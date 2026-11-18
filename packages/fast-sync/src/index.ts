@@ -1,5 +1,5 @@
 // Shared test-wallet harness for running the examples against a remote
-// Midnight network (preview / preprod). See FAST-SYNC.md at the repo root.
+// Midnight network (preview / preprod).
 
 export type { WalletSecret } from './types.js';
 export {
@@ -15,25 +15,10 @@ export {
   assembleWallet,
   getChainTipHeight,
   type AssembledWallet,
-  type FastSyncOptions,
   type SerializableSubWallet,
 } from './fast-wallet.js';
+export { checkChainStamp, getBlockHash, readChainStamp, type ChainStamp } from './chain-identity.js';
 export {
-  isSeedable,
-  preSeedNewWallet,
-  type NewWalletKeys,
-  type SeededSnapshots,
-} from './preseed.js';
-export {
-  checkChainIdentity,
-  getBlockHash,
-  loadReferenceBundle,
-  readReferenceBundle,
-  type EmptyRefStates,
-  type ReferenceBundleResult,
-} from './reference-bundle.js';
-export {
-  findReferenceRoot,
   LOCAL_SEEDS,
   resolveWallet,
   type CanonicalRole,

@@ -29,7 +29,6 @@
     "fixtures:regen": "node packages/mnkit/test/fixtures/regen.mjs",
     "pipeline": "node scripts/pipeline.mjs",
     "wallets:new": "npm run wallets:new -w @midnightntwrk/mnkit-wallet --",
-    "preseed:cut": "npm run preseed:cut -w @midnightntwrk/mnkit-wallet --",
     "fund:wallet": "npm run fund:wallet -w @midnightntwrk/mnkit-wallet --",
     "compile": "node scripts/each-workspace.mjs compile",
     "compile:fast": "node scripts/each-workspace.mjs compile:fast",

@@ -111,14 +111,7 @@ describe(`__Title__ Contract (${network})`, () => {
     // @endif
     // (e.g. resolveWallet(network, 'BOB')) if your suite needs more than one.
     const setup = resolveWallet(network);
-    // @if monorepo
     wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
-    // @endif
-    // @if standalone
-    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret, {
-      fastSync: setup.fastSync,
-    });
-    // @endif
     await wallet.start();
     await syncWallet(logger, wallet.wallet, syncTimeoutMs);
 

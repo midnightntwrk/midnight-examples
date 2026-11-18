@@ -208,12 +208,7 @@ if (replaced) {
 }
 
 const setup = resolveWallet(network);
-// @if monorepo
 const wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
-// @endif
-// @if standalone
-const wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret, { fastSync: setup.fastSync });
-// @endif
 await wallet.start();
 try {
   await syncWallet(logger, wallet.wallet, syncTimeoutMs);
