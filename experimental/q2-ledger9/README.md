@@ -66,7 +66,9 @@ npm run test:local      # against that devnet on :9944 / :8088
 The devnet uses the same ports as the mn-examples local network. Stop that
 network first, or these suites will talk to the wrong node and proof server.
 
-The suites source secrets from `.env.<network>` via vitest's `loadEnv`. On remote
+The suites source secrets from `.env.<network>` via vitest's `loadEnv`. Preprod goes
+through Blockfrost, so `.env.preprod` also needs `BLOCKFROST_PROJECT_ID` (see
+`.env.preprod.example`). On remote
 networks each **submitting** wallet must hold NIGHT and be DUST-registered (the
 harness registers DUST automatically once NIGHT is present).
 
