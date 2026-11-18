@@ -85,24 +85,26 @@ version changes happen in a coordinated pass. The pins live in
 | Component | Version |
 |---|---|
 | Compact language (`pragma`) | `0.28` |
-| Compact compiler (`setup-compact-action`) | `0.36.0` |
-| `@midnight-ntwrk/midnight-js-*` | `5.0.0` |
-| `@midnight-ntwrk/midnight-js-network-id` | `5.0.0-rc.5` (no 5.0.0 published) |
-| `@midnight-ntwrk/testkit-js` | `5.0.0` |
-| wallet SDK | `2.0.0` |
+| Compact compiler (`setup-compact-action`) | `0.36.1` |
+| `@midnight-ntwrk/midnight-js-*` | `5.0.1` |
+| `@midnight-ntwrk/testkit-js` | `5.0.1` |
+| wallet SDK | `2.0.1` |
 | Node.js | `22` (see `.nvmrc`) |
 | npm | `11.21.0` (CI; `11.10.0` or newer locally) |
 | Vitest | `5.0.4` |
-| Vite | `6.4.4` |
+| Vite | `6.4.5` |
 | Compact CLI (`compact`) | `0.5.3` |
 | `@midnight-ntwrk/dapp-connector-api` | `4.0.1` |
-| proof server image | `9.0.0` |
+| proof server image | `9.0.2` |
 | node image (local devnet) | `2.1.101` |
 | indexer image (local devnet) | `4.4.101` |
 
 `npm run toolchain:check` compares this table's compiler, language, SDK, Node,
 npm, Vitest and Vite rows with `toolchain.json`, and the image pins with every
-`compose.yml`. The other rows are copied from `toolchain.json` by hand.
+`compose.yml`. The other rows are copied from `toolchain.json` by hand. In
+`package.json` files it enforces only the Midnight (`@midnight-ntwrk/*`,
+`@midnightntwrk/*`) pins. Vitest, Vite and other third-party versions are the
+baseline new projects start from, and Dependabot may move them ahead.
 
 ## Prerequisites
 

@@ -23,11 +23,8 @@
 //   PROVIDER_SECRET_KEY  hex Jubjub secret; omit for a fresh ephemeral key each start
 //                        (which then has to be re-registered on-chain)
 //   NETWORK_ID           default 'undeployed'
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { createServer } from './server.js';
 import { generateKeyPair, getPublicKey, JUBJUB_ORDER } from './signing.js';
-
-setNetworkId(process.env['NETWORK_ID'] || 'undeployed');
 
 const PORT = parseInt(process.env['PORT'] || '4000', 10);
 const PROVIDER_ID = parseInt(process.env['PROVIDER_ID'] || '1', 10);

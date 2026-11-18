@@ -15,8 +15,8 @@ file is the browser counterpart of a piece of the Node test harness in
 | `hello-world-api.ts` | `test/hw.test.ts` | `deployContract` / `findDeployedContract` / `callTx.storeMessage`, plus a live `message$` stream |
 
 It is the reference output of `npm run new:ui` (Vite, React 19, Tailwind v4,
-shadcn), pinned to this repo's toolchain: `midnight-js-*` 5.0.0 (Ledger 9),
-`dapp-connector-api` 4.0.1, and Vite 6.4.4, which matches the hoisted root Vite
+shadcn), pinned to this repo's toolchain: `midnight-js-*` 5.0.1 (Ledger 9),
+`dapp-connector-api` 4.0.1, and Vite 6.4.5, which matches the hoisted root Vite
 (see the root `AGENTS.md`). Everything except `hello-world-api.ts`,
 `components/hello-world-panel.tsx`, `__tests__/message.test.ts` and this README
 is rendered from `packages/mnkit/templates/ui/`. Edit those files there, not here. CI fails

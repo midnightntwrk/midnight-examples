@@ -5,7 +5,6 @@
 // holds public chain state plus a public key that gets replaced here; it carries
 // no secret and no user-specific material, which is what makes it shippable.
 
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import type { DustSecretKey, ZswapSecretKeys } from '@midnight-ntwrk/midnight-js-protocol/v9';
 import type { PublicKey } from '@midnightntwrk/wallet-sdk/unshielded';
 import type { EmptyRefStates } from './reference-bundle.js';
@@ -45,8 +44,6 @@ export function preSeedNewWallet(
   emptyRef: EmptyRefStates,
 ): SeededSnapshots | null {
   try {
-    setNetworkId(networkId);
-
     const refSh = JSON.parse(emptyRef.shielded) as Record<string, unknown>;
     const refUn = JSON.parse(emptyRef.unshielded) as Record<string, unknown>;
     const pk = keys.unshieldedPublicKey;

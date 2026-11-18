@@ -19,7 +19,6 @@ import { pinFor } from '../src/lib/toolchain.mjs';
 const tc = {
   npm: {
     'midnight-js': '5.0.0',
-    'midnight-js-network-id': '5.0.0-rc.5',
     'testkit-js': '5.0.0',
     'wallet-sdk': '2.0.0',
     'wallet-sdk-address-format': '4.0.0',
@@ -37,12 +36,6 @@ describe('pinFor', () => {
     expect(pinFor(tc, '@midnight-ntwrk/testkit-js')).toBe('5.0.0');
     expect(pinFor(tc, 'vitest')).toBe('^5.0.4');
     expect(pinFor(tc, 'react')).toBeNull();
-  });
-
-  it('gives midnight-js-network-id its own pin, falling back to the family', () => {
-    expect(pinFor(tc, '@midnight-ntwrk/midnight-js-network-id')).toBe('5.0.0-rc.5');
-    const { 'midnight-js-network-id': _, ...npm } = tc.npm;
-    expect(pinFor({ ...tc, npm }, '@midnight-ntwrk/midnight-js-network-id')).toBe('5.0.0');
   });
 
   it('pins the wallet SDK on @midnightntwrk only', () => {

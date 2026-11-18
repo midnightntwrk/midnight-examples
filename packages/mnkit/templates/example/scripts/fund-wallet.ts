@@ -23,7 +23,6 @@
 // the mn_addr_… address also sends it 1,000 NIGHT. Safe to rerun.
 
 import pino from 'pino';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import { fundWallet } from '@midnightntwrk/mnkit-wallet';
 import { getConfig } from '../src/config.js';
@@ -46,7 +45,6 @@ if (config.networkId !== 'undeployed') {
   logger.error(`fund:wallet only targets the local devnet (MIDNIGHT_NETWORK=local), not ${config.networkId}`);
   process.exit(1);
 }
-setNetworkId(config.networkId);
 const envConfig: EnvironmentConfiguration = { walletNetworkId: config.networkId, ...config };
 
 try {

@@ -9,8 +9,8 @@ This file is template-owned. Its source is `packages/mnkit/templates/ui/AGENTS.m
 every generated UI gets an identical copy. Edit the template, then run
 `npm run new:ui -- --sync-all`.
 
-**Verified against:** `midnight-js-*` 5.0.0 (Ledger 9),
-`@midnight-ntwrk/dapp-connector-api` 4.0.1, Vite 6.4.4, vitest 5, React 19,
+**Verified against:** `midnight-js-*` 5.0.1 (Ledger 9),
+`@midnight-ntwrk/dapp-connector-api` 4.0.1, Vite 6.4.5, vitest 5, React 19,
 Node 22: typecheck, unit tests and build. The UIs have been tested in a
 browser with a wallet on Ledger 9; `VERIFIED.md` records which steps were
 verified step by step (those entries predate Ledger 9).
@@ -305,9 +305,8 @@ battleship's `ShipForm`.
 
 ### 4. Pins (already set by the template; keep them)
 
-- **Exact versions:** `midnight-js-*` `5.0.0` (`midnight-js-network-id`
-  `5.0.0-rc.5`: it has no 5.0.0),
-  `@midnightntwrk/wallet-sdk-address-format` `4.0.0` and
+- **Exact versions:** `midnight-js-*` `5.0.1`,
+  `@midnightntwrk/wallet-sdk-address-format` `4.0.1` and
   `@midnight-ntwrk/dapp-connector-api` `4.0.1`.
 - **`@swc/core` `1.15.47` under `vite-plugin-top-level-await`** (an override
   in `toolchain.json`): the plugin's 1.6.0, the latest, fails the production
@@ -315,7 +314,7 @@ battleship's `ShipForm`.
 - **No separate runtime packages:** no direct `ledger-v9`, `compact-runtime` or
   `compact-js`. Import them via
   `@midnight-ntwrk/midnight-js-protocol/{ledger,compact-runtime,compact-js}`.
-- **Vite:** `"vite": "6.4.4"`, matching the hoisted root Vite (see root
+- **Vite:** `"vite": "6.4.5"`, matching the hoisted root Vite (see root
   `AGENTS.md`).
 - **Scripts:** only `copy:zk`, `dev`, `build`, `preview`, `typecheck` and
   `test:unit`. **Never** add `compile`, `test`, `test:local`, `env:up` or
@@ -325,7 +324,7 @@ battleship's `ShipForm`.
 After `npm install`, check the hoisting didn't move:
 
 ```bash
-node -p "require('./node_modules/vite/package.json').version"   # 6.4.4
+node -p "require('./node_modules/vite/package.json').version"   # 6.4.5
 node -p "require('./node_modules/bn.js/package.json').version"  # 5.2.5
 ```
 

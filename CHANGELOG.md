@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `examples/voting`: anonymous, allow-listed yes / no / abstain voting with one transaction per voter, for MIP and MPS votes. Voters prove membership of a Merkle voter list and publish a per-proposal nullifier with a hiding commitment, plus a copy of the ballot encrypted to the admin keys (X25519 + XChaCha20-Poly1305). After voting closes, the admin decrypts the ballots and calls a permissionless `count`, which is checked against each commitment. Includes an admin/voter CLI (`npm run vote`).
 
+### Changed
+
+- Toolchain moved to the Release 1 1.1-patch: Compact compiler 0.36.1 (language 0.28, Compact runtime 0.21.0), Midnight.js and testkit-js 5.0.1, wallet SDK 2.0.1, `wallet-sdk-address-format` 4.0.1, proof server 9.0.2, and overrides `ledger-v9` 1.0.2, `onchain-runtime-v4` 4.0.2 and `zkir-v3` 3.2.1. The patch fixes contract calls that write a held shielded coin back (`Custom error: 104`, [midnight-ledger issue 839](https://github.com/midnightntwrk/midnight-ledger/issues/839)) and calls paid with a single DUST spend (`OutsideTimeToDismiss`, [midnight-ledger issue 838](https://github.com/midnightntwrk/midnight-ledger/issues/838)). No contract source changes; recompiling with 0.36.1 leaves the generated keys valid. `experimental/q2-ledger9` moves to the same stack.
+
+### Removed
+
+- `@midnight-ntwrk/midnight-js-network-id` and every `setNetworkId()` call, from the examples, their UIs, the mnkit templates, `@midnightntwrk/mnkit-wallet` (no longer a peer dependency) and `toolchain.json`. Midnight.js 5.0.0 doesn't read the global network ID; the providers take `config.networkId`.
+
+### Fixed
+
+- `examples/shielded-chips`: the "Alice burns from the treasury" end-to-end test runs again. It was skipped on Ledger 9 because the node rejected `burnFromTreasury` with `Custom error: 104` ([midnight-ledger issue 839](https://github.com/midnightntwrk/midnight-ledger/issues/839)); the 1.1-patch's ledger-v9 1.0.2 fixes that on the client side, and the test passes on Preview.
+- `examples/zk-loan`: the Schnorr verifier's `response` is a `JubjubScalar` now, so the generated witness type check rejects `s + order` (the old `response as JubjubScalar` cast reduced it back to `s`); signers must reduce `s` mod the order. The challenge quotient bound is tight: `q < 115`, or `q == 115` with the remainder below `P - 115 * 2^248`. With `q < 116` about 0.06% of challenge hashes had two accepted `(q, r)` pairs. Three simulator tests cover it, and the tutorials match the code. `requestLoan`'s circuit changes, so its prover and verifier keys change: redeploy rather than pointing a rebuilt UI at an existing contract.
+
 ## mnkit 0.2.0 (unreleased)
 
 The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-wallet`, `@midnightntwrk/mnkit-sim` and `@midnightntwrk/mnkit-coins`. All four share one version. Release candidates (`0.2.0-rc.2`) go to the `next` dist-tag first; `0.2.0-rc.1` was never published.
@@ -29,6 +42,6 @@ The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-
 
 ### Toolchain
 
-- Generated projects are on the Ledger 9 stack: Compact compiler 0.36.0 (language 0.28), Midnight.js 5.0.0 (`midnight-js-network-id` 5.0.0-rc.5), testkit-js 5.0.0, wallet SDK 2.0.0 (`@midnightntwrk/wallet-sdk`), proof server 9.0.0. The examples, their UIs and mnkit now share one set of pins in `toolchain.json`.
+- Generated projects are on the Ledger 9 stack: Compact compiler 0.36.1 (language 0.28), Midnight.js 5.0.1, testkit-js 5.0.1, wallet SDK 2.0.1 (`@midnightntwrk/wallet-sdk`), proof server 9.0.2. The examples, their UIs and mnkit now share one set of pins in `toolchain.json`.
 - Pre-seed fast sync is disabled until it is ported to wallet SDK 2: a `fastSync` option is accepted and ignored, and `preseed:cut` refuses to run. See FAST-SYNC.md.
 - The local devnet (`compose.yml`) runs node 2.1.101 and indexer 4.4.101, so `mnkit validate` and the other local-network steps work on Ledger 9.

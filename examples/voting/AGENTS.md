@@ -1,7 +1,7 @@
 # AGENTS.md — voting
 
-**Verified against:** Compact language `0.28`, compiler `0.36.0`,
-`@midnight-ntwrk/midnight-js-*` `5.0.0`, wallet SDK `2.0.0`, Node 22.
+**Verified against:** Compact language `0.28`, compiler `0.36.1`,
+`@midnight-ntwrk/midnight-js-*` `5.0.1`, wallet SDK `2.0.1`, Node 22.
 
 ## What it teaches
 

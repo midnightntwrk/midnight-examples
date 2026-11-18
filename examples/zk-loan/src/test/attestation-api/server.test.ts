@@ -18,7 +18,6 @@
 // so no network or fixed port is needed.
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { createServer } from '../../../attestation-api/server.js';
 import { generateKeyPair } from '../../../attestation-api/signing.js';
 import type restify from 'restify';
@@ -27,8 +26,6 @@ import type {
   HealthResponse,
   ProviderInfoResponse,
 } from '../../../attestation-api/types.js';
-
-setNetworkId('undeployed');
 
 describe('Attestation API Server', () => {
   let server: restify.Server;

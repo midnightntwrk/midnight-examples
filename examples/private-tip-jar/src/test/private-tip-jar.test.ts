@@ -16,7 +16,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { WebSocket } from 'ws';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import {
   deployContract,
   submitCallTx,
@@ -229,8 +228,6 @@ describe(`Private Tip Jar Contract (${network})`, () => {
   }
 
   beforeAll(async () => {
-    setNetworkId(config.networkId);
-
     const envConfig: EnvironmentConfiguration = {
       walletNetworkId: config.networkId,
       networkId: config.networkId,
