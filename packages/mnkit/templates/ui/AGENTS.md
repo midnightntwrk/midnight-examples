@@ -627,6 +627,12 @@ that same receiver. Amounts on chain are in STAR (1 NIGHT = 1,000,000 STAR).
   `ui/new-ui.json`, then `npx mnkit upgrade`. Opt in only for a UI that has
   been run on mainnet: every deploy and call there spends real DUST.
 <!-- @endif -->
+- **`Failed to fetch` before proving:** the UI calls the indexer that the
+  wallet's `getConfiguration()` reports, so a stale indexer setting in the
+  wallet breaks deploys and calls. The old hosted indexers
+  (`indexer.mainnet.midnight.network`, `indexer.preprod.midnight.network`)
+  return 410 Gone. Fix the endpoint in the wallet's network settings (Lace
+  ships Blockfrost for mainnet and preprod), not in the UI.
 - **Error shapes:** connector errors are plain objects
   (`type === "DAppConnectorAPIError"`; use no `instanceof`). Wallet fee
   failures are Effect `FiberFailure`s with an empty `message`; the reason is in

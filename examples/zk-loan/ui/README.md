@@ -56,6 +56,10 @@ VITE_NETWORK_ID=preview npm run dev
   uses `node:path`.
 - The indexer provider is given the browser `WebSocket` explicitly. Its
   default comes from `isomorphic-ws`, whose browser build lacks the named export.
+- The indexer endpoints come from the wallet's `getConfiguration()`. If a
+  deploy fails with `Failed to fetch` before proving, check the wallet's indexer
+  setting: the old `indexer.{mainnet,preprod}.midnight.network` hosts return
+  410 Gone.
 - `vite-plugin-top-level-await` breaks with `@swc/core` 1.16 (`missing field
   'type'` at build time). The repo root pins it to 1.15.47 for that plugin only
   (`resolutions`).

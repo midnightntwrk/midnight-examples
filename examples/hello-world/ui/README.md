@@ -99,6 +99,10 @@ This UI opts into mainnet (`"networks": ["mainnet"]` in `new-ui.json`), so
   yourself. Never use a hosted proof server you don't control.
 - **Use your own browser wallet.** Never use the repo's fast-sync or seeded test
   wallets (`.env.<network>`, `npm run wallets:new`) on mainnet.
+- **Check the wallet's indexer.** The UI uses the indexer the wallet reports.
+  The old `indexer.mainnet.midnight.network` host returns 410 Gone, so a wallet
+  still set to it fails deploys with `Failed to fetch`. Fix it in the wallet's
+  network settings.
 - **Versions must match.** This UI is built against the repo's pinned
   toolchain (see the version matrix in the root `README.md`). If mainnet runs a
   different ledger or protocol version, transactions fail at proving or
