@@ -48,7 +48,7 @@ flowchart TD
   U["5 · UI generator<br/>npm run new:ui NAME, npm install"]:::script
   D["4 · Devnet, in the background<br/>validate --keep-net --report<br/>holds .gates/devnet.lock"]:::script
   R2["6 · Add MN-specific UI code<br/>seed files: api.ts, panel.tsx, circuits.test.ts"]:::reason
-  B{"typecheck, test:unit, build<br/>new:ui --check"}:::gate
+  B{"typecheck, test:unit, build<br/>new:ui --check<br/>→ .gates/ui.json"}:::gate
   J{"join: devnet passed<br/>on current sources?"}:::gate
   FX["fix plan<br/>.gates/devnet-fix.md"]:::script
   O(["7 · Serve to user<br/>local Vite dev server"]):::io
@@ -99,7 +99,7 @@ nothing behind it yet.
 | 3c | Witnesses and tests | reason | Model writes code | See [Context budget](#context-budget) | Witness bodies in `contract/witnesses.ts`; `src/test/<name>.sim.test.ts` (logic, a negative test per assert, one `assertNotInPublicState` entry per SPEC privacy invariant); `src/test/<name>.test.ts` (the end-to-end flow) | The **in-memory gate**: `npm run typecheck`, `npm run test:sim` (in memory, no Docker, seconds) and `npm run spec:lint <name>` (the card against the code: circuits, ledger fields, witnesses, every assert in an `expectRejects`, every invariant key in `assertNotInPublicState`, every circuit run, no `it.todo`; and the devnet test written: no `it.todo`, every transaction circuit called, since the devnet starts as soon as this gate passes). The pipeline stamps a pass in `.gates/sim.json`. On failure, back to 3c (or 3a for a contract bug) |
 | 4 | Test on local devnet, **in the background** | script | The pipeline starts `npm run validate -- --keep-net --report .gates/devnet.json` ([`scripts/validate-example.mjs`](../scripts/validate-example.mjs)) detached, after the in-memory gate, the full compile and step 5's `npm install`: `env:up` → `wait:dust` → `test:local`. By hand, `npm run validate -- [--keep-net]` runs the same steps in the foreground (compiling first if needed) and takes the network down | `examples/<name>/compose.yml` (proof server, indexer, node) | `.gates/devnet.json` (steps, failing tests, log tails), `logs/devnet.log`, `logs/compose.log` on failure | Runs while steps 5–6 happen; must pass on the current sources before step 7. On failure the pipeline writes a fix plan (`.gates/devnet-fix.md`): back to 3c/3a, or retry for an infrastructure failure. See [Background devnet](#background-devnet) |
 | 5 | UI generator | script | `npm run new:ui -- <name> [--contract <managed-dir>] [--private-state memory\|persistent]` ([`scripts/new-ui.mjs`](../scripts/new-ui.mjs)); preview with `--dry-run` | `contract/managed/<c>/compiler/contract-info.json`, `contract/managed/<c>/contract/index.d.ts`, `contract/witnesses.ts`, `contract/<c>.compact`, and [`templates/ui/`](../packages/mnkit/templates/ui/) | `examples/<name>/ui/` (Vite + React): template-owned files, seed files, `new-ui.json`, `verification.json` | Refuses without an in-memory gate stamp for the current sources (`--skip-gate` overrides), when the contract isn't compiled, `ui/` already exists, or `witnesses.ts` lacks a `create<X>PrivateState` factory |
-| 6 | Add MN-specific UI code | reason | Model edits seed files only | [`templates/ui/AGENTS.md`](../packages/mnkit/templates/ui/AGENTS.md) (copied into every `ui/AGENTS.md`); existing `examples/*/ui/` | `src/midnight/<name>-api.ts`, `src/components/<name>-panel.tsx`, `src/__tests__/<name>-circuits.test.ts`, `README.md` | `typecheck`, `test:unit` and `build` pass; `npm run new:ui -- <name> --check` shows no template drift; on failure, back to 6 |
+| 6 | Add MN-specific UI code | reason | Model edits seed files only | [`templates/ui/AGENTS.md`](../packages/mnkit/templates/ui/AGENTS.md) (copied into every `ui/AGENTS.md`); existing `examples/*/ui/` | `src/midnight/<name>-api.ts`, `src/components/<name>-panel.tsx`, `src/__tests__/<name>-circuits.test.ts`, `README.md` | `typecheck`, `test:unit` and `build` pass; `npm run new:ui -- <name> --check` shows no template drift; the pipeline stamps a pass in `.gates/ui.json` and skips the four while the UI sources are unchanged; on failure, back to 6 |
 | 7 | Serve to user | output | `npm run dev -w @midnight-ntwrk/example-<name>-ui` (runs `copy:zk`, then Vite on :5173); `npm run fund:wallet` funds a browser wallet on devnet | Built UI, managed ZK assets | Running DApp | The devnet passed on the current sources (the pipeline's join); browser and wallet checks recorded in `ui/verification.json`. The background run leaves the devnet up for this step |
 
 ## Running it: `npm run pipeline`
@@ -121,7 +121,12 @@ what `next` says, run it again.
 5. `new:ui` and `npm install`, if there's no `ui/` yet
 6. the devnet, started in the background
 7. the UI: `next` points at the seed files until one changes, then the UI's
-   `typecheck`, `test:unit`, `build` and `new:ui --check`
+   `typecheck`, `test:unit`, `build` and `new:ui --check` → `.gates/ui.json`.
+   A stamp for the current UI sources skips them: `ui/` (without
+   `node_modules`, `dist` and `public/managed`), the contract it imports
+   (`contract/` sources, the compiled JS and `contract-info.json`), what
+   `--check` compares against (the UI template, the generator, every
+   `verification.json`) and `package-lock.json`. A test-only edit keeps it.
 8. docs: no `TODO` left in the example's `README.md` / `AGENTS.md` or its rows
    in the root tables
 9. join: the devnet passed on the current sources → done, with the serve
@@ -233,6 +238,9 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
 
 ## Changelog
 
+- 2026-11-18: The pipeline stamps the UI gates in `.gates/ui.json` and skips
+  them while nothing the UI depends on has changed: about 14 s off each rerun
+  (https://github.com/midnightntwrk/midnight-examples/issues/20).
 - 2026-11-18: Dropped the unrun Phase 4 baseline plan (`plannedRun` in
   `reports/generation-baseline.json`). It measured `example-coins` imports and
   `yarn pipeline`, which https://github.com/midnightntwrk/midnight-examples/issues/82

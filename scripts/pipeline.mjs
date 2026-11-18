@@ -33,7 +33,7 @@
 //   → full compile (proving keys, for the devnet and the UI's copy:zk)
 //   → 5 new:ui + npm install, if there's no ui/ yet
 //   → 4 devnet, started in the BACKGROUND: validate --keep-net --report
-//   → 6 UI gates: typecheck, test:unit, build, new:ui --check
+//   → 6 UI gates: typecheck, test:unit, build, new:ui --check → .gates/ui.json
 //   → docs: no TODO left in README.md / AGENTS.md
 //   → join: the devnet must have passed on the current sources → 7 serve
 //
@@ -117,6 +117,7 @@ const LOCK = gatePath(DIR, 'devnet.lock');
 const REPORT = gatePath(DIR, 'devnet.json');
 const SIM_STAMP = gatePath(DIR, 'sim.json');
 const SEEDS = gatePath(DIR, 'ui-seeds.json');
+const UI_STAMP = gatePath(DIR, 'ui.json');
 
 // What to read when sent back to a step: the context budget in
 // docs/generation-flow.md, by step.
@@ -494,6 +495,51 @@ else if (compileIsStale(DIR)) {
 
 // 5 · the UI scaffold, before the devnet starts (npm install rewrites node_modules)
 const seedHash = (p) => (fs.existsSync(p) ? crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex') : null);
+
+/**
+ * What the UI gates depend on, for the .gates/ui.json stamp: ui/ (without
+ * node_modules, dist and copy:zk's public/managed), the contract the UI imports
+ * and new:ui renders from (contract/ sources, each compiled contract's JS and
+ * contract-info.json, not its keys), what new:ui --check compares against (the
+ * UI template, the generator and its libs, every verification.json for
+ * VERIFIED.md) and package-lock.json. Test-only edits leave it unchanged.
+ */
+function uiHash() {
+  const files = [];
+  const walkAll = (dir, skip = () => false) => {
+    if (!fs.existsSync(dir)) return;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.name === 'node_modules' || skip(p)) continue;
+      if (e.isDirectory()) walkAll(p, skip);
+      else if (e.isFile()) files.push(p);
+    }
+  };
+  walkAll(UI_DIR, (p) => [path.join(UI_DIR, 'dist'), path.join(UI_DIR, 'public', 'managed')].includes(p));
+  walkAll(path.join(DIR, 'contract'), (p) => p === path.join(DIR, 'contract', 'managed'));
+  for (const info of contractInfos(DIR)) {
+    const managed = path.dirname(path.dirname(info));
+    files.push(info, ...['index.js', 'index.d.ts'].map((f) => path.join(managed, 'contract', f)).filter((p) => fs.existsSync(p)));
+  }
+  walkAll(path.join(REPO_ROOT, 'packages', 'mnkit', 'templates', 'ui'));
+  walkAll(path.join(REPO_ROOT, 'packages', 'mnkit', 'src', 'lib'));
+  walkAll(path.join(REPO_ROOT, 'scripts', 'lib'));
+  files.push(path.join(REPO_ROOT, 'scripts', 'new-ui.mjs'), path.join(REPO_ROOT, 'package-lock.json'));
+  const examples = path.join(REPO_ROOT, 'examples');
+  for (const ex of fs.readdirSync(examples)) {
+    const v = path.join(examples, ex, 'ui', 'verification.json');
+    if (fs.existsSync(v)) files.push(v);
+  }
+  const h = crypto.createHash('sha256');
+  for (const p of [...new Set(files)].sort()) {
+    h.update(path.relative(REPO_ROOT, p).split(path.sep).join('/'));
+    h.update('\0');
+    h.update(fs.readFileSync(p));
+    h.update('\0');
+  }
+  return h.digest('hex');
+}
+
 const seedFiles = [
   'README.md',
   `src/midnight/${name}-api.ts`,
@@ -561,16 +607,24 @@ if (opts.ui && fs.existsSync(UI_DIR)) {
       read: READ[6],
     });
   } else {
+    const uiStamp = readJson(UI_STAMP);
+    const currentUiHash = uiHash();
     const gates = [
       ['ui:typecheck', 'npm', ['run', 'typecheck', '-w', UI_PKG]],
       ['ui:test:unit', 'npm', ['run', 'test:unit', '-w', UI_PKG]],
       ['ui:build', 'npm', ['run', 'build', '-w', UI_PKG]],
       ['ui:check', 'node', [path.join(REPO_ROOT, 'scripts', 'new-ui.mjs'), name, '--check']],
     ];
-    for (const [id, cmd, args] of gates) {
-      const r = run(id, cmd, args, REPO_ROOT);
-      step(id, r.ok ? 'pass' : 'fail', { ms: r.ms });
-      if (!r.ok) {
+    if (uiStamp?.hash === currentUiHash) {
+      for (const [id] of gates) step(id, 'fresh', { note: 'passed on these UI sources' });
+    } else {
+      fs.rmSync(UI_STAMP, { force: true });
+      let uiOk = true;
+      for (const [id, cmd, args] of gates) {
+        const r = run(id, cmd, args, REPO_ROOT);
+        step(id, r.ok ? 'pass' : 'fail', { ms: r.ms });
+        if (r.ok) continue;
+        uiOk = false;
         state.pending.push(`${id} failed`);
         candidates.push({
           rank: 1,
@@ -583,6 +637,8 @@ if (opts.ui && fs.existsSync(UI_DIR)) {
         });
         break;
       }
+      // Hashed before the gates ran: ui:build's copy:zk writes only public/managed, which uiHash leaves out.
+      if (uiOk) writeJson(UI_STAMP, { hash: currentUiHash, at: new Date().toISOString() });
     }
   }
 }
