@@ -53,7 +53,6 @@ import { parseArgs } from 'node:util';
 import { loadEnv } from 'vite';
 import { WebSocket } from 'ws';
 import pino from 'pino';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import { submitCallTx } from '@midnight-ntwrk/midnight-js-contracts';
 import { indexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
 import { fromHex, toHex } from '@midnight-ntwrk/midnight-js-utils';
@@ -127,8 +126,6 @@ const parseVote = (s: string | undefined): Vote => {
 
 // Imported lazily: the network configs read the environment when they load.
 const config = (await import('../src/config.js')).getConfig();
-setNetworkId(config.networkId);
-
 function contractAddress(): string {
   if (opts.contract) return opts.contract;
   const address = readDeployments(network)?.contracts['voting']?.address;

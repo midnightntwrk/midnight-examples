@@ -40,8 +40,7 @@ export const mnkitVersion = () => JSON.parse(fs.readFileSync(path.join(PKG_ROOT,
 
 /**
  * The version spec toolchain `tc` pins `pkg` to in a package.json, or null if
- * it doesn't pin it. Exact: every midnight-js-* package (network-id has its
- * own pin while it has no final of the Midnight.js release), testkit-js,
+ * it doesn't pin it. Exact: every midnight-js-* package, testkit-js,
  * wallet-sdk and the wallet-sdk-* packages `npm` names, dapp-connector-api,
  * the packages in `overrides` (ledger-v9 and its runtimes) and vite (vitest's
  * peer, and the UIs' bundler: one Vite for the whole project, so npm hoists
@@ -55,7 +54,6 @@ export const mnkitVersion = () => JSON.parse(fs.readFileSync(path.join(PKG_ROOT,
  */
 export function pinFor(tc, pkg, { peer = false } = {}) {
   const pin = (() => {
-    if (pkg === '@midnight-ntwrk/midnight-js-network-id') return tc.npm['midnight-js-network-id'] ?? tc.npm['midnight-js'];
     if (pkg.startsWith('@midnight-ntwrk/midnight-js-')) return tc.npm['midnight-js'];
     if (pkg === '@midnight-ntwrk/testkit-js') return tc.npm['testkit-js'];
     if (pkg === '@midnightntwrk/wallet-sdk') return tc.npm['wallet-sdk'];

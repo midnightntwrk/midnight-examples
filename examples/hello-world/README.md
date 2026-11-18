@@ -47,7 +47,7 @@ export circuit storeMessage(newMessage: Opaque<"string">): [] {
 Compiling transforms your Compact code into zero-knowledge circuits, generates cryptographic keys, 
 and creates TypeScript APIs and a JavaScript implementation for the contract to be used by DApps. 
 
-Compile it with compiler 0.36.0 (this runs `compact compile contract/hello-world.compact contract/managed/hello-world`):
+Compile it with compiler 0.36.1 (this runs `compact compile contract/hello-world.compact contract/managed/hello-world`):
 
 ```bash
 npm run compile

@@ -13,10 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomBytes } from 'node:crypto';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import {
   deployContract,
   submitCallTx,
@@ -213,8 +211,6 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
   }
 
   beforeAll(async () => {
-    setNetworkId(config.networkId);
-
     const envConfig: EnvironmentConfiguration = {
       walletNetworkId: config.networkId,
       networkId: config.networkId,
@@ -638,13 +634,13 @@ describe(`Roulette tutorial (RED/BLACK, 2x payouts, house match) (${network})`, 
     expect(treasuryCoin.value).toEqual(60n);
   });
 
-  // TODO(node 2.1.200): un-skip. Node 2.1.101 (local devnet, Preview, Preprod)
-  // rejects burnFromTreasury with `1010: Invalid Transaction: Custom error: 104`:
-  // a coin overwrite under-declares bytes_written,
-  // https://github.com/midnightntwrk/midnight-ledger/issues/839. The fix ships
-  // in node 2.1.200. While skipped, the treasury keeps the 60-chip coin, which
-  // the non-house test below only needs a key for.
-  it.skip('Alice burns from the treasury — the Merkle-spend burn path', async () => {
+  // With ledger-v9 1.0.0 (Midnight.js 5.0.0) the node rejected this call with
+  // `1010: Invalid Transaction: Custom error: 104`: the coin write-back
+  // under-declared bytes_written,
+  // https://github.com/midnightntwrk/midnight-ledger/issues/839. ledger-v9 1.0.2
+  // (Midnight.js 5.0.1, Release 1 1.1-patch) fixes it on the client side, with
+  // no node change; it passed on Preview (node 2.1.101) on 2026-11-17.
+  it('Alice burns from the treasury — the Merkle-spend burn path', async () => {
     const minted = await chipsLedgerState();
     const [key, treasuryCoin] = [...minted._treasury][0]!;
     expect(treasuryCoin.value).toEqual(60n);

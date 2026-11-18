@@ -15,7 +15,6 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { WebSocket } from 'ws';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import {
   deployContract,
   submitCallTx,
@@ -81,7 +80,6 @@ const logger = pino({
 
 const network = process.env['MIDNIGHT_NETWORK'] ?? 'local';
 
-
 describe(`Secret Message Contract (${network})`, () => {
   let wallet: MidnightWalletProvider;
   let providers: SecretMessageProviders;
@@ -102,8 +100,6 @@ describe(`Secret Message Contract (${network})`, () => {
   }
 
   beforeAll(async () => {
-    setNetworkId(config.networkId);
-
     const envConfig: EnvironmentConfiguration = {
       walletNetworkId: config.networkId,
       networkId: config.networkId,

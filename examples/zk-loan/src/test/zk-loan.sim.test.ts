@@ -21,7 +21,6 @@
 import { ZkLoanSimulator } from './zk-loan.simulator.js';
 import { createCustomSignedProfile, generateProviderKeyPair } from './utils/test-data.js';
 import { JUBJUB_ORDER, TWO_248 } from '../../attestation-api/signing.js';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import {
   ecMul,
   ecAdd,
@@ -31,8 +30,6 @@ import {
 import { type Ledger, pureCircuits } from '../../contract/managed/zk-loan/contract/index.js';
 import { type ZkLoanPrivateState } from '../../contract/witnesses.js';
 import { describe, it, expect } from 'vitest';
-
-setNetworkId('undeployed');
 
 // BLS12-381 scalar field prime, the modulus of circuit arithmetic.
 const P = 52435875175126190479447740508185965837690552500527637822603658699938581184513n;

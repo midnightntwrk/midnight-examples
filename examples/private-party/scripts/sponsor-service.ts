@@ -33,7 +33,6 @@
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import pino from 'pino';
-import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 import type { EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import { getConfig } from '../src/config.js';
 import { MidnightWalletProvider, syncWallet } from '../src/wallet.js';
@@ -50,7 +49,6 @@ const logger = pino({
 
 const port = Number(process.env['SPONSOR_PORT'] ?? 3001);
 const config = getConfig();
-setNetworkId(config.networkId);
 const envConfig: EnvironmentConfiguration = { walletNetworkId: config.networkId, ...config };
 
 const sponsor = await MidnightWalletProvider.build(logger, envConfig, {
