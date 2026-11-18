@@ -615,6 +615,56 @@ export interface FundingGateOptions {
   label?: string;
 }
 
+/** How often, and how long to wait, when retrying DUST registration after a protocol-version mismatch. */
+const DUST_REGISTRATION_RETRY_ATTEMPTS = 10;
+const DUST_REGISTRATION_RETRY_DELAY_MS = 2_000;
+
+const PROTOCOL_VERSION_MISMATCH_TAG =
+  '@midnightntwrk/wallet-sdk-abstractions/WalletTransaction/ProtocolVersionMismatchError';
+
+function isProtocolVersionMismatchError(err: unknown): boolean {
+  // The SDK's error carries `_tag` set to exactly this string (checked on
+  // wallet-sdk-abstractions 3.0.0); the `name`/class-name checks add nothing.
+  return (
+    err != null &&
+    typeof err === 'object' &&
+    (err as { _tag?: unknown })._tag === PROTOCOL_VERSION_MISMATCH_TAG
+  );
+}
+
+/**
+ * Wallet SDK 2.0.0 can throw ProtocolVersionMismatchError on a
+ * `registerNightUtxosForDustGeneration` call made while the facade is still
+ * crossing a protocol boundary (midnight-examples#93). `waitForFunding`
+ * waits for the facade to settle before registering, but a crossing can
+ * still land between that read and this call — so retry over a few blocks
+ * as a backstop.
+ */
+async function registerNightUtxosForDustGenerationRetrying<T>(
+  logger: Logger,
+  label: string,
+  register: () => Promise<T>,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= DUST_REGISTRATION_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      return await register();
+    } catch (err) {
+      lastError = err;
+      if (!isProtocolVersionMismatchError(err) || attempt === DUST_REGISTRATION_RETRY_ATTEMPTS) {
+        throw err;
+      }
+      logger.warn(
+        `${label}: DUST registration hit ProtocolVersionMismatchError (attempt ${attempt}/${DUST_REGISTRATION_RETRY_ATTEMPTS}); retrying in ${DUST_REGISTRATION_RETRY_DELAY_MS}ms`,
+      );
+      await new Promise((resolve) => {
+        setTimeout(resolve, DUST_REGISTRATION_RETRY_DELAY_MS);
+      });
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Hold until the wallet can pay for transactions on a remote network. Returns
  * at once when it already can, so only a new wallet sees the faucet prompt.
@@ -657,17 +707,50 @@ export async function waitForNightThenDust(
     return;
   }
 
-  const state = await Rx.firstValueFrom(wallet.state());
+  // Registration needs the facade settled on one side of a protocol
+  // boundary: the first state emission can land mid-crossing, while the
+  // facade is still bound to the version the laggard wallets are on, and
+  // registration then fails with ProtocolVersionMismatchError
+  // (midnight-examples#93). testkit's syncWallet waits for the same
+  // `protocol._tag === 'Settled'` reading; the retry below stays as a
+  // backstop for a crossing that lands between this read and the call.
+  // Bounded overall (`first`, not `each`): the state keeps emitting while the
+  // wallets cross, so a per-emission timeout would never fire on a stall.
+  let lastProtocol: FacadeState['protocol'] | undefined;
+  const state = await Rx.firstValueFrom(
+    wallet.state().pipe(
+      Rx.tap((s: FacadeState) => {
+        lastProtocol = s.protocol;
+      }),
+      Rx.filter((s: FacadeState) => s.protocol._tag === 'Settled'),
+      Rx.timeout({
+        first: FUND_TIMEOUT_MS,
+        with: () =>
+          Rx.throwError(() => {
+            const p = lastProtocol;
+            const behind = p?._tag === 'Crossing' ? ` (${p.behind.join(', ')} behind)` : '';
+            return new Error(
+              `${label}: wallets still crossing a protocol boundary after ${FUND_TIMEOUT_MS}ms${behind}`,
+            );
+          }),
+      }),
+    ),
+  );
   const night = unshieldedToken().raw;
   const unregistered = state.unshielded.availableCoins.filter(
     (coin) => coin.utxo.type === night && !coin.meta.registeredForDustGeneration,
   );
   if (state.dust.balance(new Date()) === 0n && unregistered.length > 0) {
     logger.info(`${label}: registering ${unregistered.length} NIGHT UTXO(s) for DUST generation...`);
-    const recipe = await wallet.registerNightUtxosForDustGeneration(
-      unregistered,
-      keystore.getPublicKey(),
-      (payload) => keystore.signDataAsync(payload),
+    const recipe = await registerNightUtxosForDustGenerationRetrying(
+      logger,
+      label,
+      () =>
+        wallet.registerNightUtxosForDustGeneration(
+          unregistered,
+          keystore.getPublicKey(),
+          (payload) => keystore.signDataAsync(payload),
+        ),
     );
     const txId = await wallet.submitTransaction(await wallet.finalizeRecipe(recipe));
     logger.info(`${label}: DUST registration submitted (${txId}).`);
