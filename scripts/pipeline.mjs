@@ -17,6 +17,7 @@
 // The generation pipeline runner (docs/generation-flow.md):
 //
 //   npm run pipeline -- <name> [--json] [--until sim] [--no-ui] [--retry-devnet]
+//   npm run pipeline -- <name> --spec <card.md> [--no-register] [--json] [...]
 //   npm run pipeline -- <name> --wait-devnet [--json]
 //   npm run pipeline -- <name> --cancel-devnet
 //
@@ -28,6 +29,9 @@
 // loop: run it, do what `next` says, run it again.
 //
 // Order:
+//   (no example yet, --spec <card>) design lint of the card → its review mark
+//   → 2 new:example --spec (--witnesses from the card's Witnesses section)
+//   → npm install, then on as below
 //   1 spec lint (design) → 3a contract written? → compile:fast → 3b --derive
 //   → in-memory gate: typecheck, test:sim, spec lint (code) → .gates/sim.json
 //   → full compile (proving keys, for the devnet and the UI's copy:zk)
@@ -55,7 +59,14 @@
 // node_modules under a running test.
 //
 //   --json          print one JSON object: { example, steps, devnet, pending, next };
-//                   next.kind is reason | infra | wait | pass | done (| until)
+//                   next.kind is reason | infra | review | wait | pass | done (| until)
+//   --spec <card>   scaffold examples/<name> from this design card when it doesn't
+//                   exist yet. The card must pass the design lint and carry a
+//                   `Reviewed-by: <who>, <YYYY-MM-DD>` line under its title,
+//                   added by the person who reviewed it; until then the run
+//                   stops with next.kind = review. --witnesses comes from the
+//                   card's Witnesses section
+//   --no-register   with --spec: don't add the example to ci.yaml and README.md
 //   --until sim     stop after the in-memory gate (CI's scaffold job)
 //   --no-ui         skip steps 5 and 6 (an example without a browser UI)
 //   --retry-devnet  restart a devnet run that failed on the current sources
@@ -86,17 +97,17 @@ import {
   writeJson,
 } from '../packages/mnkit/src/lib/gates.mjs';
 import { checkDocker, preflight } from '../packages/mnkit/src/lib/preflight.mjs';
-import { lintCode, lintDesign } from '../packages/mnkit/src/lib/spec-lint.mjs';
+import { cardWitnesses, lintCode, lintDesign, reviewMark } from '../packages/mnkit/src/lib/spec-lint.mjs';
 import { NAME_RE, exitOnError, fail } from '../packages/mnkit/src/lib/template.mjs';
 
 exitOnError();
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const USAGE =
-  'Usage: npm run pipeline -- <name> [--json] [--until sim] [--no-ui] [--retry-devnet] | <name> --wait-devnet | <name> --cancel-devnet';
+  'Usage: npm run pipeline -- <name> [--spec <card.md> [--no-register]] [--json] [--until sim] [--no-ui] [--retry-devnet] | <name> --wait-devnet | <name> --cancel-devnet';
 
 // --- args ----------------------------------------------------------------------
-const opts = { json: false, until: null, ui: true, retry: false, wait: false, cancel: false, name: null };
+const opts = { json: false, until: null, ui: true, retry: false, wait: false, cancel: false, spec: null, register: true, name: null };
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
@@ -106,10 +117,13 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--retry-devnet') opts.retry = true;
   else if (a === '--wait-devnet') opts.wait = true;
   else if (a === '--cancel-devnet') opts.cancel = true;
+  else if (a === '--spec' && argv[i + 1] && !argv[i + 1].startsWith('-')) opts.spec = argv[++i];
+  else if (a === '--no-register') opts.register = false;
   else if (!a.startsWith('-') && !opts.name) opts.name = a;
   else fail(`unknown or incomplete argument: ${a}. ${USAGE}`);
 }
 if (!opts.name) fail(USAGE);
+if (!opts.register && !opts.spec) fail('--no-register only applies with --spec');
 if (!NAME_RE.test(opts.name)) fail(`invalid name '${opts.name}' (kebab-case, e.g. hello-world)`);
 
 const name = opts.name;
@@ -170,9 +184,15 @@ function trimOutput(out, lines = 40) {
   return (ts.length ? ts.slice(0, 25) : all.slice(-lines)).join('\n').trim();
 }
 
+// Entries from before the example exists (the --spec card, its review): kept
+// here and written once it does, so logging never creates examples/<name>/
+// ahead of new:example, which refuses an existing directory.
+const unlogged = [];
 function log(entry) {
+  unlogged.push(`${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`);
+  if (!fs.existsSync(path.join(DIR, 'package.json'))) return;
   fs.mkdirSync(path.join(DIR, 'logs'), { recursive: true });
-  fs.appendFileSync(path.join(DIR, 'logs', 'pipeline.jsonl'), `${JSON.stringify({ at: new Date().toISOString(), ...entry })}\n`);
+  fs.appendFileSync(path.join(DIR, 'logs', 'pipeline.jsonl'), unlogged.splice(0).join(''));
 }
 
 /** Run a command to completion, capturing its output. */
@@ -194,9 +214,10 @@ function run(id, cmd, args, cwd = DIR) {
   return { ok: status === 0, ms, output };
 }
 
-/** Print the result and exit: 0 when done, only waiting on the devnet, or (--wait-devnet) it passed; 1 otherwise. */
+/** Print the result and exit: 0 when done, waiting on the devnet or a review, or (--wait-devnet) it passed; 1 otherwise. */
 function finish() {
-  const ok = ['done', 'wait', 'pass'].includes(state.next?.kind);
+  // review: a hand-off to a person, not a failure.
+  const ok = ['done', 'wait', 'pass', 'review'].includes(state.next?.kind);
   if (opts.json) {
     console.log(JSON.stringify(state, null, 2));
   } else {
@@ -441,15 +462,69 @@ function devnetFailureNext(d) {
 }
 
 // --- one-shot modes -------------------------------------------------------------
+// `npm run` starts this in the repo root; a relative --spec is the caller's.
+const specPath = opts.spec ? path.resolve(process.env.INIT_CWD ?? process.cwd(), opts.spec) : null;
+/** The card's path as shown: repo-relative inside the repo, else absolute. */
+const cardShown = () => (rel(specPath).startsWith('..') ? specPath : rel(specPath));
+if (specPath && !fs.existsSync(specPath)) fail(`--spec: ${opts.spec} not found`);
+
 if (!fs.existsSync(path.join(DIR, 'package.json'))) {
   if (opts.wait || opts.cancel) fail(`examples/${name} does not exist`);
-  stop({
-    kind: 'reason',
-    step: '1',
-    reason: `examples/${name} does not exist: write the design card (SPEC.md) and have it reviewed, then scaffold from it`,
-    run: [`npm run spec:lint -- --file <card.md> [--witnesses]`, `npm run new:example -- ${name} --spec <card.md> [--witnesses]`],
-    read: READ[1],
-  });
+  if (!specPath) {
+    stop({
+      kind: 'reason',
+      step: '1',
+      reason: `examples/${name} does not exist: write the design card and have it reviewed, then scaffold from it`,
+      run: [`npm run pipeline -- ${name} --spec <card.md>`],
+      read: READ[1],
+    });
+  }
+  scaffoldFromCard();
+} else if (specPath) {
+  const ours = path.join(DIR, 'SPEC.md');
+  if (!fs.existsSync(ours) || fs.readFileSync(ours, 'utf8') !== fs.readFileSync(specPath, 'utf8')) {
+    fail(`examples/${name} already exists: edit examples/${name}/SPEC.md rather than passing a different --spec`);
+  }
+}
+
+/**
+ * 1–2 · scaffold examples/<name> from the --spec card: the design lint, the
+ * person's review mark, new:example (--witnesses from the card), npm install.
+ * Stops the run when the card isn't ready; returns once the example exists.
+ */
+function scaffoldFromCard() {
+  const card = fs.readFileSync(specPath, 'utf8');
+  const witnesses = cardWitnesses(card);
+  const problems = lintDesign(card, witnesses === null ? {} : { witnessesFlag: witnesses });
+  log({ step: 'card', status: problems.length ? 'fail' : 'pass' });
+  if (problems.length) {
+    step('card', 'fail');
+    stop({ kind: 'reason', step: '1', reason: 'the design card fails the design lint; fix it before the review', problems, edit: [cardShown()], read: READ[1] });
+  }
+  step('card', 'pass', { note: witnesses ? 'declares witnesses' : 'no witnesses' });
+  const mark = reviewMark(card);
+  if (!mark) {
+    step('review', 'pending');
+    stop({
+      kind: 'review',
+      step: '1',
+      reason:
+        'the card passes the design lint. A person reviews the design now and, if it is right, adds ' +
+        '`Reviewed-by: <who>, <YYYY-MM-DD>` under its title. Never add that line yourself',
+      edit: [cardShown()],
+      run: [`npm run pipeline -- ${name} --spec ${cardShown()}${opts.register ? '' : ' --no-register'}`],
+    });
+  }
+  step('review', 'pass', { note: `${mark.by}, ${mark.date}` });
+  const tooOld = lockfileNpmProblem(REPO_ROOT);
+  if (tooOld) stop({ kind: 'infra', step: '2', reason: tooOld, run: [`npx npm@11 run pipeline -- ${name} --spec ${cardShown()}`] });
+  const args = [path.join(REPO_ROOT, 'scripts', 'new-example.mjs'), name, '--spec', specPath, ...(witnesses ? ['--witnesses'] : []), ...(opts.register ? [] : ['--no-register'])];
+  let r = run('new:example', 'node', args, REPO_ROOT);
+  step('new:example', r.ok ? 'pass' : 'fail', { ms: r.ms });
+  if (!r.ok) stop({ kind: 'reason', step: '2', reason: 'new:example refused the card; its message says why', output: trimOutput(r.output), edit: [cardShown()] });
+  r = run('install', 'npm', ['install'], REPO_ROOT);
+  step('install', r.ok ? 'pass' : 'fail', { ms: r.ms, note: 'the new example workspace changes package-lock.json: commit it' });
+  if (!r.ok) stop({ kind: 'infra', step: '2', reason: '`npm install` failed after adding the example workspace', output: trimOutput(r.output) });
 }
 
 if (opts.cancel) {

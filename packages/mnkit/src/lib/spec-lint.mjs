@@ -113,6 +113,28 @@ export function testOnlyContracts(sections) {
 }
 
 /**
+ * Whether the card's "## Witnesses" section declares any: true (a table with
+ * rows), false ("None." or an empty table), null (no such section). The
+ * scaffold's --witnesses choice follows from it.
+ */
+export function cardWitnesses(src) {
+  const body = parseSpec(src).get('Witnesses');
+  if (body === undefined) return null;
+  return !isNone(body) && tableRows(body).length > 0;
+}
+
+/**
+ * The human review of the card: a `Reviewed-by: <who>, <YYYY-MM-DD>` line
+ * between the title and the first `##` section. Returns { by, date } or null.
+ * The pipeline scaffolds only from a reviewed card; lintDesign ignores the line.
+ */
+export function reviewMark(src) {
+  const head = stripComments(src).split(/^##\s/m)[0];
+  const m = /^Reviewed-by:\s*(.+?),\s*(\d{4}-\d{2}-\d{2})\s*$/m.exec(head);
+  return m ? { by: m[1].trim(), date: m[2] } : null;
+}
+
+/**
  * The design card on its own. `witnessesFlag` (true/false), when given, is
  * the scaffold's --witnesses choice, which must match the Witnesses section.
  */
@@ -161,7 +183,7 @@ export function lintDesign(src, { witnessesFlag } = {}) {
   }
 
   if (witnessesFlag !== undefined && sections.has('Witnesses')) {
-    const declares = !isNone(sections.get('Witnesses')) && tableRows(sections.get('Witnesses')).length > 0;
+    const declares = cardWitnesses(src);
     if (declares && !witnessesFlag) problems.push('"## Witnesses" lists witnesses, but --witnesses was not given');
     if (!declares && witnessesFlag) problems.push('--witnesses was given, but "## Witnesses" is "None."');
   }

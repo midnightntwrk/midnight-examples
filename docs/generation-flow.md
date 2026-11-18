@@ -37,8 +37,8 @@ flowchart LR
 flowchart TD
   P(["Prompt<br/>natural-language DApp idea"]):::io
   T["1 · Design<br/>name, --witnesses?, SPEC.md<br/><i>gap: no prompt translator yet</i>"]:::reason
-  H{"spec:lint --file<br/>+ human review"}:::gate
-  S["2 · Scaffold<br/>npm run new:example -- NAME --spec card.md --witnesses"]:::script
+  H{"design lint<br/>+ human review: Reviewed-by"}:::gate
+  S["2 · Scaffold<br/>npm run pipeline -- NAME --spec card.md<br/>(new:example, --witnesses from the card)"]:::script
   R1["3a · Write the contract<br/>contract/NAME.compact"]:::reason
   C{"npm run compile:fast<br/>pass?"}:::gate
   DV["3b · Derive stubs<br/>npm run new:example -- NAME --derive"]:::script
@@ -92,8 +92,8 @@ nothing behind it yet.
 
 | # | Step | Kind | Runs | Reads | Writes | Gate |
 |---|------|------|------|-------|--------|------|
-| 1 | Design | reason | Model drafts the design card; `new:example --spec` makes it the example's `SPEC.md` | User prompt; [`packages/mnkit/templates/example/SPEC.md`](../packages/mnkit/templates/example/SPEC.md) and the worked example [`examples/private-tip-jar/SPEC.md`](../examples/private-tip-jar/SPEC.md) | Example name (kebab-case), whether it needs witnesses, and the content of `SPEC.md`: roles, public fields, circuits and their asserts, witnesses, **privacy invariants** and **accepted leaks** | `npm run spec:lint -- --file <card> [--witnesses]`: every section filled in, tables with rows, each privacy invariant names its test key (`→ \`key\``), Witnesses matches `--witnesses`. Then a human reviews the design before any code exists. (**Gap**: nothing turns a prompt into this yet) |
-| 2 | Scaffold | script | `npm run new:example -- <name> --spec <card> [--witnesses] [--no-register]` ([`scripts/new-example.mjs`](../scripts/new-example.mjs)) | [`packages/mnkit/templates/example/`](../packages/mnkit/templates/example/) | `examples/<name>/`: `SPEC.md` (step 1's card goes here), contract stub, `src/` harness, an in-memory test (`<name>.sim.test.ts`) and a devnet test skeleton with `@generated-stub` regions, `compose.yml`, `AGENTS.md`. Registers the example in CI and the docs tables | Node 22 or newer (`.nvmrc` pins 22), `compact` at the pin in `toolchain.json` ([`packages/mnkit/src/lib/preflight.mjs`](../packages/mnkit/src/lib/preflight.mjs)); `--spec` passes the design lint; unknown flags rejected; registration succeeded; no leftover template tokens |
+| 1 | Design | reason | Model drafts the design card; `new:example --spec` makes it the example's `SPEC.md` | User prompt; [`packages/mnkit/templates/example/SPEC.md`](../packages/mnkit/templates/example/SPEC.md) and the worked example [`examples/private-tip-jar/SPEC.md`](../examples/private-tip-jar/SPEC.md) | Example name (kebab-case), whether it needs witnesses, and the content of `SPEC.md`: roles, public fields, circuits and their asserts, witnesses, **privacy invariants** and **accepted leaks** | `npm run spec:lint -- --file <card> [--witnesses]`: every section filled in, tables with rows, each privacy invariant names its test key (`→ \`key\``), Witnesses matches `--witnesses`. Then a human reviews the design before any code exists, and records it with a `Reviewed-by: <who>, <YYYY-MM-DD>` line under the card's title; the pipeline scaffolds only from a card that has one. (**Gap**: nothing turns a prompt into this yet) |
+| 2 | Scaffold | script | `npm run pipeline -- <name> --spec <card> [--no-register]` runs `npm run new:example -- <name> --spec <card> [--witnesses] [--no-register]` ([`scripts/new-example.mjs`](../scripts/new-example.mjs)), taking `--witnesses` from the card's Witnesses section, then `npm install`, and carries on to step 3a. `new:example` still works by hand | [`packages/mnkit/templates/example/`](../packages/mnkit/templates/example/) | `examples/<name>/`: `SPEC.md` (step 1's card goes here), contract stub, `src/` harness, an in-memory test (`<name>.sim.test.ts`) and a devnet test skeleton with `@generated-stub` regions, `compose.yml`, `AGENTS.md`. Registers the example in CI and the docs tables | Node 22 or newer (`.nvmrc` pins 22), `compact` at the pin in `toolchain.json` ([`packages/mnkit/src/lib/preflight.mjs`](../packages/mnkit/src/lib/preflight.mjs)); `--spec` passes the design lint; unknown flags rejected; registration succeeded; no leftover template tokens |
 | 3a | Write the contract | reason | Model writes Compact | See [Context budget](#context-budget) | `contract/<name>.compact`, plus any test-only contract beside it (`contract/<token>.compact`) | `npm run compile:fast`, which compiles every contract under `contract/` (`--skip-zk`: no proving keys, under a second for most contracts); on failure, back to 3a |
 | 3b | Derive stubs | script | `npm run new:example -- <name> --derive` ([`packages/mnkit/src/lib/derive.mjs`](../packages/mnkit/src/lib/derive.mjs)) | `contract/managed/<name>/compiler/contract-info.json`, `contract/index.d.ts`, `contract/<name>.compact`, `contract/witnesses.ts` | Fills the unedited `@generated-stub` regions: a typed stub per witness, constructor `args` in both tests' deploy calls, an `it.todo` per circuit, the ledger fields, a privacy-test skeleton. For each other contract: its exports in `contract/index.ts`, plus a provider set and a deploy test in the devnet test. When a circuit takes a shielded coin, or another contract mints to a wallet: the coin-helper imports from `./coins.js` (the example's `src/test/coins.ts`) | Refuses if the contract isn't compiled or declares witnesses without `witnesses.ts`. Re-runnable: edited regions are left alone, and a second run changes nothing |
 | 3c | Witnesses and tests | reason | Model writes code | See [Context budget](#context-budget) | Witness bodies in `contract/witnesses.ts`; `src/test/<name>.sim.test.ts` (logic, a negative test per assert, one `assertNotInPublicState` entry per SPEC privacy invariant); `src/test/<name>.test.ts` (the end-to-end flow) | The **in-memory gate**: `npm run typecheck`, `npm run test:sim` (in memory, no Docker, seconds) and `npm run spec:lint <name>` (the card against the code: circuits, ledger fields, witnesses, every assert in an `expectRejects`, every invariant key in `assertNotInPublicState`, every circuit run, no `it.todo`; and the devnet test written: no `it.todo`, every transaction circuit called, since the devnet starts as soon as this gate passes). The pipeline stamps a pass in `.gates/sim.json`. On failure, back to 3c (or 3a for a contract bug) |
@@ -113,6 +113,10 @@ go back to, the gate output, the files to edit and what to read (the
 [context budget](#context-budget) for that step). An agent loops: run it, do
 what `next` says, run it again.
 
+0. no example yet: with `--spec <card>`, the card's design lint, then its
+   `Reviewed-by` line (without one, `next.kind` is `review`: a person reviews
+   the card, and the run exits 0), then `new:example --spec` with `--witnesses`
+   from the card, and `npm install`. Without `--spec` it stops at step 1
 1. spec lint (design) → is the contract more than the template stub? (3a)
 2. `compile:fast` when a `.compact` is newer than its output → `--derive` (3b)
 3. the in-memory gate: `typecheck`, `test:sim`, the SPEC code checks →
@@ -222,9 +226,6 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
 - **Prompt → design (step 1).** Nothing derives the example name, the
   `--witnesses` choice or the SPEC.md draft from a prompt yet. `npm run spec:lint`
   checks the card once it exists.
-- **The pipeline doesn't scaffold.** `npm run pipeline` starts at an existing
-  example; step 2 (`new:example --spec`) is run by hand, because it needs the
-  reviewed card and the `--witnesses` choice.
 - **`--derive` leaves a second contract's sim tests and witnesses alone.**
   It wires another contract into `contract/index.ts` and the devnet test, but
   writes no in-memory stubs for it, and skips a second contract that declares
@@ -244,15 +245,25 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
   still show local copies of those.
 - **Serving (step 7).** Serving stops at the local Vite dev server; there is no
   deploy target in this repo.
-- **Browser verification.** The checks in `verification.json` (wallet, browser)
-  are run by hand. Decide which of them a pipeline can run automatically before
-  serving.
+- **Browser verification is manual, by design.** The checks in
+  `verification.json` (browser, wallet, preprod) are run by hand. Automating
+  them would add a headless browser and CI time for checks the UI gates mostly
+  cover (https://github.com/midnightntwrk/midnight-examples/issues/23, closed as
+  not planned).
 - **Cancelling on macOS is unchecked.** Cancelling a stale run signals its
   process group and waits for it to exit. That has been checked on Linux/WSL
   only (https://github.com/midnightntwrk/midnight-examples/issues/19).
 
 ## Changelog
 
+- 2026-11-18: `npm run pipeline -- <name> --spec <card>` scaffolds the example
+  from a reviewed design card: the design lint, a `Reviewed-by` line added by
+  the person who reviewed it (`next.kind: review` until then), `new:example`
+  with `--witnesses` from the card, and `npm install`, so one command goes
+  from the card to the gates
+  (https://github.com/midnightntwrk/midnight-examples/issues/22). Browser
+  verification stays manual
+  (https://github.com/midnightntwrk/midnight-examples/issues/23).
 - 2026-11-18: After a test-only edit, the pipeline resumes on the network
   the last devnet run left up and re-runs only the devnet test files without a
   pass (`mnkit validate --reuse-net --files`), instead of starting again from

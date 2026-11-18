@@ -391,6 +391,18 @@ jobs:
           # derive, typecheck, test:sim and the SPEC code checks. (Each example's
           # SPEC.md is also linted in its matrix job.)
           npm run pipeline -- private-tip-jar --until sim
+          # Scaffolding from a design card: an unreviewed card stops for review
+          # without writing anything; once it carries a Reviewed-by line, the
+          # runner scaffolds (witnesses from the card), installs, and stops at 3a.
+          next() { node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const n=JSON.parse(s).next;console.log(`${n.kind} ${n.step}`)})'; }
+          cp examples/private-tip-jar/SPEC.md "$RUNNER_TEMP/card.md"
+          test "$(npm run -s pipeline -- ci-card --spec "$RUNNER_TEMP/card.md" --no-register --json | next)" = "review 1"
+          test ! -e examples/ci-card
+          sed -i '1a\\nReviewed-by: ci, 2026-01-01' "$RUNNER_TEMP/card.md"
+          test "$(npm run -s pipeline -- ci-card --spec "$RUNNER_TEMP/card.md" --no-register --json | next || true)" = "reason 3a"
+          cmp "$RUNNER_TEMP/card.md" examples/ci-card/SPEC.md
+          test -f examples/ci-card/contract/witnesses.ts
+          rm -rf examples/ci-card
 
   # mnkit as a user gets it: pack mnkit and the runtime packages, scaffold each
   # fixture with the packed CLI outside the workspace, derive (twice, no diff),
