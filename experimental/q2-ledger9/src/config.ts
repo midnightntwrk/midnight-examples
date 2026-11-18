@@ -34,15 +34,38 @@ export const PREVIEW_CONFIG: NetworkConfig = {
   faucet: 'https://midnight-tmnight-preview.nethermind.dev/',
 };
 
-export const PREPROD_CONFIG: NetworkConfig = {
-  networkId: 'preprod',
-  indexer: 'https://indexer.preprod.midnight.network/api/v4/graphql',
-  indexerWS: 'wss://indexer.preprod.midnight.network/api/v4/graphql/ws',
-  node: 'https://rpc.preprod.midnight.network',
-  nodeWS: 'wss://rpc.preprod.midnight.network',
-  proofServer: process.env['MIDNIGHT_PROOF_SERVER'] ?? 'http://127.0.0.1:6300',
-  faucet: 'https://midnight-tmnight-preprod.nethermind.dev/',
-};
+// Preprod goes through Blockfrost: the Midnight-hosted preprod indexer and RPC
+// are shut down. Blockfrost rejects every request without a project token, and
+// the SDK's indexer, wallet and node clients only take URLs, so the token rides
+// along as a `project_id` query parameter. It is read from
+// BLOCKFROST_PROJECT_ID (set it in the gitignored .env.preprod in this
+// directory) and must never be written into a source file.
+// Same pattern as packages/fast-sync/src/config.ts.
+export function withBlockfrostKey(url: string, projectId: string): string {
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}project_id=${encodeURIComponent(projectId)}`;
+}
+
+// Built on demand rather than at import time so it sees the env that vitest
+// loads from .env.preprod.
+export function preprodConfig(): NetworkConfig {
+  const projectId = process.env['BLOCKFROST_PROJECT_ID']?.trim();
+  if (!projectId) {
+    throw new Error(
+      'BLOCKFROST_PROJECT_ID is not set. Add it to experimental/q2-ledger9/.env.preprod ' +
+        '(gitignored) or export it in your shell.',
+    );
+  }
+  return {
+    networkId: 'preprod',
+    indexer: withBlockfrostKey('https://midnight-preprod.blockfrost.io/api/v0', projectId),
+    indexerWS: withBlockfrostKey('wss://midnight-preprod.blockfrost.io/api/v0/ws', projectId),
+    node: withBlockfrostKey('https://rpc.midnight-preprod.blockfrost.io', projectId),
+    nodeWS: withBlockfrostKey('wss://rpc.midnight-preprod.blockfrost.io', projectId),
+    proofServer: process.env['MIDNIGHT_PROOF_SERVER'] ?? 'http://127.0.0.1:6300',
+    faucet: 'https://midnight-tmnight-preprod.nethermind.dev/',
+  };
+}
 
 // stagenet: the shielded-tech-operated 7-validator dev network on AWS EKS.
 // Endpoints live on shielded.tools (not midnight.network). Runs the 2.x node
@@ -62,7 +85,7 @@ export function getConfig(): NetworkConfig {
   const network = process.env['MIDNIGHT_NETWORK'] ?? 'local';
   if (network === 'local') return LOCAL_CONFIG;
   if (network === 'preview') return PREVIEW_CONFIG;
-  if (network === 'preprod') return PREPROD_CONFIG;
+  if (network === 'preprod') return preprodConfig();
   if (network === 'stagenet') return STAGENET_CONFIG;
   throw new Error(
     `Unknown network: ${network}. Supported: 'local', 'preview', 'preprod', 'stagenet'.`,
