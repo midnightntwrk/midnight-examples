@@ -25,9 +25,6 @@ Entries name a symbol rather than a line number, so search the file for it.
 | Smallest contract: one public ledger write | hello-world | `hello-world.compact` → `storeMessage` |
 | Arithmetic on a public `Uint` ledger value | calculator | `calculator.compact` → `add`, `square` |
 | Witness does work off chain, circuit checks it | calculator | `calculator.compact` → `witness divMod`, `divide`; `witnesses.ts` → `divMod` |
-| Hash commitment of a witness secret | secret-message | `secret-message.compact` → `publishMessageHash`, `hashMessageWithSeparator` |
-| Domain-separated hashing, binding to `kernel.self()` | secret-message | `secret-message.compact` → `hashMessageWithAddress` |
-| First caller becomes the owner; owner-only removal | secret-message | `secret-message.compact` → `publishMessageHashWithOwner`, `removeMessageHash` |
 | Identity key derived from a witness secret | voting, battleship | `voting.compact` → `adminKey(secretKey())`, `voterKey`; battleship `getDappPubKey(localSk())` |
 | Per-deployment identity (`kernel.self()` in the key) | private-bid | `private-bid.compact` → `derive` |
 | Salted `persistentCommit`, then reveal | private-bid | `private-bid.compact` → `placeBid`, `revealBid` |

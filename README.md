@@ -43,7 +43,6 @@ Every example has its own `README.md` and `AGENTS.md`, a simulator suite
 | [`token-transfers`](./examples/token-transfers) | Minting and sending unshielded, NIGHT and shielded tokens | browser UI |
 | [`battleship`](./examples/battleship) | A contract as a state machine, role checks and private state | browser UI, tutorial |
 | [`silent-auction`](./examples/silent-auction) | A sealed reserve price (commit-reveal) in an NFT auction state machine | |
-| [`secret-message`](./examples/secret-message) | Publishing a hash commitment instead of the plaintext | |
 | [`private-bid`](./examples/private-bid) | Proving a bid meets a public minimum, storing only a commitment, revealing later | |
 | [`private-tip-jar`](./examples/private-tip-jar) | Anonymous shielded tips into a contract-held pot that only the owner can withdraw | tutorial |
 | [`shielded-chips`](./examples/shielded-chips) | MIP-0011 shielded chips and a roulette that custodies and pays out coins privately | browser UI |

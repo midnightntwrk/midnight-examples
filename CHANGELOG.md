@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- `examples/secret-message`: the example was too thin to justify its own devnet suite and CI slot. Its rows are gone from the README, `docs/patterns.md` and the CI matrix.
 - Pre-seed fast sync: the `preseed/` bundles, `npm run preseed:cut`, `FAST-SYNC.md` and the `_BIRTHDAY` lines that `npm run wallets:new` wrote. It was off on Ledger 9 (wallet SDK 2 changed the snapshot format it rewrote), and the Preview bundle came from the chain before the 6 November reset, which made `wallets:new` fail on Preview ([issue 91](https://github.com/midnightntwrk/midnight-examples/issues/91)). Saved wallet state and `skipLedgerV8DustHistory` keep remote syncs short.
 - `@midnight-ntwrk/midnight-js-network-id` and every `setNetworkId()` call, from the examples, their UIs, the mnkit templates, `@midnightntwrk/mnkit-wallet` (no longer a peer dependency) and `toolchain.json`. Midnight.js 5.0.0 doesn't read the global network ID; the providers take `config.networkId`.
 
