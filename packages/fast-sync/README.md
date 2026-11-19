@@ -15,6 +15,10 @@ Test wallets for Midnight projects. Part of
   indexers number events differently (Blockfrost's preprod ids run 22 behind
   the official indexer's), so a state from another chain or indexer is not
   restored: the wallet syncs from genesis and the next save replaces the file.
+  A new wallet (and `assembleWallet`) turns on the wallet SDK's
+  `skipLedgerV8DustHistory`, so on a chain that crossed the Ledger 9 fork in
+  place (preprod, preview) its first sync skips the Ledger 8 DUST history:
+  about 6 minutes on preprod instead of about 70.
 - `resolveWallet(network, role?)`: the wallet a suite runs as. Locally, the
   genesis-funded seeds. On preview or preprod, `MIDNIGHT_<NETWORK>_<ROLE>_SEED`
   (or `_MNEMONIC`) from the environment.

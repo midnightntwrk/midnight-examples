@@ -117,8 +117,8 @@ indexer's lag, the proof server's version and, on preprod, the Blockfrost key.
   which reads `MIDNIGHT_<NETWORK>_<ROLE>_SEED` (or `_MNEMONIC`) from the
   repo-root `.env.<network>`. Add a suite-specific role name to its
   `ROLE_ALIASES`. The in-memory harness is `src/test/sim.ts`. Don't depend on
-  the repo's mnkit runtime packages here: CI rejects it. A remote wallet syncs
-  from genesis, which takes over an hour on preprod.
+  the repo's mnkit runtime packages here: CI rejects it. A new remote wallet's
+  first sync skips the Ledger 8 DUST history, about 6 minutes on preprod.
 <!-- @endif -->
 <!-- @if standalone -->
 - Remote-network wiring is shared, not copied. `MidnightWalletProvider` (with

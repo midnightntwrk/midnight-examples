@@ -103,7 +103,7 @@ describe(`__Title__ Contract (${network})`, () => {
     // Locally this is the genesis-funded Alice seed. On a remote network it is
     // @if monorepo
     // the shared Alice wallet from the repo-root .env.<network>, which syncs
-    // from genesis (over an hour on preprod).
+    // from genesis (about 6 minutes on preprod).
     // @endif
     // @if standalone
     // the Alice wallet from .env.<network> (MIDNIGHT_<NETWORK>_SEED). It syncs
