@@ -39,6 +39,8 @@ export function runDerive(dir, name, { label = name, next, coinsPackage } = {}) 
   console.log(`    constructor: ${list(result.ctorParams)}`);
   if (result.secondaries.length) {
     console.log(`    other contracts: ${result.secondaries.map((s) => `${s.name} (${s.status})`).join(', ')}`);
+    console.log('      wired into contract/index.ts and the devnet test only: the in-memory test gets no stubs');
+    console.log('      for them (use simCoin for a test-only token).');
   }
   console.log('');
   for (const r of result.report) {

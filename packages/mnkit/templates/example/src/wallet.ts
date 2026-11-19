@@ -813,3 +813,36 @@ export async function waitForNightThenDust(
   await waitForDust(logger, wallet, 1, FUND_TIMEOUT_MS, envConfig.indexer);
   logger.info(`${label}: funded and ready.`);
 }
+
+export interface StartWalletOptions {
+  /** `local`, `preview`, `preprod`, ...: picks the seed and the funding gate. */
+  network: string;
+  /** The wallet to use (see resolveWallet). Defaults to ALICE. */
+  role?: string;
+  /** Faucet URL printed while a remote wallet waits for funds. */
+  faucet: string;
+  /** How long the first sync may take. */
+  syncTimeoutMs: number;
+}
+
+/**
+ * Build, start and sync the wallet for `role`, and on a remote network hold
+ * until it has NIGHT and DUST (synced is not funded: a wallet with no DUST
+ * fails its first submit). Call it once per wallet a suite needs:
+ *
+ *   const bob = await startWallet(logger, envConfig, { network, role: 'BOB', faucet, syncTimeoutMs });
+ */
+export async function startWallet(
+  logger: Logger,
+  env: EnvironmentConfiguration,
+  { network, role, faucet, syncTimeoutMs }: StartWalletOptions,
+): Promise<MidnightWalletProvider> {
+  const setup = resolveWallet(network, role);
+  const w = await MidnightWalletProvider.build(logger, env, setup.secret);
+  await w.start();
+  await syncWallet(logger, w.wallet, syncTimeoutMs);
+  if (network !== 'local') {
+    await waitForNightThenDust(logger, w.wallet, w.unshieldedKeystore, env, faucet, { label: setup.role });
+  }
+  return w;
+}

@@ -43,6 +43,8 @@ The first npm release of `mnkit` and its runtime packages `@midnightntwrk/mnkit-
 - `mnkit add ui` adds a browser UI as a workspace, and `mnkit add contract <name>` adds another contract.
 - `mnkit upgrade` moves a project to the current templates and toolchain with a three-way merge (`--check`, `--force`).
 - `@midnightntwrk/mnkit-wallet` (`MidnightWalletProvider`, wallet state saved after each sync on a remote network and restored on the next build, `fundWallet`, `waitForDust`), `@midnightntwrk/mnkit-sim` and `@midnightntwrk/mnkit-coins`.
+- `startWallet(logger, env, { network, role, faucet, syncTimeoutMs })` in `@midnightntwrk/mnkit-wallet` and the template's `src/wallet.ts` builds, starts and syncs a wallet, and on a remote network waits until it is funded. The template devnet test uses it, and its comment shows the two lines a second wallet takes. `private-tip-jar`, `shielded-chips` and `leaderboard` use it in place of their own copies of `buildWallet(role)`, and `private-tip-jar` reads token coins and balances with the `coins.ts` helpers ([issue 13](https://github.com/midnightntwrk/midnight-examples/issues/13)).
+- The template sim test deploys as an explicit `DEPLOYER_COIN_PK`, so a constructor that records its caller as owner has a known key to check. `mnkit derive` notes pure circuits in both tests: the sim test says to call `pureCircuits.<name>(...)` directly, and the devnet test names them and says they are tested in memory only. A second contract still gets no in-memory stubs, and one with its own witnesses is still wired by hand; both are listed as deliberate gaps ([issue 15](https://github.com/midnightntwrk/midnight-examples/issues/15)).
 
 ### Toolchain
 
