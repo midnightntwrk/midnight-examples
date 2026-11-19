@@ -52,6 +52,7 @@ npm run new:example -- <name> [--witnesses] [--spec <card.md>]  # phase 1: scaff
 npm run new:example -- <name> --derive  # after compile:fast: fill its @generated-stub regions
 npm run spec:lint -- <name> [--design]  # SPEC.md alone, then against the compiled contract and sim tests
 npm run pipeline -- <name> [--json]     # run the next scripts and gates; prints what to do next
+npm run pipeline -- <name> --spec <card.md>  # no example yet: scaffold from a reviewed card (Reviewed-by line), then the gates
 npm run pipeline -- <name> --wait-devnet  # block until the background devnet run finishes
 npm run new:ui <name>                   # phase 2: scaffold its browser UI (after the in-memory gate passes)
 npm run new:ui -- <name> --check        # template-owned UI files still match packages/mnkit/templates/ui

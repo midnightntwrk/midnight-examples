@@ -29,6 +29,7 @@
 // Zero dependencies — Node built-ins only.
 
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 import { sealRegions } from './derive.mjs';
 import { assertNoLeftoverTokens, deriveNames, fail, renderTree, substituteNames, toLf } from './template.mjs';
@@ -147,6 +148,16 @@ export const packageBaseOf = (content) => {
 // untouched; the stack pairs each @endif with its own @if.
 const MARKER_RE = /^\s*(?:\/\/|#|<!--|\{\/\*|\*)\s*@(?:if (\w+)|endif)\s*(?:-->|\*\/\})?\s*$/;
 const LOOSE_MARKER_RE = /@(?:if (?:monorepo|standalone)|endif)\b/;
+
+/**
+ * The template's SPEC.md for a project that doesn't exist yet: a design card
+ * to fill in from a request, lint and have reviewed before scaffolding from it
+ * (`--spec`). Names substituted, the other mode's blocks dropped.
+ */
+export function skeletonCard(templateDir, name, mode = 'monorepo') {
+  const src = toLf(fs.readFileSync(path.join(templateDir, 'SPEC.md'), 'utf8'));
+  return substituteNames(selectBlocks(src, mode, 'SPEC.md'), deriveNames(name));
+}
 
 /** Keeps the lines of `mode`'s blocks and every unmarked line; drops the mode marker lines. */
 export function selectBlocks(content, mode, rel = 'template') {
