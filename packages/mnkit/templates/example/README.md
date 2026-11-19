@@ -57,8 +57,9 @@ This example is set up for a local devnet running via Docker.
 To run it against **preprod** or **preview** instead, start a local proof server
 (`npm run proof:up`), then from the repo root run `npm run wallets:new`, fund the
 printed addresses at the faucet, and run `npm run test:preprod`. The wallet seeds
-live in one repo-root `.env.<network>` that every example shares. Each wallet
-syncs from genesis, which takes over an hour on preprod.
+live in one repo-root `.env.<network>` that every example shares. A new
+wallet's first sync skips the Ledger 8 DUST history, about 6 minutes on
+preprod; later runs sync only the blocks since the last one.
 
 ## Deploy
 
@@ -81,9 +82,9 @@ To run it against **preprod** or **preview** instead, start a local proof server
 `BLOCKFROST_PROJECT_ID`), and run `npm run test:preprod`. The tests and `deploy`
 read the same files: `.env`, `.env.local`, `.env.<network>` and
 `.env.<network>.local`, with variables already set in the shell winning. All
-`.env*` files are gitignored. A new wallet syncs from genesis, about 80 minutes
-on preprod; if that times out, raise `MIDNIGHT_SYNC_TIMEOUT_MS` (default 120
-minutes off local).
+`.env*` files are gitignored. A new wallet's first sync skips the Ledger 8 DUST
+history, about 6 minutes on preprod; if it times out, raise
+`MIDNIGHT_SYNC_TIMEOUT_MS` (default 120 minutes off local).
 
 ## Deploy without the UI
 

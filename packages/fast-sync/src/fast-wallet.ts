@@ -58,6 +58,7 @@ export async function assembleWallet(
 ): Promise<AssembledWallet> {
   const base = FluentWalletBuilder.forEnvironment(env).withDustOptions(DUST_OPTIONS);
   const builder = secret.kind === 'mnemonic' ? base.withMnemonic(secret.value) : base.withSeed(secret.value);
+  skipLedgerV8DustHistory(builder);
   const { wallet, seeds, keystore } = await builder.buildWithoutStarting();
   return {
     facade: wallet,
@@ -66,4 +67,19 @@ export async function assembleWallet(
     keystore,
     subWallets: { shielded: wallet.shielded, unshielded: wallet.unshielded, dust: wallet.dust },
   };
+}
+
+/**
+ * Turn on the Wallet SDK's `skipLedgerV8DustHistory` for the DUST wallet the
+ * builder makes. On a chain that crossed the Ledger 9 fork in place (preprod,
+ * Preview), the fork emptied all DUST state and re-emitted live DUST as
+ * Ledger 9 events, so a fresh wallet can start at the fork instead of
+ * replaying every Ledger 8 DUST event from genesis: the slow part of a first
+ * sync. Only fresh starts read it (a restore resumes from its saved cursor),
+ * and on a chain that never crossed the fork it changes nothing. The cost is
+ * the wallet's Ledger 8 DUST transaction history, which test wallets don't use.
+ * testkit's builder keeps its wallet configuration private, so it is set there.
+ */
+export function skipLedgerV8DustHistory(builder: FluentWalletBuilder): void {
+  (builder as unknown as { config: { skipLedgerV8DustHistory?: boolean } }).config.skipLedgerV8DustHistory = true;
 }

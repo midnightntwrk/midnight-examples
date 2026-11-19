@@ -51,6 +51,7 @@ import * as Rx from 'rxjs';
 import type { Logger } from 'pino';
 
 import { type ChainStamp, checkChainStamp, readChainStamp } from './chain-identity.js';
+import { skipLedgerV8DustHistory } from './fast-wallet.js';
 import type { WalletSecret } from './types.js';
 
 // A proven, not yet bound ledger 9 transaction: what a contract call or deploy
@@ -231,6 +232,8 @@ export class MidnightWalletProvider implements Ledger9WalletProvider {
       secret.kind === 'mnemonic'
         ? base.withMnemonic(secret.value)
         : base.withSeed(secret.value);
+
+    skipLedgerV8DustHistory(builder);
 
     const built = await builder.buildWithoutStarting();
     const { seeds, keystore } = built;
