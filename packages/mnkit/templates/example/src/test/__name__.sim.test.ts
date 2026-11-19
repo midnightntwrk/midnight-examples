@@ -37,10 +37,16 @@ import { Contract, ledger } from '../../contract/managed/__name__/contract/index
 // @generated-stub end coin-imports
 __SIM_WITNESS_IMPORT__
 
+// The deployer's coin public key (hex). The constructor runs as this key, and
+// so does every call until sim.as(otherKey): a constructor that records its
+// caller as the owner records this.
+const DEPLOYER_COIN_PK = '01'.repeat(32);
+
 const deploy = () =>
   Sim.deploy({
     contract: new Contract(__SIM_WITNESSES__),
     ledger,
+    coinPublicKey: DEPLOYER_COIN_PK,
     // @generated-stub begin private-state sha=0
     privateState: __INITIAL_PRIVATE_STATE__,
     // @generated-stub end private-state

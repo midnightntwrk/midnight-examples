@@ -208,7 +208,7 @@ you have what you need.
 |---|---|---|
 | 1 (design) | [`spec-card.md`](spec-card.md); the blank card in `.cards/<name>.md`; [`examples/private-tip-jar/SPEC.md`](../examples/private-tip-jar/SPEC.md) as a worked example; [`patterns.md`](patterns.md) to find the nearest example | Any code |
 | 3a (contract) | [`compact-gotchas.md`](compact-gotchas.md) (~1.5K tokens); [`patterns.md`](patterns.md) (~1.5K tokens) to pick the 1–2 nearest examples; their `contract/*.compact`; this example's `SPEC.md` | `src/wallet.ts`, `src/providers.ts`, `src/config.ts`, `scripts/wait-for-dust.ts`, `compose.yml` (identical in every example); the narrative parts of `tutorials/*.mdx`, `TUTORIAL.md` and `LESSONS.md`; examples unrelated to the use case |
-| 3c (witnesses, tests) | The derived stubs; the nearest examples' `contract/witnesses.ts` and test bodies after `Your tests begin here`; `examples/calculator/src/test/calculator.sim.test.ts` and `examples/private-tip-jar/src/test/private-tip-jar.sim.test.ts` as models, and the example's `src/test/sim.ts` if you need more of the in-memory API. Shielded coins: the example's `src/test/coins.ts` (token color, `freshCoin` for a coin argument, balances, minting to a wallet) instead of the coin helpers above `private-tip-jar`'s marker; read its multi-wallet setup there only if the suite needs a second wallet. A second contract (a test token) is wired by `--derive`. The template's `src/wallet.ts` already has `splitShieldedCoin` and `getShieldedAddress`, and `src/providers.ts` a unique private-state store name per provider set: no need to compare them with an example | The rest of the setup above a test's marker; `contract/managed/` beyond the generated `index.d.ts` |
+| 3c (witnesses, tests) | The derived stubs; the nearest examples' `contract/witnesses.ts` and test bodies after `Your tests begin here`; `examples/calculator/src/test/calculator.sim.test.ts` and `examples/private-tip-jar/src/test/private-tip-jar.sim.test.ts` as models, and the example's `src/test/sim.ts` if you need more of the in-memory API. Shielded coins: the example's `src/test/coins.ts` (token color, `freshCoin` for a coin argument, balances, minting to a wallet). A second wallet: `startWallet(logger, envConfig, { network, role: 'BOB', … })` from `src/wallet.ts`, then `buildProviders` for it (the template's devnet test shows both lines). A second contract (a test token) is wired by `--derive`. The template's `src/wallet.ts` already has `splitShieldedCoin` and `getShieldedAddress`, and `src/providers.ts` a unique private-state store name per provider set: no need to compare them with an example | The rest of the setup above a test's marker; `contract/managed/` beyond the generated `index.d.ts` |
 | 3, on a gate failure | The failing gate's output first. If `compact-gotchas.md` doesn't explain it, then the `midnight-expert` skills (`compact-core`, `midnight-verify`) or the linked `LESSONS.md`/`TUTORIAL.md` section | Whole tutorials (`tutorials/*.mdx`, `TUTORIAL.md`) |
 | 6 (UI seed files) | [`templates/ui/AGENTS.md`](../packages/mnkit/templates/ui/AGENTS.md) §3 and §5 and the Gotchas; the nearest `examples/*/ui/` seed files (listed under its "Worked examples") | Template-owned UI files; `examples/zk-loan/ui` (hand-built, not authoritative) |
 
@@ -224,23 +224,22 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
 
 ## Known gaps and open items
 
-- **`--derive` leaves a second contract's sim tests and witnesses alone.**
-  It wires another contract into `contract/index.ts` and the devnet test, but
-  writes no in-memory stubs for it, and skips a second contract that declares
-  witnesses (the example's `witnesses.ts` belongs to the main contract).
+- **`--derive` leaves a second contract's sim tests and witnesses alone, on
+  purpose.** It wires another contract into `contract/index.ts` and the devnet
+  test, but writes no in-memory stubs for it: a second contract is so far a
+  test-only token, and the in-memory test uses made-up coins (`simCoin`)
+  instead. It also skips a second contract that declares witnesses (the
+  example's `witnesses.ts` belongs to the main contract); wire that one by hand.
 - **No shared shielded test faucet.** A devnet suite that needs shielded
   coins brings a small test-only minting contract (`private-tip-jar`'s
   `tip-token.compact` is the model), listed in SPEC.md under "Test-only
   contracts" and left out of the SPEC code checks. `--derive` wires it, and
   the example's `src/test/coins.ts` handles the coins. The in-memory tests need
   neither: `Sim` takes made-up coins (`simCoin`).
-- **Two-wallet setup is still per example.** A suite with a second wallet
-  (tipper and owner) copies `private-tip-jar`'s `buildWallet(role)`.
-- **Older examples keep some coin helpers of their own.** `private-tip-jar`
-  and `shielded-chips` take their coin arguments (`freshCoin`, `simCoin`) and
-  the escrow index (`contractCoinMtIndex`) from `src/test/coins.ts`, but still read
-  wallet coins and balances with local helpers, so the nearest example can
-  still show local copies of those.
+- **`shielded-chips` keeps some coin helpers of its own.** It takes its coin
+  arguments (`freshCoin`, `simCoin`) and the escrow index (`contractCoinMtIndex`)
+  from `src/test/coins.ts`, but still reads wallet coins and balances with local
+  helpers, so that example can still show local copies of those.
 - **Serving (step 7).** Serving stops at the local Vite dev server; there is no
   deploy target in this repo.
 - **Browser verification is manual, by design.** The checks in

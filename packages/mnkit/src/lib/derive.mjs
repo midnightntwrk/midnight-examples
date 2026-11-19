@@ -292,11 +292,22 @@ export function derive(exampleDir, name, names, { coinsPackage = '@midnightntwrk
   };
   const devnetCoinHow = (a) =>
     isShieldedCoinInfo(a.type) ? 'freshCoin(color, value)' : "a coin the contract holds, from its ledger (insertCoin)";
+  // Pure circuits make no transaction: they are tested in memory only, so the
+  // devnet test names them and says why it has no todo for them.
+  const pureNames = pure.map((c) => c.name).join(', ');
   const devnetTodos = (indent) =>
-    impure.map((c) => `${indent}it.todo(${quote(signature(c) + coinHint(c, devnetCoinHow))});`).join('\n');
+    [
+      ...impure.map((c) => `${indent}it.todo(${quote(signature(c) + coinHint(c, devnetCoinHow))});`),
+      ...(pure.length
+        ? [`${indent}// Pure circuits (${pureNames}) never reach the chain: test them in the sim test, not here.`]
+        : []),
+    ].join('\n');
   const simTodos = (indent) =>
     [
       ...impure.map((c) => `${indent}it.todo(${quote(signature(c) + coinHint(c, () => 'simCoin(value, color)'))});`),
+      ...(pure.length
+        ? [`${indent}// Pure circuits make no transaction: call pureCircuits.<name>(...) directly, not sim.call.`]
+        : []),
       ...pure.map((c) => `${indent}it.todo(${quote(`${signature(c)} (pure)`)});`),
     ].join('\n');
   const ledgerComment = (indent) =>

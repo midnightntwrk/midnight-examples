@@ -86,6 +86,7 @@ describe('derive', () => {
     expect(r).toMatchObject({ managed: 'hello-world', circuits: ['storeMessage'], witnesses: [], ctorParams: [], secondaries: [] });
     const sim = read(dir, 'src/test/hello-world.sim.test.ts');
     expect(region(sim, 'circuits')).toContain("it.todo('storeMessage(newMessage: Opaque<\"string\">)');");
+    expect(region(sim, 'circuits')).not.toContain('Pure circuits');
     expect(region(sim, 'constructor-args')).toBe('');
     expect(region(sim, 'coin-imports')).toBe('');
     expect(region(read(dir, 'src/test/hello-world.test.ts'), 'ledger-fields')).toContain('//   message: Opaque<"string">');
@@ -178,6 +179,10 @@ describe('derive', () => {
     const sim = read(dir, 'src/test/private-tip-jar.sim.test.ts');
     expect(region(sim, 'coin-imports')).toBe("import { simCoin } from '@midnightntwrk/mnkit-coins';");
     expect(region(sim, 'circuits')).toContain("it.todo('ownerKey(sk: Bytes<32>) (pure)');");
+    expect(region(sim, 'circuits')).toContain('call pureCircuits.<name>(...) directly, not sim.call.');
+    expect(region(devnet, 'circuits')).toContain('// Pure circuits (ownerKey) never reach the chain');
+    expect(region(devnet, 'circuits')).not.toContain('ownerKey(sk');
+    expect(sim).toContain('coinPublicKey: DEPLOYER_COIN_PK,');
     expect(region(sim, 'privacy')).toContain("toEqual(['owner', 'pot', 'tipColor'])");
 
     const deployArgs = read(dir, 'contract/deploy-args.ts');

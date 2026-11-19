@@ -59,7 +59,7 @@ import { contractCoinMtIndex, freshCoin } from './coins.js';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
-import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust } from '../wallet.js';
+import { MidnightWalletProvider, startWallet, syncWallet } from '../wallet.js';
 import { buildProviders, ledgerState, type ShieldedChipsProviders } from '../providers.js';
 import {
   CompiledRouletteContract,
@@ -98,31 +98,6 @@ const isRemote = network !== 'local';
 const syncTimeoutMs = Number(
   process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ?? (isRemote ? 60 * 60_000 : 10 * 60_000),
 );
-
-/**
- * Build, start, sync, and (on a remote network) fund-gate one wallet.
- *
- * Locally, ALICE/BOB/CHARLIE are the genesis-funded seeds 01/02/03. Remotely
- * they are the shared wallets in the repo-root .env.<network>, which sync
- * from genesis (over an hour on preprod).
- */
-async function buildWallet(
-  role: 'ALICE' | 'BOB' | 'CHARLIE',
-  env: EnvironmentConfiguration,
-  faucet: string,
-): Promise<MidnightWalletProvider> {
-  const setup = resolveWallet(network, role);
-  const w = await MidnightWalletProvider.build(logger, env, setup.secret);
-  await w.start();
-  await syncWallet(logger, w.wallet, syncTimeoutMs);
-  if (isRemote) {
-    // Synced is not funded: a wallet with no DUST fails its first submit.
-    await waitForNightThenDust(logger, w.wallet, w.unshieldedKeystore, env, faucet, {
-      label: setup.role,
-    });
-  }
-  return w;
-}
 
 const hex = (u: Uint8Array): string => Buffer.from(u).toString('hex');
 
@@ -259,8 +234,8 @@ describe(`Privacy assumptions of shielded-chips (mechanical, on-chain) (${networ
       faucet: config.faucet,
       proofServer: config.proofServer,
     };
-    aliceWallet = await buildWallet('ALICE', env, config.faucet);
-    bobWallet = await buildWallet('BOB', env, config.faucet);
+    aliceWallet = await startWallet(logger, env, { network, role: 'ALICE', faucet: config.faucet, syncTimeoutMs });
+    bobWallet = await startWallet(logger, env, { network, role: 'BOB', faucet: config.faucet, syncTimeoutMs });
 
     aliceChipsProv = buildProviders(aliceWallet, chipsZkConfigPath, config, 'p-chips-alice');
     bobChipsProv = buildProviders(bobWallet, chipsZkConfigPath, config, 'p-chips-bob');

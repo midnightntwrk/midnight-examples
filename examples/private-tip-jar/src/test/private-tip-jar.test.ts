@@ -28,11 +28,17 @@ import {
 } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { rawTokenType } from '@midnight-ntwrk/midnight-js-protocol/v9';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
-import { freshCoin } from './coins.js';
+import {
+  freshCoin,
+  shieldedBalance,
+  shieldedCoins,
+  waitForShieldedBalance,
+  type ShieldedCoinArg,
+} from './coins.js';
 import pino from 'pino';
 
 import { getConfig } from '../config.js';
-import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust } from '../wallet.js';
+import { MidnightWalletProvider, startWallet, syncWallet } from '../wallet.js';
 import { buildProviders, ledgerState, type PrivateTipJarProviders } from '../providers.js';
 import { createPrivateTipJarPrivateState } from '../../contract/witnesses.js';
 import {
@@ -63,31 +69,6 @@ const syncTimeoutMs = Number(
   process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ?? (isRemote ? 60 * 60_000 : 10 * 60_000),
 );
 
-/**
- * Build, start, sync, and (on a remote network) fund-gate one wallet.
- *
- * Locally, ALICE and BOB are the genesis-funded seeds 01 and 02. Remotely they
- * are the shared wallets in the repo-root .env.<network>, which sync from
- * genesis (over an hour on preprod).
- */
-async function buildWallet(
-  role: 'ALICE' | 'BOB',
-  env: EnvironmentConfiguration,
-  faucet: string,
-): Promise<MidnightWalletProvider> {
-  const setup = resolveWallet(network, role);
-  const w = await MidnightWalletProvider.build(logger, env, setup.secret);
-  await w.start();
-  await syncWallet(logger, w.wallet, syncTimeoutMs);
-  if (isRemote) {
-    // Synced is not funded: a wallet with no DUST fails its first submit.
-    await waitForNightThenDust(logger, w.wallet, w.unshieldedKeystore, env, faucet, {
-      label: setup.role,
-    });
-  }
-  return w;
-}
-
 const hex = (u: Uint8Array): string => Buffer.from(u).toString('hex');
 
 /** The same bytes as Compact's pad(32, s): UTF-8, zero-filled on the right. */
@@ -97,7 +78,6 @@ const pad32 = (s: string): Uint8Array => {
   return out;
 };
 
-type ShieldedCoinArg = { nonce: Uint8Array; color: Uint8Array; value: bigint };
 type Labeled = { label: string; bytes: Uint8Array };
 
 /**
@@ -176,37 +156,6 @@ describe(`Private Tip Jar Contract (${network})`, () => {
     return ledger(ledgerState(state));
   }
 
-  /** Shielded coins of the jar's token currently in `w`. */
-  async function tokenCoins(w: MidnightWalletProvider): Promise<ShieldedCoinArg[]> {
-    const state = await w.wallet.waitForSyncedState();
-    return state.shielded.availableCoins
-      .filter((c) => c.coin.type === tipColorHex)
-      .map((c) => ({
-        nonce: Uint8Array.from(Buffer.from(c.coin.nonce, 'hex')),
-        color: tipColorBytes,
-        value: c.coin.value,
-      }));
-  }
-
-  async function tokenBalance(w: MidnightWalletProvider): Promise<bigint> {
-    const state = await w.wallet.waitForSyncedState();
-    return state.shielded.balances[tipColorHex] ?? 0n;
-  }
-
-  /**
-   * Wait until `w` holds `want` of the token. submitCallTx resolves on
-   * acceptance; the wallet's change shows up a few seconds later.
-   */
-  async function waitForTokenBalance(w: MidnightWalletProvider, want: bigint): Promise<void> {
-    const deadline = Date.now() + 300_000;
-    for (;;) {
-      const have = await tokenBalance(w);
-      if (have === want) return;
-      if (Date.now() > deadline) throw new Error(`token balance ${have}, expected ${want}`);
-      await new Promise((resolve) => setTimeout(resolve, 2_000));
-    }
-  }
-
   async function bobTips(coin: ShieldedCoinArg): Promise<void> {
     await submitCallTx(bobJarProv, {
       compiledContract: CompiledPrivateTipJarContract,
@@ -239,8 +188,8 @@ describe(`Private Tip Jar Contract (${network})`, () => {
       proofServer: config.proofServer,
     };
 
-    aliceWallet = await buildWallet('ALICE', envConfig, config.faucet);
-    bobWallet = await buildWallet('BOB', envConfig, config.faucet);
+    aliceWallet = await startWallet(logger, envConfig, { network, role: 'ALICE', faucet: config.faucet, syncTimeoutMs });
+    bobWallet = await startWallet(logger, envConfig, { network, role: 'BOB', faucet: config.faucet, syncTimeoutMs });
 
     aliceJarProv = buildProviders(aliceWallet, zkConfigPath, config);
     bobJarProv = buildProviders(bobWallet, zkConfigPath, config);
@@ -284,9 +233,9 @@ describe(`Private Tip Jar Contract (${network})`, () => {
     expect(tipTokenLedger(ledgerState(state)).mintCount).toEqual(1n);
 
     await syncWallet(logger, bobWallet.wallet, syncTimeoutMs);
-    expect(await tokenBalance(bobWallet)).toEqual(MINTED);
+    expect(await shieldedBalance(bobWallet, tipColorHex)).toEqual(MINTED);
     // Alice chose this coin's nonce when she minted it, so she knows it.
-    for (const c of await tokenCoins(bobWallet)) bobIssuedNonces.push(c.nonce);
+    for (const c of await shieldedCoins(bobWallet, tipColorHex)) bobIssuedNonces.push(c.nonce);
     expect(bobIssuedNonces).toHaveLength(1);
   });
 
@@ -322,8 +271,8 @@ describe(`Private Tip Jar Contract (${network})`, () => {
     let state = await queryLedger();
     expect(state.pot.size()).toEqual(1n);
 
-    await waitForTokenBalance(bobWallet, MINTED - FIRST_TIP);
-    const change = await tokenCoins(bobWallet);
+    await waitForShieldedBalance(bobWallet, tipColorHex, MINTED - FIRST_TIP);
+    const change = await shieldedCoins(bobWallet, tipColorHex);
     for (const c of change) bobWalletNonces.push(c.nonce);
     // The issued coin is spent; what is left is change under a new nonce.
     const issued = new Set(bobIssuedNonces.map(hex));
@@ -346,7 +295,7 @@ describe(`Private Tip Jar Contract (${network})`, () => {
       expect(hex(key)).toEqual(hex(coin.nonce));
     }
 
-    await waitForTokenBalance(bobWallet, 0n);
+    await waitForShieldedBalance(bobWallet, tipColorHex, 0n);
   });
 
   it('public state holds no tipper identity, tipper wallet coin, or owner secret', async () => {
@@ -407,11 +356,11 @@ describe(`Private Tip Jar Contract (${network})`, () => {
 
     // Nothing moved.
     expect((await queryLedger()).pot.size()).toEqual(2n);
-    expect(await tokenBalance(bobWallet)).toEqual(0n);
+    expect(await shieldedBalance(bobWallet, tipColorHex)).toEqual(0n);
   });
 
   it('the owner withdraws every tip into her own shielded wallet', async () => {
-    expect(await tokenBalance(aliceWallet)).toEqual(0n);
+    expect(await shieldedBalance(aliceWallet, tipColorHex)).toEqual(0n);
 
     for (const [key] of [...(await queryLedger()).pot]) {
       await aliceWithdraws(key);
@@ -420,7 +369,7 @@ describe(`Private Tip Jar Contract (${network})`, () => {
 
     expect((await queryLedger()).pot.isEmpty()).toBe(true);
     await syncWallet(logger, aliceWallet.wallet, syncTimeoutMs);
-    expect(await tokenBalance(aliceWallet)).toEqual(MINTED);
+    expect(await shieldedBalance(aliceWallet, tipColorHex)).toEqual(MINTED);
   });
 
   it('rejects withdrawing a tip that is not (or no longer) in the jar', async () => {

@@ -161,6 +161,7 @@ const READ = {
     'packages/sim/src/sim.ts and privacy.ts, only if you need more of the in-memory API',
     'shielded coins: packages/coins/src/index.ts (token color, freshCoin for a coin argument, balances, minting to a wallet), not the helpers above an example’s marker',
     'a second contract (a test-only token): add contract/<it>.compact, then compile:fast and --derive wire it',
+    `a second wallet: startWallet(…, { role: 'BOB' }) from src/wallet.ts, then buildProviders for it (the template devnet test shows both lines)`,
   ],
   gate: ['the gate output in this report first', 'docs/compact-gotchas.md', 'then the midnight-expert skills (compact-core, midnight-verify)'],
   6: ['packages/mnkit/templates/ui/AGENTS.md: §3, §5 and the Gotchas', 'the nearest examples/*/ui seed files (listed under its "Worked examples")'],

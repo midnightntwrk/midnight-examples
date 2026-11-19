@@ -30,7 +30,7 @@ import pino from 'pino';
 import { firstValueFrom } from 'rxjs';
 
 import { getConfig } from '../config.js';
-import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust } from '../wallet.js';
+import { MidnightWalletProvider, startWallet, syncWallet } from '../wallet.js';
 import { buildProviders } from '../providers.js';
 import { LeaderboardAPI, decodeLedger, type LeaderboardProviders } from '../../api/index.js';
 import { pureCircuits, type Ledger } from '../../contract/index.js';
@@ -50,30 +50,6 @@ const isRemote = network !== 'local';
 const syncTimeoutMs = Number(
   process.env['MIDNIGHT_SYNC_TIMEOUT_MS'] ?? (isRemote ? 60 * 60_000 : 10 * 60_000),
 );
-
-/**
- * Build, start, sync, and (on a remote network) fund-gate one wallet.
- *
- * Locally, ALICE and BOB are the genesis-funded seeds 01 and 02. Remotely they
- * are the shared wallets in the repo-root .env.<network>.
- */
-async function buildWallet(
-  role: 'ALICE' | 'BOB',
-  env: EnvironmentConfiguration,
-  faucet: string,
-): Promise<MidnightWalletProvider> {
-  const setup = resolveWallet(network, role);
-  const w = await MidnightWalletProvider.build(logger, env, setup.secret);
-  await w.start();
-  await syncWallet(logger, w.wallet, syncTimeoutMs);
-  if (isRemote) {
-    // Synced is not funded: a wallet with no DUST fails its first submit.
-    await waitForNightThenDust(logger, w.wallet, w.unshieldedKeystore, env, faucet, {
-      label: setup.role,
-    });
-  }
-  return w;
-}
 
 const nameBytes = (name: string): Uint8Array => {
   const out = new Uint8Array(32);
@@ -111,8 +87,8 @@ describe(`Leaderboard contract (${network})`, () => {
       proofServer: config.proofServer,
     };
 
-    aliceWallet = await buildWallet('ALICE', envConfig, config.faucet);
-    bobWallet = await buildWallet('BOB', envConfig, config.faucet);
+    aliceWallet = await startWallet(logger, envConfig, { network, role: 'ALICE', faucet: config.faucet, syncTimeoutMs });
+    bobWallet = await startWallet(logger, envConfig, { network, role: 'BOB', faucet: config.faucet, syncTimeoutMs });
     aliceProviders = buildProviders(aliceWallet, config);
     bobProviders = buildProviders(bobWallet, config);
     logger.info(`Providers initialized on '${network}'. Ready to test!`);

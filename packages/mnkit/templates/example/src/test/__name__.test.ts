@@ -23,10 +23,10 @@ import {
 import type { ContractAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-runtime';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 // @if monorepo
-import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust } from '../wallet.js';
+import { MidnightWalletProvider, startWallet } from '../wallet.js';
 // @endif
 // @if standalone
-import { MidnightWalletProvider, resolveWallet, syncWallet, waitForNightThenDust } from '@midnightntwrk/mnkit-wallet';
+import { MidnightWalletProvider, startWallet } from '@midnightntwrk/mnkit-wallet';
 // @endif
 import pino from 'pino';
 
@@ -103,29 +103,17 @@ describe(`__Title__ Contract (${network})`, () => {
     // Locally this is the genesis-funded Alice seed. On a remote network it is
     // @if monorepo
     // the shared Alice wallet from the repo-root .env.<network>, which syncs
-    // from genesis (over an hour on preprod). Pass a role name
+    // from genesis (over an hour on preprod).
     // @endif
     // @if standalone
     // the Alice wallet from .env.<network> (MIDNIGHT_<NETWORK>_SEED). It syncs
-    // from genesis the first time; saved state makes later runs fast. Pass a role name
+    // from genesis the first time; saved state makes later runs fast.
     // @endif
-    // (e.g. resolveWallet(network, 'BOB')) if your suite needs more than one.
-    const setup = resolveWallet(network);
-    wallet = await MidnightWalletProvider.build(logger, envConfig, setup.secret);
-    await wallet.start();
-    await syncWallet(logger, wallet.wallet, syncTimeoutMs);
-
-    if (isRemote) {
-      // Synced is not funded: a wallet with no DUST fails its first submit.
-      await waitForNightThenDust(
-        logger,
-        wallet.wallet,
-        wallet.unshieldedKeystore,
-        envConfig,
-        config.faucet,
-        { label: setup.role },
-      );
-    }
+    // startWallet builds, starts and syncs it, and on a remote network waits
+    // until it is funded. A second wallet (a tipper, a bidder) is two lines:
+    //   bob = await startWallet(logger, envConfig, { network, role: 'BOB', faucet: config.faucet, syncTimeoutMs });
+    //   bobProviders = buildProviders(bob, zkConfigPath, config);
+    wallet = await startWallet(logger, envConfig, { network, faucet: config.faucet, syncTimeoutMs });
 
     providers = buildProviders(wallet, zkConfigPath, config);
     // @generated-stub begin contract-providers-init sha=0
@@ -167,10 +155,10 @@ describe(`__Title__ Contract (${network})`, () => {
   });
 
   // @if monorepo
-  // One it.todo per circuit, written by `npm run new:example -- __name__ --derive`.
+  // One it.todo per impure circuit, written by `npm run new:example -- __name__ --derive`.
   // @endif
   // @if standalone
-  // One it.todo per circuit, written by `npx mnkit derive`.
+  // One it.todo per impure circuit, written by `npx mnkit derive`.
   // @endif
   // @generated-stub begin circuits sha=0
   // @generated-stub end circuits
