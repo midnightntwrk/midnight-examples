@@ -158,7 +158,12 @@ network is left up for step 7; `npm run env:down` in the example takes it down.
   covers `contract/`, `src/`, `scripts/`, `package.json` and
   `vitest.config.ts`, but not `ui/`. A change there makes the run stale: the
   next pipeline run cancels it, waits for it to exit, and starts a new one
-  once the in-memory gate passes again. UI work never does.
+  once the in-memory gate passes again. UI work never does. Cancelling
+  signals validate's process group; validate passes the signal on to the
+  running step's own group (npm, its shell, `docker compose` or vitest and its
+  worker). Checked on Linux/WSL and on macOS 15 (arm64, npm 11): no step
+  outlived the cancel, the proving keys were untouched, and the next run
+  passed (https://github.com/midnightntwrk/midnight-examples/issues/19).
 - **Resumed runs.** The pipeline records which devnet test files passed
   (`.gates/devnet-passes.json`), against a hash of every source file except
   the tests (`src/test/*.test.ts`). After an edit to test files only, and if
@@ -247,12 +252,13 @@ in-memory test, so the devnet run only has to confirm the end-to-end flow.
   them would add a headless browser and CI time for checks the UI gates mostly
   cover (https://github.com/midnightntwrk/midnight-examples/issues/23, closed as
   not planned).
-- **Cancelling on macOS is unchecked.** Cancelling a stale run signals its
-  process group and waits for it to exit. That has been checked on Linux/WSL
-  only (https://github.com/midnightntwrk/midnight-examples/issues/19).
 
 ## Changelog
 
+- 2026-11-18: Cancelling a stale devnet run is checked on macOS: a run
+  cancelled during `test:local` and one cancelled during `env:up` left no
+  process behind, and the fresh run passed
+  (https://github.com/midnightntwrk/midnight-examples/issues/19).
 - 2026-11-18: Step 1 has a prompt: [`spec-card.md`](spec-card.md) turns a
   request into a design card. `npm run pipeline -- <name>` with no example
   writes a blank card to `.cards/<name>.md`; the agent fills it in, lints it with
