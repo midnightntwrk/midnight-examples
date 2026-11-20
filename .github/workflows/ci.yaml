@@ -477,6 +477,9 @@ jobs:
           MNKIT_E2E_DIR: ${{ runner.temp }}/mnkit-e2e
           UPGRADE: ${{ matrix.upgrade && 'true' || '' }}
           FRESH: ${{ matrix.fixture == 'hello-world' && !matrix.upgrade && 'true' || '' }}
+          # --fresh-compact runs `compact update` in an empty HOME; without a token it
+          # hits GitHub's unauthenticated API rate limit on shared runners.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload service logs on failure
         if: failure() && env.RUN == 'true'

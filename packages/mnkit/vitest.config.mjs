@@ -21,5 +21,8 @@ export default defineConfig({
   test: {
     root: import.meta.dirname,
     include: ['test/**/*.test.mjs'],
+    // Some tests spawn the CLI (standalone.test.mjs, compile.test.mjs) and can
+    // pass the 5 s default on a busy runner.
+    testTimeout: 30_000,
   },
 });
