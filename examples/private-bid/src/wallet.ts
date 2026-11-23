@@ -331,8 +331,8 @@ function stateFileFor(networkId: string, masterSeed: string): string | undefined
 /**
  * Turn on the Wallet SDK's `skipLedgerV8DustHistory` for the DUST wallet the
  * builder makes. On a chain that crossed the Ledger 9 fork in place (preprod,
- * Mainnet), the fork emptied all DUST state and re-emitted live DUST as
- * Ledger 9 events, so a fresh wallet can start at the fork instead of
+ * Preview, Mainnet), the fork emptied all DUST state and re-emitted live
+ * DUST as Ledger 9 events, so a fresh wallet can start at the fork instead of
  * replaying every Ledger 8 DUST event from genesis: the slow part of a first
  * sync. Only fresh starts read it (a restore resumes from its saved cursor),
  * and on a chain that never crossed the fork it changes nothing. The cost is
