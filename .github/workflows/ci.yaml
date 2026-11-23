@@ -115,7 +115,7 @@ jobs:
       - name: Use the pinned npm (min-release-age in .npmrc needs 11.10+)
         if: env.RUN == 'true'
         working-directory: .
-        run: npm install -g npm@11.21.0
+        run: npm install -g npm@11.21.3
 
       - name: Install dependencies (whole workspace)
         if: env.RUN == 'true'
@@ -233,7 +233,7 @@ jobs:
 
       - name: Use the pinned npm (min-release-age in .npmrc needs 11.10+)
         if: env.RUN == 'true'
-        run: npm install -g npm@11.21.0
+        run: npm install -g npm@11.21.3
 
       - name: Install dependencies (whole workspace)
         if: env.RUN == 'true'
@@ -335,7 +335,7 @@ jobs:
           node-version-file: .nvmrc
 
       - name: Use the pinned npm (min-release-age in .npmrc needs 11.10+)
-        run: npm install -g npm@11.21.0
+        run: npm install -g npm@11.21.3
 
       - name: Install dependencies (whole workspace)
         run: npm ci
