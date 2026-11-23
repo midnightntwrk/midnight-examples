@@ -2,9 +2,9 @@
 // @midnight-ntwrk/testkit-js supplies the wallet provider and sync helper, and
 // @midnightntwrk/wallet-sdk the wallet itself.
 //
-// A wallet syncs from genesis. On a local devnet that takes seconds; on preprod
-// it can take over an hour the first time, so remote runs set a long
-// MIDNIGHT_SYNC_TIMEOUT_MS (see the test suite).
+// A new wallet's first sync takes seconds on a local devnet and about 6 minutes
+// on preprod, where it skips the Ledger 8 DUST history. Remote runs still set a
+// long MIDNIGHT_SYNC_TIMEOUT_MS (see the test suite).
 
 import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';

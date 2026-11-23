@@ -250,8 +250,9 @@ export class MidnightWalletProvider implements Ledger9WalletProvider {
   }
 
   /**
-   * Build an un-started wallet provider from a seed or mnemonic. The wallet
-   * syncs from genesis: seconds on a local devnet, over an hour on preprod.
+   * Build an un-started wallet provider from a seed or mnemonic. A new wallet's
+   * first sync takes seconds on a local devnet and about 6 minutes on preprod,
+   * where it skips the Ledger 8 DUST history.
    */
   static async build(
     logger: Logger,

@@ -98,8 +98,8 @@ clock. Set `LOG_LEVEL=debug` for verbose wallet-sync output.
 To run against **preprod** or **preview** instead, start a local proof server
 (`npm run proof:up`), then from the repo root run `npm run wallets:new`, fund the
 printed addresses at the faucet, and run `npm run test:preprod`. This suite uses
-the shared Alice, Bob, and Charlie wallets. Each one syncs from genesis, which
-takes over an hour on preprod.
+the shared Alice, Bob, and Charlie wallets. A new wallet's first sync skips the
+Ledger 8 DUST history, about 6 minutes on preprod.
 
 ## How a round plays out
 
