@@ -60,5 +60,6 @@ This example is set up for a local devnet running via Docker.
 To run it against **preprod** or **preview** instead, start a local proof server
 (`npm run proof:up`), then from the repo root run `npm run wallets:new`, fund the
 printed addresses at the faucet, and run `npm run test:preprod`. The wallet seeds
-live in one repo-root `.env.<network>` that every example shares. Each wallet
-syncs from genesis, which takes over an hour on preprod.
+live in one repo-root `.env.<network>` that every example shares. A new
+wallet's first sync skips the Ledger 8 DUST history, about 6 minutes on
+preprod; later runs sync only the blocks since the last one.

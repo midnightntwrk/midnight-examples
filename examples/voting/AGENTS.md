@@ -149,5 +149,5 @@ deploys with `contract/deploy-args.ts` and records the address in
   which reads `MIDNIGHT_<NETWORK>_<ROLE>_SEED` (or `_MNEMONIC`) from the
   repo-root `.env.<network>`. Add a suite-specific role name to its
   `ROLE_ALIASES`. The in-memory harness is `src/test/sim.ts`. Don't depend on
-  the repo's mnkit runtime packages here: CI rejects it. A remote wallet syncs
-  from genesis, which takes over an hour on preprod.
+  the repo's mnkit runtime packages here: CI rejects it. A new remote wallet's
+  first sync skips the Ledger 8 DUST history, about 6 minutes on preprod.

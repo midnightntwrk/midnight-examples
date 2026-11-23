@@ -128,7 +128,7 @@ Hello World! You are now ready to explore [Tutorials](https://docs.midnight.netw
 
 ## Deploy Contract to Live Testnet
 
-The wallet is built with `@midnight-ntwrk/testkit-js` and syncs from genesis. On Preprod the first sync takes **well over an hour** (one run took 88 minutes), almost all of it spent building the chain-wide DUST generation tree. The test waits up to 90 minutes between sync updates; set `MIDNIGHT_SYNC_TIMEOUT_MS` to change that.
+The wallet is built with `@midnight-ntwrk/testkit-js`. On Preprod a new wallet's first sync takes about 6 minutes: it skips the Ledger 8 DUST history, which took over an hour to replay from genesis. The test waits up to 90 minutes between sync updates; set `MIDNIGHT_SYNC_TIMEOUT_MS` to change that.
 
 To run the test script on Preview or Preprod:
 

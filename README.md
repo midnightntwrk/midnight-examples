@@ -152,14 +152,13 @@ suites; export it in your shell for `npm run wallets:new`, which doesn't read th
 file. Preview needs no key.
 
 The examples' wallets are built with `@midnight-ntwrk/testkit-js`. Every example
-except `leaderboard` turns on the wallet SDK's `skipLedgerV8DustHistory`, so a new
-wallet's first sync skips the Ledger 8 DUST history (on preprod about 6 minutes
-instead of about 70). After
-each sync, a wallet's state is saved to the gitignored `.wallet-state/` and the
-next run syncs only the gap (`MIDNIGHT_WALLET_STATE=off` turns this off). Each
-saved state records the indexer and a block on its chain, and it isn't restored
-after a network reset or onto another indexer: that wallet syncs from genesis
-again.
+turns on the wallet SDK's `skipLedgerV8DustHistory`, so a new wallet's first
+sync skips the Ledger 8 DUST history (on preprod about 6 minutes instead of
+about 70). After each sync, a wallet's state is saved to the gitignored
+`.wallet-state/` and the next run syncs only the gap (`MIDNIGHT_WALLET_STATE=off`
+turns this off). Each saved state records the indexer and a block on its chain,
+and it isn't restored after a network reset or onto another indexer: that wallet
+syncs from genesis again.
 
 ```bash
 cd examples/hello-world && npm run proof:up   # local proof server on :6300
