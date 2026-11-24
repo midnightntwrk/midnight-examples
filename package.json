@@ -1,5 +1,5 @@
 {
-  "name": "mn-examples",
+  "name": "midnight-examples",
   "version": "0.1.0",
   "private": true,
   "description": "Official Midnight example DApps and smart contracts, verified to compile and run against a pinned toolchain.",

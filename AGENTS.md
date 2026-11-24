@@ -1,4 +1,4 @@
-# AGENTS.md — mn-examples
+# AGENTS.md — midnight-examples
 
 Instructions for AI agents working in this repository. Humans: see `README.md`.
 

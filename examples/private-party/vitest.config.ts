@@ -14,8 +14,8 @@ const isRemote = network !== 'local';
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
 // MIDNIGHT_ENV_FILE names one more env file (relative to the repo root), read
 // after .env.<network>, so its values win over that file's. It lets one network
-// switch endpoint sets without editing code, e.g. .env.custom.prefork and
-// .env.custom.postfork on top of the seeds in .env.custom.
+// switch endpoint sets without editing code, e.g. a second endpoint set on
+// top of the seeds in .env.custom.
 const envFile = process.env['MIDNIGHT_ENV_FILE'];
 function readEnvFile(name: string): Record<string, string> {
   const file = resolve(repoRoot, name);
