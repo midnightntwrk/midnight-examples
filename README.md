@@ -1,4 +1,4 @@
-# mn-examples
+# midnight-examples
 
 Official Midnight example DApps and smart contracts, consolidated into one
 monorepo so that **every example compiles _and_ runs against a single, pinned
@@ -53,7 +53,7 @@ Every example has its own `README.md` and `AGENTS.md`, a simulator suite
 ## Layout
 
 ```
-mn-examples/
+midnight-examples/
 ├── examples/<name>/       # one npm workspace per example (see All examples)
 ├── packages/
 │   ├── mnkit/            # the scaffolder: engine, CLI and templates/example (copied by `npm run new:example`)
@@ -115,31 +115,84 @@ baseline new projects start from, and Dependabot may move them ahead.
 - **Docker** (the examples spin up a local Midnight network via `docker compose`).
 - **Compact compiler** on `PATH` (`compact`); CI installs it via `setup-compact-action`.
 
-## Getting started
+## Running the full suite
+
+These steps run what CI runs, in the same order. Each one needs the
+[Prerequisites](#prerequisites). Flags for a script go after `--`, or npm takes
+them as its own options: `npm run new:ui -- <name> --check`.
+
+### 1. Install and compile
 
 ```bash
-npm install      # one lockfile for the whole workspace
-npm run compile  # compile every example's contract (parallel)
+nvm use                 # Node 22
+npm install -g npm@11   # npm 11.10 or newer
+npm ci                  # one lockfile for the whole workspace; also builds packages/*
+npm run compile         # compile every example's contracts (parallel, several minutes)
 ```
 
-Flags for a script go after `--`, or npm takes them as its own options:
-`npm run new:ui -- <name> --check`.
+### 2. Offline checks (no Docker)
 
-Run a single example end-to-end (compile is already done above):
+```bash
+npm run toolchain:check  # every pin agrees with toolchain.json
+npm run typecheck        # every workspace
+npm run test:sim         # in-memory contract tests: every example and the mnkit-* packages
+npm run test:engine      # mnkit engine unit tests
+```
+
+### 3. Devnet suites
+
+Each example's `npm run test:local` runs its suite against a local Midnight
+network (node, indexer and proof server in Docker). For one example:
 
 ```bash
 cd examples/battleship
-npm run env:up      # start the local Midnight network (Docker)
-npm run wait:dust   # wait for DUST to accrue for fees
-npm run test:local  # run the test suite against the local network
-npm run env:down
+npm run env:up      # start the local network
+npm run wait:dust   # wait until the test wallet has DUST for fees
+npm run test:local  # run the suite against it
+npm run env:down    # stop the network and delete its chain
 ```
 
-Run every example's tests from the root:
+For every example, run the same four steps in each one, one at a time:
 
 ```bash
-npm run test:local       # npm run test:local --workspaces --if-present
+for dir in examples/*/; do
+  [ -f "$dir/compose.yml" ] || continue
+  echo "== $dir"
+  (cd "$dir" && npm run env:up && npm run wait:dust && npm run test:local)
+  status=$?
+  (cd "$dir" && npm run env:down)
+  [ "$status" -eq 0 ] || { echo "FAILED: $dir"; break; }
+done
 ```
+
+Every example's network binds the same ports (9944, 8088 and 6300), so only
+one can run at a time. Like CI, the loop gives each example a fresh chain. Don't
+run the root `npm run test:local` on its own: it starts no network and doesn't
+wait for DUST. The whole loop takes well over an hour.
+
+### 4. Generated UIs
+
+Examples with a `ui/` folder carry a generated browser UI. CI checks that each
+one still matches its generator, then typechecks, unit-tests and builds it:
+
+```bash
+for f in examples/*/ui/new-ui.json; do
+  name=$(basename "$(dirname "$(dirname "$f")")")
+  npm run new:ui -- "$name" --check &&
+  npm run typecheck -w "@midnight-ntwrk/example-$name-ui" &&
+  npm run test:unit -w "@midnight-ntwrk/example-$name-ui" &&
+  npm run build -w "@midnight-ntwrk/example-$name-ui" || break
+done
+```
+
+### 5. mnkit end to end
+
+`bash scripts/mnkit-e2e.sh --devnet` tests the packed scaffolder outside the
+repo (see [mnkit](#mnkit-the-scaffolder-outside-this-repo)). It starts its own
+local network, so stop any example's network first.
+
+To run the suites against preprod, preview or your own network instead of a
+local devnet, see the next section.
 
 ## Running against a remote network (preprod / preview)
 
@@ -196,16 +249,8 @@ To run against a network that isn't built in, such as a private test network,
 copy `.env.custom.example` to `.env.custom` (gitignored). Fill in the network ID,
 the node and indexer URLs (HTTP and WebSocket), and four wallet seeds, then run
 `npm run test:custom`. The run stops with one error that lists any missing
-endpoint. The suites print any address that still needs funding.
-
-If the endpoints change partway through, such as at a hard fork, keep the seeds in
-`.env.custom` and put each endpoint set in its own file. Pick one per run with
-`MIDNIGHT_ENV_FILE`:
-
-```bash
-MIDNIGHT_ENV_FILE=.env.custom.prefork  npm run test:custom
-MIDNIGHT_ENV_FILE=.env.custom.postfork npm run test:custom
-```
+endpoint. The suites print any address that still needs funding. (`voting` has
+no `test:custom` script yet, so the root run skips it.)
 
 The same rule applies here: run one suite at a time.
 
